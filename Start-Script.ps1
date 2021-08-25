@@ -178,6 +178,17 @@ End {
         }
         
         Write-Verbose "End action '$Action'"
+        
+        if ($Error) {
+            Write-Warning "Non blocking errors detected:"
+            $Error.Exception.Message | ForEach-Object {
+                Write-Warning $_
+            }
+        }
+        else {
+            Write-Host 'All actions performed successfully' -ForegroundColor Green
+        }
+        
     }
     Catch {
         throw "Failed to perform action '$Action': $_"

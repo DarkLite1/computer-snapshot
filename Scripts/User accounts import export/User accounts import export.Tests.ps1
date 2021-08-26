@@ -27,7 +27,7 @@ BeforeAll {
     $testParams = @{
         Action     = 'Export'
         DataFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        FileName   = 'UserAccounts.csv'
+        FileName   = 'UserAccounts.xml'
     }
 }
 Describe 'the mandatory parameters are' {
@@ -80,7 +80,7 @@ Describe "Throw an error on action 'Import' when" {
         Should -Throw "*user accounts file '$($testNewParams.DataFolder)\$($testNewParams.FileName)' not found"
     }
 }
-Describe "On action 'Export' a .csv file" {
+Describe "On action 'Export' a .xml file" {
     BeforeAll {
         Get-ChildItem -Path $testParams.DataFolder | Remove-Item
         $testUsers | ForEach-Object { 
@@ -106,18 +106,15 @@ Describe "On action 'Export' a .csv file" {
 
         $testImportParams = @{
             LiteralPath = "$($testParams.DataFolder)\$($testParams.FileName)"
-            Encoding    = 'UTF8'
-            Delimiter   = ';'
-            ErrorAction = 'Ignore'
         }
-        $testImportCsv = Import-Csv @testImportParams
+        $testImport = Import-Clixml @testImportParams
     }
     It 'is created' {
         $testImportParams.LiteralPath | Should -Exist
     }
     It 'only contains enabled local user accounts' {
         foreach ($testUser in $testUsers | Where-Object { $_.Enabled }) {
-            $testUserDetails = $testImportCsv | Where-Object { 
+            $testUserDetails = $testImport | Where-Object { 
                 $_.Name -eq $testUser.Name 
             }
             $testUserDetails | Should -Not -BeNullOrEmpty
@@ -126,7 +123,47 @@ Describe "On action 'Export' a .csv file" {
         }
     }
     It 'does not contain disabled local user accounts' {
-        $testImportCsv | Where-Object { -not $_.Enabled } | 
+        $testImport | Where-Object { -not $_.Enabled } | 
         Should -BeNullOrEmpty
+    }
+}
+Describe "On action 'Import' a .xml file is read and" {
+    BeforeAll {
+        Get-ChildItem -Path $testParams.DataFolder | Remove-Item
+        $testUsers | ForEach-Object { 
+            Remove-LocalUser -Name $_.Name -EA Ignore
+        }
+
+        $testUsers | ForEach-Object {
+            $testUserParams = @{
+                Name        = $_.Name
+                FullName    = $_.FullName
+                Description = $_.Description
+                Password    = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
+            }
+            $null = New-LocalUser @testUserParams
+        }
+
+        $testParams.Action = 'Export'
+        .$testScript @testParams
+        
+        $testUsers | Where-Object { $_.Enabled } |
+        Select-Object -First 1 | ForEach-Object {
+            Remove-LocalUser -Name $_.Name
+        }
+
+        $testParams.Action = 'Import'
+        .$testScript @testParams
+    }
+    It 'only non existing users are created' {
+        $testCreatedUsers = $testUsers | Where-Object { $_.Enabled } |
+        Select-Object -Skip 1
+
+        foreach ($testUser in $testCreatedUsers) {
+            $testUserDetails = Get-LocalUser -Name $_.Name -EA ignore
+            $testUserDetails | Should -Not -BeNullOrEmpty
+            $testUserDetails.FullName | Should -Be $testUser.FullName
+            $testUserDetails.Description | Should -Be $testUser.Description
+        }
     }
 }

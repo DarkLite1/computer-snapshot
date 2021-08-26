@@ -35,12 +35,12 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$FileName = 'UserAccounts.csv'
+    [String]$FileName = 'UserAccounts.xml'
 )
 
 Begin {
     Try {
-        $csvFile = Join-Path -Path $DataFolder -ChildPath $FileName
+        $exportFile = Join-Path -Path $DataFolder -ChildPath $FileName
 
         #region Test DataFolder
         If ($Action -eq 'Export') {
@@ -58,8 +58,8 @@ Begin {
             If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
                 throw "Import folder '$DataFolder' empty"
             }
-            If (-not (Test-Path -LiteralPath $csvFile -PathType Leaf)) {
-                throw "User accounts file '$csvFile' not found"
+            If (-not (Test-Path -LiteralPath $exportFile -PathType Leaf)) {
+                throw "User accounts file '$exportFile' not found"
             }
         }
         #endregion
@@ -72,27 +72,40 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            Write-Verbose "Export user accounts to file '$csvFile'"
-            If ($users = Get-LocalUser | Where-Object {$_.Enabled}) {
+            Write-Verbose "Export user accounts to file '$exportFile'"
+            If ($users = Get-LocalUser | Where-Object { $_.Enabled }) {
                 $users | ForEach-Object {
                     Write-Verbose "User account '$($_.Name)' description '$($_.description)'"
                 }
-                $exportParams = @{
-                    LiteralPath       = $csvFile 
-                    Encoding          = 'UTF8'
-                    NoTypeInformation = $true
-                    Delimiter         = ';'
-                }
-                Write-Verbose "Export to file '$csvFile'"
-                $users | Export-Csv @exportParams
+                Write-Verbose "Export to file '$exportFile'"
+                $users | Export-Clixml -LiteralPath $exportFile -EA Stop
             }
             else {
                 throw 'No enabled local user accounts found'
             }
         }
         else {
-            Write-Verbose "Import user accounts from file '$csvFile'"
-            
+            Write-Verbose "Import user accounts from file '$exportFile'"
+            Import-Clixml -LiteralPath $exportFile -EA Stop
+
+            $knownComputerUsers = Get-LocalUser
+
+            foreach ($user in $importedUsers) {
+                Write-Verbose "User '$($user.Name)'"
+                if ($knownComputerUsers.Name -NotContains $user.Name) {
+                    $password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
+                    # $Password = Read-Host -AsSecureString
+                    New-LocalUser -Name $user.Name -Password $password
+                }
+                $setUserParams = @{
+                    Name                = $user.Name
+                    Description         = $user.Description
+                    FullName            = $user.FullName
+                    AccountNeverExpires = $user.AccountNeverExpires
+                    AccountExpires      = $user.AccountExpires
+                }
+                Set-LocalUser @setUserParams
+            }
         }
     }
     Catch {

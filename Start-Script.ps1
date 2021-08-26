@@ -39,6 +39,10 @@
         
         Simply copy/paste the data you want to restore to a specific folder
         and add the folder path to '$RestoreSnapshotFolder'.
+
+    .PARAMETER SnapshotsFolder
+        The parent folder where all the snapshots will be store by computer name
+        and snapshot date. By default this data is stored on the USB stick.
 #>
 
 [CmdLetBinding()]

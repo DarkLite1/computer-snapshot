@@ -6,7 +6,6 @@ BeforeAll {
     $testSmbShareName = 'TestShare'
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        ScriptName              = 'Test (Brecht)'
         Action                  = 'Export'
         DataFolder              = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
         smbSharesFileName       = 'smbShares.xml'

@@ -41,6 +41,7 @@
         and add the folder path to '$RestoreSnapshotFolder'.
 #>
 
+[CmdLetBinding()]
 Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
@@ -52,28 +53,49 @@ Param (
     [HashTable]$Script = @{
         FirewallRules = "$PSScriptRoot\Scripts\ImportExportFirewallRules.ps1"
         SmbShares     = "$PSScriptRoot\Scripts\ImportExportSmbShares.ps1"
-    }
+    },
+    [String]$SnapshotFolder = "$PSScriptRoot\Snapshots"
 )
 
 Begin {
+    Function Invoke-ScriptHC {
+        [CmdLetBinding()]
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Path,
+            [Parameter(Mandatory)]
+            [String]$DataFolder,
+            [Parameter(Mandatory)]
+            [ValidateSet('Export', 'Import')]
+            [String]$Type
+        )
+
+        Write-Verbose "Invoke script '$Path' on data folder '$DataFolder' for '$Type'"
+        & $Path -DataFolder $DataFolder -Action $Type
+    }
+
     Try {
         $VerbosePreference = 'Continue'
-
+        $Error.Clear()
         $Now = Get-Date
 
         Write-Verbose "Start action '$Action'"
 
-        $snapshotFolder = Join-Path -Path $PSScriptRoot -ChildPath 'Snapshots'
-
         If ($Action -eq 'CreateSnapshot') {
             #region Create snapshot folder
-            $joinParams = @{
-                Path      = $snapshotFolder
-                ChildPath = '{0} - {1}' -f 
-                $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff')
+            try {
+                $joinParams = @{
+                    Path        = $SnapshotFolder
+                    ChildPath   = '{0} - {1}' -f 
+                    $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff')
+                    ErrorAction = 'Stop'
+                }
+                $SnapshotFolder = Join-Path @joinParams
+                $null = New-Item -Path $SnapshotFolder -ItemType Directory
             }
-            $snapshotFolder = Join-Path @joinParams
-            $null = New-Item -Path $snapshotFolder -ItemType Directory
+            catch {
+                Throw "Failed to created snapshot folder '$SnapshotFolder': $_"
+            }
             #endregion
         }
         else {
@@ -84,40 +106,40 @@ Begin {
                 }
                 #endregion
 
-                $snapshotFolder = $RestoreSnapshotFolder
+                $SnapshotFolder = $RestoreSnapshotFolder
             }
             else {
                 #region Test snapshot folder
-                If (-not (Test-Path -Path $snapshotFolder -PathType Container)) {
-                    throw "No snapshots made yet. Please create your first snapshot with action 'CreateSnapshot'"
+                If (-not (Test-Path -Path $SnapshotFolder -PathType Container)) {
+                    throw "Snapshot folder '$SnapshotFolder' not found. Please create your first snapshot with action 'CreateSnapshot'"
                 }
                 #endregion
 
                 #region Get latest snapshot folder
                 $getParams = @{
-                    Path        = $snapshotFolder
+                    Path        = $SnapshotFolder
                     Directory   = $true
                     ErrorAction = 'Stop'
                 }
-                $snapshotFolder = Get-ChildItem @getParams | Sort-Object LastWriteTime | 
+                $SnapshotFolder = Get-ChildItem @getParams | Sort-Object LastWriteTime | 
                 Select-Object -Last 1 -ExpandProperty FullName
                 #endregion
 
                 #region Test latest snapshot
-                If (-not $snapshotFolder) {
-                    throw "No snapshot found to restore. Please create a snapshot first with Action 'CreateSnapshot'"
+                If (-not $SnapshotFolder) {
+                    throw "No data found in snapshot folder '$($getParams.Path)' to restore. Please create a snapshot first with Action 'CreateSnapshot'"
                 }
                 #endregion
             }
 
             #region Test snapshot folder
-            If ((Get-ChildItem -LiteralPath $snapshotFolder | Measure-Object).Count -eq 0) {
-                throw "No data found in snapshot folder '$snapshotFolder'"
+            If ((Get-ChildItem -LiteralPath $SnapshotFolder | Measure-Object).Count -eq 0) {
+                throw "No data found in snapshot folder '$SnapshotFolder'"
             }
             #endregion        
         }
 
-        Write-Verbose "Snapshot folder '$scriptFolder'"
+        Write-Verbose "Snapshot folder '$SnapshotFolder'"
     }    
     Catch {
         throw "Failed to perform action '$Action': $_"
@@ -129,38 +151,41 @@ Process {
         foreach ($item in $Snapshot.GetEnumerator() | Where-Object { $_.Value }) {
             Write-Verbose "Snapshot '$($item.Key)'"
 
-            $executionScript = $Script.$($item.Key)
-
-            #region Test execution script
-            If (-not $executionScript) {
-                throw "No script found for '$($item.Key)'"
+            $invokeScriptParams = @{
+                Path       = $Script.$($item.Key) 
+                DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
             }
 
-            If (-not (Test-Path -Path $executionScript -PathType Leaf)) {
-                throw "Script '$executionScript' not found for '$($item.Key)'"
+            #region Test execution script
+            If (-not $invokeScriptParams.Path) {
+                throw "No script found for snapshot item '$($item.Key)'"
+            }
+
+            If (-not (Test-Path -Path $invokeScriptParams.Path -PathType Leaf)) {
+                throw "Script file '$($invokeScriptParams.Path)' not found for snapshot item '$($item.Key)'"
             }
             #endregion
 
-            $scriptFolder = Join-Path -Path $snapshotFolder -ChildPath $item.Key
-
             If ($Action -eq 'CreateSnapshot') {
-                $null = New-Item -Path $scriptFolder -ItemType Directory
+                $null = New-Item -Path $invokeScriptParams.DataFolder -ItemType Directory
 
-                & $executionScript -DataFolder $scriptFolder -Action 'Export'
+                $invokeScriptParams.Type = 'Export'
             }
             else {
                 #region Test script folder
-                If (-not (Test-Path -Path $scriptFolder -PathType Container)) {
-                    throw "Snapshot folder '$scriptFolder' not found"
+                If (-not (Test-Path -LiteralPath $invokeScriptParams.DataFolder -PathType Container)) {
+                    throw "Snapshot folder '$($invokeScriptParams.DataFolder)' not found"
                 }
 
-                If ((Get-ChildItem -Path $scriptFolder | Measure-Object).Count -eq 0) {
-                    throw "No data found for snapshot item '$($item.Key)' in folder '$scriptFolder'"
+                If ((Get-ChildItem -LiteralPath $invokeScriptParams.DataFolder | Measure-Object).Count -eq 0) {
+                    throw "No data found for snapshot item '$($item.Key)' in folder '$($invokeScriptParams.DataFolder)'"
                 }
                 #endregion
 
-                #& $executionScript -DataFolder $scriptFolder -Action 'Import'
+                $invokeScriptParams.Type = 'Import'
             }
+            
+            Invoke-ScriptHC @invokeScriptParams
         }
     }
     Catch {
@@ -171,15 +196,15 @@ Process {
 End {
     Try {
         If ($Action -eq 'CreateSnapshot') {
-            Write-Verbose "Snapshot created in folder '$snapshotFolder'"
+            Write-Verbose "Snapshot created in folder '$SnapshotFolder'"
         }
         else {
-            Write-Verbose "Snapshot restored from folder '$snapshotFolder'"
+            Write-Verbose "Snapshot restored from folder '$SnapshotFolder'"
         }
         
         Write-Verbose "End action '$Action'"
         
-        if ($Error) {
+        if ($Error.Exception.Message) {
             Write-Warning "Non blocking errors detected:"
             $Error.Exception.Message | ForEach-Object {
                 Write-Warning $_

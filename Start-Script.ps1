@@ -46,11 +46,13 @@ Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
     [HashTable]$Snapshot = @{
-        FirewallRules = $false
+        UserAccounts  = $true
+        FirewallRules = $true
         SmbShares     = $true
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
+        UserAccounts = "$PSScriptRoot\Scripts\User accounts import export\User accounts import export.ps1"
         FirewallRules = "$PSScriptRoot\Scripts\Firewall rules import export\Firewall rules import export.ps1"
         SmbShares     = "$PSScriptRoot\Scripts\Smb shares import export\Smb shares import export.ps1"
     },

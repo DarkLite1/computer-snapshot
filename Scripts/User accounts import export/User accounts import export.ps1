@@ -73,7 +73,22 @@ Process {
     Try {
         If ($Action -eq 'Export') {
             Write-Verbose "Export user accounts to file '$csvFile'"
-            
+            If ($users = Get-LocalUser | Where-Object {$_.Enabled}) {
+                $users | ForEach-Object {
+                    Write-Verbose "User account '$($_.Name)' description '$($_.description)'"
+                }
+                $exportParams = @{
+                    LiteralPath       = $csvFile 
+                    Encoding          = 'UTF8'
+                    NoTypeInformation = $true
+                    Delimiter         = ';'
+                }
+                Write-Verbose "Export to file '$csvFile'"
+                $users | Export-Csv @exportParams
+            }
+            else {
+                throw 'No local user accounts found'
+            }
         }
         else {
             Write-Verbose "Import user accounts from file '$csvFile'"

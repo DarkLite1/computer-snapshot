@@ -51,8 +51,8 @@ Param (
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
-        FirewallRules = "$PSScriptRoot\Scripts\ImportExportFirewallRules.ps1"
-        SmbShares     = "$PSScriptRoot\Scripts\ImportExportSmbShares.ps1"
+        FirewallRules = "$PSScriptRoot\Scripts\Firewall rules import export\Firewall rules import export.ps1"
+        SmbShares     = "$PSScriptRoot\Scripts\Smb shares import export\Smb shares import export.ps1"
     },
     [String]$SnapshotFolder = "$PSScriptRoot\Snapshots"
 )

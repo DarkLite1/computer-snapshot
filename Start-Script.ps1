@@ -56,7 +56,7 @@ Param (
         FirewallRules = "$PSScriptRoot\Scripts\Firewall rules import export\Firewall rules import export.ps1"
         SmbShares     = "$PSScriptRoot\Scripts\Smb shares import export\Smb shares import export.ps1"
     },
-    [String]$SnapshotFolder = "$PSScriptRoot\Snapshots"
+    [String]$SnapshotsFolder = "$PSScriptRoot\Snapshots"
 )
 
 Begin {
@@ -87,7 +87,7 @@ Begin {
             #region Create snapshot folder
             try {
                 $joinParams = @{
-                    Path        = $SnapshotFolder
+                    Path        = $SnapshotsFolder
                     ChildPath   = '{0} - {1}' -f 
                     $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff')
                     ErrorAction = 'Stop'
@@ -96,7 +96,7 @@ Begin {
                 $null = New-Item -Path $SnapshotFolder -ItemType Directory
             }
             catch {
-                Throw "Failed to created snapshot folder '$SnapshotFolder': $_"
+                Throw "Failed to create snapshots folder '$SnapshotsFolder': $_"
             }
             #endregion
         }
@@ -112,14 +112,14 @@ Begin {
             }
             else {
                 #region Test snapshot folder
-                If (-not (Test-Path -Path $SnapshotFolder -PathType Container)) {
-                    throw "Snapshot folder '$SnapshotFolder' not found. Please create your first snapshot with action 'CreateSnapshot'"
+                If (-not (Test-Path -Path $SnapshotsFolder -PathType Container)) {
+                    throw "Snapshot folder '$SnapshotsFolder' not found. Please create your first snapshot with action 'CreateSnapshot'"
                 }
                 #endregion
 
                 #region Get latest snapshot folder
                 $getParams = @{
-                    Path        = $SnapshotFolder
+                    Path        = $SnapshotsFolder
                     Directory   = $true
                     ErrorAction = 'Stop'
                 }

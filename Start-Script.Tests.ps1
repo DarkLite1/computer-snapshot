@@ -13,7 +13,7 @@ BeforeAll {
             Script1 = (New-Item 'TestDrive:/1.ps1' -ItemType File).FullName
             Script2 = (New-Item 'TestDrive:/2.ps1' -ItemType File).FullName
         }
-        SnapshotFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        SnapshotsFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
     }
 
     Function Invoke-ScriptHC {
@@ -36,10 +36,10 @@ Describe "Throw a terminating error for action 'CreateSnapshot' when" {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'CreateSnapshot'
     }
-    It 'the snapshot folder cannot be created' {
-        $testNewParams.SnapshotFolder = 'x:/xxx'
+    It 'the snapshots folder cannot be created' {
+        $testNewParams.SnapshotsFolder = 'x:/xxx'
         { .$testScript @testNewParams } | 
-        Should -Throw "*Failed to created snapshot folder 'x:/xxx'*"
+        Should -Throw "*Failed to create snapshots folder 'x:/xxx'*"
     }
     It 'the script does not exist' {
         $testNewParams.Snapshot = @{
@@ -61,14 +61,14 @@ Describe "Throw a terminating error for action 'CreateSnapshot' when" {
 }
 Describe "Throw a terminating error for action 'RestoreSnapshot' when" {
     BeforeEach {
-        Remove-Item $testParams.SnapshotFolder -Recurse -EA Ignore
+        Remove-Item $testParams.SnapshotsFolder -Recurse -EA Ignore
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'RestoreSnapshot'
     }
     It 'no snapshot has been made yet' {
-        $testNewParams.SnapshotFolder | Should -Not -Exist
+        $testNewParams.SnapshotsFolder | Should -Not -Exist
         { .$testScript @testNewParams } | 
-        Should -Throw "*Snapshot folder '$($testNewParams.SnapshotFolder)' not found. Please create your first snapshot with action 'CreateSnapshot'"
+        Should -Throw "*Snapshot folder '$($testNewParams.SnapshotsFolder)' not found. Please create your first snapshot with action 'CreateSnapshot'"
     }
     It "the 'RestoreSnapshotFolder' folder is not found'" {
         $testNewParams.RestoreSnapshotFolder = 'TestDrive:/xxx'
@@ -81,18 +81,18 @@ Describe "Throw a terminating error for action 'RestoreSnapshot' when" {
         Should -Throw "*No data found in snapshot folder '$($testNewParams.RestoreSnapshotFolder)'"
     }
     It 'no data is found in the snapshot folder' {
-        New-Item $testNewParams.SnapshotFolder -ItemType Directory
+        New-Item $testNewParams.SnapshotsFolder -ItemType Directory
         { .$testScript @testNewParams } | 
-        Should -Throw "*No data found in snapshot folder '$($testNewParams.SnapshotFolder)' to restore. Please create a snapshot first with Action 'CreateSnapshot'"
+        Should -Throw "*No data found in snapshot folder '$($testNewParams.SnapshotsFolder)' to restore. Please create a snapshot first with Action 'CreateSnapshot'"
     }
     It 'no data is found for the specified script to restore' {
-        $testSnapshotFolder = New-Item "$($testNewParams.SnapshotFolder)/Snapshot1/Script2" -ItemType Directory
+        $testSnapshotFolder = New-Item "$($testNewParams.SnapshotsFolder)/Snapshot1/Script2" -ItemType Directory
         { .$testScript @testNewParams } | 
         Should -Throw "*No data found for snapshot item 'Script2' in folder '$testSnapshotFolder'"
     }
     It 'the script does not exist' {
-        New-Item "$($testNewParams.SnapshotFolder)\Snapshot1\Script1" -ItemType Directory
-        New-Item "$($testNewParams.SnapshotFolder)\Snapshot1\Script1\Export.csv" -ItemType file
+        New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script1" -ItemType Directory
+        New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script1\Export.csv" -ItemType file
         $testNewParams.Snapshot = @{
             Script1 = $true
         }
@@ -120,16 +120,16 @@ Describe "When action is 'CreateSnapshot'" {
 }
 Describe "When action is 'RestoreSnapshot'" {
     BeforeEach {
-        Remove-Item $testParams.SnapshotFolder -Recurse -EA Ignore
+        Remove-Item $testParams.SnapshotsFolder -Recurse -EA Ignore
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'RestoreSnapshot'
     }
     Context 'a script is called for enabled snapshot items only' {
         It 'on the most recently created snapshot' {
-            $testSnapshot1 = (New-Item "$($testNewParams.SnapshotFolder)\Snapshot1\Script2" -ItemType Directory).FullName
+            $testSnapshot1 = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script2" -ItemType Directory).FullName
             New-Item "$testSnapshot1\Export.csv" -ItemType file
             Start-Sleep -Milliseconds 1
-            $testSnapshot2 = (New-Item "$($testNewParams.SnapshotFolder)\Snapshot2\Script2" -ItemType Directory).FullName
+            $testSnapshot2 = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot2\Script2" -ItemType Directory).FullName
             New-Item "$testSnapshot2\Export.csv" -ItemType file
 
             .$testScript @testNewParams
@@ -141,11 +141,11 @@ Describe "When action is 'RestoreSnapshot'" {
             }
         }
         It "on the snapshot in the folder 'RestoreSnapshotFolder'" {
-            $testSnapshotFolder = (New-Item "$($testNewParams.SnapshotFolder)\Snapshot1" -ItemType Directory).FullName
+            $testSnapshotFolder = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1" -ItemType Directory).FullName
             $testSnapshot1 = (New-Item "$testSnapshotFolder\Script2" -ItemType Directory).FullName
             New-Item "$testSnapshot1\Export.csv" -ItemType file
             Start-Sleep -Milliseconds 1
-            $testSnapshot2 = (New-Item "$($testNewParams.SnapshotFolder)\Snapshot2\Script2" -ItemType Directory).FullName
+            $testSnapshot2 = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot2\Script2" -ItemType Directory).FullName
             New-Item "$testSnapshot2\Export.csv" -ItemType file
 
             $testNewParams.RestoreSnapshotFolder = $testSnapshotFolder

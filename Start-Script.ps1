@@ -30,6 +30,8 @@
 
     .PARAMETER Snapshot
         Defines for which items to create a snapshot or which items to restore.
+        Order is important if you want users to be created before other actions
+        it must be the first item in the hash table.
 
     .PARAMETER RestoreSnapshotFolder
         By default the last created snapshot is used for restoring data. By

@@ -113,40 +113,39 @@ Begin {
             #endregion
     
             #region Get firewall rules
-            $FirewallRules = Get-NetFirewallRule -DisplayName $Name -PolicyStore $PolicyStore | Where-Object { 
+            $firewallRules = Get-NetFirewallRule -DisplayName $Name -PolicyStore $PolicyStore | Where-Object { 
                 $_.Direction -like $Direction -and 
                 $_.Enabled -like $RuleState -And 
                 $_.Action -like $Action 
             }
             #endregion
             
-            #region Get firewall rules details
-            $FirewallRuleSet = @()
-            ForEach ($Rule In $FirewallRules) {
-                Write-Verbose "Firewall rule `"$($Rule.DisplayName)`" ($($Rule.Name))"
+            #region Create firewall rule details for export
+            $firewallRuleSet = ForEach ($rule In $firewallRules) {
+                Write-Verbose "Firewall rule `"$($rule.DisplayName)`" ($($rule.Name))"
     
-                $AddressFilter = $Rule | Get-NetFirewallAddressFilter
-                $PortFilter = $Rule | Get-NetFirewallPortFilter
-                $ApplicationFilter = $Rule | Get-NetFirewallApplicationFilter
-                $ServiceFilter = $Rule | Get-NetFirewallServiceFilter
-                $InterfaceFilter = $Rule | Get-NetFirewallInterfaceFilter
-                $InterfaceTypeFilter = $Rule | Get-NetFirewallInterfaceTypeFilter
-                $SecurityFilter = $Rule | Get-NetFirewallSecurityFilter
+                $AddressFilter = $rule | Get-NetFirewallAddressFilter
+                $PortFilter = $rule | Get-NetFirewallPortFilter
+                $ApplicationFilter = $rule | Get-NetFirewallApplicationFilter
+                $ServiceFilter = $rule | Get-NetFirewallServiceFilter
+                $InterfaceFilter = $rule | Get-NetFirewallInterfaceFilter
+                $InterfaceTypeFilter = $rule | Get-NetFirewallInterfaceTypeFilter
+                $SecurityFilter = $rule | Get-NetFirewallSecurityFilter
     
-                $HashProps = [PSCustomObject]@{
-                    Name                = $Rule.Name
-                    DisplayName         = $Rule.DisplayName
-                    Description         = $Rule.Description
-                    Group               = $Rule.Group
-                    Enabled             = $Rule.Enabled
-                    Profile             = $Rule.Profile
-                    Platform            = StringArrayToList $Rule.Platform
-                    Direction           = $Rule.Direction
-                    Action              = $Rule.Action
-                    EdgeTraversalPolicy = $Rule.EdgeTraversalPolicy
-                    LooseSourceMapping  = $Rule.LooseSourceMapping
-                    LocalOnlyMapping    = $Rule.LocalOnlyMapping
-                    Owner               = $Rule.Owner
+                [PSCustomObject]@{
+                    Name                = $rule.Name
+                    DisplayName         = $rule.DisplayName
+                    Description         = $rule.Description
+                    Group               = $rule.Group
+                    Enabled             = $rule.Enabled
+                    Profile             = $rule.Profile
+                    Platform            = StringArrayToList $rule.Platform
+                    Direction           = $rule.Direction
+                    Action              = $rule.Action
+                    EdgeTraversalPolicy = $rule.EdgeTraversalPolicy
+                    LooseSourceMapping  = $rule.LooseSourceMapping
+                    LocalOnlyMapping    = $rule.LocalOnlyMapping
+                    Owner               = $rule.Owner
                     LocalAddress        = StringArrayToList $AddressFilter.LocalAddress
                     RemoteAddress       = StringArrayToList $AddressFilter.RemoteAddress
                     Protocol            = $PortFilter.Protocol
@@ -166,8 +165,6 @@ Begin {
                     Encryption          = $SecurityFilter.Encryption
                     OverrideBlockRules  = $SecurityFilter.OverrideBlockRules
                 }
-    
-                $FirewallRuleSet += $HashProps
             }
             #endregion
     
@@ -177,33 +174,34 @@ Begin {
                 Delimiter         = ';' 
                 Encoding          = 'UTF8'
             }
-            $FirewallRuleSet | Export-Csv @exportParams
+            $firewallRuleSet | Export-Csv @exportParams
         }
         Catch {
             throw "Failed to export the firewall rules: $_"
         }
     }
-    function Import-FirewallRulesHC {
+    
+    Function Import-FirewallRulesHC {
         <#
-        .SYNOPSIS
-            Imports firewall rules from a '.csv' file
+    .SYNOPSIS
+        Imports firewall rules from a '.csv' file
 
-        .DESCRIPTION
-            Imports firewall rules from a '.csv' file. Existing rules with same 
-            display name will be overwritten.
+    .DESCRIPTION
+        Imports firewall rules from a '.csv' file. Existing rules with same 
+        display name will be overwritten.
 
-        .PARAMETER PolicyStore
-            Store to which the rules are written (default: PersistentStore).
-            Allowed values are PersistentStore, ActiveStore (the resultant rule 
-            set of all sources), localhost, a computer name, 
-            <domain.fqdn.com>\<GPO_Friendly_Name> and others depending on the 
-            environment.
+    .PARAMETER PolicyStore
+        Store to which the rules are written (default: PersistentStore).
+        Allowed values are PersistentStore, ActiveStore (the resultant rule 
+        set of all sources), localhost, a computer name, 
+        <domain.fqdn.com>\<GPO_Friendly_Name> and others depending on the 
+        environment.
 
-        .EXAMPLE
-            Import-FirewallRulesHC -CsvFile 'C:\rules.csv'
+    .EXAMPLE
+        Import-FirewallRulesHC -CsvFile 'C:\rules.csv'
             
-            Import all firewall rules in the file 'C:\rules.csv'
-        #>
+        Import all firewall rules in the file 'C:\rules.csv'
+    #>
     
         Param(
             [Parameter(Mandatory)]
@@ -248,62 +246,63 @@ Begin {
                 Delimiter   = ';'  
                 Encoding    = 'UTF8'
             }
-            $FirewallRules = Import-Csv @importParams
+            $firewallRules = Import-Csv @importParams
     
-            ForEach ($Rule In $FirewallRules) {
-                $RuleSplatHash = @{
-                    Name                = $Rule.Name
-                    Displayname         = $Rule.Displayname
-                    Description         = $Rule.Description
-                    Group               = $Rule.Group
-                    Enabled             = $Rule.Enabled
-                    Profile             = $Rule.Profile
-                    Platform            = ListToStringArray $Rule.Platform @()
-                    Direction           = $Rule.Direction
-                    Action              = $Rule.Action
-                    EdgeTraversalPolicy = $Rule.EdgeTraversalPolicy
-                    LooseSourceMapping  = ValueToBoolean $Rule.LooseSourceMapping
-                    LocalOnlyMapping    = ValueToBoolean $Rule.LocalOnlyMapping
-                    LocalAddress        = ListToStringArray $Rule.LocalAddress
-                    RemoteAddress       = ListToStringArray $Rule.RemoteAddress
-                    Protocol            = $Rule.Protocol
-                    LocalPort           = ListToStringArray $Rule.LocalPort
-                    RemotePort          = ListToStringArray $Rule.RemotePort
-                    IcmpType            = ListToStringArray $Rule.IcmpType
-                    DynamicTarget       = if ([String]::IsNullOrEmpty($Rule.DynamicTarget)) { 'Any' } else { $Rule.DynamicTarget }
-                    Program             = $Rule.Program
-                    Service             = $Rule.Service
-                    InterfaceAlias      = ListToStringArray $Rule.InterfaceAlias
-                    InterfaceType       = $Rule.InterfaceType
-                    LocalUser           = $Rule.LocalUser
-                    RemoteUser          = $Rule.RemoteUser
-                    RemoteMachine       = $Rule.RemoteMachine
-                    Authentication      = $Rule.Authentication
-                    Encryption          = $Rule.Encryption
-                    OverrideBlockRules  = ValueToBoolean $Rule.OverrideBlockRules
+            ForEach ($rule In $firewallRules) {
+                $newRuleParams = @{
+                    Name                = $rule.Name
+                    DisplayName         = $rule.DisplayName
+                    Description         = $rule.Description
+                    Group               = $rule.Group
+                    Enabled             = $rule.Enabled
+                    Profile             = $rule.Profile
+                    Direction           = $rule.Direction
+                    Action              = $rule.Action
+                    EdgeTraversalPolicy = $rule.EdgeTraversalPolicy
+                    LooseSourceMapping  = ValueToBoolean $rule.LooseSourceMapping
+                    LocalOnlyMapping    = ValueToBoolean $rule.LocalOnlyMapping
+                    LocalAddress        = ListToStringArray $rule.LocalAddress
+                    RemoteAddress       = ListToStringArray $rule.RemoteAddress
+                    Platform            = ListToStringArray $rule.Platform $null
+                    Protocol            = $rule.Protocol
+                    LocalPort           = ListToStringArray $rule.LocalPort
+                    RemotePort          = ListToStringArray $rule.RemotePort
+                    IcmpType            = ListToStringArray $rule.IcmpType
+                    DynamicTarget       = if (
+                        [String]::IsNullOrEmpty($rule.DynamicTarget)) { 'Any' } else { $rule.DynamicTarget }
+                    Program             = $rule.Program
+                    Service             = $rule.Service
+                    InterfaceAlias      = ListToStringArray $rule.InterfaceAlias
+                    InterfaceType       = $rule.InterfaceType
+                    LocalUser           = $rule.LocalUser
+                    RemoteUser          = $rule.RemoteUser
+                    RemoteMachine       = $rule.RemoteMachine
+                    Authentication      = $rule.Authentication
+                    Encryption          = $rule.Encryption
+                    OverrideBlockRules  = ValueToBoolean $rule.OverrideBlockRules
                 }
+                if (-not $rule.Platform) { $newRuleParams.Remove('Platform') }
     
                 # for SID types no empty value is defined, so omit if not present
-                if (![String]::IsNullOrEmpty($Rule.Owner)) { 
-                    $RuleSplatHash.Owner = $Rule.Owner 
+                if (![String]::IsNullOrEmpty($rule.Owner)) { 
+                    $newRuleParams.Owner = $rule.Owner 
                 }
-                if (![String]::IsNullOrEmpty($Rule.Package)) {
-                    $RuleSplatHash.Package = $Rule.Package 
+                if (![String]::IsNullOrEmpty($rule.Package)) {
+                    $newRuleParams.Package = $rule.Package 
                 }
 
                 $storeParam = @{
                     PolicyStore = $PolicyStore
                 }
-    
-                Get-NetFirewallRule @storeParam -Name $Rule.Name -EA Ignore | 
+                Get-NetFirewallRule @storeParam -Name $rule.Name -EA Ignore | 
                 Remove-NetFirewallRule
             
                 Try {
-                    Write-Verbose "Create firewall rule '$($Rule.DisplayName)' '($($Rule.Name))'"
-                    New-NetFirewallRule @RuleSplatHash @storeParam -EA Stop
+                    Write-Verbose "Create firewall rule '$($rule.DisplayName)' '($($rule.Name))'"
+                    $null = New-NetFirewallRule @newRuleParams @storeParam -EA Stop
                 }
                 Catch {
-                    Write-Error "Failed to create firewall rule '$($Rule.DisplayName)' '($($Rule.Name))': $_"
+                    Write-Error "Failed to create firewall rule '$($rule.DisplayName)' '($($rule.Name))': $_"
                     $Error.RemoveAt(1)
                 }
             }
@@ -360,7 +359,7 @@ Process {
         }
         else {
             Write-Verbose "Import firewall rules from file '$csvFile'"
-            Import-FirewallRulesHC -CSVFile $csvFile
+            Import-FirewallRulesHC -CsvFile $csvFile
         }
     }
     Catch {

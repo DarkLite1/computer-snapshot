@@ -231,6 +231,9 @@ End {
                 Write-Warning $_
             }
         }
+
+        Write-Host "Snapshot folder '$SnapshotFolder'" -ForegroundColor Yellow
+
         if (-not $errorsFound) {
             Write-Host "$Action successful" -ForegroundColor Green
         }

@@ -33,7 +33,6 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$FirewallManagerModule = "$PSScriptRoot\Firewall-Manager",
     [String]$FileName = 'FirewallRules.csv'
 )
 

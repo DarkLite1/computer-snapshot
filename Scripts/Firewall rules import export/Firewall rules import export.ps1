@@ -180,7 +180,6 @@ Begin {
             throw "Failed to export the firewall rules: $_"
         }
     }
-    
     Function Import-FirewallRulesHC {
         <#
     .SYNOPSIS
@@ -332,7 +331,7 @@ Begin {
                 throw "Import folder '$DataFolder' empty"
             }
             If (-not (Test-Path -LiteralPath $csvFile -PathType Leaf)) {
-                throw "Firewall rules file '$smbSharesFile' not found"
+                throw "Firewall rules file '$csvFile' not found"
             }
         }
         #endregion

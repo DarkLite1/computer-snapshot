@@ -140,15 +140,52 @@ Begin {
         }
 
         Write-Verbose "Snapshot folder '$SnapshotFolder'"
+
+        #region Test scripts and data folders
+        foreach ($item in $Snapshot.GetEnumerator() | 
+            Where-Object { $_.Value }
+        ) {
+            Write-Verbose "Snapshot '$($item.Key)'"
+    
+            $invokeScriptParams = @{
+                Path       = $Script.$($item.Key) 
+                DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
+            }
+    
+            #region Test execution script
+            If (-not $invokeScriptParams.Path) {
+                throw "No script found for snapshot item '$($item.Key)'"
+            }
+    
+            If (-not (Test-Path -Path $invokeScriptParams.Path -PathType Leaf)) {
+                throw "Script file '$($invokeScriptParams.Path)' not found for snapshot item '$($item.Key)'"
+            }
+            #endregion
+    
+            If ($Action -eq 'RestoreSnapshot') {
+                #region Test script folder
+                If (-not (Test-Path -LiteralPath $invokeScriptParams.DataFolder -PathType Container)) {
+                    throw "Snapshot folder '$($invokeScriptParams.DataFolder)' not found"
+                }
+    
+                If ((Get-ChildItem -LiteralPath $invokeScriptParams.DataFolder | Measure-Object).Count -eq 0) {
+                    throw "No data found for snapshot item '$($item.Key)' in folder '$($invokeScriptParams.DataFolder)'"
+                }
+                #endregion
+            }
+        }
+        #endregion
     }    
     Catch {
-        throw "Failed to perform action '$Action': $_"
+        throw "Failed to perform action '$Action'. Nothing done, please fix this error first: $_"
     }
 }
 
 Process {
-    Try {
-        foreach ($item in $Snapshot.GetEnumerator() | Where-Object { $_.Value }) {
+    $childScriptTerminatingErrors = @()
+
+    foreach ($item in $Snapshot.GetEnumerator() | Where-Object { $_.Value }) {
+        Try {
             Write-Verbose "Snapshot '$($item.Key)'"
 
             $invokeScriptParams = @{
@@ -156,64 +193,47 @@ Process {
                 DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
             }
 
-            #region Test execution script
-            If (-not $invokeScriptParams.Path) {
-                throw "No script found for snapshot item '$($item.Key)'"
-            }
-
-            If (-not (Test-Path -Path $invokeScriptParams.Path -PathType Leaf)) {
-                throw "Script file '$($invokeScriptParams.Path)' not found for snapshot item '$($item.Key)'"
-            }
-            #endregion
-
             If ($Action -eq 'CreateSnapshot') {
                 $null = New-Item -Path $invokeScriptParams.DataFolder -ItemType Directory
 
                 $invokeScriptParams.Type = 'Export'
             }
             else {
-                #region Test script folder
-                If (-not (Test-Path -LiteralPath $invokeScriptParams.DataFolder -PathType Container)) {
-                    throw "Snapshot folder '$($invokeScriptParams.DataFolder)' not found"
-                }
-
-                If ((Get-ChildItem -LiteralPath $invokeScriptParams.DataFolder | Measure-Object).Count -eq 0) {
-                    throw "No data found for snapshot item '$($item.Key)' in folder '$($invokeScriptParams.DataFolder)'"
-                }
-                #endregion
-
                 $invokeScriptParams.Type = 'Import'
             }
-            
+
             Invoke-ScriptHC @invokeScriptParams
         }
-    }
-    Catch {
-        throw "Failed to perform action '$Action': $_"
+        Catch {
+            $childScriptTerminatingErrors += "Failed to execute script '$($invokeScriptParams.Path)' for snapshot item '$($item.Key)': $_"
+            $Error.RemoveAt(0)
+        }
     }
 }
 
 End {
     Try {
-        If ($Action -eq 'CreateSnapshot') {
-            Write-Verbose "Snapshot created in folder '$SnapshotFolder'"
-        }
-        else {
-            Write-Verbose "Snapshot restored from folder '$SnapshotFolder'"
-        }
-        
         Write-Verbose "End action '$Action'"
         
+        $errorsFound = $false
+
+        if ($childScriptTerminatingErrors) {
+            $errorsFound = $true
+            Write-Host 'Blocking errors:' -ForegroundColor Red
+            $childScriptTerminatingErrors | ForEach-Object {
+                Write-Host $_ -ForegroundColor Red
+            }
+        }
         if ($Error.Exception.Message) {
-            Write-Warning "Non blocking errors detected:"
+            $errorsFound = $true
+            Write-Warning "Non blocking errors:"
             $Error.Exception.Message | ForEach-Object {
                 Write-Warning $_
             }
         }
-        else {
-            Write-Host 'All actions performed successfully' -ForegroundColor Green
+        if (-not $errorsFound) {
+            Write-Host "$Action successful" -ForegroundColor Green
         }
-        
     }
     Catch {
         throw "Failed to perform action '$Action': $_"

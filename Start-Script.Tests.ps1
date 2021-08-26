@@ -160,3 +160,90 @@ Describe "When action is 'RestoreSnapshot'" {
         }
     }
 }
+Describe 'When a child script fails with a non terminating error' {
+    BeforeEach {
+        Get-ChildItem -Path 'TestDrive:/' -Filter '*.ps1' |
+        Remove-Item
+
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'CreateSnapshot'
+        $testNewParams.Snapshot = @{
+            Script1 = $true
+            Script2 = $true
+            Script3 = $true
+        }
+        $testNewParams.Script = @{
+            Script1 = (New-Item 'TestDrive:/1.ps1' -ItemType File).FullName
+            Script2 = (New-Item 'TestDrive:/2.ps1' -ItemType File).FullName
+            Script3 = (New-Item 'TestDrive:/3.ps1' -ItemType File).FullName
+        }
+
+        Mock Invoke-ScriptHC {
+            Write-Error 'Script2 non terminating error'
+        } -ParameterFilter { $Path -eq $testNewParams.Script.Script2 }
+        Mock Write-Warning
+
+        .$testScript @testNewParams -ErrorAction SilentlyContinue
+    }
+    It 'other scripts are still executed' {
+        Should -Invoke Invoke-ScriptHC -Times 3 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
+            $Path -eq $testNewParams.Script.Script1 
+        }
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
+            $Path -eq $testNewParams.Script.Script2 
+        }
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
+            $Path -eq $testNewParams.Script.Script3 
+        }
+    }
+    It "the error is reported as a 'Blocking error'" {
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { 
+            $Message -like '*Script2 non terminating error*' 
+        }
+    }
+}
+Describe 'When a child script fails with a terminating error' {
+    BeforeEach {
+        Get-ChildItem -Path 'TestDrive:/' -Filter '*.ps1' |
+        Remove-Item
+
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'CreateSnapshot'
+        $testNewParams.Snapshot = @{
+            Script1 = $true
+            Script2 = $true
+            Script3 = $true
+        }
+        $testNewParams.Script = @{
+            Script1 = (New-Item 'TestDrive:/1.ps1' -ItemType File).FullName
+            Script2 = (New-Item 'TestDrive:/2.ps1' -ItemType File).FullName
+            Script3 = (New-Item 'TestDrive:/3.ps1' -ItemType File).FullName
+        }
+
+        Mock Invoke-ScriptHC {
+            throw 'Script2 terminating error'
+        } -ParameterFilter { $Path -eq $testNewParams.Script.Script2 }
+        Mock Write-Host
+
+        .$testScript @testNewParams
+    }
+    It 'other scripts are still executed' {
+        Should -Invoke Invoke-ScriptHC -Times 3 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
+            $Path -eq $testNewParams.Script.Script1 
+        }
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
+            $Path -eq $testNewParams.Script.Script2 
+        }
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
+            $Path -eq $testNewParams.Script.Script3 
+        }
+    }
+    It "the error is reported as a 'Blocking error'" {
+        Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { 
+            ($Object -like '*Script2 terminating error*') -and
+            ($ForegroundColor -eq 'Red')
+        }
+    }
+}

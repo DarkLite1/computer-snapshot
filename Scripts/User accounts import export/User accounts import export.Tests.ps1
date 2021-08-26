@@ -97,6 +97,10 @@ Describe "On action 'Export' a .csv file" {
             $null = New-LocalUser @testUserParams
         }
 
+        $testUsers | Where-Object { -not $_.Enabled } | ForEach-Object {
+            Disable-LocalUser -Name $_.Name
+        }
+
         $testParams.Action = 'Export'
         .$testScript @testParams
 

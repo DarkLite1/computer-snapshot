@@ -5,7 +5,7 @@
     .DESCRIPTION
         This script should be run on a machine that has its firewall rules correctly
         configured with the action 'Export'. This will save the current firewall 
-        rules. On another machine this data will be used to restore the firewal rules.
+        rules. On another machine this data will be used to restore the firewall rules.
 
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DateFolder, when action is

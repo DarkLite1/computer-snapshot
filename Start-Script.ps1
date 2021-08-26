@@ -49,7 +49,7 @@
 Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
-    [HashTable]$Snapshot = @{
+    [System.Collections.Specialized.OrderedDictionary]$Snapshot = [Ordered]@{
         UserAccounts  = $true
         FirewallRules = $true
         SmbShares     = $true

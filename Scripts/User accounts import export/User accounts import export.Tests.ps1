@@ -115,7 +115,6 @@ Describe "On action 'Export' a .csv file" {
     It 'is created' {
         $testImportParams.LiteralPath | Should -Exist
     }
-
     It 'only contains enabled local user accounts' {
         foreach ($testUser in $testUsers | Where-Object { $_.Enabled }) {
             $testUserDetails = $testImportCsv | Where-Object { 

@@ -87,7 +87,7 @@ Process {
                 $users | Export-Csv @exportParams
             }
             else {
-                throw 'No local user accounts found'
+                throw 'No enabled local user accounts found'
             }
         }
         else {

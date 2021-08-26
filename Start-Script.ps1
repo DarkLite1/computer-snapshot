@@ -234,6 +234,9 @@ End {
         if (-not $errorsFound) {
             Write-Host "$Action successful" -ForegroundColor Green
         }
+        else {
+            Write-Warning "$Action not 100% successful"
+        }
     }
     Catch {
         throw "Failed to perform action '$Action': $_"

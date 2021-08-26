@@ -218,6 +218,8 @@ End {
         #region console summary for end user
         $errorsFound = $false
 
+        Write-Host "Snapshot folder '$SnapshotFolder' action '$Action'" -ForegroundColor Yellow
+
         if ($childScriptTerminatingErrors) {
             $errorsFound = $true
             Write-Host 'Blocking errors:' -ForegroundColor Red
@@ -227,19 +229,14 @@ End {
         }
         if ($Error.Exception.Message) {
             $errorsFound = $true
-            Write-Warning "Non blocking errors:"
+            Write-Warning 'Non blocking errors:'
             $Error.Exception.Message | ForEach-Object {
                 Write-Warning $_
             }
         }
 
-        Write-Host "Snapshot folder '$SnapshotFolder'" -ForegroundColor Yellow
-
         if (-not $errorsFound) {
-            Write-Host "$Action successful, no errors detected" -ForegroundColor Green
-        }
-        else {
-            Write-Warning "$Action not 100% successful"
+            Write-Host 'Success, no errors detected' -ForegroundColor Green
         }
         #endregion
     }

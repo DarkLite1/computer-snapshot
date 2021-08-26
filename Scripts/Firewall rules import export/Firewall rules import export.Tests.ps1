@@ -63,3 +63,24 @@ Describe 'Fail the import of firewall rules when' {
         Should -Throw "*Firewall rules file '$($testNewParams.DataFolder)\$($testNewParams.FileName)' not found"
     }
 }
+Describe 'when all tests pass call the function' {
+    It "'Export-FirewallRulesHC' on action 'Export'" {
+        Get-ChildItem $testParams.DataFolder | Remove-Item
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'Export'
+
+        .$testScript @testNewParams 
+
+        Should -Invoke Export-FirewallRulesHC -Times 1 -Exactly
+    }
+    It "'Import-FirewallRulesHC' on action 'Export'" {
+        Get-ChildItem $testParams.DataFolder | Remove-Item
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'Import'
+        New-Item -Path "$($testParams.DataFolder)\$($testParams.FileName)" -ItemType File
+
+        .$testScript @testNewParams 
+
+        Should -Invoke Import-FirewallRulesHC -Times 1 -Exactly
+    }
+}

@@ -31,7 +31,6 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$ScriptName = 'Smb shares',
     [String]$smbSharesFileName = 'SmbShares.xml',
     [String]$smbSharesAccessFileName = 'SmbSharesAccess.xml'
 )
@@ -149,8 +148,6 @@ Begin {
     }
 
     Try {
-        Write-Verbose "Start script '$ScriptName'"
-
         $smbSharesFile = Join-Path -Path $DataFolder -ChildPath $smbSharesFileName
         $smbSharesAccessFile = Join-Path -Path $DataFolder -ChildPath $smbSharesAccessFileName
 
@@ -376,8 +373,6 @@ Process {
                 #endregion
             }
         }
-
-        Write-Verbose "End script '$ScriptName'"
     }
     Catch {
         throw "$Action smb shares failed: $_"

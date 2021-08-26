@@ -33,7 +33,6 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$ScriptName = 'Firewall rules',
     [String]$FirewallManagerModule = "$PSScriptRoot\Firewall-Manager",
     [String]$FileName = 'FirewallRules.csv'
 )
@@ -184,7 +183,6 @@ Begin {
             throw "Failed to export the firewall rules: $_"
         }
     }
-
     function Import-FirewallRulesHC {
         <#
         .SYNOPSIS
@@ -205,7 +203,7 @@ Begin {
             Import-FirewallRulesHC -CsvFile 'C:\rules.csv'
             
             Import all firewall rules in the file 'C:\rules.csv'
-    #>
+        #>
     
         Param(
             [Parameter(Mandatory)]
@@ -311,13 +309,11 @@ Begin {
             }
         }
         Catch {
-            throw "Failed to import the firewall rule: $_"
+            throw "Failed to import the firewall rules: $_"
         }
     }
 
     Try {
-        Write-Verbose "Start script '$ScriptName'"
-
         $csvFile = Join-Path -Path $DataFolder -ChildPath $FileName
 
         #region Test DataFolder
@@ -366,8 +362,6 @@ Process {
             Write-Verbose "Import firewall rules from file '$csvFile'"
             Import-FirewallRulesHC -CSVFile $csvFile
         }
-
-        Write-Verbose "End script '$ScriptName'"
     }
     Catch {
         throw "$Action firewall rules failed: $_"

@@ -70,7 +70,7 @@ Begin {
             [String]$Type
         )
 
-        Write-Verbose "Invoke script '$Path' on data folder '$DataFolder' for '$Type'"
+        Write-Debug "Invoke script '$Path' on data folder '$DataFolder' for '$Type'"
         & $Path -DataFolder $DataFolder -Action $Type
     }
 
@@ -186,8 +186,6 @@ Process {
 
     foreach ($item in $Snapshot.GetEnumerator() | Where-Object { $_.Value }) {
         Try {
-            Write-Verbose "Snapshot '$($item.Key)'"
-
             $invokeScriptParams = @{
                 Path       = $Script.$($item.Key) 
                 DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
@@ -202,6 +200,7 @@ Process {
                 $invokeScriptParams.Type = 'Import'
             }
 
+            Write-Verbose "Start snapshot '$($item.Key)'"
             Invoke-ScriptHC @invokeScriptParams
         }
         Catch {

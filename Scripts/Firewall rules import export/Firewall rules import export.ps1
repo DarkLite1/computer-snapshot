@@ -343,15 +343,6 @@ Begin {
 
 Process {
     Try {
-        #region Import firewall manager module
-        Try {
-            Import-Module -Name $FirewallManagerModule -ErrorAction Stop -Verbose:$false -Force
-        }
-        Catch {
-            throw "Firewall manager module folder '$FirewallManagerModule' not found"
-        }
-        #endregion
-
         If ($Action -eq 'Export') {
             Write-Verbose "Export firewall rules to file '$csvFile'"
             Export-FirewallRulesHC -CsvFile $csvFile

@@ -25,9 +25,10 @@ BeforeAll {
 
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        Action     = 'Export'
-        DataFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        UserAccountsFileName   = 'UserAccounts.xml'
+        Action                = 'Export'
+        DataFolder            = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        UserAccountsFileName  = 'UserAccounts.xml'
+        UserPasswordsFileName = 'UserAccounts.json'
     }
 }
 Describe 'the mandatory parameters are' {
@@ -136,7 +137,7 @@ Describe "On action 'Export'" {
             Should -BeNullOrEmpty
         }
     }
-    Context 'a json file' {
+    Context 'a password json file' {
         It 'is created' {
             1
         }

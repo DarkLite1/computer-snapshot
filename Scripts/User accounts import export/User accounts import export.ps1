@@ -5,8 +5,9 @@
     .DESCRIPTION
         This script should be run on a machine that has all the required
         users already created on the computer. Then run the script with action
-        'Export' which will create a file containing the user accounts.
-        On another machine this script can be run with action 'Import' to
+        'Export' which will create a file containing the enabled user accounts.
+
+        On another computer this script can be run with action 'Import' to
         recreate the required user accounts.
 
     .PARAMETER Action
@@ -15,6 +16,21 @@
 
     .PARAMETER DataFolder
         Folder where to save or restore the user accounts
+
+    .PARAMETER UserAccountsFileName
+        Name of the file that contains all local user accounts that are enabled
+
+    .PARAMETER UserPasswordsFileName
+        Name of the file that contains all the passwords for user accounts that 
+        need to be imported. This allows you to set passwords upfront for each
+        account. 
+        
+        If this file is not present or the password is empty you will be 
+        prompted to provide a password for the user to be created.
+
+        When a user account already exist on the computer and no password is 
+        available in the UserPasswordsFileName, the password will not be 
+        changed for that user account.
 
     .EXAMPLE
         & 'C:\UserAccounts.ps1' -DataFolder 'C:\UserAccounts' -Action 'Export'
@@ -35,12 +51,14 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$UserAccountsFileName = 'UserAccounts.xml'
+    [String]$UserAccountsFileName = 'UserAccounts.xml',
+    [String]$UserPasswordsFileName = 'UserAccounts.json'
 )
 
 Begin {
     Try {
-        $exportFile = Join-Path -Path $DataFolder -ChildPath $UserAccountsFileName
+        $UserAccountsFile = Join-Path -Path $DataFolder -ChildPath $UserAccountsFileName
+        $UserPasswordsFile = Join-Path -Path $DataFolder -ChildPath $UserPasswordsFileName
 
         #region Test DataFolder
         If ($Action -eq 'Export') {
@@ -58,8 +76,8 @@ Begin {
             If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
                 throw "Import folder '$DataFolder' empty"
             }
-            If (-not (Test-Path -LiteralPath $exportFile -PathType Leaf)) {
-                throw "User accounts file '$exportFile' not found"
+            If (-not (Test-Path -LiteralPath $UserAccountsFile -PathType Leaf)) {
+                throw "User accounts file '$UserAccountsFile' not found"
             }
         }
         #endregion
@@ -72,21 +90,25 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            Write-Verbose "Export user accounts to file '$exportFile'"
+            Write-Verbose "Export user accounts to file '$UserAccountsFile'"
             If ($users = Get-LocalUser | Where-Object { $_.Enabled }) {
                 $users | ForEach-Object {
                     Write-Verbose "User account '$($_.Name)' description '$($_.description)'"
                 }
-                Write-Verbose "Export to file '$exportFile'"
-                $users | Export-Clixml -LiteralPath $exportFile -EA Stop
+                Write-Verbose "Export to file '$UserAccountsFile'"
+                $users | Export-Clixml -LiteralPath $UserAccountsFile -EA Stop
+
+                $users | Select-Object 'Name',
+                @{Name = 'Password'; Expression = { '' } } | ConvertTo-Json |
+                Out-File -LiteralPath $UserPasswordsFile
             }
             else {
                 throw 'No enabled local user accounts found'
             }
         }
         else {
-            Write-Verbose "Import user accounts from file '$exportFile'"
-            $importedUsers = Import-Clixml -LiteralPath $exportFile -EA Stop
+            Write-Verbose "Import user accounts from file '$UserAccountsFile'"
+            $importedUsers = Import-Clixml -LiteralPath $UserAccountsFile -EA Stop
 
             $knownComputerUsers = Get-LocalUser
 

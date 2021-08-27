@@ -23,6 +23,17 @@
         In case you want to restore another snapshot than the last one created
         use the '$RestoreSnapshotFolder'.
 
+        TIPS:
+        - It is encouraged to modify the exported files to contain only the
+        data you really need. This will speed up the process and reduces the
+        risks.
+
+        - After making a snapshot it is advised to rename the folder in the 
+        snapshots folder to something more recognizable (ex. 'Config App1').
+        Then move it to another folder on the USB drive so you can start the
+        'RestoreBackup' process with the argument 'RestoreSnapshotFolder' set
+        to the new folder (ex. 'X:\Backup restore\Production\Config App1').
+
     .PARAMETER Action
         A snapshot of the current machine is created when set to 
         'CreateSnapshot'. When set to 'RestoreSnapshot' the last created 

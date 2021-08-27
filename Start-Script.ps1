@@ -4,21 +4,28 @@
 
     .DESCRIPTION
         This script is intended to be run from a USB stick and is portable.
+        The intend is to create a snapshot on one machine and restore a
+        snapshot on another machine.
 
-        Step 1: Configure the current machine correctly in Windows.
+        PROCEDURE:
+        Step 1: Configure the current computer to the desired state.
+        (ex. add smb shares, set up local users, grant them NTFS permissions,
+        configure firewall rules, ..)
 
-        Step 2: Plug in the USB stick and run this script on the correctly 
-        configured machine to create a snapshot. Simply set $Action to 
-        'CreateSnapshot' and set the $Snapshot items to '$true' for the 
-        data you want to collect.
+        Step 2: Plug in the USB stick and run this script on the current 
+        computer, which is now configured correctly, to create a snapshot. 
+        Simply set $Action to 'CreateSnapshot' and set the $Snapshot items to 
+        $true for the data you want to collect in the $SnapshotsFolder.
 
         At this point a snapshot is created and saved on the USB stick in the
-        folder 'Snapshots'.
+        $SnapshotsFolder.
 
-        Step 3: On another machine, where you want to restore the snapshot: 
-        Plug in the USB stick and run this script with $Action set to 
-        'RestoreSnapshot' and set the $Snapshot items to '$true' for the 
-        data you want to restore.
+        Step 3: To restore the snapshot on another computer plug in the USB 
+        stick and run this script with $Action set to 'RestoreSnapshot' and set 
+        the $Snapshot items to $true for the data you want to restore.
+
+        At this point the snapshot will be used to create or update the current
+        computer to the desired state.
         
         In case you want to restore another snapshot than the last one created
         use the '$RestoreSnapshotFolder'.
@@ -26,13 +33,19 @@
         TIPS:
         - It is encouraged to modify the exported files to contain only the
         data you really need. This will speed up the process and reduces the
-        risks.
+        risks. Use something like Notepad++ or vscode to easily see the file
+        structure and remove the unneeded pieces or update others.
+        # less is more
 
         - After making a snapshot it is advised to rename the folder in the 
-        snapshots folder to something more recognizable (ex. 'Config App1').
+        snapshots folder to something more recognizable (ex. 'Image MyApp').
         Then move it to another folder on the USB drive so you can start the
         'RestoreBackup' process with the argument 'RestoreSnapshotFolder' set
-        to the new folder (ex. 'X:\Backup restore\Production\Config App1').
+        to the new folder (ex. 'X:\Backup restore\Production\Image MyApp').
+        This way you are always certain the correct snapshot is restored.
+        Otherwise, when not using 'RestoreSnapshotFolder', the last created
+        snapshot is restored which might lead to unexpected results.
+        # know what you're doing
 
     .PARAMETER Action
         A snapshot of the current machine is created when set to 

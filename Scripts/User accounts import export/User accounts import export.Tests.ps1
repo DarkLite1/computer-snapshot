@@ -27,7 +27,7 @@ BeforeAll {
     $testParams = @{
         Action     = 'Export'
         DataFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        FileName   = 'UserAccounts.xml'
+        UserAccountsFileName   = 'UserAccounts.xml'
     }
 }
 Describe 'the mandatory parameters are' {
@@ -84,10 +84,10 @@ Describe "Throw a terminating error on action 'Import' when" {
         '1' | Out-File -LiteralPath "$($testNewParams.DataFolder)\file.txt"
 
         { .$testScript @testNewParams } | 
-        Should -Throw "*user accounts file '$($testNewParams.DataFolder)\$($testNewParams.FileName)' not found"
+        Should -Throw "*user accounts file '$($testNewParams.DataFolder)\$($testNewParams.UserAccountsFileName)' not found"
     }
 }
-Describe "On action 'Export' an xml file" {
+Describe "On action 'Export'" {
     BeforeAll {
         Get-ChildItem -Path $testParams.DataFolder | Remove-Item
         $testUsers | ForEach-Object { 
@@ -110,28 +110,36 @@ Describe "On action 'Export' an xml file" {
 
         $testParams.Action = 'Export'
         .$testScript @testParams
-
-        $testImportParams = @{
-            LiteralPath = "$($testParams.DataFolder)\$($testParams.FileName)"
-        }
-        $testImport = Import-Clixml @testImportParams
     }
-    It 'is created' {
-        $testImportParams.LiteralPath | Should -Exist
-    }
-    It 'only contains enabled local user accounts' {
-        foreach ($testUser in $testUsers | Where-Object { $_.Enabled }) {
-            $testUserDetails = $testImport | Where-Object { 
-                $_.Name -eq $testUser.Name 
+    Context 'an xml file' {
+        BeforeAll {
+            $testImportParams = @{
+                LiteralPath = "$($testParams.DataFolder)\$($testParams.UserAccountsFileName)"
             }
-            $testUserDetails | Should -Not -BeNullOrEmpty
-            $testUserDetails.FullName | Should -Be $testUser.FullName
-            $testUserDetails.Description | Should -Be $testUser.Description
+            $testImport = Import-Clixml @testImportParams
+        }
+        It 'is created' {
+            $testImportParams.LiteralPath | Should -Exist
+        }
+        It 'only contains enabled local user accounts' {
+            foreach ($testUser in $testUsers | Where-Object { $_.Enabled }) {
+                $testUserDetails = $testImport | Where-Object { 
+                    $_.Name -eq $testUser.Name 
+                }
+                $testUserDetails | Should -Not -BeNullOrEmpty
+                $testUserDetails.FullName | Should -Be $testUser.FullName
+                $testUserDetails.Description | Should -Be $testUser.Description
+            }
+        }
+        It 'does not contain disabled local user accounts' {
+            $testImport | Where-Object { -not $_.Enabled } | 
+            Should -BeNullOrEmpty
         }
     }
-    It 'does not contain disabled local user accounts' {
-        $testImport | Where-Object { -not $_.Enabled } | 
-        Should -BeNullOrEmpty
+    Context 'a json file' {
+        It 'is created' {
+            1
+        }
     }
 }
 Describe "On action 'Import' the exported xml file is read and" {
@@ -139,7 +147,7 @@ Describe "On action 'Import' the exported xml file is read and" {
         $testParams.Action = 'Import'
         $testJoinParams = @{
             Path      = $testParams.DataFolder 
-            ChildPath = $testParams.FileName
+            ChildPath = $testParams.UserAccountsFileName
         }
         $testXmlFile = Join-Path @testJoinParams
     }

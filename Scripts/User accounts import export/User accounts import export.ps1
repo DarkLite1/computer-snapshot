@@ -35,12 +35,12 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$FileName = 'UserAccounts.xml'
+    [String]$UserAccountsFileName = 'UserAccounts.xml'
 )
 
 Begin {
     Try {
-        $exportFile = Join-Path -Path $DataFolder -ChildPath $FileName
+        $exportFile = Join-Path -Path $DataFolder -ChildPath $UserAccountsFileName
 
         #region Test DataFolder
         If ($Action -eq 'Export') {

@@ -86,25 +86,38 @@ Process {
         }
         else {
             Write-Verbose "Import user accounts from file '$exportFile'"
-            Import-Clixml -LiteralPath $exportFile -EA Stop
+            $importedUsers = Import-Clixml -LiteralPath $exportFile -EA Stop
 
             $knownComputerUsers = Get-LocalUser
 
             foreach ($user in $importedUsers) {
-                Write-Verbose "User '$($user.Name)'"
-                if ($knownComputerUsers.Name -NotContains $user.Name) {
-                    $password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
-                    # $Password = Read-Host -AsSecureString
-                    New-LocalUser -Name $user.Name -Password $password
+                try {                    
+                    Write-Verbose "User '$($user.Name)'"
+                    if ($knownComputerUsers.Name -NotContains $user.Name) {
+                        $password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
+                        # $Password = Read-Host -AsSecureString
+                        New-LocalUser -Name $user.Name -Password $password
+                    }
+                    $setUserParams = @{
+                        Name                  = $user.Name
+                        Description           = $user.Description
+                        FullName              = $user.FullName
+                        PasswordNeverExpires  = ![Boolean]$user.PasswordExpires
+                        UserMayChangePassword = $user.UserMayChangePassword
+                        ErrorAction           = 'Stop'
+                    }
+                    if ($user.AccountExpires) {
+                        $setUserParams.AccountExpires = $user.AccountExpires
+                    }
+                    else {
+                        $setUserParams.AccountNeverExpires = $true
+                    }
+                    Set-LocalUser @setUserParams
                 }
-                $setUserParams = @{
-                    Name                = $user.Name
-                    Description         = $user.Description
-                    FullName            = $user.FullName
-                    AccountNeverExpires = $user.AccountNeverExpires
-                    AccountExpires      = $user.AccountExpires
+                catch {
+                    Write-Error "Failed to create user '$($user.Name)': $_"
+                    $Error.RemoveAt(1)
                 }
-                Set-LocalUser @setUserParams
             }
         }
     }

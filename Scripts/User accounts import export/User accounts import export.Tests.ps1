@@ -6,19 +6,19 @@ BeforeAll {
         @{
             Name        = 'testUser1'
             FullName    = 'Test User1'
-            Description = 'User created for testing purposes'
+            Description = 'User 1 created for testing purposes'
             Enabled     = $true
         }
         @{
             Name        = 'testUser2'
             FullName    = 'Test User2'
-            Description = 'User created for testing purposes'
+            Description = 'User 2 created for testing purposes'
             Enabled     = $true
         }
         @{
             Name        = 'testUser3'
             FullName    = 'Test User3'
-            Description = 'User created for testing purposes'
+            Description = 'User 3 created for testing purposes'
             Enabled     = $false
         }
     )
@@ -127,43 +127,237 @@ Describe "On action 'Export' a .xml file" {
         Should -BeNullOrEmpty
     }
 }
-Describe "On action 'Import' a .xml file is read and" {
+Describe "On action 'Import' the exported xml file is read and" {
     BeforeAll {
-        Get-ChildItem -Path $testParams.DataFolder | Remove-Item
-        $testUsers | ForEach-Object { 
-            Remove-LocalUser -Name $_.Name -EA Ignore
-        }
-
-        $testUsers | ForEach-Object {
-            $testUserParams = @{
-                Name        = $_.Name
-                FullName    = $_.FullName
-                Description = $_.Description
-                Password    = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
-            }
-            $null = New-LocalUser @testUserParams
-        }
-
-        $testParams.Action = 'Export'
-        .$testScript @testParams
-        
-        $testUsers | Where-Object { $_.Enabled } |
-        Select-Object -First 1 | ForEach-Object {
-            Remove-LocalUser -Name $_.Name
-        }
-
         $testParams.Action = 'Import'
-        .$testScript @testParams
-    }
-    It 'only non existing users are created' {
-        $testCreatedUsers = $testUsers | Where-Object { $_.Enabled } |
-        Select-Object -Skip 1
-
-        foreach ($testUser in $testCreatedUsers) {
-            $testUserDetails = Get-LocalUser -Name $_.Name -EA ignore
-            $testUserDetails | Should -Not -BeNullOrEmpty
-            $testUserDetails.FullName | Should -Be $testUser.FullName
-            $testUserDetails.Description | Should -Be $testUser.Description
+        $testJoinParams = @{
+            Path      = $testParams.DataFolder 
+            ChildPath = $testParams.FileName
         }
+        $testXmlFile = Join-Path @testJoinParams
+    }
+    BeforeEach {
+        $testUser = @{
+            Name     = $testUsers[0].Name
+            Password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
+        }
+        Remove-Item -Path $testXmlFile -EA Ignore
+        Remove-LocalUser -Name $testUser.Name -EA Ignore
+    }
+    Context 'a non existing user account is created with' {
+        It 'Name only' {
+            New-LocalUser @testUser | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.FullName | Should -BeNullOrEmpty
+            $actual.Description | Should -BeNullOrEmpty
+        }
+        It 'FullName Description' {
+            $testUserDetails = @{
+                FullName    = 'bob lee'
+                Description = 'Test user'
+            }
+            New-LocalUser @testUser @testUserDetails | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.FullName | Should -Be $testUserDetails.FullName
+            $actual.Description | Should -Be $testUserDetails.Description
+        }
+        It 'PasswordNeverExpires true' {
+            $testUser.PasswordNeverExpires = $true
+            
+            New-LocalUser @testUser | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.PasswordExpires | Should -BeNullOrEmpty
+        }
+        It 'PasswordNeverExpires false' {
+            $testUser.PasswordNeverExpires = $false
+            
+            New-LocalUser @testUser | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.PasswordExpires | Should -Not -BeNullOrEmpty
+        }
+        It 'UserMayChangePassword true' {
+            $testUser.UserMayNotChangePassword = $false
+            
+            New-LocalUser @testUser | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.UserMayChangePassword | Should -BeTrue
+        }
+        It 'UserMayChangePassword false' {
+            $testUser.UserMayNotChangePassword = $true
+            
+            New-LocalUser @testUser | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.UserMayChangePassword | Should -BeFalse
+        }
+        It 'AccountExpires' {
+            $testUser.AccountExpires = (Get-Date).AddDays(3) 
+            
+            New-LocalUser @testUser | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.AccountExpires | Should -Not -BeNullOrEmpty
+        }
+        It 'AccountNeverExpires' {
+            $testUser.AccountNeverExpires = $true
+            
+            New-LocalUser @testUser | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.AccountExpires | Should -BeNullOrEmpty
+        } 
+    }
+    Context 'an existing user account is updated' {
+        It 'FullName Description' {
+            $testUserDetails = @{
+                FullName    = 'bob'
+                Description = 'Test user bob'
+            }
+            New-LocalUser @testUser @testUserDetails | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+            $testUserDetailsWrong = @{
+                FullName    = 'mike'
+                Description = 'Test user mike'
+            }
+            New-LocalUser @testUser @testUserDetailsWrong
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.FullName | Should -Be $testUserDetails.FullName
+            $actual.Description | Should -Be $testUserDetails.Description
+        }
+        It 'PasswordNeverExpires true' {
+            New-LocalUser @testUser -PasswordNeverExpires | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+            New-LocalUser @testUser
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.PasswordExpires | Should -BeNullOrEmpty
+        }
+        It 'PasswordNeverExpires false' {
+            New-LocalUser @testUser | Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+            New-LocalUser @testUser -PasswordNeverExpires
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.PasswordExpires | Should -Not -BeNullOrEmpty
+        }
+        It 'UserMayChangePassword true' {
+            New-LocalUser @testUser | Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+            New-LocalUser @testUser -UserMayNotChangePassword
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.UserMayChangePassword | Should -BeTrue
+        }
+        It 'UserMayChangePassword false' {
+            New-LocalUser @testUser -UserMayNotChangePassword | 
+            Export-Clixml -LiteralPath $testXmlFile
+
+            Remove-LocalUser -Name $testUser.Name
+            New-LocalUser @testUser
+        
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.UserMayChangePassword | Should -BeFalse
+        }
+        It 'AccountExpires' {
+            New-LocalUser @testUser -AccountExpires (Get-Date).AddDays(3) | 
+            Export-Clixml -LiteralPath $testXmlFile
+        
+            Remove-LocalUser -Name $testUser.Name
+            New-LocalUser @testUser -AccountNeverExpires
+
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.AccountExpires | Should -Not -BeNullOrEmpty
+        }
+        It 'AccountNeverExpires' {
+            New-LocalUser @testUser -AccountNeverExpires | 
+            Export-Clixml -LiteralPath $testXmlFile
+
+            Remove-LocalUser -Name $testUser.Name
+            New-LocalUser @testUser -AccountExpires (Get-Date).AddDays(3)
+        
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.AccountExpires | Should -BeNullOrEmpty
+        } 
     }
 }

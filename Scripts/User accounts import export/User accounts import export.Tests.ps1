@@ -36,10 +36,11 @@ Describe 'the mandatory parameters are' {
         Should -BeTrue
     }
 }
-Describe "Throw an error on action 'Export' when" {
-    BeforeAll {
+Describe "Throw a terminating error on action 'Export' when" {
+    BeforeEach {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Export'
+        Get-ChildItem $testNewParams.DataFolder | Remove-Item
     }
     It 'the data folder is not found' {
         $testNewParams.DataFolder = 'TestDrive:/xxx'
@@ -56,8 +57,14 @@ Describe "Throw an error on action 'Export' when" {
         { .$testScript @testNewParams } | 
         Should -Throw "*Export folder '$testFolder' not empty"
     }
+    It 'there are no enabled user accounts found on the computer' {
+        Mock Get-LocalUser
+        
+        { .$testScript @testNewParams } | 
+        Should -Throw '*No enabled local user accounts found'
+    }
 }
-Describe "Throw an error on action 'Import' when" {
+Describe "Throw a terminating error on action 'Import' when" {
     BeforeEach {
         Get-ChildItem $testParams.DataFolder | Remove-Item
         $testNewParams = $testParams.clone()

@@ -80,7 +80,7 @@ Describe "Throw an error on action 'Import' when" {
         Should -Throw "*user accounts file '$($testNewParams.DataFolder)\$($testNewParams.FileName)' not found"
     }
 }
-Describe "On action 'Export' a .xml file" {
+Describe "On action 'Export' an xml file" {
     BeforeAll {
         Get-ChildItem -Path $testParams.DataFolder | Remove-Item
         $testUsers | ForEach-Object { 
@@ -359,5 +359,31 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual | Should -Not -BeNullOrEmpty
             $actual.AccountExpires | Should -BeNullOrEmpty
         } 
+    }
+    Context 'a non terminating error is created when' {
+        It 'creating a user account fails' {
+            $testXmlFile = Join-Path @testJoinParams
+            New-LocalUser @testUser | Export-Clixml -LiteralPath $testXmlFile
+    
+            Mock Set-LocalUser {
+                Write-Error 'Non terminating error Set-LocalUser'
+            }
+            $Error.Clear()
+            .$testScript @testParams -EA SilentlyContinue
+            $Error.Exception.Message | Should -Be "Failed to create user account '$($testUser.Name)': Non terminating error Set-LocalUser"
+        }
+        It 'updating a user account fails' {
+            $testXmlFile = Join-Path @testJoinParams
+            New-LocalUser @testUser | Export-Clixml -LiteralPath $testXmlFile
+    
+            Remove-LocalUser -Name $testUser.Name
+
+            Mock New-LocalUser {
+                Write-Error 'Non terminating error New-LocalUser'
+            }
+            $Error.Clear()
+            .$testScript @testParams -EA SilentlyContinue
+            $Error.Exception.Message | Should -Be "Failed to create user account '$($testUser.Name)': Non terminating error New-LocalUser"
+        }
     }
 }

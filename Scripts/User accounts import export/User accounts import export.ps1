@@ -96,7 +96,12 @@ Process {
                     if ($knownComputerUsers.Name -NotContains $user.Name) {
                         $password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
                         # $Password = Read-Host -AsSecureString
-                        New-LocalUser -Name $user.Name -Password $password
+                        $newParams = @{
+                            Name        = $user.Name 
+                            Password    = $password 
+                            ErrorAction = 'Stop'
+                        }
+                        New-LocalUser @newParams
                     }
                     $setUserParams = @{
                         Name                  = $user.Name
@@ -115,7 +120,7 @@ Process {
                     Set-LocalUser @setUserParams
                 }
                 catch {
-                    Write-Error "Failed to create user '$($user.Name)': $_"
+                    Write-Error "Failed to create user account '$($user.Name)': $_"
                     $Error.RemoveAt(1)
                 }
             }

@@ -111,7 +111,7 @@ Describe "On action 'Export'" {
         $testParams.Action = 'Export'
         .$testScript @testParams
     }
-    Context 'an xml file' {
+    Context 'a user accounts xml file' {
         BeforeAll {
             $testImportParams = @{
                 LiteralPath = "$($testParams.DataFolder)\$($testParams.UserAccountsFileName)"
@@ -121,7 +121,7 @@ Describe "On action 'Export'" {
         It 'is created' {
             $testImportParams.LiteralPath | Should -Exist
         }
-        It 'only contains enabled local user accounts' {
+        It 'containing only enabled local user accounts' {
             foreach ($testUser in $testUsers | Where-Object { $_.Enabled }) {
                 $testUserDetails = $testImport | Where-Object { 
                     $_.Name -eq $testUser.Name 
@@ -131,7 +131,7 @@ Describe "On action 'Export'" {
                 $testUserDetails.Description | Should -Be $testUser.Description
             }
         }
-        It 'does not contain disabled local user accounts' {
+        It 'not containing disabled local user accounts' {
             $testImport | Where-Object { -not $_.Enabled } | 
             Should -BeNullOrEmpty
         }

@@ -55,6 +55,117 @@ Param(
 )
 
 Begin {
+    Function Compare-EncryptedPasswordsEqualHC {
+        <#
+            .SYNOPSIS
+                Compare two encrypted passwords to see if they match
+    
+            .DESCRIPTION
+                Users must enter a password twice to make sure they 
+                didn't miss type
+    
+            .EXAMPLE
+                $compareParams = @{
+                    Password1 = ConvertTo-SecureString -String '1' -AsPlainText -Force
+                    Password2 = ConvertTo-SecureString -String '1' -AsPlainText -Force
+                }
+                Compare-EncryptedPasswordsEqualHC @compareParams
+    
+                Both passwords match, so true is returned
+    
+            .EXAMPLE
+                $compareParams = @{
+                    Password1 = ConvertTo-SecureString -String '1' -AsPlainText -Force
+                    Password2 = ConvertTo-SecureString -String '2' -AsPlainText -Force
+                }
+                Compare-EncryptedPasswordsEqualHC @compareParams
+    
+                Both passwords do not match, so false is returned
+        #>
+        Param (
+            [Parameter(Mandatory)]
+            [System.Security.SecureString]$Password1, 
+            [Parameter(Mandatory)]
+            [System.Security.SecureString]$Password2
+        )
+    
+        if ([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringtoBSTR($password1)) -ne [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringtoBSTR($password2))) {
+            $false
+        }
+        else {
+            $true
+        }
+    }
+    Function Set-NewPasswordHC {
+        <#
+            .SYNOPSIS
+                Create a new user account or update an existing user account
+                with the provided plain string password
+
+            .PARAMETER UserName
+                Name of the user account
+
+            .PARAMETER UserPassword
+                Plain string containing the user account password
+
+            .PARAMETER NewUser
+                If used a new user is created with the requested password
+                otherwise an existing user is updated with the requested
+                password
+
+            .EXAMPLE
+                Set-NewPasswordHC -UserName 'bob' -UserPassword 'P@s/-%*D!'
+
+                Updates the existing user 'bob' with the new password
+
+            .EXAMPLE
+                Set-NewPasswordHC -UserName 'mike' -UserPassword 'P@s/-%*D!' -NewUser
+
+                Creates the new user 'mike' and set his password
+        #>
+        Param (
+            [Parameter(Mandatory)]
+            [String]$UserName,
+            [String]$UserPassword,
+            [Switch]$NewUser
+        )
+
+        if (-not $UserPassword) {
+            $UserPassword = Read-Host "Please type a password for user account '$UserName':"
+        }
+
+        Do {
+            try {
+                $isPasswordAccepted = $false
+                $params = @{
+                    Name        = $user.Name 
+                    Password    = ConvertTo-SecureString $UserPassword -AsPlainText -Force
+                    ErrorAction = 'Stop'
+                }
+                if ($NewUser) {
+                    New-LocalUser @params
+                }
+                else {
+                    Set-LocalUser @params
+                }
+                $isPasswordAccepted = $true
+            }
+            catch [Microsoft.PowerShell.Commands.InvalidPasswordException] {
+                if ($NewUser) {
+                    # a user account is created first and only
+                    # afterwards the password is set. So a user will
+                    # be created when the password is not complex enough
+                    Get-LocalUser -Name $UserName -EA Ignore |
+                    Remove-LocalUser
+                }
+                Write-Host 'Password not accepted: The value provided for the password does not meet the length, complexity, or history requirements of the domain.' -ForegroundColor Red
+                $UserPassword = Read-Host "Please type a new password for user account '$UserName':"
+                $Error.RemoveAt(1)
+            }
+        }
+        while (-not $isPasswordAccepted)
+    }
+
     Try {
         $UserAccountsFile = Join-Path -Path $DataFolder -ChildPath $UserAccountsFileName
 
@@ -107,50 +218,6 @@ Process {
             $importedUsers = Import-Clixml -LiteralPath $UserAccountsFile -EA Stop
 
             $knownComputerUsers = Get-LocalUser
-
-            Function Set-NewPasswordHC {
-                Param (
-                    [Parameter(Mandatory)]
-                    [String]$UserName,
-                    [String]$UserPassword,
-                    [Switch]$NewUser
-                )
-
-                if (-not $UserPassword) {
-                    $UserPassword = Read-Host "Please type a password for user account '$UserName':"
-                }
-
-                Do {
-                    try {
-                        $isPasswordAccepted = $false
-                        $params = @{
-                            Name        = $user.Name 
-                            Password    = ConvertTo-SecureString $UserPassword -AsPlainText -Force
-                            ErrorAction = 'Stop'
-                        }
-                        if ($NewUser) {
-                            New-LocalUser @params
-                        }
-                        else {
-                            Set-LocalUser @params
-                        }
-                        $isPasswordAccepted = $true
-                    }
-                    catch [Microsoft.PowerShell.Commands.InvalidPasswordException] {
-                        if ($NewUser) {
-                            # a user account is created first and only
-                            # afterwards the password is set. So a user will
-                            # be created when the password is not complex enough
-                            Get-LocalUser -Name $UserName -EA Ignore |
-                            Remove-LocalUser
-                        }
-                        Write-Host 'Password not accepted: The value provided for the password does not meet the length, complexity, or history requirements of the domain.' -ForegroundColor Red
-                        $UserPassword = Read-Host "Please type a new password for user account '$UserName':"
-                        $Error.RemoveAt(1)
-                    }
-                }
-                while (-not $isPasswordAccepted)
-            }
 
             foreach ($user in $importedUsers) {
                 try {                    

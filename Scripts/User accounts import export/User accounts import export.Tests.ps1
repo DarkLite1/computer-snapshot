@@ -576,39 +576,36 @@ Describe "on 'Import' a user account password" {
             }
         }
     }
-    Context 'a new password is asked in the console when it is not complex enough' {
-        BeforeAll {
-            $testNotComplexPassword = '123'
-            $testNewPassword = 'P@s/-%*D!'
-            Mock ConvertTo-SecureString {
-                & $ConvertToSecureString -String $testNotComplexPassword -AsPlainText -Force
-            } -ParameterFilter { ($String -eq $testNotComplexPassword) }
-            Mock ConvertTo-SecureString {
-                & $ConvertToSecureString -String $testNewPassword -AsPlainText -Force
-            } -ParameterFilter { ($String -eq $testNewPassword) }
+    It 'is asked in the console when it is not complex enough' {
+        $testNotComplexPassword = '123'
+        $testNewPassword = 'P@s/-%*D!'
+        Mock ConvertTo-SecureString {
+            & $ConvertToSecureString -String $testNotComplexPassword -AsPlainText -Force
+        } -ParameterFilter { ($String -eq $testNotComplexPassword) }
+        Mock ConvertTo-SecureString {
+            & $ConvertToSecureString -String $testNewPassword -AsPlainText -Force
+        } -ParameterFilter { ($String -eq $testNewPassword) }
+
+        New-LocalUser @testUser | Select-Object -Property *, 
+        @{Name = 'Password'; Expression = { $testNotComplexPassword } } | 
+        Export-Clixml -LiteralPath $testXmlFile
+        Remove-LocalUser $testUser.Name -EA ignore
+
+        Mock Read-Host { $testNewPassword } -ParameterFilter {
+            ($Prompt -eq "Please type a new password for user account '$($testUser.Name)':")
         }
-        It 'for a password in the import file' {
-            New-LocalUser @testUser | Select-Object -Property *, 
-            @{Name = 'Password'; Expression = { $testNotComplexPassword } } | 
-            Export-Clixml -LiteralPath $testXmlFile
-            Remove-LocalUser $testUser.Name -EA ignore
 
-            Mock Read-Host { $testNewPassword } -ParameterFilter {
-                ($Prompt -eq "Please type a new password for user account '$($testUser.Name)':")
-            }
+        Mock Write-Host
+        .$testScript @testParams
 
-            Mock Write-Host
-            .$testScript @testParams
-
-            Should -Invoke Write-Host -ParameterFilter {
-                ($Object -like "Password not accepted*")
-            }
-            Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
-                ($Prompt -eq "Please type a new password for user account '$($testUser.Name)':")
-            }
-            Should -Invoke ConvertTo-SecureString -Times 1 -Exactly -ParameterFilter {
-                ($String -eq $testNewPassword)
-            }
+        Should -Invoke Write-Host -ParameterFilter {
+            ($Object -like "Password not accepted*")
+        }
+        Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+            ($Prompt -eq "Please type a new password for user account '$($testUser.Name)':")
+        }
+        Should -Invoke ConvertTo-SecureString -Times 1 -Exactly -ParameterFilter {
+            ($String -eq $testNewPassword)
         }
     }
 }

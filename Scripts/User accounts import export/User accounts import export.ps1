@@ -35,7 +35,35 @@
     .EXAMPLE
         & 'C:\UserAccounts.ps1' -DataFolder 'C:\UserAccounts' -Action 'Import'
 
-        Restore all user accounts in the folder 'C:\UserAccounts' on the current computer
+        Restore all user accounts in the folder 'C:\UserAccounts' on the 
+        current computer
+
+    .EXAMPLE
+        $exportParams = @{
+            Action               = 'Export'
+            DataFolder           = 'C:\UserAccounts'
+            UserAccountsFileName = 'UserAccounts.xml'
+        }
+        & 'C:\UserAccounts.ps1' @exportParams
+
+        $joinParams = @{
+            Path      = $exportParams.DataFolder 
+            ChildPath = $exportParams.UserAccountsFileName
+        }
+        $exportFile = Join-Path @joinParams
+
+        $ExportedUsers = Import-Clixml -LiteralPath $exportFile
+        $ExportedUsers | Foreach-Object {$_.Enabled = $true}
+        $ExportedUsers[0..1] | Export-Clixml -LiteralPath $exportFile
+
+        $exportParams.Action = 'Import'
+        & 'C:\UserAccounts.ps1' @exportParams
+
+        The first command exports all user accounts. The second command
+        sets the status Enable to $true for all exported user accounts and
+        overwrites the exported file with the first 2 user accounts only.
+        The last command creates all users in the exported file, being two
+        users with status Enabled set to $true.
 #>
 
 [CmdletBinding()]

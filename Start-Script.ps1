@@ -69,6 +69,34 @@
     .PARAMETER SnapshotsFolder
         The parent folder where all the snapshots will be store by computer name
         and snapshot date. By default this data is stored on the USB stick.
+
+    .EXAMPLE
+        # on PC1
+        $params = @{
+            Action = 'CreateSnapshot'
+            Snapshot = [Ordered]@{
+                UserAccounts  = $true
+                FirewallRules = $false
+                SmbShares     = $true
+            }
+        }
+        & 'Start-Script.ps1' @params
+
+        # On PC2
+        $params = @{
+            Action = 'RestoreSnapshot'
+            Snapshot = [Ordered]@{
+                UserAccounts  = $true
+                FirewallRules = $false
+                SmbShares     = $true
+            }
+        }
+        & 'Start-Script.ps1' @params
+
+        On PC1 an export is done of all user accounts and smb shares to the 
+        snapshot folder 'Snapshots' on the USB stick.
+        On PC2 this snapshot is restored and the user accounts and smb shares
+        that were on PC1 are recreated/updated as needed.
 #>
 
 [CmdLetBinding()]

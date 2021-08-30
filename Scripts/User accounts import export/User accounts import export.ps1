@@ -51,14 +51,12 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$UserAccountsFileName = 'UserAccounts.xml',
-    [String]$UserPasswordsFileName = 'UserAccounts.json'
+    [String]$UserAccountsFileName = 'UserAccounts.xml'
 )
 
 Begin {
     Try {
         $UserAccountsFile = Join-Path -Path $DataFolder -ChildPath $UserAccountsFileName
-        $UserPasswordsFile = Join-Path -Path $DataFolder -ChildPath $UserPasswordsFileName
 
         #region Test DataFolder
         If ($Action -eq 'Export') {
@@ -95,12 +93,10 @@ Process {
                 $users | ForEach-Object {
                     Write-Verbose "User account '$($_.Name)' description '$($_.description)'"
                 }
-                Write-Verbose "Export to file '$UserAccountsFile'"
-                $users | Export-Clixml -LiteralPath $UserAccountsFile -EA Stop
-
-                $users | Select-Object 'Name',
-                @{Name = 'Password'; Expression = { '' } } | ConvertTo-Json |
-                Out-File -LiteralPath $UserPasswordsFile
+                Write-Verbose "Export users to file '$UserAccountsFile'"
+                $users | Select-Object -Property *, 
+                @{Name = 'Password'; Expression = { '' } } | 
+                Export-Clixml -LiteralPath $UserAccountsFile -EA Stop
             }
             else {
                 throw 'No enabled local user accounts found'
@@ -112,19 +108,60 @@ Process {
 
             $knownComputerUsers = Get-LocalUser
 
+            Function Set-NewPasswordHC {
+                Param (
+                    [Parameter(Mandatory)]
+                    [String]$UserName,
+                    [String]$UserPassword,
+                    [Switch]$NewUser
+                )
+
+                if (-not $UserPassword) {
+                    $UserPassword = Read-Host "Please type a password for user account '$UserName':"
+                }
+
+                Do {
+                    try {
+                        $isPasswordAccepted = $false
+                        $params = @{
+                            Name        = $user.Name 
+                            Password    = ConvertTo-SecureString $UserPassword -AsPlainText -Force
+                            ErrorAction = 'Stop'
+                        }
+                        if ($NewUser) {
+                            New-LocalUser @params
+                        }
+                        else {
+                            Set-LocalUser @params
+                        }
+                        $isPasswordAccepted = $true
+                    }
+                    catch [Microsoft.PowerShell.Commands.InvalidPasswordException] {
+                        Write-Host "Password not accepted: $_" -ForegroundColor Red
+                        $UserPassword = Read-Host "Please type a new password for user account '$UserName':"
+                        $Error.RemoveAt(1)
+                    }
+                }
+                while (-not $isPasswordAccepted)
+            }
+
             foreach ($user in $importedUsers) {
                 try {                    
                     Write-Verbose "User '$($user.Name)'"
-                    if ($knownComputerUsers.Name -NotContains $user.Name) {
-                        $password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
-                        # $Password = Read-Host -AsSecureString
-                        $newParams = @{
-                            Name        = $user.Name 
-                            Password    = $password 
-                            ErrorAction = 'Stop'
-                        }
-                        New-LocalUser @newParams
+                    $passwordParams = @{
+                        UserName     = $user.Name 
+                        UserPassword = $user.Password 
+                        NewUser      = $false
                     }
+
+                    #region Create incomplete user when not present
+                    if ($knownComputerUsers.Name -NotContains $user.Name) {
+                        $passwordParams.NewUser = $true
+                        Set-NewPasswordHC @passwordParams
+                    }
+                    #endregion
+
+                    #region Set user account details
                     $setUserParams = @{
                         Name                  = $user.Name
                         Description           = $user.Description
@@ -140,6 +177,24 @@ Process {
                         $setUserParams.AccountNeverExpires = $true
                     }
                     Set-LocalUser @setUserParams
+                    #endregion
+
+                    if (-not $passwordParams.NewUser) {
+                        if ($user.Password) {
+                            Set-NewPasswordHC @passwordParams
+                        }
+                        else {
+                            do { 
+                                $answer = (
+                                    Read-Host "Would you like to set a new password for user account '$($user.Name)'? [Y]es or [N]o"
+                                ).ToLower()
+                            } 
+                            until ('y', 'n' -contains $answer)
+                            if ($answer -eq 'y') {
+                                Set-NewPasswordHC @passwordParams
+                            }
+                        }
+                    }
                 }
                 catch {
                     Write-Error "Failed to create user account '$($user.Name)': $_"

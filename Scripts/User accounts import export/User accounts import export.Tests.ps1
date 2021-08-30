@@ -25,10 +25,9 @@ BeforeAll {
 
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        Action                = 'Export'
-        DataFolder            = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        UserAccountsFileName  = 'UserAccounts.xml'
-        UserPasswordsFileName = 'UserAccounts.json'
+        Action               = 'Export'
+        DataFolder           = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        UserAccountsFileName = 'UserAccounts.xml'
     }
 }
 Describe 'the mandatory parameters are' {
@@ -88,7 +87,7 @@ Describe "Throw a terminating error on action 'Import' when" {
         Should -Throw "*user accounts file '$($testNewParams.DataFolder)\$($testNewParams.UserAccountsFileName)' not found"
     }
 }
-Describe "On action 'Export'" {
+Describe "On action 'Export' a user accounts xml file" {
     BeforeAll {
         Get-ChildItem -Path $testParams.DataFolder | Remove-Item
         $testUsers | ForEach-Object { 
@@ -111,35 +110,39 @@ Describe "On action 'Export'" {
 
         $testParams.Action = 'Export'
         .$testScript @testParams
+
+        $testImportParams = @{
+            LiteralPath = "$($testParams.DataFolder)\$($testParams.UserAccountsFileName)"
+        }
+        $testImport = Import-Clixml @testImportParams
     }
-    Context 'a user accounts xml file' {
-        BeforeAll {
-            $testImportParams = @{
-                LiteralPath = "$($testParams.DataFolder)\$($testParams.UserAccountsFileName)"
+    It 'is created' {
+        $testImportParams.LiteralPath | Should -Exist
+    }
+    It 'contains only enabled local user accounts' {
+        foreach ($testUser in $testUsers | Where-Object { $_.Enabled }) {
+            $testUserDetails = $testImport | Where-Object { 
+                $_.Name -eq $testUser.Name 
             }
-            $testImport = Import-Clixml @testImportParams
-        }
-        It 'is created' {
-            $testImportParams.LiteralPath | Should -Exist
-        }
-        It 'containing only enabled local user accounts' {
-            foreach ($testUser in $testUsers | Where-Object { $_.Enabled }) {
-                $testUserDetails = $testImport | Where-Object { 
-                    $_.Name -eq $testUser.Name 
-                }
-                $testUserDetails | Should -Not -BeNullOrEmpty
-                $testUserDetails.FullName | Should -Be $testUser.FullName
-                $testUserDetails.Description | Should -Be $testUser.Description
-            }
-        }
-        It 'not containing disabled local user accounts' {
-            $testImport | Where-Object { -not $_.Enabled } | 
-            Should -BeNullOrEmpty
+            $testUserDetails | Should -Not -BeNullOrEmpty
+            $testUserDetails.FullName | Should -Be $testUser.FullName
+            $testUserDetails.Description | Should -Be $testUser.Description
         }
     }
-    Context 'a password json file' {
-        It 'is created' {
-            1
+    It 'does not contain disabled local user accounts' {
+        $testImport | Where-Object { -not $_.Enabled } | 
+        Should -BeNullOrEmpty
+    }
+    It 'contains and empty password property for each user' {
+        foreach ($testUser in $testUsers | Where-Object { $_.Enabled }) {
+            $testUserDetails = $testImport | Where-Object { 
+                $_.Name -eq $testUser.Name 
+            }
+            $testUserDetails | Should -Not -BeNullOrEmpty
+            [bool](
+                $testUserDetails.PsObject.Properties.name -match 'Password'
+            ) | Should -BeTrue
+            $testUserDetails.Password | Should -BeNullOrEmpty
         }
     }
 }
@@ -162,7 +165,8 @@ Describe "On action 'Import' the exported xml file is read and" {
     }
     Context 'a non existing user account is created with' {
         It 'Name only' {
-            New-LocalUser @testUser | 
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -180,6 +184,8 @@ Describe "On action 'Import' the exported xml file is read and" {
                 Description = 'Test user'
             }
             New-LocalUser @testUser @testUserDetails | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -194,7 +200,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         It 'PasswordNeverExpires true' {
             $testUser.PasswordNeverExpires = $true
             
-            New-LocalUser @testUser | 
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -208,7 +215,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         It 'PasswordNeverExpires false' {
             $testUser.PasswordNeverExpires = $false
             
-            New-LocalUser @testUser | 
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -222,7 +230,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         It 'UserMayChangePassword true' {
             $testUser.UserMayNotChangePassword = $false
             
-            New-LocalUser @testUser | 
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -236,7 +245,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         It 'UserMayChangePassword false' {
             $testUser.UserMayNotChangePassword = $true
             
-            New-LocalUser @testUser | 
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -250,7 +260,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         It 'AccountExpires' {
             $testUser.AccountExpires = (Get-Date).AddDays(3) 
             
-            New-LocalUser @testUser | 
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -264,7 +275,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         It 'AccountNeverExpires' {
             $testUser.AccountNeverExpires = $true
             
-            New-LocalUser @testUser | 
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -283,6 +295,8 @@ Describe "On action 'Import' the exported xml file is read and" {
                 Description = 'Test user bob'
             }
             New-LocalUser @testUser @testUserDetails | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -301,6 +315,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'PasswordNeverExpires true' {
             New-LocalUser @testUser -PasswordNeverExpires | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -313,7 +329,9 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual.PasswordExpires | Should -BeNullOrEmpty
         }
         It 'PasswordNeverExpires false' {
-            New-LocalUser @testUser | Export-Clixml -LiteralPath $testXmlFile
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
+            Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
             New-LocalUser @testUser -PasswordNeverExpires
@@ -325,7 +343,9 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual.PasswordExpires | Should -Not -BeNullOrEmpty
         }
         It 'UserMayChangePassword true' {
-            New-LocalUser @testUser | Export-Clixml -LiteralPath $testXmlFile
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
+            Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
             New-LocalUser @testUser -UserMayNotChangePassword
@@ -338,6 +358,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'UserMayChangePassword false' {
             New-LocalUser @testUser -UserMayNotChangePassword | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
 
             Remove-LocalUser -Name $testUser.Name
@@ -351,6 +373,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'AccountExpires' {
             New-LocalUser @testUser -AccountExpires (Get-Date).AddDays(3) | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
         
             Remove-LocalUser -Name $testUser.Name
@@ -364,6 +388,8 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'AccountNeverExpires' {
             New-LocalUser @testUser -AccountNeverExpires | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
             Export-Clixml -LiteralPath $testXmlFile
 
             Remove-LocalUser -Name $testUser.Name
@@ -379,7 +405,10 @@ Describe "On action 'Import' the exported xml file is read and" {
     Context 'a non terminating error is created when' {
         It 'creating a user account fails' {
             $testXmlFile = Join-Path @testJoinParams
-            New-LocalUser @testUser | Export-Clixml -LiteralPath $testXmlFile
+            New-LocalUser @testUser | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
+            Export-Clixml -LiteralPath $testXmlFile
     
             Mock Set-LocalUser {
                 Write-Error 'Non terminating error Set-LocalUser'
@@ -390,7 +419,10 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'updating a user account fails' {
             $testXmlFile = Join-Path @testJoinParams
-            New-LocalUser @testUser | Export-Clixml -LiteralPath $testXmlFile
+            New-LocalUser @testUser | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
+            Export-Clixml -LiteralPath $testXmlFile
     
             Remove-LocalUser -Name $testUser.Name
 
@@ -402,4 +434,65 @@ Describe "On action 'Import' the exported xml file is read and" {
             $Error.Exception.Message | Should -Be "Failed to create user account '$($testUser.Name)': Non terminating error New-LocalUser"
         }
     }
+}
+Describe "on 'Import' a user account password" {
+    BeforeAll {
+        $ConvertToSecureString = Get-Command ConvertTo-SecureString
+        Mock ConvertTo-SecureString {
+            & $ConvertToSecureString -String 'P@s/-%*D!' -AsPlainText -Force
+        }
+        Mock Set-LocalUser
+
+        $testParams.Action = 'Import'
+        $testJoinParams = @{
+            Path      = $testParams.DataFolder 
+            ChildPath = $testParams.UserAccountsFileName
+        }
+        $testXmlFile = Join-Path @testJoinParams
+        $testUser = @{
+            Name     = $testUsers[0].Name
+            Password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
+        }
+    }
+    BeforeEach {
+        Remove-Item -Path $testXmlFile -EA Ignore
+        Remove-LocalUser -Name $testUser.Name -EA Ignore
+    }
+    Context 'is set when the import file has a password' {
+        It 'for an existing user account' {
+            $testNewPassword = 'P@s/-%*D!newPassword'
+
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { $testNewPassword } } | 
+            Export-Clixml -LiteralPath $testXmlFile
+
+            .$testScript @testParams
+
+            Should -Invoke ConvertTo-SecureString -Times 1 -Exactly -ParameterFilter {
+                ($String -eq $testNewPassword)
+            }
+            Should -Invoke Set-LocalUser -Times 1 -Exactly -ParameterFilter {
+                ($Password) -and ($Name -eq $testUser.Name) 
+            }
+        }
+        It 'for a new user account' {
+            $testNewPassword = 'P@s/-%*D!newPassword'
+            
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { $testNewPassword } } | 
+            Export-Clixml -LiteralPath $testXmlFile
+            
+            Remove-LocalUser -Name $testUser.Name -EA Ignore
+            
+            Mock New-LocalUser
+            .$testScript @testParams
+
+            Should -Invoke ConvertTo-SecureString -Times 1 -Exactly -ParameterFilter {
+                ($String -eq $testNewPassword)
+            }
+            Should -Invoke New-LocalUser -Times 1 -Exactly -ParameterFilter {
+                ($Password) -and ($Name -eq $testUser.Name) 
+            }
+        }
+    }   
 }

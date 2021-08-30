@@ -121,6 +121,7 @@ Describe "With Action set to 'Import'" {
                 Password    = ConvertTo-SecureString "P@ssW0rD!" -AsPlainText -Force
                 FullName    = 'testGivenName testSurname'
                 Description = 'User created by Pester for testing purposes'
+                ErrorAction = 'Ignore'
             }
             $null = New-LocalUser @testUserParams
         }
@@ -145,32 +146,32 @@ Describe "With Action set to 'Import'" {
         $acl.SetAccessRuleProtection($true, $false)
         $acl.AddAccessRule(
             (New-Object System.Security.AccessControl.FileSystemAccessRule(
-                    [System.Security.Principal.NTAccount]'BUILTIN\Administrators',
-                    [System.Security.AccessControl.FileSystemRights]::FullControl,
-                    [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-                    [System.Security.AccessControl.PropagationFlags]::None,
-                    [System.Security.AccessControl.AccessControlType]::Allow
-                )
+                [System.Security.Principal.NTAccount]'BUILTIN\Administrators',
+                [System.Security.AccessControl.FileSystemRights]::FullControl,
+                [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+                [System.Security.AccessControl.PropagationFlags]::None,
+                [System.Security.AccessControl.AccessControlType]::Allow
+            )
             )
         )
         $acl.AddAccessRule(
             (New-Object System.Security.AccessControl.FileSystemAccessRule(
-                    [System.Security.Principal.NTAccount]$testLocalUserNames[0],
-                    [System.Security.AccessControl.FileSystemRights]::FullControl,
-                    [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-                    [System.Security.AccessControl.PropagationFlags]::None,
-                    [System.Security.AccessControl.AccessControlType]::Allow
-                )
+                [System.Security.Principal.NTAccount]$testLocalUserNames[0],
+                [System.Security.AccessControl.FileSystemRights]::FullControl,
+                [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+                [System.Security.AccessControl.PropagationFlags]::None,
+                [System.Security.AccessControl.AccessControlType]::Allow
+            )
             )
         )
         $acl.AddAccessRule(
             (New-Object System.Security.AccessControl.FileSystemAccessRule(
-                    [System.Security.Principal.NTAccount]$testLocalUserNames[1],
-                    [System.Security.AccessControl.FileSystemRights]::Read,
-                    [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-                    [System.Security.AccessControl.PropagationFlags]::None,
-                    [System.Security.AccessControl.AccessControlType]::Allow
-                )
+                [System.Security.Principal.NTAccount]$testLocalUserNames[1],
+                [System.Security.AccessControl.FileSystemRights]::Read,
+                [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+                [System.Security.AccessControl.PropagationFlags]::None,
+                [System.Security.AccessControl.AccessControlType]::Allow
+            )
             )
         )
         $acl | Set-Acl -Path $testSmbShare.Path

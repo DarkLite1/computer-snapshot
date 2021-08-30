@@ -3,8 +3,8 @@
         Export or import smb shares.
 
     .DESCRIPTION
-        This script should be run on a machine that has the correct smb shares configured, then it can be run to export the smb shares. On another 
-        machine the exported shares can then be imported.
+        This script should be run on a computer that has the correct smb shares configured, then it can be run to export the smb shares. On another 
+        computer the exported shares can then be imported.
         
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DateFolder, when 
@@ -14,12 +14,20 @@
         Folder of the files containing all the smb shares data.
 
     .EXAMPLE
-        & 'C:\ImportExportSmbShares.ps1' -DataFolder 'C:\SmbShares' -Action 'Export'
+        $exportParams = @{
+            Action     = 'Export'
+            DataFolder = 'C:\SmbShares'
+        }
+        & 'C:\ImportExportSmbShares.ps1' @exportParams
 
-        Export all smb shares on the current machine to the folder 'SmbShares'
+        Export all smb shares on the current computer to the folder 'SmbShares'
 
     .EXAMPLE
-        & 'C:\ImportExportSmbShares.ps1' -ImportFolder 'C:\SmbShares' -Action 'Import'
+        $importParams = @{
+            Action     = 'Import'
+            DataFolder = 'C:\SmbShares'
+        }
+        & 'C:\ImportExportSmbShares.ps1' @importParams
 
         Import all smb shares in the folder 'SmbShares'
 #>
@@ -45,7 +53,7 @@ Begin {
             .EXAMPLE
                 Convert-AccountNameHC -Name 'PC1\mike'
                 Returns 'PC2\mike' when the computer name of the current
-                machine is 'PC2'
+                computer is 'PC2'
     
             .EXAMPLE
                 Convert-AccountNameHC -Name 'BUILTIN\Administrators'

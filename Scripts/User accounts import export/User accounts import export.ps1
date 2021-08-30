@@ -27,13 +27,23 @@
         Name of the file that contains all local user accounts
 
     .EXAMPLE
-        & 'C:\UserAccounts.ps1' -DataFolder 'C:\UserAccounts' -Action 'Export'
+        $exportParams = @{
+            Action               = 'Export'
+            DataFolder           = 'C:\UserAccounts'
+            UserAccountsFileName = 'UserAccounts.xml'
+        }
+        & 'C:\UserAccounts.ps1' @exportParams
 
         Export all user accounts on the current computer to the folder 
         'C:\UserAccounts'
 
     .EXAMPLE
-        & 'C:\UserAccounts.ps1' -DataFolder 'C:\UserAccounts' -Action 'Import'
+        $importParams = @{
+            Action               = 'Import'
+            DataFolder           = 'C:\UserAccounts'
+            UserAccountsFileName = 'UserAccounts.xml'
+        }
+        & 'C:\UserAccounts.ps1' @importParams
 
         Restore all user accounts in the folder 'C:\UserAccounts' on the 
         current computer
@@ -60,7 +70,7 @@
         & 'C:\UserAccounts.ps1' @exportParams
 
         The first command exports all user accounts. The second command
-        sets the status Enable to $true for all exported user accounts and
+        sets the status Enabled to $true for all exported user accounts and
         overwrites the exported file with the first 2 user accounts only.
         The last command creates all users in the exported file, being two
         users with status Enabled set to $true.

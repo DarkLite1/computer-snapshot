@@ -3,9 +3,9 @@
         Export or import firewall rules.
 
     .DESCRIPTION
-        This script should be run on a machine that has its firewall rules 
+        This script should be run on a computer that has its firewall rules 
         correctly configured with the action 'Export'. This will save the 
-        current firewall rules. On another machine this data will be used to 
+        current firewall rules. On another computer this data will be used to 
         restore the firewall rules.
 
     .PARAMETER Action
@@ -16,14 +16,24 @@
         Folder where to save or restore the firewall rules
 
     .EXAMPLE
-        & 'C:\ImportExportFirewallRules.ps1' -DataFolder 'C:\FirewallRules' -Action 'Export'
+        $exportParams = @{
+            Action     = 'Export'
+            DataFolder = 'C:\FirewallRules'
+        }
+        & 'C:\ImportExportFirewallRules.ps1' @exportParams
 
-        Export all firewall rules on the current machine to the folder 'FirewallRules'
+        Export all firewall rules on the current computer to the folder 
+        'FirewallRules'
 
     .EXAMPLE
-        & 'C:\ImportExportFirewallRules.ps1' -DataFolder 'C:\FirewallRules' -Action 'Import'
+        $importParams = @{
+            Action     = 'Import'
+            DataFolder = 'C:\FirewallRules'
+        }
+        & 'C:\ImportExportFirewallRules.ps1' @importParams
 
-        Restore all firewall rules in the folder 'FirewallRules' to the local machine
+        Restore all firewall rules in the folder 'FirewallRules' to the local 
+        computer
 #>
 
 [CmdletBinding()]
@@ -159,7 +169,7 @@ Begin {
                     InterfaceType       = $InterfaceTypeFilter.InterfaceType
                     LocalUser           = $SecurityFilter.LocalUser
                     RemoteUser          = $SecurityFilter.RemoteUser
-                    RemoteMachine       = $SecurityFilter.RemoteMachine
+                    Remotecomputer       = $SecurityFilter.RemoteMachine
                     Authentication      = $SecurityFilter.Authentication
                     Encryption          = $SecurityFilter.Encryption
                     OverrideBlockRules  = $SecurityFilter.OverrideBlockRules

@@ -228,10 +228,16 @@ Process {
                         NewUser      = $false
                     }
 
-                    #region Create incomplete user when not present
-                    if ($knownComputerUsers.Name -NotContains $user.Name) {
+                    #region Create incomplete user
+                    if (-not (
+                            $existingUser = $knownComputerUsers | 
+                            Where-Object { $_.Name -eq $user.Name })
+                    ) {
                         $passwordParams.NewUser = $true
                         Set-NewPasswordHC @passwordParams
+                    }
+                    elseif (-not $existingUser.Enabled) {
+                        Enable-LocalUser -Name $user.Name
                     }
                     #endregion
 

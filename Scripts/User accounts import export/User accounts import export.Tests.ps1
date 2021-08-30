@@ -400,7 +400,21 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual = Get-LocalUser -Name $testUser.Name -EA ignore
             $actual | Should -Not -BeNullOrEmpty
             $actual.AccountExpires | Should -BeNullOrEmpty
-        } 
+        }
+        It 'to enabled when it was disabled' {
+            New-LocalUser @testUser | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
+            Export-Clixml -LiteralPath $testXmlFile
+
+            Disable-LocalUser -Name $testUser.Name
+        
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.Enabled | Should -BeTrue
+        }
     }
     Context 'a non terminating error is created when' {
         It 'creating a user account fails' {

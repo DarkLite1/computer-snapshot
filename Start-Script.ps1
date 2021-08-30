@@ -1,11 +1,11 @@
 <#
     .SYNOPSIS
-        Create or restore a snapshot of the current machine.
+        Create or restore a snapshot of the current computer.
 
     .DESCRIPTION
         This script is intended to be run from a USB stick and is portable.
-        The intend is to create a snapshot on one machine and restore a
-        snapshot on another machine.
+        The intend is to create a snapshot on one computer and restore a
+        snapshot on another computer.
 
         PROCEDURE:
         Step 1: Configure the current computer to the desired state.
@@ -48,9 +48,9 @@
         # know what you're doing
 
     .PARAMETER Action
-        A snapshot of the current machine is created when set to 
+        A snapshot of the current computer is created when set to 
         'CreateSnapshot'. When set to 'RestoreSnapshot' the last created 
-        snapshot will be restored on the current machine.
+        snapshot will be restored on the current computer.
 
     .PARAMETER Snapshot
         Defines for which items to create a snapshot or which items to restore.
@@ -61,7 +61,7 @@
         By default the last created snapshot is used for restoring data. By
         using the argument '$RestoreSnapshotFolder' it is possible to restore
         data from a specific folder. This allows for the creation of named
-        snapshot folders that can be restored on specific machines. 
+        snapshot folders that can be restored on specific computers. 
         
         Simply copy/paste the data you want to restore to a specific folder
         and add the folder path to '$RestoreSnapshotFolder'.

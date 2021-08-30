@@ -1,14 +1,20 @@
 <#
     .SYNOPSIS
-        Export or import user rules.
+        Export or import user accounts
 
     .DESCRIPTION
-        This script should be run on a machine that has all the required
-        users already created on the computer. Then run the script with action
-        'Export' which will create a file containing the enabled user accounts.
+        This script should be run with action 'Export' on a computer that has 
+        all the required users already created. Then on another computer this
+        script can be run with action 'Import' to recreate the exported user 
+        accounts.
 
-        On another computer this script can be run with action 'Import' to
-        recreate the required user accounts.
+        Disabled and Enabled user accounts will be recreated with their 
+        respective status. 
+        
+        TIP:
+        It's encouraged to clean up the export file before running the script 
+        with action 'Import'. Remove disabled user accounts, remove non 
+        relevant user accounts, update user account details as desired, ...
 
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DateFolder, when 
@@ -18,19 +24,7 @@
         Folder where to save or restore the user accounts
 
     .PARAMETER UserAccountsFileName
-        Name of the file that contains all local user accounts that are enabled
-
-    .PARAMETER UserPasswordsFileName
-        Name of the file that contains all the passwords for user accounts that 
-        need to be imported. This allows you to set passwords upfront for each
-        account. 
-        
-        If this file is not present or the password is empty you will be 
-        prompted to provide a password for the user to be created.
-
-        When a user account already exist on the computer and no password is 
-        available in the UserPasswordsFileName, the password will not be 
-        changed for that user account.
+        Name of the file that contains all local user accounts
 
     .EXAMPLE
         & 'C:\UserAccounts.ps1' -DataFolder 'C:\UserAccounts' -Action 'Export'

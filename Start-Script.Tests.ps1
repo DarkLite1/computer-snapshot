@@ -4,12 +4,12 @@
 BeforeAll {
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        Action         = 'CreateSnapshot'
-        Snapshot       = [Ordered]@{
+        Action          = 'CreateSnapshot'
+        Snapshot        = [Ordered]@{
             Script1 = $false
             Script2 = $true
         }
-        Script         = @{
+        Script          = @{
             Script1 = (New-Item 'TestDrive:/1.ps1' -ItemType File).FullName
             Script2 = (New-Item 'TestDrive:/2.ps1' -ItemType File).FullName
         }

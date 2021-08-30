@@ -198,7 +198,7 @@ Begin {
         )
 
         if (-not $UserPassword) {
-            $encryptedPassword = Get-PasswordHC -UserName $UserName
+            $encryptedPassword = Request-PasswordHC -UserName $UserName
             # $UserPassword = Read-Host "Please type a password for user account '$UserName':"
         }
         else {
@@ -230,7 +230,7 @@ Begin {
                     Remove-LocalUser
                 }
                 Write-Host 'Password not accepted: The value provided for the password does not meet the length, complexity, or history requirements of the domain.' -ForegroundColor Red
-                $encryptedPassword = Get-PasswordHC -UserName $UserName
+                $encryptedPassword = Request-PasswordHC -UserName $UserName
                 $Error.RemoveAt(0)
             }
         }

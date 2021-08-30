@@ -5,7 +5,7 @@ BeforeAll {
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
         Action         = 'CreateSnapshot'
-        Snapshot       = @{
+        Snapshot       = [Ordered]@{
             Script1 = $false
             Script2 = $true
         }
@@ -42,7 +42,7 @@ Describe "Throw a terminating error for action 'CreateSnapshot' when" {
         Should -Throw "*Failed to create snapshots folder 'x:/xxx'*"
     }
     It 'the script does not exist' {
-        $testNewParams.Snapshot = @{
+        $testNewParams.Snapshot = [Ordered]@{
             Script1 = $true
         }
         $testNewParams.Script = @{
@@ -52,7 +52,7 @@ Describe "Throw a terminating error for action 'CreateSnapshot' when" {
         Should -Throw "*Script file 'TestDrive:/xxx.ps1' not found for snapshot item 'Script1'"
     }
     It 'a snapshot is requested for an item that does not exist' {
-        $testNewParams.Snapshot = @{
+        $testNewParams.Snapshot = [Ordered]@{
             Unknown = $true
         }
         { .$testScript @testNewParams } | 
@@ -93,7 +93,7 @@ Describe "Throw a terminating error for action 'RestoreSnapshot' when" {
     It 'the script does not exist' {
         New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script1" -ItemType Directory
         New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script1\Export.csv" -ItemType file
-        $testNewParams.Snapshot = @{
+        $testNewParams.Snapshot = [Ordered]@{
             Script1 = $true
         }
         $testNewParams.Script = @{
@@ -167,7 +167,7 @@ Describe 'When a child script fails with a non terminating error' {
 
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'CreateSnapshot'
-        $testNewParams.Snapshot = @{
+        $testNewParams.Snapshot = [Ordered]@{
             Script1 = $true
             Script2 = $true
             Script3 = $true
@@ -210,7 +210,7 @@ Describe 'When a child script fails with a terminating error' {
 
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'CreateSnapshot'
-        $testNewParams.Snapshot = @{
+        $testNewParams.Snapshot = [Ordered]@{
             Script1 = $true
             Script2 = $true
             Script3 = $true

@@ -200,7 +200,7 @@ Process {
     Try {
         If ($Action -eq 'Export') {
             Write-Verbose "Export user accounts to file '$UserAccountsFile'"
-            If ($users = Get-LocalUser | Where-Object { $_.Enabled }) {
+            If ($users = Get-LocalUser) {
                 $users | ForEach-Object {
                     Write-Verbose "User account '$($_.Name)' description '$($_.description)'"
                 }
@@ -229,15 +229,9 @@ Process {
                     }
 
                     #region Create incomplete user
-                    if (-not (
-                            $existingUser = $knownComputerUsers | 
-                            Where-Object { $_.Name -eq $user.Name })
-                    ) {
+                    if ($knownComputerUsers.Name -notContains $user.Name) {
                         $passwordParams.NewUser = $true
                         Set-NewPasswordHC @passwordParams
-                    }
-                    elseif (-not $existingUser.Enabled) {
-                        Enable-LocalUser -Name $user.Name
                     }
                     #endregion
 
@@ -257,6 +251,16 @@ Process {
                         $setUserParams.AccountNeverExpires = $true
                     }
                     Set-LocalUser @setUserParams
+                    #endregion
+
+                    #region Enable or disable user account
+                    if ($user.Enabled) {
+                        Enable-LocalUser -Name $user.Name
+                    }
+                    else {
+                        Write-Warning "Disable user account '$($user.Name)' as requested in the import file"
+                        Disable-LocalUser -Name $user.Name
+                    }
                     #endregion
 
                     if (-not $passwordParams.NewUser) {

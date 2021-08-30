@@ -129,10 +129,6 @@ Describe "On action 'Export' a user accounts xml file" {
             $testUserDetails.Description | Should -Be $testUser.Description
         }
     }
-    It 'does not contain disabled local user accounts' {
-        $testImport | Where-Object { -not $_.Enabled } | 
-        Should -BeNullOrEmpty
-    }
     It 'contains and empty password property for each user' {
         foreach ($testUser in $testUsers | Where-Object { $_.Enabled }) {
             $testUserDetails = $testImport | Where-Object { 
@@ -286,7 +282,39 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual = Get-LocalUser -Name $testUser.Name -EA ignore
             $actual | Should -Not -BeNullOrEmpty
             $actual.AccountExpires | Should -BeNullOrEmpty
-        } 
+        }
+        It 'Enabled' {
+            New-LocalUser @testUser | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
+            Export-Clixml -LiteralPath $testXmlFile
+
+            Remove-LocalUser -Name $testUser.Name
+        
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.Enabled | Should -BeTrue
+        }
+        It 'not Enabled' {
+            New-LocalUser @testUser | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
+            Export-Clixml -LiteralPath $testXmlFile
+
+            Remove-LocalUser -Name $testUser.Name
+
+            $testImport = Import-Clixml -LiteralPath $testXmlFile
+            $testImport.Enabled = $false
+            $testImport | Export-Clixml -LiteralPath $testXmlFile
+            
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.Enabled | Should -BeFalse
+        }
     }
     Context 'an existing user account is updated' {
         It 'FullName Description' {
@@ -401,7 +429,7 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual | Should -Not -BeNullOrEmpty
             $actual.AccountExpires | Should -BeNullOrEmpty
         }
-        It 'to enabled when it was disabled' {
+        It 'to Enabled' {
             New-LocalUser @testUser | 
             Select-Object -Property *, 
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
@@ -414,6 +442,22 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual = Get-LocalUser -Name $testUser.Name -EA ignore
             $actual | Should -Not -BeNullOrEmpty
             $actual.Enabled | Should -BeTrue
+        }
+        It 'to not Enabled' {
+            New-LocalUser @testUser | 
+            Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
+            Export-Clixml -LiteralPath $testXmlFile
+
+            $testImport = Import-Clixml -LiteralPath $testXmlFile
+            $testImport.Enabled = $false
+            $testImport | Export-Clixml -LiteralPath $testXmlFile
+            
+            .$testScript @testParams
+        
+            $actual = Get-LocalUser -Name $testUser.Name -EA ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.Enabled | Should -BeFalse
         }
     }
     Context 'a non terminating error is created when' {
@@ -440,6 +484,7 @@ Describe "On action 'Import' the exported xml file is read and" {
     
             Remove-LocalUser -Name $testUser.Name
 
+            Mock Enable-LocalUser
             Mock New-LocalUser {
                 Write-Error 'Non terminating error New-LocalUser'
             }
@@ -499,6 +544,7 @@ Describe "on 'Import' a user account password" {
             Remove-LocalUser -Name $testUser.Name -EA Ignore
             
             Mock New-LocalUser
+            Mock Enable-LocalUser
             .$testScript @testParams
 
             Should -Invoke ConvertTo-SecureString -Times 1 -Exactly -ParameterFilter {
@@ -576,6 +622,7 @@ Describe "on 'Import' a user account password" {
                 }
 
                 Mock New-LocalUser
+                Mock Enable-LocalUser
                 .$testScript @testParams
 
                 Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {

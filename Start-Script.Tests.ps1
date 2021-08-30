@@ -102,6 +102,14 @@ Describe "Throw a terminating error for action 'RestoreSnapshot' when" {
         { .$testScript @testNewParams } | 
         Should -Throw "*Script file 'TestDrive:/xxx.ps1' not found for snapshot item 'Script1'"
     }
+    It 'an xml file could not be imported' {
+        $testSnapshotFolder = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script2" -ItemType Directory).FullName
+        $testFile = Join-Path $testSnapshotFolder 'export.xml'
+        'a' | Out-File -LiteralPath $testFile
+        
+        { .$testScript @testNewParams } | 
+        Should -Throw "*File '$testFile' is not a valid xml file for snapshot item 'Script2'"
+    }
 }
 Describe "When action is 'CreateSnapshot'" {
     BeforeEach {

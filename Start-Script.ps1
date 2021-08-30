@@ -82,7 +82,7 @@ Param (
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
-        UserAccounts = "$PSScriptRoot\Scripts\User accounts import export\User accounts import export.ps1"
+        UserAccounts  = "$PSScriptRoot\Scripts\User accounts import export\User accounts import export.ps1"
         FirewallRules = "$PSScriptRoot\Scripts\Firewall rules import export\Firewall rules import export.ps1"
         SmbShares     = "$PSScriptRoot\Scripts\Smb shares import export\Smb shares import export.ps1"
     },
@@ -200,8 +200,23 @@ Begin {
                     throw "Snapshot folder '$($invokeScriptParams.DataFolder)' not found"
                 }
     
-                If ((Get-ChildItem -LiteralPath $invokeScriptParams.DataFolder | Measure-Object).Count -eq 0) {
+                $folderContent = @(Get-ChildItem -LiteralPath $invokeScriptParams.DataFolder)
+                
+                If ($folderContent.Count -eq 0) {
                     throw "No data found for snapshot item '$($item.Key)' in folder '$($invokeScriptParams.DataFolder)'"
+                }
+                #endregion
+                
+                #region Test valid import files
+                Foreach ($file in ($folderContent | 
+                        Where-Object { $_.extension -eq '.xml' })
+                ) {
+                    try {
+                        $null = Import-Clixml -LiteralPath $file.FullName
+                    }
+                    catch {
+                        throw "File '$($file.FullName)' is not a valid xml file for snapshot item '$($item.Key)'"
+                    }
                 }
                 #endregion
             }

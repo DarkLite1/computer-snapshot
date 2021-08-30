@@ -128,6 +128,41 @@ Begin {
             $true
         }
     }
+    Function Request-PasswordHC {
+        <#
+            .SYNOPSIS
+                Ask the user to type a password in the console
+
+            .DESCRIPTION
+                The password typed will be checked by asking the users to type
+                it twice and confirming it's a match. In case it's not matching
+                we'll ask again.
+        #>
+
+        [OutputType([System.Security.SecureString])]
+        Param (
+            [Parameter(Mandatory)]
+            [String]$UserName
+        )
+        do {
+            $compareParams = @{
+                Password1 = Read-Host "Please type a password for user account '$UserName'" -AsSecureString
+                Password2 = Read-Host "Type the password again to confirm it's correct" -AsSecureString
+            }
+            $passwordsMatching = Compare-EncryptedPasswordsEqualHC @compareParams
+    
+            if (-not $passwordsMatching) {
+                Write-Host 'Passwords are not matching, please try again' -ForegroundColor Red
+            }
+            if ($compareParams.Password1.Length -eq 0) {
+                $passwordsMatching = $false
+                Write-Host 'Passwords can not be blank, please try again' -ForegroundColor Red
+            }
+        }
+        until ($passwordsMatching)
+    
+        $compareParams.Password1
+    }    
     Function Set-NewPasswordHC {
         <#
             .SYNOPSIS
@@ -163,7 +198,11 @@ Begin {
         )
 
         if (-not $UserPassword) {
-            $UserPassword = Read-Host "Please type a password for user account '$UserName':"
+            $encryptedPassword = Get-PasswordHC -UserName $UserName
+            # $UserPassword = Read-Host "Please type a password for user account '$UserName':"
+        }
+        else {
+            $encryptedPassword = ConvertTo-SecureString $UserPassword -AsPlainText -Force
         }
 
         Do {
@@ -171,7 +210,7 @@ Begin {
                 $isPasswordAccepted = $false
                 $params = @{
                     Name        = $user.Name 
-                    Password    = ConvertTo-SecureString $UserPassword -AsPlainText -Force
+                    Password    = $encryptedPassword
                     ErrorAction = 'Stop'
                 }
                 if ($NewUser) {
@@ -191,8 +230,8 @@ Begin {
                     Remove-LocalUser
                 }
                 Write-Host 'Password not accepted: The value provided for the password does not meet the length, complexity, or history requirements of the domain.' -ForegroundColor Red
-                $UserPassword = Read-Host "Please type a new password for user account '$UserName':"
-                $Error.RemoveAt(1)
+                $encryptedPassword = Get-PasswordHC -UserName $UserName
+                $Error.RemoveAt(0)
             }
         }
         while (-not $isPasswordAccepted)

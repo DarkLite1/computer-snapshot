@@ -137,7 +137,14 @@ Process {
                         $isPasswordAccepted = $true
                     }
                     catch [Microsoft.PowerShell.Commands.InvalidPasswordException] {
-                        Write-Host "Password not accepted: $_" -ForegroundColor Red
+                        if ($NewUser) {
+                            # a user account is created first and only
+                            # afterwards the password is set. So a user will
+                            # be created when the password is not complex enough
+                            Get-LocalUser -Name $UserName -EA Ignore |
+                            Remove-LocalUser
+                        }
+                        Write-Host 'Password not accepted: The value provided for the password does not meet the length, complexity, or history requirements of the domain.' -ForegroundColor Red
                         $UserPassword = Read-Host "Please type a new password for user account '$UserName':"
                         $Error.RemoveAt(1)
                     }

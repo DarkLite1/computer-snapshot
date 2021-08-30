@@ -458,7 +458,7 @@ Describe "on 'Import' a user account password" {
         Remove-Item -Path $testXmlFile -EA Ignore
         Remove-LocalUser -Name $testUser.Name -EA Ignore
     }
-    Context 'is set when the import file has a password' {
+    Context 'is always set when the import file has a password' {
         It 'for an existing user account' {
             $testNewPassword = 'P@s/-%*D!newPassword'
 
@@ -493,6 +493,122 @@ Describe "on 'Import' a user account password" {
             Should -Invoke New-LocalUser -Times 1 -Exactly -ParameterFilter {
                 ($Password) -and ($Name -eq $testUser.Name) 
             }
+            Should -Not -Invoke Set-LocalUser -ParameterFilter {
+                ($Password) -and ($Name -eq $testUser.Name) 
+            }
         }
-    }   
+    }
+    Context 'is always asked in the console when the import file has no password' {
+        Context 'for an existing user account' {
+            It 'the password can be updated' {
+                New-LocalUser @testUser | Select-Object -Property *, 
+                @{Name = 'Password'; Expression = { '' } } | 
+                Export-Clixml -LiteralPath $testXmlFile
+
+                $testNewPassword = 'P@s/-%*D!'
+
+                Mock Read-Host { 'y' } -ParameterFilter {
+                    ($Prompt -eq "Would you like to set a new password for user account '$($testUser.Name)'? [Y]es or [N]o")
+                }
+                Mock Read-Host { $testNewPassword } -ParameterFilter {
+                    ($Prompt -eq "Please type a password for user account '$($testUser.Name)':")
+                }
+                .$testScript @testParams
+
+                Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                    ($Prompt -eq "Would you like to set a new password for user account '$($testUser.Name)'? [Y]es or [N]o")
+                }
+                Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                    ($Prompt -eq "Please type a password for user account '$($testUser.Name)':")
+                }
+                Should -Invoke ConvertTo-SecureString -Times 1 -Exactly -ParameterFilter {
+                    ($String -eq $testNewPassword)
+                }
+                Should -Invoke Set-LocalUser -Times 1 -Exactly -ParameterFilter {
+                    ($Password) -and ($Name -eq $testUser.Name) 
+                }
+            }
+            It 'the password does not need to be updated' {
+                New-LocalUser @testUser | Select-Object -Property *, 
+                @{Name = 'Password'; Expression = { '' } } | 
+                Export-Clixml -LiteralPath $testXmlFile
+
+                Mock Read-Host { 'n' } -ParameterFilter {
+                ($Prompt -eq "Would you like to set a new password for user account '$($testUser.Name)'? [Y]es or [N]o")
+                }
+        
+                .$testScript @testParams
+
+                Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                    ($Prompt -eq "Would you like to set a new password for user account '$($testUser.Name)'? [Y]es or [N]o")
+                }
+                Should -Not -Invoke ConvertTo-SecureString
+                Should -Not -Invoke Set-LocalUser -ParameterFilter {
+                    ($Password) -and ($Name -eq $testUser.Name) 
+                }
+            }
+        }
+        Context 'for a new user account' {
+            It 'the password must be set' {
+                New-LocalUser @testUser | Select-Object -Property *, 
+                @{Name = 'Password'; Expression = { '' } } | 
+                Export-Clixml -LiteralPath $testXmlFile
+                Remove-LocalUser -Name $testUser.Name -EA Ignore
+
+                $testNewPassword = 'P@s/-%*D!'
+
+                Mock Read-Host { $testNewPassword } -ParameterFilter {
+                    ($Prompt -eq "Please type a password for user account '$($testUser.Name)':")
+                }
+
+                Mock New-LocalUser
+                .$testScript @testParams
+
+                Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                    ($Prompt -eq "Please type a password for user account '$($testUser.Name)':")
+                }
+                Should -Invoke ConvertTo-SecureString -Times 1 -Exactly -ParameterFilter {
+                    ($String -eq $testNewPassword)
+                }
+                Should -Invoke New-LocalUser -Times 1 -Exactly -ParameterFilter {
+                    ($Password) -and ($Name -eq $testUser.Name) 
+                }
+            }
+        }
+    }
+    Context 'a new password is asked in the console when it is not complex enough' {
+        BeforeAll {
+            $testNotComplexPassword = '123'
+            $testNewPassword = 'P@s/-%*D!'
+            Mock ConvertTo-SecureString {
+                & $ConvertToSecureString -String $testNotComplexPassword -AsPlainText -Force
+            } -ParameterFilter { ($String -eq $testNotComplexPassword) }
+            Mock ConvertTo-SecureString {
+                & $ConvertToSecureString -String $testNewPassword -AsPlainText -Force
+            } -ParameterFilter { ($String -eq $testNewPassword) }
+        }
+        It 'for a password in the import file' {
+            New-LocalUser @testUser | Select-Object -Property *, 
+            @{Name = 'Password'; Expression = { $testNotComplexPassword } } | 
+            Export-Clixml -LiteralPath $testXmlFile
+            Remove-LocalUser $testUser.Name -EA ignore
+
+            Mock Read-Host { $testNewPassword } -ParameterFilter {
+                ($Prompt -eq "Please type a new password for user account '$($testUser.Name)':")
+            }
+
+            Mock Write-Host
+            .$testScript @testParams
+
+            Should -Invoke Write-Host -ParameterFilter {
+                ($Object -like "Password not accepted*")
+            }
+            Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                ($Prompt -eq "Please type a new password for user account '$($testUser.Name)':")
+            }
+            Should -Invoke ConvertTo-SecureString -Times 1 -Exactly -ParameterFilter {
+                ($String -eq $testNewPassword)
+            }
+        }
+    }
 }

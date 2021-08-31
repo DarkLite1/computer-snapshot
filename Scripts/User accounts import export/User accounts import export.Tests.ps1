@@ -27,7 +27,7 @@ BeforeAll {
     $testParams = @{
         Action               = 'Export'
         DataFolder           = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        UserAccountsFileName = 'UserAccounts.xml'
+        UserAccountsFileName = 'UserAccounts.json'
     }
 }
 Describe 'the mandatory parameters are' {
@@ -87,7 +87,7 @@ Describe "Throw a terminating error on action 'Import' when" {
         Should -Throw "*user accounts file '$($testNewParams.DataFolder)\$($testNewParams.UserAccountsFileName)' not found"
     }
 }
-Describe "On action 'Export' a user accounts xml file" {
+Describe "On action 'Export' a user accounts json file" {
     BeforeAll {
         Get-ChildItem -Path $testParams.DataFolder | Remove-Item
         $testUsers | ForEach-Object { 
@@ -113,8 +113,9 @@ Describe "On action 'Export' a user accounts xml file" {
 
         $testImportParams = @{
             LiteralPath = "$($testParams.DataFolder)\$($testParams.UserAccountsFileName)"
+            Raw         = $true
         }
-        $testImport = Import-Clixml @testImportParams
+        $testImport = Get-Content @testImportParams | ConvertFrom-Json -EA Stop
     }
     It 'is created' {
         $testImportParams.LiteralPath | Should -Exist
@@ -142,29 +143,29 @@ Describe "On action 'Export' a user accounts xml file" {
         }
     }
 }
-Describe "On action 'Import' the exported xml file is read and" {
+Describe "On action 'Import' the exported json file is read and" {
     BeforeAll {
         $testParams.Action = 'Import'
         $testJoinParams = @{
             Path      = $testParams.DataFolder 
             ChildPath = $testParams.UserAccountsFileName
         }
-        $testXmlFile = Join-Path @testJoinParams
+        $testFile = Join-Path @testJoinParams
     }
     BeforeEach {
         $testUser = @{
             Name     = $testUsers[0].Name
             Password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
         }
-        Remove-Item -Path $testXmlFile -EA Ignore
+        Remove-Item -Path $testFile -EA Ignore
         Remove-LocalUser -Name $testUser.Name -EA Ignore
     }
     Context 'a non existing user account is created with' {
         It 'Name only' {
-            New-LocalUser @testUser | Select-Object -Property *, 
+            New-LocalUser @testUser | Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
-        
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
+                    
             Remove-LocalUser -Name $testUser.Name
 
             .$testScript @testParams
@@ -180,10 +181,10 @@ Describe "On action 'Import' the exported xml file is read and" {
                 Description = 'Test user'
             }
             New-LocalUser @testUser @testUserDetails | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
-        
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
+
             Remove-LocalUser -Name $testUser.Name
 
             .$testScript @testParams
@@ -195,10 +196,11 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'PasswordNeverExpires true' {
             $testUser.PasswordNeverExpires = $true
-            
-            New-LocalUser @testUser | Select-Object -Property *, 
+
+            New-LocalUser @testUser | 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
 
@@ -210,10 +212,11 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'PasswordNeverExpires false' {
             $testUser.PasswordNeverExpires = $false
-            
-            New-LocalUser @testUser | Select-Object -Property *, 
+
+            New-LocalUser @testUser | 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
 
@@ -225,10 +228,11 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'UserMayChangePassword true' {
             $testUser.UserMayNotChangePassword = $false
-            
-            New-LocalUser @testUser | Select-Object -Property *, 
+
+            New-LocalUser @testUser | 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
 
@@ -240,10 +244,11 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'UserMayChangePassword false' {
             $testUser.UserMayNotChangePassword = $true
-            
-            New-LocalUser @testUser | Select-Object -Property *, 
+
+            New-LocalUser @testUser | 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
 
@@ -255,10 +260,11 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'AccountExpires' {
             $testUser.AccountExpires = (Get-Date).AddDays(3) 
-            
-            New-LocalUser @testUser | Select-Object -Property *, 
+
+            New-LocalUser @testUser | 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
 
@@ -270,10 +276,11 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'AccountNeverExpires' {
             $testUser.AccountNeverExpires = $true
-            
-            New-LocalUser @testUser | Select-Object -Property *, 
+
+            New-LocalUser @testUser | 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
 
@@ -285,9 +292,9 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'Enabled' {
             New-LocalUser @testUser | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
 
             Remove-LocalUser -Name $testUser.Name
         
@@ -298,17 +305,16 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual.Enabled | Should -BeTrue
         }
         It 'not Enabled' {
-            New-LocalUser @testUser | 
+            New-LocalUser @testUser
+            Disable-LocalUser -Name $testUser.Name
+
+            Get-LocalUser -Name $testUser.Name | 
             Select-Object -Property *, 
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
 
             Remove-LocalUser -Name $testUser.Name
-
-            $testImport = Import-Clixml -LiteralPath $testXmlFile
-            $testImport.Enabled = $false
-            $testImport | Export-Clixml -LiteralPath $testXmlFile
-            
+     
             .$testScript @testParams
         
             $actual = Get-LocalUser -Name $testUser.Name -EA ignore
@@ -323,9 +329,9 @@ Describe "On action 'Import' the exported xml file is read and" {
                 Description = 'Test user bob'
             }
             New-LocalUser @testUser @testUserDetails | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
             $testUserDetailsWrong = @{
@@ -343,9 +349,9 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'PasswordNeverExpires true' {
             New-LocalUser @testUser -PasswordNeverExpires | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
             New-LocalUser @testUser
@@ -357,9 +363,9 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual.PasswordExpires | Should -BeNullOrEmpty
         }
         It 'PasswordNeverExpires false' {
-            New-LocalUser @testUser | Select-Object -Property *, 
+            New-LocalUser @testUser | Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
             New-LocalUser @testUser -PasswordNeverExpires
@@ -371,9 +377,9 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual.PasswordExpires | Should -Not -BeNullOrEmpty
         }
         It 'UserMayChangePassword true' {
-            New-LocalUser @testUser | Select-Object -Property *, 
+            New-LocalUser @testUser | Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
             New-LocalUser @testUser -UserMayNotChangePassword
@@ -386,10 +392,9 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'UserMayChangePassword false' {
             New-LocalUser @testUser -UserMayNotChangePassword | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
-
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
             Remove-LocalUser -Name $testUser.Name
             New-LocalUser @testUser
         
@@ -401,9 +406,9 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'AccountExpires' {
             New-LocalUser @testUser -AccountExpires (Get-Date).AddDays(3) | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
         
             Remove-LocalUser -Name $testUser.Name
             New-LocalUser @testUser -AccountNeverExpires
@@ -416,9 +421,9 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'AccountNeverExpires' {
             New-LocalUser @testUser -AccountNeverExpires | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
 
             Remove-LocalUser -Name $testUser.Name
             New-LocalUser @testUser -AccountExpires (Get-Date).AddDays(3)
@@ -431,12 +436,12 @@ Describe "On action 'Import' the exported xml file is read and" {
         }
         It 'to Enabled' {
             New-LocalUser @testUser | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
 
             Disable-LocalUser -Name $testUser.Name
-        
+
             .$testScript @testParams
         
             $actual = Get-LocalUser -Name $testUser.Name -EA ignore
@@ -444,15 +449,16 @@ Describe "On action 'Import' the exported xml file is read and" {
             $actual.Enabled | Should -BeTrue
         }
         It 'to not Enabled' {
-            New-LocalUser @testUser | 
+            New-LocalUser @testUser
+            Disable-LocalUser -Name $testUser.Name
+            Get-LocalUser -Name $testUser.Name | 
             Select-Object -Property *, 
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
 
-            $testImport = Import-Clixml -LiteralPath $testXmlFile
-            $testImport.Enabled = $false
-            $testImport | Export-Clixml -LiteralPath $testXmlFile
-            
+            Remove-LocalUser -Name $testUser.Name
+            New-LocalUser @testUser
+ 
             .$testScript @testParams
         
             $actual = Get-LocalUser -Name $testUser.Name -EA ignore
@@ -462,11 +468,11 @@ Describe "On action 'Import' the exported xml file is read and" {
     }
     Context 'a non terminating error is created when' {
         It 'creating a user account fails' {
-            $testXmlFile = Join-Path @testJoinParams
+            $testFile = Join-Path @testJoinParams
             New-LocalUser @testUser | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
     
             Mock Set-LocalUser {
                 Write-Error 'Non terminating error Set-LocalUser'
@@ -474,13 +480,13 @@ Describe "On action 'Import' the exported xml file is read and" {
             $Error.Clear()
             .$testScript @testParams -EA SilentlyContinue
             $Error.Exception.Message | Should -Be "Failed to create user account '$($testUser.Name)': Non terminating error Set-LocalUser"
-        }
+        } 
         It 'updating a user account fails' {
-            $testXmlFile = Join-Path @testJoinParams
+            $testFile = Join-Path @testJoinParams
             New-LocalUser @testUser | 
-            Select-Object -Property *, 
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { 'P@s/-%*D!' } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
     
             Remove-LocalUser -Name $testUser.Name
 
@@ -507,23 +513,24 @@ Describe "on 'Import' a user account password" {
             Path      = $testParams.DataFolder 
             ChildPath = $testParams.UserAccountsFileName
         }
-        $testXmlFile = Join-Path @testJoinParams
+        $testFile = Join-Path @testJoinParams
         $testUser = @{
             Name     = $testUsers[0].Name
             Password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
         }
     }
     BeforeEach {
-        Remove-Item -Path $testXmlFile -EA Ignore
+        Remove-Item -Path $testFile -EA Ignore
         Remove-LocalUser -Name $testUser.Name -EA Ignore
     }
     Context 'is always set when the import file has a password' {
         It 'for an existing user account' {
             $testNewPassword = 'P@s/-%*D!newPassword'
 
-            New-LocalUser @testUser | Select-Object -Property *, 
+            New-LocalUser @testUser |
+            Select-Object -Property *,
             @{Name = 'Password'; Expression = { $testNewPassword } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
 
             .$testScript @testParams
 
@@ -537,9 +544,9 @@ Describe "on 'Import' a user account password" {
         It 'for a new user account' {
             $testNewPassword = 'P@s/-%*D!newPassword'
             
-            New-LocalUser @testUser | Select-Object -Property *, 
+            New-LocalUser @testUser | Select-Object -Property *,
             @{Name = 'Password'; Expression = { $testNewPassword } } | 
-            Export-Clixml -LiteralPath $testXmlFile
+            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
             
             Remove-LocalUser -Name $testUser.Name -EA Ignore
             
@@ -561,9 +568,9 @@ Describe "on 'Import' a user account password" {
     Context 'is always asked in the console when the import file has no password' {
         Context 'for an existing user account' {
             It 'the password can be updated' {
-                New-LocalUser @testUser | Select-Object -Property *, 
+                New-LocalUser @testUser | Select-Object -Property *,
                 @{Name = 'Password'; Expression = { '' } } | 
-                Export-Clixml -LiteralPath $testXmlFile
+                ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
 
                 $testEncryptedPassword = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
 
@@ -589,12 +596,12 @@ Describe "on 'Import' a user account password" {
                 }
             }
             It 'the password does not need to be updated' {
-                New-LocalUser @testUser | Select-Object -Property *, 
-                @{Name = 'Password'; Expression = { '' } } | 
-                Export-Clixml -LiteralPath $testXmlFile
+                New-LocalUser @testUser | Select-Object -Property *,
+                @{Name = 'Password'; Expression = { $testNewPassword } } | 
+                ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
 
                 Mock Read-Host { 'n' } -ParameterFilter {
-                ($Prompt -eq "Would you like to set a new password for user account '$($testUser.Name)'? [Y]es or [N]o")
+                    ($Prompt -eq "Would you like to set a new password for user account '$($testUser.Name)'? [Y]es or [N]o")
                 }
         
                 .$testScript @testParams
@@ -610,9 +617,11 @@ Describe "on 'Import' a user account password" {
         }
         Context 'for a new user account' {
             It 'the password must be set' {
-                New-LocalUser @testUser | Select-Object -Property *, 
+                New-LocalUser @testUser | 
+                Select-Object -Property *,
                 @{Name = 'Password'; Expression = { '' } } | 
-                Export-Clixml -LiteralPath $testXmlFile
+                ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
+
                 Remove-LocalUser -Name $testUser.Name -EA Ignore
 
                 $testEncryptedPassword = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
@@ -641,9 +650,11 @@ Describe "on 'Import' a user account password" {
         }
     }
     It 'is asked in the console when it is not complex enough' {
-        New-LocalUser @testUser | Select-Object -Property *, 
-        @{Name = 'Password'; Expression = { '123' } } | 
-        Export-Clixml -LiteralPath $testXmlFile
+        New-LocalUser @testUser | 
+        Select-Object -Property *,
+        @{Name = 'Password'; Expression = { '123' } } |
+        ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
+        
         Remove-LocalUser $testUser.Name -EA ignore
 
         Mock ConvertTo-SecureString {

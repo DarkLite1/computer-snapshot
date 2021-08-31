@@ -30,7 +30,7 @@
         $exportParams = @{
             Action               = 'Export'
             DataFolder           = 'C:\UserAccounts'
-            UserAccountsFileName = 'UserAccounts.xml'
+            UserAccountsFileName = 'UserAccounts.json'
         }
         & 'C:\UserAccounts.ps1' @exportParams
 
@@ -41,7 +41,7 @@
         $importParams = @{
             Action               = 'Import'
             DataFolder           = 'C:\UserAccounts'
-            UserAccountsFileName = 'UserAccounts.xml'
+            UserAccountsFileName = 'UserAccounts.json'
         }
         & 'C:\UserAccounts.ps1' @importParams
 
@@ -52,7 +52,7 @@
         $exportParams = @{
             Action               = 'Export'
             DataFolder           = 'C:\UserAccounts'
-            UserAccountsFileName = 'UserAccounts.xml'
+            UserAccountsFileName = 'UserAccounts.json'
         }
         & 'C:\UserAccounts.ps1' @exportParams
 
@@ -62,9 +62,9 @@
         }
         $exportFile = Join-Path @joinParams
 
-        $ExportedUsers = Import-Clixml -LiteralPath $exportFile
+        $ExportedUsers = Get-Content -Path $exportFile -Raw | ConvertFrom-Json
         $ExportedUsers | Foreach-Object {$_.Enabled = $true}
-        $ExportedUsers[0..1] | Export-Clixml -LiteralPath $exportFile
+        $ExportedUsers[0..1] | ConvertTo-Json | Out-File -Path $exportFile -Encoding UTF8
 
         $exportParams.Action = 'Import'
         & 'C:\UserAccounts.ps1' @exportParams
@@ -275,9 +275,10 @@ Process {
                     Write-Verbose "User account '$($_.Name)' description '$($_.description)'"
                 }
                 Write-Verbose "Export users to file '$UserAccountsFile'"
-                $users | Select-Object -Property *, 
-                @{Name = 'Password'; Expression = { '' } } | 
-                Export-Clixml -LiteralPath $UserAccountsFile -EA Stop
+                $users | Select-Object -Property *,
+                @{Name = 'Password'; Expression = { '' } } -ExcludeProperty PrincipalSource, SID, ObjectClass, PasswordChangeableDate | 
+                ConvertTo-Json | 
+                Out-File -FilePath $UserAccountsFile -Encoding UTF8
             }
             else {
                 throw 'No enabled local user accounts found'
@@ -285,7 +286,8 @@ Process {
         }
         else {
             Write-Verbose "Import user accounts from file '$UserAccountsFile'"
-            $importedUsers = Import-Clixml -LiteralPath $UserAccountsFile -EA Stop
+            $importedUsers = Get-Content -LiteralPath $UserAccountsFile -Raw | 
+            ConvertFrom-Json -EA Stop
 
             $knownComputerUsers = Get-LocalUser
 

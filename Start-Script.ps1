@@ -261,6 +261,17 @@ Begin {
                         throw "File '$($file.FullName)' is not a valid xml file for snapshot item '$($item.Key)'"
                     }
                 }
+                Foreach ($file in ($folderContent | 
+                        Where-Object { $_.extension -eq '.json' })
+                ) {
+                    try {
+                        $null = Get-Content -LiteralPath $file.FullName -Raw |
+                        ConvertFrom-Json
+                    }
+                    catch {
+                        throw "File '$($file.FullName)' is not a valid json file for snapshot item '$($item.Key)'"
+                    }
+                }
                 #endregion
             }
         }

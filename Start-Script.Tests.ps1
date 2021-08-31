@@ -109,6 +109,14 @@ Describe "Throw a terminating error for action 'RestoreSnapshot' when" {
         { .$testScript @testNewParams } | 
         Should -Throw "*File '$testFile' is not a valid xml file for snapshot item 'Script2'"
     }
+    It 'an json file could not be imported' {
+        $testSnapshotFolder = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script2" -ItemType Directory).FullName
+        $testFile = Join-Path $testSnapshotFolder 'export.json'
+        'a' | Out-File -LiteralPath $testFile
+        
+        { .$testScript @testNewParams } | 
+        Should -Throw "*File '$testFile' is not a valid json file for snapshot item 'Script2'"
+    }
 }
 Describe "When action is 'CreateSnapshot'" {
     BeforeAll {

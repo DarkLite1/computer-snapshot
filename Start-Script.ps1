@@ -114,12 +114,12 @@ Param (
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
-        UserAccounts  = "$PSScriptRoot\Scripts\User accounts import export\User accounts import export.ps1"
-        FirewallRules = "$PSScriptRoot\Scripts\Firewall rules import export\Firewall rules import export.ps1"
-        SmbShares     = "$PSScriptRoot\Scripts\Smb shares import export\Smb shares import export.ps1"
+        UserAccounts  = '.\Scripts\User accounts import export\User accounts import export.ps1'
+        FirewallRules = '.\Scripts\Firewall rules import export\Firewall rules import export.ps1'
+        SmbShares     = '.\Scripts\Smb shares import export\Smb shares import export.ps1'
     },
-    [String]$SnapshotsFolder = "$PSScriptRoot\Snapshots",
-    [String]$ReportsFolder = "$PSScriptRoot\Reports"
+    [String]$SnapshotsFolder = '.\Snapshots',
+    [String]$ReportsFolder = '.\Reports'
 )
 
 Begin {
@@ -318,19 +318,49 @@ End {
     Try {
         Write-Verbose "End action '$Action'"
         
+        $joinParams = @{
+            Path      = $ReportsFolder
+            ChildPath = '{0} - {1} - {2}.html' -f 
+            $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff'), $Action
+        }
+        $ReportFile = Join-Path @joinParams
+
+        $totalRuntime = New-TimeSpan -Start $Now -End (Get-Date)
+
+        $html = @"
+        <table>
+            <ul>
+                <li>
+                    <tr>
+                        <th>Snapshot folder</th>
+                        <td>$SnapshotFolder</td>
+                    </tr>
+                    <tr>
+                        <th>Start time</th>
+                        <td>$($Now.ToString('dd/MM/yyyy HH:mm (dddd)'))</td>
+                    </tr>
+                    <tr>
+                        <th>Total runtime</th>
+                        <td>$('{0:00}:{1:00}:{2:00}' -f $totalRuntime.Hours, $totalRuntime.Minutes, $totalRuntime.Seconds)</td>
+                    </tr>
+                </li>
+            </ul>
+        </table>
+"@
+
         #region console summary for end user
         $errorsFound = $false
 
         Write-Host "Snapshot folder '$SnapshotFolder' action '$Action'" -ForegroundColor Yellow
 
-        if ($childScriptTerminatingErrors = $childScriptResults.TerminatingError | Where-Object {$_}) {
+        if ($childScriptTerminatingErrors = $childScriptResults.TerminatingError | Where-Object { $_ }) {
             $errorsFound = $true
             Write-Host 'Blocking errors:' -ForegroundColor Red
             $childScriptTerminatingErrors | ForEach-Object {
                 Write-Host $_ -ForegroundColor Red
             }
         }
-        if ($childScriptResults.nonTerminatingErrors | Where-Object {$_}) {
+        if ($childScriptResults.nonTerminatingErrors | Where-Object { $_ }) {
             $errorsFound = $true
             Write-Warning 'Non blocking errors:'
             $childScriptResults.nonTerminatingErrors | ForEach-Object {

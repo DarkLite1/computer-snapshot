@@ -226,8 +226,7 @@ Begin {
                     # a user account is created first and only
                     # afterwards the password is set. So a user will
                     # be created when the password is not complex enough
-                    Get-LocalUser -Name $UserName -EA Ignore |
-                    Remove-LocalUser
+                    Remove-LocalUser -Name $UserName -EA Ignore
                 }
                 Write-Host 'Password not accepted: The value provided for the password does not meet the length, complexity, or history requirements of the domain.' -ForegroundColor Red
                 $encryptedPassword = Request-PasswordHC -UserName $UserName

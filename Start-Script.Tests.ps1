@@ -14,6 +14,7 @@ BeforeAll {
             Script2 = (New-Item 'TestDrive:/2.ps1' -ItemType File).FullName
         }
         SnapshotsFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        ReportsFolder   = (New-Item 'TestDrive:/R' -ItemType Directory).FullName
     }
 
     Function Invoke-ScriptHC {
@@ -110,17 +111,24 @@ Describe "Throw a terminating error for action 'RestoreSnapshot' when" {
     }
 }
 Describe "When action is 'CreateSnapshot'" {
-    BeforeEach {
+    BeforeAll {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'CreateSnapshot'
+        $testNewParams.Snapshot = [Ordered]@{
+            Script1 = $false
+            Script2 = $true
+        }
+        .$testScript @testNewParams
     }
     It 'a script is called for enabled snapshot items only' {
-        .$testScript @testNewParams
-        Should -Invoke Invoke-ScriptHC -Exactly -Times 1
-        Should -Invoke Invoke-ScriptHC -Exactly -Times 1 -ParameterFilter {
+        Should -Invoke Invoke-ScriptHC -Exactly -Times 1 -Scope Describe
+        Should -Invoke Invoke-ScriptHC -Exactly -Times 1 -Scope Describe -ParameterFilter {
             ($Path -eq $testNewParams.Script.Script2) -and
             ($DataFolder -like '*Script2*') -and
             ($Type -eq 'Export')
+        }
+        Should -Not -Invoke Invoke-ScriptHC -Scope Describe -ParameterFilter {
+            ($Path -eq $testNewParams.Script.Script1)
         }
     }
 }
@@ -166,11 +174,11 @@ Describe "When action is 'RestoreSnapshot'" {
         }
     }
 }
-Describe 'When a child script fails with a non terminating error' {
-    BeforeEach {
+Describe 'Other scripts are still executed when' {
+    BeforeAll {
         Get-ChildItem -Path 'TestDrive:/' -Filter '*.ps1' |
         Remove-Item
-
+    
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'CreateSnapshot'
         $testNewParams.Snapshot = [Ordered]@{
@@ -183,15 +191,14 @@ Describe 'When a child script fails with a non terminating error' {
             Script2 = (New-Item 'TestDrive:/2.ps1' -ItemType File).FullName
             Script3 = (New-Item 'TestDrive:/3.ps1' -ItemType File).FullName
         }
-
+    }
+    It 'a child script fails with a non terminating error' {
         Mock Invoke-ScriptHC {
             Write-Error 'Script2 non terminating error'
         } -ParameterFilter { $Path -eq $testNewParams.Script.Script2 }
-        Mock Write-Warning
 
         .$testScript @testNewParams -ErrorAction SilentlyContinue
-    }
-    It 'other scripts are still executed' {
+
         Should -Invoke Invoke-ScriptHC -Times 3 -Exactly
         Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
             $Path -eq $testNewParams.Script.Script1 
@@ -203,17 +210,30 @@ Describe 'When a child script fails with a non terminating error' {
             $Path -eq $testNewParams.Script.Script3 
         }
     }
-    It "the error is reported as a 'Blocking error'" {
-        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter { 
-            $Message -like '*Script2 non terminating error*' 
+    It 'a child script fails with a terminating error' {
+        Mock Invoke-ScriptHC {
+            throw 'Script2 terminating error'
+        } -ParameterFilter { $Path -eq $testNewParams.Script.Script2 }
+
+        .$testScript @testNewParams
+
+        Should -Invoke Invoke-ScriptHC -Times 3 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
+            $Path -eq $testNewParams.Script.Script1 
+        }
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
+            $Path -eq $testNewParams.Script.Script2 
+        }
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
+            $Path -eq $testNewParams.Script.Script3 
         }
     }
 }
-Describe 'When a child script fails with a terminating error' {
-    BeforeEach {
+Describe 'When child scripts are executed' {
+    BeforeAll {
         Get-ChildItem -Path 'TestDrive:/' -Filter '*.ps1' |
         Remove-Item
-
+    
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'CreateSnapshot'
         $testNewParams.Snapshot = [Ordered]@{
@@ -226,30 +246,36 @@ Describe 'When a child script fails with a terminating error' {
             Script2 = (New-Item 'TestDrive:/2.ps1' -ItemType File).FullName
             Script3 = (New-Item 'TestDrive:/3.ps1' -ItemType File).FullName
         }
+        $testNewParams.ReportsFolder = 'TestDrive:/R2'
 
         Mock Invoke-ScriptHC {
-            throw 'Script2 terminating error'
+            throw 'Script1 terminating error'
+        } -ParameterFilter { $Path -eq $testNewParams.Script.Script1 }
+        Mock Invoke-ScriptHC {
+            Write-Error 'Script2 non terminating error'
         } -ParameterFilter { $Path -eq $testNewParams.Script.Script2 }
-        Mock Write-Host
+        Mock Invoke-ScriptHC {
+            'normal output'
+        } -ParameterFilter { $Path -eq $testNewParams.Script.Script3 }
 
-        .$testScript @testNewParams
-    }
-    It 'other scripts are still executed' {
-        Should -Invoke Invoke-ScriptHC -Times 3 -Exactly
-        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
-            $Path -eq $testNewParams.Script.Script1 
+        .$testScript @testNewParams -EA SilentlyContinue
+
+        $testGetParams = @{
+            Path        = $testNewParams.ReportsFolder 
+            Filter      = '*.html'
+            ErrorAction = 'Ignore'
         }
-        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
-            $Path -eq $testNewParams.Script.Script2 
-        }
-        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { 
-            $Path -eq $testNewParams.Script.Script3 
+        If ($testReportFile = (Get-ChildItem @testGetParams).FullName) {
+            $testReport = Get-Content $testReportFile
         }
     }
-    It "the error is reported as a 'Blocking error'" {
-        Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { 
-            ($Object -like '*Script2 terminating error*') -and
-            ($ForegroundColor -eq 'Red')
-        }
+    It 'a report folder is created' {
+        $testNewParams.ReportsFolder | Should -Exist
+    }
+    It 'an HTML file is created' {
+        $testReportFile | Should -Exist
+    }
+    It 'terminating errors are reported' {
+        $testReport | Should -BeLike '*terminating error*'
     }
 }

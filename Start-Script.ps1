@@ -70,6 +70,10 @@
         The parent folder where all the snapshots will be store by computer name
         and snapshot date. By default this data is stored on the USB stick.
 
+    .PARAMETER ReportsFolder
+        The folder where the reports will be saved. These reports contain the
+        results of the scripts ran.
+
     .EXAMPLE
         # on PC1
         $params = @{
@@ -114,7 +118,8 @@ Param (
         FirewallRules = "$PSScriptRoot\Scripts\Firewall rules import export\Firewall rules import export.ps1"
         SmbShares     = "$PSScriptRoot\Scripts\Smb shares import export\Smb shares import export.ps1"
     },
-    [String]$SnapshotsFolder = "$PSScriptRoot\Snapshots"
+    [String]$SnapshotsFolder = "$PSScriptRoot\Snapshots",
+    [String]$ReportsFolder = "$PSScriptRoot\Reports"
 )
 
 Begin {
@@ -139,6 +144,17 @@ Begin {
         $Now = Get-Date
 
         Write-Verbose "Start action '$Action'"
+
+        #region Create reports folder
+        if (-not (Test-Path -Path $ReportsFolder -PathType Container)) {
+            try {
+                New-Item -Path $ReportsFolder -ItemType Directory -EA Stop
+            }
+            catch {
+                throw "Failed to created reports folder '$ReportsFolder': $_"
+            }
+        }
+        #endregion
 
         If ($Action -eq 'CreateSnapshot') {
             #region Create snapshot folder
@@ -256,10 +272,18 @@ Begin {
 }
 
 Process {
-    $childScriptTerminatingErrors = @()
-
+    $childScriptResults = @()
     foreach ($item in $Snapshot.GetEnumerator() | Where-Object { $_.Value }) {
         Try {
+            $Error.Clear()
+
+            $childScriptResult = @{
+                Name                = $item.Key
+                Results             = $null
+                TerminatingError    = $null
+                NonTerminatingError = $null
+            }
+
             $invokeScriptParams = @{
                 Path       = $Script.$($item.Key) 
                 DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
@@ -275,11 +299,17 @@ Process {
             }
 
             Write-Verbose "Start snapshot '$($item.Key)'"
-            Invoke-ScriptHC @invokeScriptParams
+            $childScriptResult.Results = Invoke-ScriptHC @invokeScriptParams
         }
         Catch {
-            $childScriptTerminatingErrors += "Failed to execute script '$($invokeScriptParams.Path)' for snapshot item '$($item.Key)': $_"
+            $childScriptResult.TerminatingError = $_
             $Error.RemoveAt(0)
+        }
+        Finally {
+            if ($Error.Exception.Message) {
+                $childScriptResult.NonTerminatingErrors = $Error.Exception.Message
+            }
+            $childScriptResults += $childScriptResult
         }
     }
 }
@@ -293,17 +323,17 @@ End {
 
         Write-Host "Snapshot folder '$SnapshotFolder' action '$Action'" -ForegroundColor Yellow
 
-        if ($childScriptTerminatingErrors) {
+        if ($childScriptTerminatingErrors = $childScriptResults.TerminatingError | Where-Object {$_}) {
             $errorsFound = $true
             Write-Host 'Blocking errors:' -ForegroundColor Red
             $childScriptTerminatingErrors | ForEach-Object {
                 Write-Host $_ -ForegroundColor Red
             }
         }
-        if ($Error.Exception.Message) {
+        if ($childScriptResults.nonTerminatingErrors | Where-Object {$_}) {
             $errorsFound = $true
             Write-Warning 'Non blocking errors:'
-            $Error.Exception.Message | ForEach-Object {
+            $childScriptResults.nonTerminatingErrors | ForEach-Object {
                 Write-Warning $_
             }
         }

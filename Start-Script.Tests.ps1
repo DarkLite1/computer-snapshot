@@ -27,9 +27,7 @@ BeforeAll {
             [String]$Type
         )
     }
-    Mock Invoke-ScriptHC {
-        Write-Verbose "Invoke script '$Path' on data folder '$DataFolder' for '$Type'"
-    }
+    Mock Invoke-ScriptHC
 }
 Describe "Throw a terminating error for action 'CreateSnapshot' when" {
     BeforeEach {

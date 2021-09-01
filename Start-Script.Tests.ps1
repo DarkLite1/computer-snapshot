@@ -284,6 +284,7 @@ Describe 'When child scripts are executed' {
         $testReportFile | Should -Exist
     }
     It 'terminating errors are reported' {
-        $testReport | Should -BeLike '*terminating error*'
+        $testReport | Where-Object {$_ -like '*Blocking error*'} | 
+        Should -not -BeNullOrEmpty
     }
 }

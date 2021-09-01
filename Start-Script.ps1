@@ -290,7 +290,7 @@ Process {
 
             $childScriptResult = @{
                 Name                = $item.Key
-                Results             = $null
+                Output             = $null
                 TerminatingError    = $null
                 NonTerminatingError = $null
             }
@@ -310,7 +310,7 @@ Process {
             }
 
             Write-Verbose "Start snapshot '$($item.Key)'"
-            $childScriptResult.Results = Invoke-ScriptHC @invokeScriptParams
+            $childScriptResult.Output = Invoke-ScriptHC @invokeScriptParams
         }
         Catch {
             $childScriptResult.TerminatingError = $_
@@ -334,55 +334,129 @@ End {
             ChildPath = '{0} - {1} - {2}.html' -f 
             $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff'), $Action
         }
-        $ReportFile = Join-Path @joinParams
+        $reportFile = Join-Path @joinParams
+        $runtime = New-TimeSpan -Start $Now -End (Get-Date)
+        $totalRunTime = "{0:00}:{1:00}:{2:00}" -f 
+        $runTime.Hours, $runTime.Minutes, $runTime.Seconds
+        
+        $html = "
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <style>
+        table {
+            font-family: arial, sans-serif;
+            border-collapse: collapse;
+            width: 70%;
+        }
 
-        $totalRuntime = New-TimeSpan -Start $Now -End (Get-Date)
+        td, th {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
 
-        $html = @"
-        <table>
-            <ul>
-                <li>
-                    <tr>
-                        <th>Snapshot folder</th>
-                        <td>$SnapshotFolder</td>
-                    </tr>
-                    <tr>
-                        <th>Start time</th>
-                        <td>$($Now.ToString('dd/MM/yyyy HH:mm (dddd)'))</td>
-                    </tr>
-                    <tr>
-                        <th>Total runtime</th>
-                        <td>$('{0:00}:{1:00}:{2:00}' -f $totalRuntime.Hours, $totalRuntime.Minutes, $totalRuntime.Seconds)</td>
-                    </tr>
-                </li>
-            </ul>
-        </table>
-"@
+        th {
+            width: 1px;
+            white-space: nowrap;
+        }
+
+        </style>
+        </head>
+        <body>
+        "
 
         #region console summary for end user
-        $errorsFound = $false
-
-        Write-Host "Snapshot folder '$SnapshotFolder' action '$Action'" -ForegroundColor Yellow
-
-        if ($childScriptTerminatingErrors = $childScriptResults.TerminatingError | Where-Object { $_ }) {
-            $errorsFound = $true
-            Write-Host 'Blocking errors:' -ForegroundColor Red
-            $childScriptTerminatingErrors | ForEach-Object {
-                Write-Host $_ -ForegroundColor Red
-            }
+        $writeParams = @{
+            ForegroundColor = 'Yellow'
         }
-        if ($childScriptResults.nonTerminatingErrors | Where-Object { $_ }) {
-            $errorsFound = $true
-            Write-Warning 'Non blocking errors:'
-            $childScriptResults.nonTerminatingErrors | ForEach-Object {
-                Write-Warning $_
-            }
+        $writeSuccessParams = @{
+            ForegroundColor = 'Green'
+        }
+        $writeBlockingErrorsParams = @{
+            ForegroundColor = 'Red'
+        }
+        $writeSeparatorParams = @{
+            ForegroundColor = 'Gray'
+        }
+        $writeScriptNameParams = @{
+            ForegroundColor = 'Yellow'
         }
 
-        if (-not $errorsFound) {
-            Write-Host 'Success, no errors detected' -ForegroundColor Green
+        Write-Host ('-' * ($Host.UI.RawUI.WindowSize.Width - 10)) @writeSeparatorParams
+        Write-Host "Action`t`t: $Action" @writeParams
+        Write-Host "Total runtime`t: $totalRunTime" @writeParams
+        Write-Host "Snapshot folder`t: $SnapshotFolder" @writeParams
+        Write-Host ('-' * ($Host.UI.RawUI.WindowSize.Width - 10)) @writeSeparatorParams
+
+        $html += "
+            <table>
+                <tr>
+                    <th>Action</th>
+                    <td>$Action</td>
+                </tr>
+                <tr>
+                    <th>Total runtime</th>
+                    <td>$totalRunTime</td>
+                </tr>
+                <tr>
+                    <th>Snapshot folder</th>
+                    <td><a href=`"$SnapshotFolder`">$SnapshotFolder</a></td>
+                </tr>
+            </table>
+        "
+
+
+        foreach ($script in $childScriptResults) {
+            Write-Host '' + $Script.Name @writeScriptNameParams
+            $html += '<h2>' + $Script.Name + '</h2>'
+            
+            $errorsFound = $false
+
+            if (
+                $TerminatingError = $script.TerminatingError
+            ) {
+                $errorsFound = $true
+                Write-Host 'Blocking error:' @writeBlockingErrorsParams
+                Write-Host $TerminatingError @writeBlockingErrorsParams
+
+                $html += '<h4>Blocking error</h4>'
+                $html += '<p style="color:red;">' + $TerminatingError + '</p>'
+            }
+            if (
+                $nonTerminatingErrors = $script.NonTerminatingErrors
+            ) {
+                $errorsFound = $true
+
+                $html += '<h4>Non blocking errors</h4>'
+                
+                Write-Warning 'Non blocking errors:'
+                $nonTerminatingErrors | ForEach-Object { 
+                    Write-Warning $_ 
+                    $html += '<p style="color:orange;">' + $_ + '</p>'
+                }
+            }
+            if (
+                $output = $script.Output
+            ) {
+                $html += '<h4>Output<h4>'
+                
+                Write-Host 'Output:' 
+                $output | ForEach-Object {
+                    Write-Host $_
+                    $html += '<p>' + $_ + '</p>'
+                }
+            }
+
+            if (-not $errorsFound) {
+                Write-Host 'Success, no errors detected' @writeSuccessParams
+                $html += '<p style="color:green;">Success, no errors detected</p>'
+            }
+            Write-Host ('-' * ($Host.UI.RawUI.WindowSize.Width - 10)) @writeSeparatorParams
         }
         #endregion
+
+        $html | Out-File -FilePath $reportFile -Encoding utf8
     }
     Catch {
         throw "Failed to perform action '$Action': $_"

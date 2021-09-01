@@ -118,9 +118,9 @@ Param (
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
-        UserAccounts  = '.\Scripts\User accounts import export\User accounts import export.ps1'
-        FirewallRules = '.\Scripts\Firewall rules import export\Firewall rules import export.ps1'
-        SmbShares     = '.\Scripts\Smb shares import export\Smb shares import export.ps1'
+        UserAccounts  = 'Scripts\User accounts import export\User accounts import export.ps1'
+        FirewallRules = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
+        SmbShares     = 'Scripts\Smb shares import export\Smb shares import export.ps1'
     },
     [String]$SnapshotsFolder = '.\Snapshots',
     [String]$ReportsFolder = '.\Reports',
@@ -227,16 +227,20 @@ Begin {
         ) {
             Write-Verbose "Snapshot '$($item.Key)'"
     
+            If ($Script.Keys -NotContains $item.Key) {
+                throw "No script found for snapshot item '$($item.Key)'"
+            }
+
             $invokeScriptParams = @{
-                Path       = $Script.$($item.Key) 
+                Path       = if ($Script.$($item.Key) -like '*:*') {
+                    $Script.$($item.Key)
+                } else {
+                    Join-Path -Path $PSScriptRoot -ChildPath ($Script.$($item.Key))
+                }
                 DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
             }
     
             #region Test execution script
-            If (-not $invokeScriptParams.Path) {
-                throw "No script found for snapshot item '$($item.Key)'"
-            }
-    
             If (-not (Test-Path -Path $invokeScriptParams.Path -PathType Leaf)) {
                 throw "Script file '$($invokeScriptParams.Path)' not found for snapshot item '$($item.Key)'"
             }

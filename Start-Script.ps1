@@ -70,9 +70,15 @@
         The parent folder where all the snapshots will be store by computer name
         and snapshot date. By default this data is stored on the USB stick.
 
+        Can be a folder name or a folder path. In case it's a folder name the
+        data will be stored in the script root.
+
     .PARAMETER ReportsFolder
         The folder where the reports will be saved. These reports contain the
         results of the scripts ran.
+
+        Can be a folder name or a folder path. In case it's a folder name the
+        data will be stored in the script root.
 
     .PARAMETER OpenReportInBrowser
         Once the script is done an HTML report will be opened in the browser for

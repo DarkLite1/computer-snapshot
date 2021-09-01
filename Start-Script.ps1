@@ -423,11 +423,11 @@ End {
             ForegroundColor = 'Yellow'
         }
 
-        Write-Host ('-' * ($Host.UI.RawUI.WindowSize.Width - 10)) @writeSeparatorParams
+        Write-Host ('-' * 80) @writeSeparatorParams
         Write-Host "Action`t`t: $Action" @writeParams
         Write-Host "Total runtime`t: $totalRunTime" @writeParams
         Write-Host "Snapshot folder`t: $SnapshotFolder" @writeParams
-        Write-Host ('-' * ($Host.UI.RawUI.WindowSize.Width - 10)) @writeSeparatorParams
+        Write-Host ('-' * 80) @writeSeparatorParams
 
         $html += "
             <table>
@@ -493,7 +493,7 @@ End {
                 Write-Host 'Success, no errors detected' @writeSuccessParams
                 $html += '<p style="color:green;">Success, no errors detected</p>'
             }
-            Write-Host ('-' * ($Host.UI.RawUI.WindowSize.Width - 10)) @writeSeparatorParams
+            Write-Host ('-' * 80) @writeSeparatorParams
 
             $html += '</div>'
         }

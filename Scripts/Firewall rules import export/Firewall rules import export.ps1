@@ -43,42 +43,42 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$FileName = 'FirewallRules.csv'
+    [String]$FileName = 'FirewallRules.json'
 )
 
 Begin {
     Function Export-FirewallRulesHC {
         <#
-        .SYNOPSIS
-            Exports firewall rules to a '.csv' file
-
-        .DESCRIPTION
-            Export local and policy based firewall rules to a '.csv' file.
-            All rules are exported by default, you can filter with parameter 
-            -Name, -Inbound, -Outbound, -Enabled, -Disabled, -Allow and -Block
-
-        .PARAMETER Name
-            Display name of the rules to be processed. Wildcard character * is 
-            allowed
-
-        .PARAMETER PolicyStore
-            Store from which the rules are retrieved (default: ActiveStore).
-            Allowed values are PersistentStore, ActiveStore (the resultant rule 
-            set of all sources), localhost, a computer name, <domain.fqdn.
-            com>\<GPO_Friendly_Name>, RSOP and others depending on the 
-            environment.
-        
-        .EXAMPLE
-            Export-FirewallRulesHC -ExportFile 'C:\rules.csv'
-
-            Exports all firewall rules to the file 'C:\rules.csv'
-
-        .EXAMPLE
-            Export-FirewallRulesHC -ExportFile 'C:\rules.csv' -Inbound -Allow
-
-            Exports all inbound and firewall 'Allow' rules to the file 
-            'C:\rules.csv'
-        #>
+            .SYNOPSIS
+                Exports firewall rules to a '.json' file
+    
+            .DESCRIPTION
+                Export local and policy based firewall rules to a '.json' file.
+                All rules are exported by default, you can filter with parameter 
+                -Name, -Inbound, -Outbound, -Enabled, -Disabled, -Allow and -Block
+    
+            .PARAMETER Name
+                Display name of the rules to be processed. Wildcard character * is 
+                allowed
+    
+            .PARAMETER PolicyStore
+                Store from which the rules are retrieved (default: ActiveStore).
+                Allowed values are PersistentStore, ActiveStore (the resultant rule 
+                set of all sources), localhost, a computer name, <domain.fqdn.
+                com>\<GPO_Friendly_Name>, RSOP and others depending on the 
+                environment.
+            
+            .EXAMPLE
+                Export-FirewallRulesHC -ExportFile 'C:\rules.json'
+    
+                Exports all firewall rules to the file 'C:\rules.json'
+    
+            .EXAMPLE
+                Export-FirewallRulesHC -ExportFile 'C:\rules.json' -Inbound -Allow
+    
+                Exports all inbound and firewall 'Allow' rules to the file 
+                'C:\rules.json'
+            #>
         Param(
             [Parameter(Mandatory)]
             [String]$ExportFile, 
@@ -91,36 +91,52 @@ Begin {
             [Switch]$Block, 
             [Switch]$Allow
         )
-    
-        function StringArrayToList($StringArray) {
+        
+        Function ConvertTo-BooleanHC {
+            Param (
+                $Value
+            )
+            if ($Value -is [Boolean]) {
+                $Value
+            }
+            else {
+                if (($Value -eq 'True') -or ($Value -eq '1')) { 
+                    $true 
+                }
+                else {
+                    $false 
+                }
+            }
+        }
+        Function ConvertTo-StringArrayHC {
+            Param(
+                $StringArray
+            )
+            $Result = ''
             if ($StringArray) {
-                $Result = ''
                 Foreach ($Value In $StringArray) {
                     if ($Result -ne '') { $Result += ',' }
                     $Result += $Value
                 }
-                return $Result
             }
-            else {
-                return ''
-            }
+            $Result
         }
-    
+        
         Try {
             #region Filter rules
             $Direction = '*'
             if ($Inbound -And !$Outbound) { $Direction = 'Inbound' }
             if (!$Inbound -And $Outbound) { $Direction = 'Outbound' }
-    
+        
             $RuleState = '*'
             if ($Enabled -And !$Disabled) { $RuleState = 'True' }
             if (!$Enabled -And $Disabled) { $RuleState = 'False' }
-    
+        
             $Action = '*'
             if ($Allow -And !$Block) { $Action = 'Allow' }
             if (!$Allow -And $Block) { $Action = 'Block' }
             #endregion
-    
+        
             #region Get firewall rules
             $firewallRules = Get-NetFirewallRule -DisplayName $Name -PolicyStore $PolicyStore | Where-Object { 
                 $_.Direction -like $Direction -and 
@@ -128,11 +144,11 @@ Begin {
                 $_.Action -like $Action 
             }
             #endregion
-            
+                
             #region Create firewall rule details for export
             $firewallRuleSet = ForEach ($rule In $firewallRules) {
                 Write-Verbose "Firewall rule `"$($rule.DisplayName)`" ($($rule.Name))"
-    
+        
                 $AddressFilter = $rule | Get-NetFirewallAddressFilter
                 $PortFilter = $rule | Get-NetFirewallPortFilter
                 $ApplicationFilter = $rule | Get-NetFirewallApplicationFilter
@@ -140,50 +156,48 @@ Begin {
                 $InterfaceFilter = $rule | Get-NetFirewallInterfaceFilter
                 $InterfaceTypeFilter = $rule | Get-NetFirewallInterfaceTypeFilter
                 $SecurityFilter = $rule | Get-NetFirewallSecurityFilter
-    
-                [PSCustomObject]@{
+        
+                @{
                     Name                = $rule.Name
                     DisplayName         = $rule.DisplayName
                     Description         = $rule.Description
                     Group               = $rule.Group
-                    Enabled             = $rule.Enabled
-                    Profile             = $rule.Profile
-                    Platform            = StringArrayToList $rule.Platform
-                    Direction           = $rule.Direction
-                    Action              = $rule.Action
-                    EdgeTraversalPolicy = $rule.EdgeTraversalPolicy
-                    LooseSourceMapping  = $rule.LooseSourceMapping
-                    LocalOnlyMapping    = $rule.LocalOnlyMapping
+                    Enabled             = ConvertTo-BooleanHC $rule.Enabled
+                    Profile             = [String]$rule.Profile -replace ' '
+                    Platform            = ConvertTo-StringArrayHC $rule.Platform
+                    Direction           = [String]$rule.Direction
+                    Action              = [String]$rule.Action
+                    EdgeTraversalPolicy = [String]$rule.EdgeTraversalPolicy
+                    LooseSourceMapping  = ConvertTo-BooleanHC $rule.LooseSourceMapping
+                    LocalOnlyMapping    = ConvertTo-BooleanHC $rule.LocalOnlyMapping
                     Owner               = $rule.Owner
-                    LocalAddress        = StringArrayToList $AddressFilter.LocalAddress
-                    RemoteAddress       = StringArrayToList $AddressFilter.RemoteAddress
+                    LocalAddress        = ConvertTo-StringArrayHC $AddressFilter.LocalAddress
+                    RemoteAddress       = ConvertTo-StringArrayHC $AddressFilter.RemoteAddress
                     Protocol            = $PortFilter.Protocol
-                    LocalPort           = StringArrayToList $PortFilter.LocalPort
-                    RemotePort          = StringArrayToList $PortFilter.RemotePort
-                    IcmpType            = StringArrayToList $PortFilter.IcmpType
-                    DynamicTarget       = $PortFilter.DynamicTarget
+                    LocalPort           = ConvertTo-StringArrayHC $PortFilter.LocalPort
+                    RemotePort          = ConvertTo-StringArrayHC $PortFilter.RemotePort
+                    IcmpType            = ConvertTo-StringArrayHC $PortFilter.IcmpType
+                    DynamicTarget       = [String]$PortFilter.DynamicTarget
                     Program             = $ApplicationFilter.Program -Replace "$($ENV:SystemRoot.Replace("\","\\"))\\", "%SystemRoot%\" -Replace "$(${ENV:ProgramFiles(x86)}.Replace("\","\\").Replace("(","\(").Replace(")","\)"))\\", "%ProgramFiles(x86)%\" -Replace "$($ENV:ProgramFiles.Replace("\","\\"))\\", "%ProgramFiles%\"
                     Package             = $ApplicationFilter.Package
                     Service             = $ServiceFilter.Service
-                    InterfaceAlias      = StringArrayToList $InterfaceFilter.InterfaceAlias
-                    InterfaceType       = $InterfaceTypeFilter.InterfaceType
+                    InterfaceAlias      = ConvertTo-StringArrayHC $InterfaceFilter.InterfaceAlias
+                    InterfaceType       = [String]$InterfaceTypeFilter.InterfaceType
                     LocalUser           = $SecurityFilter.LocalUser
                     RemoteUser          = $SecurityFilter.RemoteUser
-                    Remotecomputer       = $SecurityFilter.RemoteMachine
-                    Authentication      = $SecurityFilter.Authentication
-                    Encryption          = $SecurityFilter.Encryption
-                    OverrideBlockRules  = $SecurityFilter.OverrideBlockRules
+                    RemoteMachine      = $SecurityFilter.RemoteMachine
+                    Authentication      = [String]$SecurityFilter.Authentication
+                    Encryption          = [String]$SecurityFilter.Encryption
+                    OverrideBlockRules  = ConvertTo-BooleanHC $SecurityFilter.OverrideBlockRules
                 }
             }
             #endregion
-    
-            $exportParams = @{
-                LiteralPath       = $ExportFile 
-                NoTypeInformation = $true
-                Delimiter         = ';' 
-                Encoding          = 'UTF8'
+        
+            $outParams = @{
+                LiteralPath = $ExportFile 
+                Encoding    = 'UTF8'
             }
-            $firewallRuleSet | Export-Csv @exportParams
+            $firewallRuleSet | ConvertTo-Json | Out-File @outParams
         }
         Catch {
             throw "Failed to export the firewall rules: $_"
@@ -191,33 +205,62 @@ Begin {
     }
     Function Import-FirewallRulesHC {
         <#
-    .SYNOPSIS
-        Imports firewall rules from a '.csv' file
-
-    .DESCRIPTION
-        Imports firewall rules from a '.csv' file. Existing rules with same 
-        display name will be overwritten.
-
-    .PARAMETER PolicyStore
-        Store to which the rules are written (default: PersistentStore).
-        Allowed values are PersistentStore, ActiveStore (the resultant rule 
-        set of all sources), localhost, a computer name, 
-        <domain.fqdn.com>\<GPO_Friendly_Name> and others depending on the 
-        environment.
-
-    .EXAMPLE
-        Import-FirewallRulesHC -ImportFile 'C:\rules.csv'
-            
-        Import all firewall rules in the file 'C:\rules.csv'
-    #>
+            .SYNOPSIS
+                Imports firewall rules from a '.json' file
     
+            .DESCRIPTION
+                Imports firewall rules from a '.json' file. Existing rules with same 
+                display name will be overwritten.
+    
+            .PARAMETER PolicyStore
+                Store to which the rules are written (default: PersistentStore).
+                Allowed values are PersistentStore, ActiveStore (the resultant rule 
+                set of all sources), localhost, a computer name, 
+                <domain.fqdn.com>\<GPO_Friendly_Name> and others depending on the 
+                environment.
+    
+            .EXAMPLE
+                Import-FirewallRulesHC -ImportFile 'C:\rules.json'
+                    
+                Import all firewall rules in the file 'C:\rules.json'
+    
+            .EXAMPLE
+                Export-FirewallRulesHC -ExportFile '.\rules.json' -Verbose
+    
+                $getParams = @{
+                    Path     = '.\rules.json'
+                    Raw      = $true
+                    Encoding = 'utf8'
+                }
+                $exportedRules = Get-Content @getParams | ConvertFrom-Json
+    
+                $rulesToImport = $exportedRules | Where-Object {
+                    ($_.DisplayName -eq 'Logica') -or
+                    ($_.DisplayName -eq 'CA Communication Beckhoff PLC') -or
+                    ($_.DisplayName -eq 'Firebird DB Server') -or
+                    ($_.DisplayName -eq 'SMB')
+                }
+    
+                $outParams = @{
+                    FilePath = '.\rules.json'
+                    Encoding  = 'utf8'
+                }
+                $rulesToImport | ConvertTo-Json | Out-File @outParams
+    
+                Import-FirewallRulesHC -ImportFile $outParams.FilePath
+    
+                The first command exports the current firewall rules, then they 
+                only the rules that need to be restored are selected and the file
+                is updated. Om import only those selected rules will be restored.
+            #>
+        
         Param(
             [Parameter(Mandatory)]
             [String]$ImportFile, 
             [String]$PolicyStore = 'PersistentStore'
         )
-    
-        Function ListToStringArray {
+        
+        Function ConvertTo-StringArrayHC {
             Param (
                 [String]$List, 
                 [String]$DefaultValue = 'Any'
@@ -229,82 +272,78 @@ Begin {
                 return $DefaultValue 
             }
         }
-    
-        Function ValueToBoolean {
+        Function ConvertTo-BooleanHC {
             Param (
-                [String]$Value,
-                [Boolean]$DefaultValue = $false
+                $Value
             )
-            if (![String]::IsNullOrEmpty($Value)) {
-                if (($Value -eq 'True') -or ($Value -eq '1')) { 
-                    return $true 
-                }
-                else {
-                    return $false 
-                }
+            if ($Value -is [Boolean]) {
+                $Value
             }
             else {
-                return $DefaultValue
+                if (($Value -eq 'True') -or ($Value -eq '1')) { 
+                    $true 
+                }
+                else {
+                    $false 
+                }
             }
         }
-    
+        
         Try {
-            $importParams = @{
+            $getParams = @{
                 LiteralPath = $ImportFile 
-                Delimiter   = ';'  
                 Encoding    = 'UTF8'
+                Raw         = $true
             }
-            $firewallRules = Import-Csv @importParams
-    
+            $firewallRules = Get-Content @getParams | ConvertFrom-Json
+        
             ForEach ($rule In $firewallRules) {
                 $newRuleParams = @{
                     Name                = $rule.Name
                     DisplayName         = $rule.DisplayName
                     Description         = $rule.Description
                     Group               = $rule.Group
-                    Enabled             = $rule.Enabled
+                    Enabled             = ConvertTo-BooleanHC $rule.Enabled
                     Profile             = $rule.Profile
                     Direction           = $rule.Direction
                     Action              = $rule.Action
                     EdgeTraversalPolicy = $rule.EdgeTraversalPolicy
-                    LooseSourceMapping  = ValueToBoolean $rule.LooseSourceMapping
-                    LocalOnlyMapping    = ValueToBoolean $rule.LocalOnlyMapping
-                    LocalAddress        = ListToStringArray $rule.LocalAddress
-                    RemoteAddress       = ListToStringArray $rule.RemoteAddress
-                    Platform            = ListToStringArray $rule.Platform $null
+                    LooseSourceMapping  = ConvertTo-BooleanHC $rule.LooseSourceMapping
+                    LocalOnlyMapping    = ConvertTo-BooleanHC $rule.LocalOnlyMapping
+                    LocalAddress        = ConvertTo-StringArrayHC $rule.LocalAddress
+                    RemoteAddress       = ConvertTo-StringArrayHC $rule.RemoteAddress
                     Protocol            = $rule.Protocol
-                    LocalPort           = ListToStringArray $rule.LocalPort
-                    RemotePort          = ListToStringArray $rule.RemotePort
-                    IcmpType            = ListToStringArray $rule.IcmpType
-                    DynamicTarget       = if (
-                        [String]::IsNullOrEmpty($rule.DynamicTarget)) { 'Any' } else { $rule.DynamicTarget }
+                    LocalPort           = ConvertTo-StringArrayHC $rule.LocalPort
+                    RemotePort          = ConvertTo-StringArrayHC $rule.RemotePort
+                    IcmpType            = ConvertTo-StringArrayHC $rule.IcmpType
+                    DynamicTarget       = $rule.DynamicTarget
                     Program             = $rule.Program
                     Service             = $rule.Service
-                    InterfaceAlias      = ListToStringArray $rule.InterfaceAlias
+                    InterfaceAlias      = ConvertTo-StringArrayHC $rule.InterfaceAlias
                     InterfaceType       = $rule.InterfaceType
                     LocalUser           = $rule.LocalUser
                     RemoteUser          = $rule.RemoteUser
                     RemoteMachine       = $rule.RemoteMachine
                     Authentication      = $rule.Authentication
                     Encryption          = $rule.Encryption
-                    OverrideBlockRules  = ValueToBoolean $rule.OverrideBlockRules
+                    OverrideBlockRules  = ConvertTo-BooleanHC $rule.OverrideBlockRules
                 }
-                if (-not $rule.Platform) { $newRuleParams.Remove('Platform') }
-    
-                # for SID types no empty value is defined, so omit if not present
-                if (![String]::IsNullOrEmpty($rule.Owner)) { 
+                if ($rule.Platform) { 
+                    $newRuleParams.Platform = ConvertTo-StringArrayHC $rule.Platform
+                }
+                if ($rule.Owner) { 
                     $newRuleParams.Owner = $rule.Owner 
                 }
-                if (![String]::IsNullOrEmpty($rule.Package)) {
+                if ($rule.Package) {
                     $newRuleParams.Package = $rule.Package 
                 }
-
+    
                 $storeParam = @{
                     PolicyStore = $PolicyStore
                 }
                 Get-NetFirewallRule @storeParam -Name $rule.Name -EA Ignore | 
                 Remove-NetFirewallRule
-            
+                
                 Try {
                     Write-Verbose "Create firewall rule '$($rule.DisplayName)' '($($rule.Name))'"
                     $null = New-NetFirewallRule @newRuleParams @storeParam -EA Stop

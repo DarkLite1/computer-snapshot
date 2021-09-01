@@ -6,7 +6,7 @@ BeforeAll {
     $testParams = @{
         Action     = 'Export'
         DataFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        FileName   = 'rules.csv'
+        FileName   = 'rules.json'
     }
     Function Export-FirewallRulesHC {}
     Function Import-FirewallRulesHC {}

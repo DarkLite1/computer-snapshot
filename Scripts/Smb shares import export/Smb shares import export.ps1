@@ -436,6 +436,9 @@ Process {
 
                             Write-Output "Smb share '$($share.Name)' added NTFS permission '$($_.FileSystemRights)' for '$($_.IdentityReference)'"
                         }
+                        if (-not $aceList) {
+                            Write-Output "Smb share '$($share.Name)' no NTFS permission added as none were found in the import file. Most likely they are all inherited and not explicit permissions were set."
+                        }
                         $acl | Set-Acl -LiteralPath $share.Path
                         #endregion
                     }

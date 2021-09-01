@@ -83,7 +83,7 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$UserAccountsFileName = 'UserAccounts.xml'
+    [String]$UserAccountsFileName = 'UserAccounts.json'
 )
 
 Begin {

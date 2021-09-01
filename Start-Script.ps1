@@ -202,6 +202,8 @@ Begin {
         }
         else {
             If ($RestoreSnapshotFolder) {
+                $RestoreSnapshotFolder = Get-FullPathHC -Path $RestoreSnapshotFolder
+
                 #region Test RestoreSnapshotFolder
                 If (-not (Test-Path -Path $RestoreSnapshotFolder -PathType Container)) {
                     throw "Restore snapshot folder '$RestoreSnapshotFolder' not found"

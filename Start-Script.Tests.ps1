@@ -4,17 +4,18 @@
 BeforeAll {
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        Action          = 'CreateSnapshot'
-        Snapshot        = [Ordered]@{
+        Action              = 'CreateSnapshot'
+        Snapshot            = [Ordered]@{
             Script1 = $false
             Script2 = $true
         }
-        Script          = @{
+        Script              = @{
             Script1 = (New-Item 'TestDrive:/1.ps1' -ItemType File).FullName
             Script2 = (New-Item 'TestDrive:/2.ps1' -ItemType File).FullName
         }
-        SnapshotsFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        ReportsFolder   = (New-Item 'TestDrive:/R' -ItemType Directory).FullName
+        SnapshotsFolder     = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        ReportsFolder       = (New-Item 'TestDrive:/R' -ItemType Directory).FullName
+        OpenReportInBrowser = $false
     }
 
     Function Invoke-ScriptHC {
@@ -284,7 +285,7 @@ Describe 'When child scripts are executed' {
         $testReportFile | Should -Exist
     }
     It 'terminating errors are reported' {
-        $testReport | Where-Object {$_ -like '*Blocking error*'} | 
-        Should -not -BeNullOrEmpty
+        $testReport | Where-Object { $_ -like '*Blocking error*' } | 
+        Should -Not -BeNullOrEmpty
     }
 }

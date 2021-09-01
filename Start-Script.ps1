@@ -119,7 +119,8 @@ Param (
         SmbShares     = '.\Scripts\Smb shares import export\Smb shares import export.ps1'
     },
     [String]$SnapshotsFolder = '.\Snapshots',
-    [String]$ReportsFolder = '.\Reports'
+    [String]$ReportsFolder = '.\Reports',
+    [Boolean]$OpenReportInBrowser = $true
 )
 
 Begin {
@@ -347,7 +348,14 @@ End {
         table {
             font-family: arial, sans-serif;
             border-collapse: collapse;
-            width: 70%;
+            width: 80%;
+            margin-bottom: 25px;
+        }
+
+        h2 {
+            text-align: center;
+            color: White;
+            background-color: MediumSeaGreen;
         }
 
         td, th {
@@ -359,6 +367,12 @@ End {
         th {
             width: 1px;
             white-space: nowrap;
+        }
+
+        div {
+            
+            width: 80%;
+            margin-bottom: 25px;
         }
 
         </style>
@@ -393,7 +407,7 @@ End {
             <table>
                 <tr>
                     <th>Action</th>
-                    <td>$Action</td>
+                    <td>$Action on $env:COMPUTERNAME</td>
                 </tr>
                 <tr>
                     <th>Total runtime</th>
@@ -409,6 +423,7 @@ End {
 
         foreach ($script in $childScriptResults) {
             Write-Host '' + $Script.Name @writeScriptNameParams
+            $html += '<div>'
             $html += '<h2>' + $Script.Name + '</h2>'
             
             $errorsFound = $false
@@ -453,10 +468,20 @@ End {
                 $html += '<p style="color:green;">Success, no errors detected</p>'
             }
             Write-Host ('-' * ($Host.UI.RawUI.WindowSize.Width - 10)) @writeSeparatorParams
+
+            $html += '</div>'
         }
         #endregion
 
+        if (-not $childScriptResults) {
+            $html += '<p>No snapshot items selected</p>'
+        }
+
         $html | Out-File -FilePath $reportFile -Encoding utf8
+
+        if ($OpenReportInBrowser) {
+            Start-Process $reportFile
+        }
     }
     Catch {
         throw "Failed to perform action '$Action': $_"

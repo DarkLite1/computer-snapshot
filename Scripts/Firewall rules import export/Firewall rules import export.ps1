@@ -304,7 +304,15 @@ Begin {
                     DisplayName         = $rule.DisplayName
                     Description         = $rule.Description
                     Group               = $rule.Group
-                    Enabled             = ConvertTo-BooleanHC $rule.Enabled
+                    Enabled             = if (
+                        ConvertTo-BooleanHC $rule.Enabled
+                    ) {
+                        # only accepts a string not a boolean
+                        'true'
+                    }
+                    else {
+                        'false'
+                    }
                     Profile             = $rule.Profile
                     Direction           = $rule.Direction
                     Action              = $rule.Action

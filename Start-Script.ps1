@@ -153,7 +153,7 @@ Begin {
         #region Create reports folder
         if (-not (Test-Path -Path $ReportsFolder -PathType Container)) {
             try {
-                New-Item -Path $ReportsFolder -ItemType Directory -EA Stop
+                $null = New-Item -Path $ReportsFolder -ItemType Directory -EA Stop
             }
             catch {
                 throw "Failed to created reports folder '$ReportsFolder': $_"

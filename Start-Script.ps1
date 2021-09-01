@@ -122,8 +122,8 @@ Param (
         FirewallRules = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
         SmbShares     = 'Scripts\Smb shares import export\Smb shares import export.ps1'
     },
-    [String]$SnapshotsFolder = '.\Snapshots',
-    [String]$ReportsFolder = '.\Reports',
+    [String]$SnapshotsFolder = 'Snapshots',
+    [String]$ReportsFolder = 'Reports',
     [Boolean]$OpenReportInBrowser = $true
 )
 
@@ -143,12 +143,28 @@ Begin {
         Write-Debug "Invoke script '$Path' on data folder '$DataFolder' for '$Type'"
         & $Path -DataFolder $DataFolder -Action $Type
     }
+    Function Get-FullPathHC {
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Path
+        )
+
+        if ($Path -like '*:*') {
+            $Path
+        }
+        else {
+            Join-Path -Path $PSScriptRoot -ChildPath $Path
+        }
+    }
 
     Try {
         $Error.Clear()
         $Now = Get-Date
 
         Write-Verbose "Start action '$Action'"
+
+        $SnapshotsFolder = Get-FullPathHC -Path $SnapshotsFolder
+        $ReportsFolder = Get-FullPathHC -Path $ReportsFolder
 
         #region Create reports folder
         if (-not (Test-Path -Path $ReportsFolder -PathType Container)) {
@@ -232,11 +248,7 @@ Begin {
             }
 
             $invokeScriptParams = @{
-                Path       = if ($Script.$($item.Key) -like '*:*') {
-                    $Script.$($item.Key)
-                } else {
-                    Join-Path -Path $PSScriptRoot -ChildPath ($Script.$($item.Key))
-                }
+                Path       = Get-FullPathHC -Path $Script.$($item.Key)
                 DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
             }
     
@@ -299,7 +311,7 @@ Process {
 
             $childScriptResult = @{
                 Name                = $item.Key
-                Output             = $null
+                Output              = $null
                 TerminatingError    = $null
                 NonTerminatingError = $null
             }

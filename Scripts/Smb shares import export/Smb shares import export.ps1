@@ -352,10 +352,8 @@ Process {
                     $aclImport = Get-Content -LiteralPath $ntfsFile -Encoding UTF8 | ConvertFrom-Json
                     
                     #region Create ACE's
-                    $i = -1
                     $aceList = ForEach ($ace in $aclImport.Access) {
                         Try {
-                            $i++
                             $accountName = Convert-AccountNameHC -Name $ace.IdentityReference
        
                             #region Test if account exists

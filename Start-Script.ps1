@@ -57,6 +57,9 @@
         Order is important if you want users to be created before other actions
         it must be the first item in the hash table.
 
+        Can be a path relative to the Start-Script.ps1 directory like:
+        'Snapshots\Snapshot1' or a full path like 'C:\Snapshots\Snapshot1'
+
     .PARAMETER RestoreSnapshotFolder
         By default the last created snapshot is used for restoring data. By
         using the argument '$RestoreSnapshotFolder' it is possible to restore

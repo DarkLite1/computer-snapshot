@@ -351,6 +351,13 @@ Process {
                             }
                         }
                     }
+
+                    if ($passwordParams.NewUser) {
+                        Write-Output "Created user '$($User.Name)'"
+                    }
+                    else {
+                        Write-Output "updated user '$($User.Name)'"
+                    }
                 }
                 catch {
                     Write-Error "Failed to create user account '$($user.Name)': $_"

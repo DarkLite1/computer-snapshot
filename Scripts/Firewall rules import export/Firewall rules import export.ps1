@@ -69,19 +69,19 @@ Begin {
             environment.
         
         .EXAMPLE
-            Export-FirewallRulesHC -CsvFile 'C:\rules.csv'
+            Export-FirewallRulesHC -ExportFile 'C:\rules.csv'
 
             Exports all firewall rules to the file 'C:\rules.csv'
 
         .EXAMPLE
-            Export-FirewallRulesHC -CsvFile 'C:\rules.csv' -Inbound -Allow
+            Export-FirewallRulesHC -ExportFile 'C:\rules.csv' -Inbound -Allow
 
             Exports all inbound and firewall 'Allow' rules to the file 
             'C:\rules.csv'
         #>
         Param(
             [Parameter(Mandatory)]
-            [String]$CsvFile, 
+            [String]$ExportFile, 
             [String]$Name = '*', 
             [String]$PolicyStore = 'ActiveStore', 
             [Switch]$Inbound, 
@@ -178,7 +178,7 @@ Begin {
             #endregion
     
             $exportParams = @{
-                LiteralPath       = $CsvFile 
+                LiteralPath       = $ExportFile 
                 NoTypeInformation = $true
                 Delimiter         = ';' 
                 Encoding          = 'UTF8'
@@ -206,14 +206,14 @@ Begin {
         environment.
 
     .EXAMPLE
-        Import-FirewallRulesHC -CsvFile 'C:\rules.csv'
+        Import-FirewallRulesHC -ImportFile 'C:\rules.csv'
             
         Import all firewall rules in the file 'C:\rules.csv'
     #>
     
         Param(
             [Parameter(Mandatory)]
-            [String]$CsvFile, 
+            [String]$ImportFile, 
             [String]$PolicyStore = 'PersistentStore'
         )
     
@@ -250,7 +250,7 @@ Begin {
     
         Try {
             $importParams = @{
-                LiteralPath = $CsvFile 
+                LiteralPath = $ImportFile 
                 Delimiter   = ';'  
                 Encoding    = 'UTF8'
             }
@@ -321,7 +321,7 @@ Begin {
     }
 
     Try {
-        $csvFile = Join-Path -Path $DataFolder -ChildPath $FileName
+        $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
 
         #region Test DataFolder
         If ($Action -eq 'Export') {
@@ -339,8 +339,8 @@ Begin {
             If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
                 throw "Import folder '$DataFolder' empty"
             }
-            If (-not (Test-Path -LiteralPath $csvFile -PathType Leaf)) {
-                throw "Firewall rules file '$csvFile' not found"
+            If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
+                throw "Firewall rules file '$ExportFile' not found"
             }
         }
         #endregion
@@ -353,12 +353,12 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            Write-Verbose "Export firewall rules to file '$csvFile'"
-            Export-FirewallRulesHC -CsvFile $csvFile
+            Write-Verbose "Export firewall rules to file '$ExportFile'"
+            Export-FirewallRulesHC -ExportFile $ExportFile
         }
         else {
-            Write-Verbose "Import firewall rules from file '$csvFile'"
-            Import-FirewallRulesHC -CsvFile $csvFile
+            Write-Verbose "Import firewall rules from file '$ExportFile'"
+            Import-FirewallRulesHC -ImportFile $ExportFile
         }
     }
     Catch {

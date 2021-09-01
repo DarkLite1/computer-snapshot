@@ -328,7 +328,7 @@ Process {
             }
 
             $invokeScriptParams = @{
-                Path       = $Script.$($item.Key) 
+                Path       = Get-FullPathHC -Path $Script.$($item.Key)
                 DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
             }
 

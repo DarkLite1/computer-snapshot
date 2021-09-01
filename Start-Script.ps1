@@ -74,6 +74,10 @@
         The folder where the reports will be saved. These reports contain the
         results of the scripts ran.
 
+    .PARAMETER OpenReportInBrowser
+        Once the script is done an HTML report will be opened in the browser for
+        further inspection.
+
     .EXAMPLE
         # on PC1
         $params = @{

@@ -8,8 +8,8 @@ BeforeAll {
     $testParams = @{
         Action                  = 'Export'
         DataFolder              = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        smbSharesFileName       = 'smbShares.xml'
-        smbSharesAccessFileName = 'SmbSharesAccess.xml'
+        smbSharesFileName       = 'smbShares.json'
+        smbSharesAccessFileName = 'SmbSharesAccess.json'
     }
 }
 AfterAll {
@@ -99,7 +99,7 @@ Describe 'Export the smb shares details to the data folder' {
     It 'save the general configurations in the smbSharesFile' {
         $testSmbExport.smbSharesFile | Should -Exist
         Get-Content $testSmbExport.smbSharesFile | Should -Not -BeNullOrEmpty
-    }
+    } -Tag test
     It 'save the smb share permissions in the smbSharesAccessFile' {
         $testSmbExport.smbSharesAccessFile | Should -Exist
         Get-Content $testSmbExport.smbSharesAccessFile | 
@@ -107,7 +107,7 @@ Describe 'Export the smb shares details to the data folder' {
     }
     It 'save the NTFS permissions in the NTFS folder' {
         $testSmbExport.ntfsFolder | Should -Exist
-        $testNtfsFiles = @(Get-ChildItem $testSmbExport.ntfsFolder | Where-Object { $_.Name -eq "$($testSmbShare.Name).xml" })
+        $testNtfsFiles = @(Get-ChildItem $testSmbExport.ntfsFolder | Where-Object { $_.Name -eq "$($testSmbShare.Name).json" })
         $testNtfsFiles | Should -Not -BeNullOrEmpty
         Get-Content $testNtfsFiles.FullName | Should -Not -BeNullOrEmpty
     }
@@ -198,8 +198,27 @@ Describe "With Action set to 'Import'" {
         #endregion
 
         #region Only test on the test share
-        $testSmbShareOnly = Import-Clixml -LiteralPath $testSmbExport.smbSharesFile | Where-Object Name -EQ $testSmbShare.Name
-        $testSmbShareOnly | Export-Clixml -LiteralPath $testSmbExport.smbSharesFile
+        $testSmbShareOnly = (Get-Content -LiteralPath $testSmbExport.smbSharesFile -Encoding UTF8 | ConvertFrom-Json) |
+        Where-Object { $_.Name -EQ $testSmbShare.Name } 
+         
+
+        $testSmbShareOnly | Select-Object -Property Name, ScopeName, Path, 
+        Description, 
+        @{
+            Name       = 'CachingMode';
+            Expression = { [String]$_.CachingMode } 
+        }, 
+        @{
+            Name       = 'SmbInstance'; 
+            Expression = { [String]$_.SmbInstance } 
+        }, 
+        @{
+            Name       = 'FolderEnumerationMode'; 
+            Expression = { [String]$_.FolderEnumerationMode } 
+        }, 
+        CATimeout, EncryptData, ThrottleLimit, ConcurrentUserLimit, 
+        ContinuouslyAvailable | ConvertTo-Json | 
+        Out-File -LiteralPath $testSmbExport.smbSharesFile -Encoding utf8
         #endregion
 
         $Error.clear()

@@ -39,8 +39,8 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$smbSharesFileName = 'SmbShares.xml',
-    [String]$smbSharesAccessFileName = 'SmbSharesAccess.xml'
+    [String]$smbSharesFileName = 'SmbShares.json',
+    [String]$smbSharesAccessFileName = 'SmbSharesAccess.json'
 )
 
 Begin {    
@@ -128,12 +128,12 @@ Begin {
                 $acl.SetAccessRuleProtection($true, $false)
                 $acl.AddAccessRule(
                     (New-Object System.Security.AccessControl.FileSystemAccessRule(
-                            [System.Security.Principal.NTAccount]$Name,
-                            [System.Security.AccessControl.FileSystemRights]::FullControl,
-                            [System.Security.AccessControl.InheritanceFlags]::None,
-                            [System.Security.AccessControl.PropagationFlags]::None,
-                            [System.Security.AccessControl.AccessControlType]::Allow
-                        )
+                        [System.Security.Principal.NTAccount]$Name,
+                        [System.Security.AccessControl.FileSystemRights]::FullControl,
+                        [System.Security.AccessControl.InheritanceFlags]::None,
+                        [System.Security.AccessControl.PropagationFlags]::None,
+                        [System.Security.AccessControl.AccessControlType]::Allow
+                    )
                     )
                 )
                 $acl | Set-Acl -LiteralPath $tmpFile.FullName -ErrorAction Stop
@@ -192,25 +192,79 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            If ($smbShares = @(Get-SmbShare | 
-                    Where-Object { (-not $_.Special) -and ($_.Path) -and 
-                        (Test-Path -LiteralPath $_.Path -PathType Container) })
-            ) {
+            If ($smbShares = Get-SmbShare) {
                 Write-Verbose "Smb shares '$($smbShares.Name -join "', '")'"
                 Write-Verbose "Export smb shares to file '$smbSharesFile'"
-                $smbShares | Export-Clixml -LiteralPath $smbSharesFile
+                $smbShares | Select-Object -Property Name, ScopeName, Path, 
+                Description, 
+                @{
+                    Name       = 'CachingMode';
+                    Expression = { [String]$_.CachingMode } 
+                }, 
+                @{
+                    Name       = 'SmbInstance'; 
+                    Expression = { [String]$_.SmbInstance } 
+                }, 
+                @{
+                    Name       = 'FolderEnumerationMode'; 
+                    Expression = { [String]$_.FolderEnumerationMode } 
+                }, 
+                CATimeout, EncryptData, ThrottleLimit, ConcurrentUserLimit, 
+                ContinuouslyAvailable | ConvertTo-Json | 
+                Out-File -LiteralPath $smbSharesFile -Encoding utf8
 
                 $smbSharesAccess = $smbShares | Get-SmbShareAccess
                 Write-Verbose "Export smb share access permissions to file '$smbSharesAccessFile'"
-                $smbSharesAccess | Export-Clixml -LiteralPath $smbSharesAccessFile
+                $smbSharesAccess | Select-Object -Property Name, ScopeName,
+                AccountName, 
+                @{
+                    Name       = 'AccessControlType'; 
+                    Expression = { [String]$_.AccessControlType } 
+                },
+                @{
+                    Name       = 'AccessRight'; 
+                    Expression = { [String]$_.AccessRight } 
+                } | ConvertTo-Json | 
+                Out-File -LiteralPath $smbSharesAccessFile -Encoding utf8
                     
                 $ntfsFolder = New-Item -Path (Join-Path $DataFolder 'NTFS') -ItemType Directory
 
-                Foreach ($share in $smbShares) {
-                    $ntfsFile = Join-Path -Path $ntfsFolder -ChildPath "$($share.Name).xml"
+                Foreach ($share in $smbShares | 
+                    Where-Object { 
+                        ($_.Path) -and
+                        (Test-Path -LiteralPath $_.Path -PathType Container -EA Ignore)
+                    }
+                ) {
+                    $ntfsFile = Join-Path -Path $ntfsFolder -ChildPath "$($share.Name).json"
                     $acl = Get-Acl -Path $share.Path
                     Write-Verbose "Smb share '$($share.Name)' export NTFS permissions to file '$ntfsFile'"
-                    $acl | Export-Clixml -LiteralPath $ntfsFile
+                    @{
+                        Owner                   = $acl.Owner
+                        AreAccessRulesProtected = $acl.AreAccessRulesProtected
+                        Access                  = $acl.Access | 
+                        Where-Object { -not $_.IsInherited } | 
+                        Select-Object -Property @{
+                            Name       = 'IdentityReference'; 
+                            Expression = { [String]$_.IdentityReference } 
+                        },
+                        @{
+                            Name       = 'AccessControlType'; 
+                            Expression = { [String]$_.AccessControlType } 
+                        },
+                        @{
+                            Name       = 'FileSystemRights'; 
+                            Expression = { [String]$_.FileSystemRights } 
+                        },
+                        @{
+                            Name       = 'InheritanceFlags'; 
+                            Expression = { [String]$_.InheritanceFlags } 
+                        },
+                        @{
+                            Name       = 'PropagationFlags'; 
+                            Expression = { [String]$_.PropagationFlags } 
+                        } 
+                    } | ConvertTo-Json | 
+                    Out-File -LiteralPath $ntfsFile -Encoding utf8
                 }
             }
             else {
@@ -221,10 +275,10 @@ Process {
             $accountsValid = @{}
 
             Write-Verbose "Import smb shares from file '$smbSharesFile'"
-            $smbShares = Import-Clixml -LiteralPath $smbSharesFile
+            $smbShares = Get-Content -LiteralPath $smbSharesFile -Encoding UTF8 -Raw | ConvertFrom-Json
         
             Write-Verbose "Import smb shares access from file '$smbSharesAccessFile'"
-            $smbSharesAccesses = Import-Clixml -LiteralPath $smbSharesAccessFile
+            $smbSharesAccesses = Get-Content -LiteralPath $smbSharesAccessFile -Encoding UTF8 -Raw | ConvertFrom-Json
         
             foreach ($share in $smbShares) {
                 Write-Verbose "Smb share '$($share.Name)' path '$($share.Path)'"
@@ -293,29 +347,16 @@ Process {
                 #endregion
         
                 #region Add NTFS permissions
-                $ntfsFile = Join-Path -Path $DataFolder -ChildPath "NTFS\$($share.Name).xml"
+                $ntfsFile = Join-Path -Path $DataFolder -ChildPath "NTFS\$($share.Name).json"
                 If (Test-Path -Path $ntfsFile -PathType Leaf) {
-                    $aclImport = Import-Clixml -LiteralPath $ntfsFile
+                    $aclImport = Get-Content -LiteralPath $ntfsFile -Encoding UTF8 | ConvertFrom-Json
                     
-                    #region Import correct account names
-                    # Import-Clixml converts unknown account names
-                    # to unrecognizable strings
-                    $rawAclXmlImport = [Xml](Get-Content -LiteralPath $ntfsFile)
-                    $unconvertedAccountNames = (
-                        $rawAclXmlImport.Objs.Obj.MS.S | 
-                        Where-Object N -EQ AccessToString | 
-                        ForEach-Object InnerText ) -split '_x000A_' | ForEach-Object {
-                        ($_.Split(' '))[0].Trim()
-                    }
-                    #endregion
-
                     #region Create ACE's
                     $i = -1
                     $aceList = ForEach ($ace in $aclImport.Access) {
                         Try {
                             $i++
-                            $accountName = Convert-AccountNameHC -Name $unconvertedAccountNames[$i]
-                            # $accountName = Convert-AccountNameHC -Name $ace.IdentityReference
+                            $accountName = Convert-AccountNameHC -Name $ace.IdentityReference
        
                             #region Test if account exists
                             if ($accountsValid.Keys -NotContains $accountName) {
@@ -386,4 +427,3 @@ Process {
         throw "$Action smb shares failed: $_"
     }
 }
-

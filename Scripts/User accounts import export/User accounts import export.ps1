@@ -279,6 +279,8 @@ Process {
                 @{Name = 'Password'; Expression = { '' } } -ExcludeProperty PrincipalSource, SID, ObjectClass, PasswordChangeableDate | 
                 ConvertTo-Json | 
                 Out-File -FilePath $UserAccountsFile -Encoding UTF8
+
+                Write-Output "Exported $($users.count) user accounts"
             }
             else {
                 throw 'No enabled local user accounts found'

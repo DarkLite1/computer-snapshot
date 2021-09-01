@@ -185,7 +185,7 @@ Begin {
                     InterfaceType       = [String]$InterfaceTypeFilter.InterfaceType
                     LocalUser           = $SecurityFilter.LocalUser
                     RemoteUser          = $SecurityFilter.RemoteUser
-                    RemoteMachine      = $SecurityFilter.RemoteMachine
+                    RemoteMachine       = $SecurityFilter.RemoteMachine
                     Authentication      = [String]$SecurityFilter.Authentication
                     Encryption          = [String]$SecurityFilter.Encryption
                     OverrideBlockRules  = ConvertTo-BooleanHC $SecurityFilter.OverrideBlockRules
@@ -198,6 +198,7 @@ Begin {
                 Encoding    = 'UTF8'
             }
             $firewallRuleSet | ConvertTo-Json | Out-File @outParams
+            Write-Output "Exported $($firewallRuleSet.Count) firewall rules"
         }
         Catch {
             throw "Failed to export the firewall rules: $_"
@@ -347,6 +348,8 @@ Begin {
                 Try {
                     Write-Verbose "Create firewall rule '$($rule.DisplayName)' '($($rule.Name))'"
                     $null = New-NetFirewallRule @newRuleParams @storeParam -EA Stop
+                    Write-Output "Created firewall rule '$($newRuleParams.DisplayName) ($($newRuleParams.Name))'"
+
                 }
                 Catch {
                     Write-Error "Failed to create firewall rule '$($rule.DisplayName)' '($($rule.Name))': $_"

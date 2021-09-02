@@ -119,7 +119,9 @@ Describe 'Export the smb shares details to the data folder' {
             $testNtfsFileContent = Get-Content $testNtfsFile.FullName |
             ConvertFrom-Json -EA Stop
     
-            $testNtfsFile
+            $testNtfsFileContent.AreAccessRulesProtected | Should -BeFalse
+            $testNtfsFileContent.Owner | Should -Be 'BUILTIN\Administrators'
+            $testNtfsFileContent.Access | Should -BeNullOrEmpty
         }
     }
 }

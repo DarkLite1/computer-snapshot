@@ -195,38 +195,44 @@ Process {
             If ($smbShares = @(Get-SmbShare)) {
                 Write-Verbose "Smb shares '$($smbShares.Name -join "', '")'"
                 Write-Verbose "Export smb shares to file '$smbSharesFile'"
-                $smbShares | Select-Object -Property Name, Description, Path, 
-                ScopeName, 
-                @{
-                    Name       = 'CachingMode';
-                    Expression = { [String]$_.CachingMode } 
-                }, 
-                @{
-                    Name       = 'SmbInstance'; 
-                    Expression = { [String]$_.SmbInstance } 
-                }, 
-                @{
-                    Name       = 'FolderEnumerationMode'; 
-                    Expression = { [String]$_.FolderEnumerationMode } 
-                }, 
-                CATimeout, EncryptData, ThrottleLimit, ConcurrentUserLimit, 
-                ContinuouslyAvailable | ConvertTo-Json | 
+                (
+                    $smbShares | Select-Object -Property Name, Description, Path, 
+                    ScopeName, 
+                    @{
+                        Name       = 'CachingMode';
+                        Expression = { [String]$_.CachingMode } 
+                    }, 
+                    @{
+                        Name       = 'SmbInstance'; 
+                        Expression = { [String]$_.SmbInstance } 
+                    }, 
+                    @{
+                        Name       = 'FolderEnumerationMode'; 
+                        Expression = { [String]$_.FolderEnumerationMode } 
+                    }, 
+                    CATimeout, EncryptData, ThrottleLimit, ConcurrentUserLimit, 
+                    ContinuouslyAvailable
+                ) | 
+                ConvertTo-Json | 
                 Out-File -LiteralPath $smbSharesFile -Encoding utf8
 
                 Write-Output "Exported $($smbShares.Count) smb shares"
 
                 $smbSharesAccess = $smbShares | Get-SmbShareAccess
                 Write-Verbose "Export smb share access permissions to file '$smbSharesAccessFile'"
-                $smbSharesAccess | Select-Object -Property Name, 
-                ScopeName, AccountName, 
-                @{
-                    Name       = 'AccessControlType'; 
-                    Expression = { [String]$_.AccessControlType } 
-                },
-                @{
-                    Name       = 'AccessRight'; 
-                    Expression = { [String]$_.AccessRight } 
-                } | ConvertTo-Json | 
+                (
+                    $smbSharesAccess | Select-Object -Property Name, 
+                    ScopeName, AccountName, 
+                    @{
+                        Name       = 'AccessControlType'; 
+                        Expression = { [String]$_.AccessControlType } 
+                    },
+                    @{
+                        Name       = 'AccessRight'; 
+                        Expression = { [String]$_.AccessRight } 
+                    }
+                ) | 
+                ConvertTo-Json | 
                 Out-File -LiteralPath $smbSharesAccessFile -Encoding utf8
                     
                 Write-Output "Exported $($smbSharesAccess.Count) smb share accesses"
@@ -243,34 +249,37 @@ Process {
                     $acl = Get-Acl -Path $share.Path
                     Write-Verbose "Smb share '$($share.Name)' export NTFS permissions to file '$ntfsFile'"
 
-                    (@{
-                        Owner                   = $acl.Owner
-                        AreAccessRulesProtected = $acl.AreAccessRulesProtected
-                        Access                  = @(
-                            $acl.Access | 
-                            Where-Object { -not $_.IsInherited } | 
-                            Select-Object -Property @{
-                                Name       = 'IdentityReference'; 
-                                Expression = { [String]$_.IdentityReference } 
-                            },
-                            @{
-                                Name       = 'AccessControlType'; 
-                                Expression = { [String]$_.AccessControlType } 
-                            },
-                            @{
-                                Name       = 'FileSystemRights'; 
-                                Expression = { [String]$_.FileSystemRights } 
-                            },
-                            @{
-                                Name       = 'InheritanceFlags'; 
-                                Expression = { [String]$_.InheritanceFlags } 
-                            },
-                            @{
-                                Name       = 'PropagationFlags'; 
-                                Expression = { [String]$_.PropagationFlags } 
-                            } 
-                        )
-                    }) | ConvertTo-Json | 
+                    (
+                        [Ordered]@{
+                            Owner                   = $acl.Owner
+                            AreAccessRulesProtected = $acl.AreAccessRulesProtected
+                            Access                  = @(
+                                $acl.Access | 
+                                Where-Object { -not $_.IsInherited } | 
+                                Select-Object -Property @{
+                                    Name       = 'IdentityReference'; 
+                                    Expression = { [String]$_.IdentityReference } 
+                                },
+                                @{
+                                    Name       = 'AccessControlType'; 
+                                    Expression = { [String]$_.AccessControlType } 
+                                },
+                                @{
+                                    Name       = 'FileSystemRights'; 
+                                    Expression = { [String]$_.FileSystemRights } 
+                                },
+                                @{
+                                    Name       = 'InheritanceFlags'; 
+                                    Expression = { [String]$_.InheritanceFlags } 
+                                },
+                                @{
+                                    Name       = 'PropagationFlags'; 
+                                    Expression = { [String]$_.PropagationFlags } 
+                                } 
+                            )
+                        }
+                    ) | 
+                    ConvertTo-Json | 
                     Out-File -LiteralPath $ntfsFile -Encoding utf8
                 }
 
@@ -286,10 +295,16 @@ Process {
             $accountsValid = @{}
 
             Write-Verbose "Import smb shares from file '$smbSharesFile'"
-            $smbShares = Get-Content -LiteralPath $smbSharesFile -Encoding UTF8 -Raw | ConvertFrom-Json
+            $smbShares = (
+                Get-Content -LiteralPath $smbSharesFile -Encoding UTF8 -Raw
+            ) | 
+            ConvertFrom-Json -EA Stop
         
             Write-Verbose "Import smb shares access from file '$smbSharesAccessFile'"
-            $smbSharesAccesses = Get-Content -LiteralPath $smbSharesAccessFile -Encoding UTF8 -Raw | ConvertFrom-Json
+            $smbSharesAccesses = (
+                Get-Content -LiteralPath $smbSharesAccessFile -Encoding UTF8 -Raw
+            ) | 
+            ConvertFrom-Json -EA Stop
         
             foreach ($share in $smbShares) {
                 Try {
@@ -363,7 +378,10 @@ Process {
                     #region Add NTFS permissions
                     $ntfsFile = Join-Path -Path $DataFolder -ChildPath "NTFS\$($share.Name).json"
                     If (Test-Path -Path $ntfsFile -PathType Leaf) {
-                        $aclImport = Get-Content -LiteralPath $ntfsFile -Encoding UTF8 | ConvertFrom-Json
+                        $aclImport = (
+                            Get-Content -LiteralPath $ntfsFile -Encoding UTF8
+                        ) | 
+                        ConvertFrom-Json -EA Stop
                     
                         #region Create ACE's
                         $aceList = ForEach ($ace in $aclImport.Access) {

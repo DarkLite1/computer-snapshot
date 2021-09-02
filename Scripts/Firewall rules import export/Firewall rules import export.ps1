@@ -233,7 +233,7 @@ Begin {
                     Raw      = $true
                     Encoding = 'utf8'
                 }
-                $exportedRules = Get-Content @getParams | ConvertFrom-Json
+                $exportedRules = (Get-Content @getParams) | ConvertFrom-Json
     
                 $rulesToImport = $exportedRules | Where-Object {
                     ($_.DisplayName -eq 'Logica') -or
@@ -296,7 +296,8 @@ Begin {
                 Encoding    = 'UTF8'
                 Raw         = $true
             }
-            $firewallRules = Get-Content @getParams | ConvertFrom-Json
+            $firewallRules = (Get-Content @getParams) | 
+            ConvertFrom-Json -EA Stop
         
             ForEach ($rule In $firewallRules) {
                 $newRuleParams = @{

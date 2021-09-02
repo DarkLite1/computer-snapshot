@@ -157,27 +157,27 @@ Begin {
                 $InterfaceTypeFilter = $rule | Get-NetFirewallInterfaceTypeFilter
                 $SecurityFilter = $rule | Get-NetFirewallSecurityFilter
         
-                @{
+                [Ordered]@{
                     Name                = $rule.Name
                     DisplayName         = $rule.DisplayName
                     Description         = $rule.Description
-                    Group               = $rule.Group
+                    Action              = [String]$rule.Action
+                    Direction           = [String]$rule.Direction
                     Enabled             = ConvertTo-BooleanHC $rule.Enabled
                     Profile             = [String]$rule.Profile -replace ' '
+                    Protocol            = $PortFilter.Protocol
+                    LocalPort           = ConvertTo-StringArrayHC $PortFilter.LocalPort
+                    RemotePort          = ConvertTo-StringArrayHC $PortFilter.RemotePort
+                    IcmpType            = ConvertTo-StringArrayHC $PortFilter.IcmpType
+                    DynamicTarget       = [String]$PortFilter.DynamicTarget
+                    Group               = $rule.Group
                     Platform            = ConvertTo-StringArrayHC $rule.Platform
-                    Direction           = [String]$rule.Direction
-                    Action              = [String]$rule.Action
                     EdgeTraversalPolicy = [String]$rule.EdgeTraversalPolicy
                     LooseSourceMapping  = ConvertTo-BooleanHC $rule.LooseSourceMapping
                     LocalOnlyMapping    = ConvertTo-BooleanHC $rule.LocalOnlyMapping
                     Owner               = $rule.Owner
                     LocalAddress        = ConvertTo-StringArrayHC $AddressFilter.LocalAddress
                     RemoteAddress       = ConvertTo-StringArrayHC $AddressFilter.RemoteAddress
-                    Protocol            = $PortFilter.Protocol
-                    LocalPort           = ConvertTo-StringArrayHC $PortFilter.LocalPort
-                    RemotePort          = ConvertTo-StringArrayHC $PortFilter.RemotePort
-                    IcmpType            = ConvertTo-StringArrayHC $PortFilter.IcmpType
-                    DynamicTarget       = [String]$PortFilter.DynamicTarget
                     Program             = $ApplicationFilter.Program -Replace "$($ENV:SystemRoot.Replace("\","\\"))\\", "%SystemRoot%\" -Replace "$(${ENV:ProgramFiles(x86)}.Replace("\","\\").Replace("(","\(").Replace(")","\)"))\\", "%ProgramFiles(x86)%\" -Replace "$($ENV:ProgramFiles.Replace("\","\\"))\\", "%ProgramFiles%\"
                     Package             = $ApplicationFilter.Package
                     Service             = $ServiceFilter.Service

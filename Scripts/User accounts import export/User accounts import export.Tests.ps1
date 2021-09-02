@@ -30,6 +30,11 @@ BeforeAll {
         UserAccountsFileName = 'UserAccounts.json'
     }
 }
+AfterAll {
+    $testUsers | ForEach-Object {
+        Remove-LocalUser -Name $_.Name -EA Ignore
+    }
+}
 Describe 'the mandatory parameters are' {
     It '<_>' -ForEach 'Action', 'DataFolder' {
         (Get-Command $testScript).Parameters[$_].Attributes.Mandatory | 

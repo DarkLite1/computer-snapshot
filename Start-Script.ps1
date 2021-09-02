@@ -377,7 +377,7 @@ End {
         <head>
         <style>
         table {
-            font-family: arial, sans-serif;
+            
             border-collapse: collapse;
             width: 80%;
             margin-bottom: 25px;
@@ -403,6 +403,7 @@ End {
         th {
             width: 1px;
             white-space: nowrap;
+            color: Gray;
         }
 
         div {

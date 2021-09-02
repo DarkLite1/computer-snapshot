@@ -106,7 +106,7 @@ Process {
                     }
                 }
                 catch {
-                    Write-Error "Failed to retrieve group members for group '$($group.Name)'. This group will most likely contain invalid accounts: $_"
+                    Write-Error "Failed to retrieve group members for group '$($group.Name)'. This group will most likely contains invalid accounts: $_"
                     $Error.RemoveAt(1)
                 }    
 

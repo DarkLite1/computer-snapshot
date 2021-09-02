@@ -195,8 +195,8 @@ Process {
             If ($smbShares = @(Get-SmbShare)) {
                 Write-Verbose "Smb shares '$($smbShares.Name -join "', '")'"
                 Write-Verbose "Export smb shares to file '$smbSharesFile'"
-                $smbShares | Select-Object -Property Name, ScopeName, Path, 
-                Description, 
+                $smbShares | Select-Object -Property Name, Description, Path, 
+                ScopeName, 
                 @{
                     Name       = 'CachingMode';
                     Expression = { [String]$_.CachingMode } 
@@ -217,8 +217,8 @@ Process {
 
                 $smbSharesAccess = $smbShares | Get-SmbShareAccess
                 Write-Verbose "Export smb share access permissions to file '$smbSharesAccessFile'"
-                $smbSharesAccess | Select-Object -Property Name, ScopeName,
-                AccountName, 
+                $smbSharesAccess | Select-Object -Property Name, 
+                ScopeName, AccountName, 
                 @{
                     Name       = 'AccessControlType'; 
                     Expression = { [String]$_.AccessControlType } 

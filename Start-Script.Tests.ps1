@@ -264,7 +264,9 @@ Describe 'When child scripts are executed' {
             Write-Error 'Script2 non terminating error'
         } -ParameterFilter { $Path -eq $testNewParams.Script.Script2 }
         Mock Invoke-ScriptHC {
-            'normal output'
+            'normal output1'
+            'normal output2'
+            'normal output3'
         } -ParameterFilter { $Path -eq $testNewParams.Script.Script3 }
 
         .$testScript @testNewParams -EA SilentlyContinue
@@ -286,6 +288,26 @@ Describe 'When child scripts are executed' {
     }
     It 'terminating errors are reported' {
         $testReport | Where-Object { $_ -like '*Blocking error*' } | 
+        Should -Not -BeNullOrEmpty
+        $testReport | Where-Object { $_ -like '*Script1 terminating error*' } | 
+        Should -Not -BeNullOrEmpty
+    }
+    It 'non terminating errors are reported' {
+        $testReport | Where-Object { $_ -like '*Non blocking errors*' } | 
+        Should -Not -BeNullOrEmpty
+        $testReport | Where-Object { 
+            $_ -like '*Script2 non terminating error*' 
+        } | 
+        Should -Not -BeNullOrEmpty
+    }
+    It 'output is reported' {
+        $testReport | Where-Object { $_ -like '*Non blocking errors*' } | 
+        Should -Not -BeNullOrEmpty
+        $testReport | Where-Object { $_ -like '*normal output1*' } | 
+        Should -Not -BeNullOrEmpty
+        $testReport | Where-Object { $_ -like '*normal output2*' } | 
+        Should -Not -BeNullOrEmpty
+        $testReport | Where-Object { $_ -like '*normal output3*' } | 
         Should -Not -BeNullOrEmpty
     }
 }

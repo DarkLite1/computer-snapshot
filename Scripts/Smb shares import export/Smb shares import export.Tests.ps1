@@ -123,6 +123,66 @@ Describe 'Export the smb shares details to the data folder' {
             $testNtfsFileContent.Owner | Should -Be 'BUILTIN\Administrators'
             $testNtfsFileContent.Access | Should -BeNullOrEmpty
         }
+        It 'the json file only contains non inherited NTFS permissions' {
+            Get-ChildItem $testParams.DataFolder | Remove-Item -Recurse
+
+            #region Create local test user
+            $testUserParams = @{
+                Name        = $testLocalUserNames[0]
+                Password    = ConvertTo-SecureString "P@ssW0rD!" -AsPlainText -Force
+                ErrorAction = 'Ignore'
+            }
+            $null = New-LocalUser @testUserParams
+            #endregion
+
+            #region Apply custom NTFS permissions
+            $acl = Get-Acl -Path $testSmbShare.Path
+            $acl.SetAccessRuleProtection($true, $false)
+            $acl.AddAccessRule(
+            (New-Object System.Security.AccessControl.FileSystemAccessRule(
+                    [System.Security.Principal.NTAccount]'BUILTIN\Administrators',
+                    [System.Security.AccessControl.FileSystemRights]::FullControl,
+                    [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+                    [System.Security.AccessControl.PropagationFlags]::None,
+                    [System.Security.AccessControl.AccessControlType]::Allow
+                )
+            )
+            )
+            $acl.AddAccessRule(
+            (New-Object System.Security.AccessControl.FileSystemAccessRule(
+                    [System.Security.Principal.NTAccount]$testLocalUserNames[0],
+                    [System.Security.AccessControl.FileSystemRights]::FullControl,
+                    [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+                    [System.Security.AccessControl.PropagationFlags]::None,
+                    [System.Security.AccessControl.AccessControlType]::Allow
+                )
+            )
+            )
+            $acl | Set-Acl -Path $testSmbShare.Path
+            #endregion
+
+            .$testScript @testParams
+
+
+            $testNtfsFile = Get-ChildItem $testSmbExport.ntfsFolder | Where-Object { $_.Name -eq "$($testSmbShare.Name).json" }
+
+            $testNtfsFileContent = Get-Content $testNtfsFile.FullName |
+            ConvertFrom-Json -EA Stop
+    
+            $testNtfsFileContent.AreAccessRulesProtected | Should -BeTrue
+            $testNtfsFileContent.Owner | Should -Be 'BUILTIN\Administrators'
+            $testNtfsFileContent.Access | Should -Not -BeNullOrEmpty
+            $testUserAccess = $testNtfsFileContent.Access |
+            Where-Object {
+                $_.IdentityReference -like "*$($testLocalUserNames[0])"
+            }
+            $testUserAccess | Should -Not -BeNullOrEmpty
+            $testUserAccess.AccessControlType | Should -Be 'Allow'
+            $testUserAccess.PropagationFlags | Should -Be 'None'
+            $testUserAccess.FileSystemRights | Should -Be 'FullControl'
+            $testUserAccess.InheritanceFlags | 
+            Should -Be 'ContainerInherit, ObjectInherit'
+        }
     }
 }
 Describe "With Action set to 'Import'" {

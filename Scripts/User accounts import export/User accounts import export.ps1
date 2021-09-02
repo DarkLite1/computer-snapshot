@@ -277,7 +277,6 @@ Process {
                 Write-Verbose "Export users to file '$UserAccountsFile'"
                 $users | Select-Object -Property Name, FullName, Description, 
                 Enabled, PasswordExpires, UserMayChangePassword, 
-                PasswordRequired, 
                 @{Name = 'Password'; Expression = { '' } } | 
                 ConvertTo-Json | 
                 Out-File -FilePath $UserAccountsFile -Encoding UTF8

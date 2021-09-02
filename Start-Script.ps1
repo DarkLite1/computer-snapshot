@@ -389,6 +389,11 @@ End {
             background-color: MediumSeaGreen;
         }
 
+        h4{
+            font-style: italic;
+            color: Gray;
+        }
+
         td, th {
             border: 1px solid #dddddd;
             text-align: left;
@@ -460,6 +465,20 @@ End {
             $errorsFound = $false
 
             if (
+                $output = $script.Output
+            ) {
+                # $html += '<h4>Output<h4>'
+                # Write-Host 'Output:' 
+                $html += '<ul>' 
+                
+                $output | ForEach-Object {
+                    Write-Host "- $_"
+                    # $html += '<p>' + $_ + '</p>'
+                    $html += '<li>' + $_ + '</li>'
+                }
+                $html +='</ul>'
+            }
+            if (
                 $TerminatingError = $script.TerminatingError
             ) {
                 $errorsFound = $true
@@ -482,21 +501,10 @@ End {
                     $html += '<p style="color:orange;">' + $_ + '</p>'
                 }
             }
-            if (
-                $output = $script.Output
-            ) {
-                $html += '<h4>Output<h4>'
-                
-                Write-Host 'Output:' 
-                $output | ForEach-Object {
-                    Write-Host $_
-                    $html += '<p>' + $_ + '</p>'
-                }
-            }
 
             if (-not $errorsFound) {
                 Write-Host 'Success, no errors detected' @writeSuccessParams
-                $html += '<p style="color:green;">Success, no errors detected</p>'
+                $html += '<p style="color:green;"><b>Success, no errors detected</b></p>'
             }
             Write-Host ('-' * 80) @writeSeparatorParams
 

@@ -310,4 +310,4 @@ Describe 'When child scripts are executed' {
         $testReport | Where-Object { $_ -like '*normal output3*' } | 
         Should -Not -BeNullOrEmpty
     }
-}
+} -tag test

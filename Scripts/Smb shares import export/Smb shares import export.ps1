@@ -242,40 +242,34 @@ Process {
                     $ntfsFile = Join-Path -Path $ntfsFolder -ChildPath "$($share.Name).json"
                     $acl = Get-Acl -Path $share.Path
                     Write-Verbose "Smb share '$($share.Name)' export NTFS permissions to file '$ntfsFile'"
-                    $ntfsAccess = $acl.Access | 
-                    Where-Object { -not $_.IsInherited } | 
-                    Select-Object -Property @{
-                        Name       = 'IdentityReference'; 
-                        Expression = { [String]$_.IdentityReference } 
-                    },
-                    @{
-                        Name       = 'AccessControlType'; 
-                        Expression = { [String]$_.AccessControlType } 
-                    },
-                    @{
-                        Name       = 'FileSystemRights'; 
-                        Expression = { [String]$_.FileSystemRights } 
-                    },
-                    @{
-                        Name       = 'InheritanceFlags'; 
-                        Expression = { [String]$_.InheritanceFlags } 
-                    },
-                    @{
-                        Name       = 'PropagationFlags'; 
-                        Expression = { [String]$_.PropagationFlags } 
-                    } 
 
                     @{
                         Owner                   = $acl.Owner
                         AreAccessRulesProtected = $acl.AreAccessRulesProtected
-                        Access                  = if ($ntfsAccess) {
-                            $ntfsAccess 
-                        }
-                        else { 
-                            # otherwise an empty object is returned which fails
-                            # the import
-                            $null 
-                        }
+                        Access                  = @(
+                            $acl.Access | 
+                            Where-Object { -not $_.IsInherited } | 
+                            Select-Object -Property @{
+                                Name       = 'IdentityReference'; 
+                                Expression = { [String]$_.IdentityReference } 
+                            },
+                            @{
+                                Name       = 'AccessControlType'; 
+                                Expression = { [String]$_.AccessControlType } 
+                            },
+                            @{
+                                Name       = 'FileSystemRights'; 
+                                Expression = { [String]$_.FileSystemRights } 
+                            },
+                            @{
+                                Name       = 'InheritanceFlags'; 
+                                Expression = { [String]$_.InheritanceFlags } 
+                            },
+                            @{
+                                Name       = 'PropagationFlags'; 
+                                Expression = { [String]$_.PropagationFlags } 
+                            } 
+                        )
                     } | ConvertTo-Json | 
                     Out-File -LiteralPath $ntfsFile -Encoding utf8
                 }

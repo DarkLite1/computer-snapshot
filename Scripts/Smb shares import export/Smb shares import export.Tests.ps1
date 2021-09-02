@@ -105,11 +105,22 @@ Describe 'Export the smb shares details to the data folder' {
         Get-Content $testSmbExport.smbSharesAccessFile | 
         Should -Not -BeNullOrEmpty
     }
-    It 'save the NTFS permissions in the NTFS folder' {
-        $testSmbExport.ntfsFolder | Should -Exist
-        $testNtfsFiles = @(Get-ChildItem $testSmbExport.ntfsFolder | Where-Object { $_.Name -eq "$($testSmbShare.Name).json" })
-        $testNtfsFiles | Should -Not -BeNullOrEmpty
-        Get-Content $testNtfsFiles.FullName | Should -Not -BeNullOrEmpty
+    Context 'save the NTFS permissions' {
+        BeforeAll {
+            $testNtfsFile = Get-ChildItem $testSmbExport.ntfsFolder | Where-Object { $_.Name -eq "$($testSmbShare.Name).json" }
+        }
+        It 'in an NTFS folder' {
+            $testSmbExport.ntfsFolder | Should -Exist
+        }
+        It 'in a json file in the NTFS folder' {
+            $testNtfsFile.FullName | Should -Exist
+        }
+        It 'the json file only contains non inherited NTFS permissions' {
+            $testNtfsFileContent = Get-Content $testNtfsFile.FullName |
+            ConvertFrom-Json -EA Stop
+    
+            $testNtfsFile
+        }
     }
 }
 Describe "With Action set to 'Import'" {

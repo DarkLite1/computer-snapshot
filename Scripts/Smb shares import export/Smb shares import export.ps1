@@ -243,7 +243,7 @@ Process {
                     $acl = Get-Acl -Path $share.Path
                     Write-Verbose "Smb share '$($share.Name)' export NTFS permissions to file '$ntfsFile'"
 
-                    @{
+                    (@{
                         Owner                   = $acl.Owner
                         AreAccessRulesProtected = $acl.AreAccessRulesProtected
                         Access                  = @(
@@ -270,7 +270,7 @@ Process {
                                 Expression = { [String]$_.PropagationFlags } 
                             } 
                         )
-                    } | ConvertTo-Json | 
+                    }) | ConvertTo-Json | 
                     Out-File -LiteralPath $ntfsFile -Encoding utf8
                 }
 

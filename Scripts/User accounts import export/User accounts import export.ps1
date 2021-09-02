@@ -62,9 +62,10 @@
         }
         $exportFile = Join-Path @joinParams
 
-        $ExportedUsers = Get-Content -Path $exportFile -Raw | ConvertFrom-Json
+        $ExportedUsers = (Get-Content -Path $exportFile -Raw) | ConvertFrom-Json
         $ExportedUsers | Foreach-Object {$_.Enabled = $true}
-        $ExportedUsers[0..1] | ConvertTo-Json | Out-File -Path $exportFile -Encoding UTF8
+        ($ExportedUsers[0..1]) | ConvertTo-Json | 
+        Out-File -Path $exportFile -Encoding UTF8
 
         $exportParams.Action = 'Import'
         & 'C:\UserAccounts.ps1' @exportParams
@@ -275,9 +276,12 @@ Process {
                     Write-Verbose "User account '$($_.Name)' description '$($_.description)'"
                 }
                 Write-Verbose "Export users to file '$UserAccountsFile'"
-                $users | Select-Object -Property Name, FullName, Description, 
-                Enabled, PasswordExpires, UserMayChangePassword, 
-                @{Name = 'Password'; Expression = { '' } } | 
+                (
+                    $users | Select-Object -Property Name, FullName,
+                    Description, Enabled, PasswordExpires, 
+                    UserMayChangePassword, 
+                    @{Name = 'Password'; Expression = { '' } } 
+                ) | 
                 ConvertTo-Json | 
                 Out-File -FilePath $UserAccountsFile -Encoding UTF8
 
@@ -289,8 +293,9 @@ Process {
         }
         else {
             Write-Verbose "Import user accounts from file '$UserAccountsFile'"
-            $importedUsers = Get-Content -LiteralPath $UserAccountsFile -Raw | 
-            ConvertFrom-Json -EA Stop
+            $importedUsers = (
+                Get-Content -LiteralPath $UserAccountsFile -Raw
+            ) | ConvertFrom-Json -EA Stop
 
             $knownComputerUsers = Get-LocalUser
 

@@ -14,7 +14,7 @@ BeforeAll {
 }
 AfterAll {
     $testLocalUserNames | ForEach-Object {
-        Get-LocalUser -Name $_ -EA ignore | Remove-LocalUser
+        Remove-LocalUser -Name $_ -EA Ignore
     }
     Remove-SmbShare -Name $testSmbShareName -EA Ignore -Confirm:$false
 }

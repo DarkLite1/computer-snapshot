@@ -351,7 +351,7 @@ Describe 'on action Import' {
         }
     }
     Context 'group members' {
-        It 'are added to a a new group' {
+        It 'are added to a new group' {
             $testUserParams = @{
                 Name     = $testUserNames[0]
                 Password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
@@ -382,6 +382,100 @@ Describe 'on action Import' {
 
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
                 $InputObject -eq "Group '$($testGroups[0].Name)' added account member '$($testUserNames[0])'"
+            }
+        }
+        It 'are added to an existing group' {
+            $testUserParams = @{
+                Name     = $testUserNames[0]
+                Password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
+            }
+            New-LocalUser @testUserParams
+            New-LocalGroup -Name $testGroups[0].Name
+
+            @{
+                Name            = $testGroups[0].Name
+                Description     = 'test group'
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = @(
+                    @{
+                        Name            = $testUserNames[0]
+                        ObjectClass     = 'User'
+                        PrincipalSource = 'Local'
+                    }
+                )
+            } | 
+            ConvertTo-Json -Depth 5 | 
+            Out-File -LiteralPath $testFile -Encoding utf8
+        
+            .$testScript @testParams    
+
+            $actual = Get-LocalGroupMember -Name $testGroups[0].Name -EA Ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.Name | Should -Be "$env:COMPUTERNAME\$($testUserNames[0])"
+
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Group '$($testGroups[0].Name)' added account member '$($testUserNames[0])'"
+            }
+        }
+        It 'are reported when they are already a member of the group' {
+            $testUserParams = @{
+                Name     = $testUserNames[0]
+                Password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
+            }
+            New-LocalUser @testUserParams
+            New-LocalGroup -Name $testGroups[0].Name
+            Add-LocalGroupMember -Group $testGroups[0].Name -Member $testUserNames[0]
+
+            @{
+                Name            = $testGroups[0].Name
+                Description     = 'test group'
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = @(
+                    @{
+                        Name            = $testUserNames[0]
+                        ObjectClass     = 'User'
+                        PrincipalSource = 'Local'
+                    }
+                )
+            } | 
+            ConvertTo-Json -Depth 5 | 
+            Out-File -LiteralPath $testFile -Encoding utf8
+        
+            .$testScript @testParams    
+
+            $actual = Get-LocalGroupMember -Name $testGroups[0].Name -EA Ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.Name | Should -Be "$env:COMPUTERNAME\$($testUserNames[0])"
+
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Group '$($testGroups[0].Name)' account '$($testUserNames[0])' is already a member"
+            }
+        }
+        It 'are reported as non terminating error when they do not exist' {
+            Mock Write-Error
+
+            @{
+                Name            = $testGroups[0].Name
+                Description     = 'test group'
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = @(
+                    @{
+                        Name            = 'NotExisting'
+                        ObjectClass     = 'User'
+                        PrincipalSource = 'Local'
+                    }
+                )
+            } | 
+            ConvertTo-Json -Depth 5 | 
+            Out-File -LiteralPath $testFile -Encoding utf8
+        
+            .$testScript @testParams 
+
+            Should -Invoke Write-Error -Times 1 -Exactly -ParameterFilter {
+                $Message -eq "Failed to add member account 'NotExisting' to group '$($testGroups[0].Name)': member account not found"
             }
         }
     }   

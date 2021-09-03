@@ -21,7 +21,7 @@
         action is 'Import' the data in the $DataFolder will be restored.
 
     .PARAMETER DataFolder
-        Folder where to save or restore the user accounts
+        Folder where the export or import file can be found
 
     .PARAMETER UserAccountsFileName
         Name of the file that contains all local user accounts

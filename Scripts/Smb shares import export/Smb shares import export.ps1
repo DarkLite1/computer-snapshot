@@ -10,8 +10,8 @@
         When action is 'Export' the data will be saved in the $DataFolder, when 
         action is 'Import' the data in the $DataFolder will be restored.
 
-    .PARAMETER ImportFolder
-        Folder of the files containing all the smb shares data.
+    .PARAMETER DataFolder
+        Folder where the export or import file can be found
 
     .EXAMPLE
         $exportParams = @{

@@ -63,6 +63,54 @@ Param(
 )
 
 Begin {
+    Function Convert-AccountNameHC {
+        <#
+            .SYNOPSIS
+                Convert an account name coming from another computer to 
+                an account name usable on the current computer.
+    
+            .EXAMPLE
+                Convert-AccountNameHC -Name 'PC1\mike'
+                Returns 'PC2\mike' when the computer name of the current
+                computer is 'PC2'
+    
+            .EXAMPLE
+                Convert-AccountNameHC -Name 'BUILTIN\Administrators'
+                Returns 'BUILTIN\Administrators'
+    
+            .EXAMPLE
+                Convert-AccountNameHC -Name 'CONTOSO\bob'
+                Returns 'CONTOSO\bob'
+    
+            .EXAMPLE
+                Convert-AccountNameHC -Name 'Everyone'
+                Returns 'Everyone'
+        #>
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Name
+        )
+    
+        Try {
+            $accountName = $Name
+            If ($accountName -like '*\*') {
+                $split = $accountName.Split('\')
+                If ( 
+                    ($split[0] -ne $env:USERDOMAIN) -and
+                    ($split[0] -ne $env:COMPUTERNAME) -and
+                    ($split[0] -ne 'BUILTIN') -and
+                    ($split[0] -ne 'NT AUTHORITY')
+                ) {
+                    $accountName = "$env:COMPUTERNAME\$($split[1])"
+                }
+            }
+            $accountName
+        }
+        Catch {
+            throw "Failed to convert the account name of '$Name': $_"
+        }
+    }
+
     Try {
         $GroupsFile = Join-Path -Path $DataFolder -ChildPath $FileName
 
@@ -181,7 +229,7 @@ Process {
                         try {
                             $addMemberParams = @{
                                 Group       = $group.Name
-                                Member      = $member
+                                Member      = Convert-AccountNameHC $member
                                 ErrorAction = 'Stop'
                             }
                             Add-LocalGroupMember @addMemberParams

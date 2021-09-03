@@ -104,8 +104,6 @@ Process {
                 [Ordered]@{
                     Name            = $group.Name
                     Description     = $group.Description
-                    ObjectClass     = $group.ObjectClass
-                    PrincipalSource = [String]$group.PrincipalSource
                     Members         = @($groupMembers.Name)
                 }
             }

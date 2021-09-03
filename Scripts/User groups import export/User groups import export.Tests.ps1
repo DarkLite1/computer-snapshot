@@ -5,33 +5,25 @@ BeforeAll {
     $testUserNames = @('TestUser1', 'TestUser2', 'TestUser3')
     $testGroups = @(
         @{
-            Name            = 'testGroup1'
-            Description     = 'group 1 created for testing purposes'
-            Members         = @($testUserNames[0])
-            ObjectClass     = 'Group'
-            PrincipalSource = 'Local'
+            Name        = 'testGroup1'
+            Description = 'group 1 created for testing purposes'
+            Members     = @($testUserNames[0])
         }
         @{
-            Name            = 'testGroup2'
-            Description     = 'group 2 created for testing purposes'
-            Members         = @(
+            Name        = 'testGroup2'
+            Description = 'group 2 created for testing purposes'
+            Members     = @(
                 $testUserNames[0], $testUserNames[1], $testUserNames[2]
                 # local groups can not be added to other local groups
             )
-            ObjectClass     = 'Group'
-            PrincipalSource = 'Local'
         }
         @{
-            Name            = 'testGroup3'
-            Description     = 'group 3 created for testing purposes'
-            ObjectClass     = 'Group'
-            PrincipalSource = 'Local'
+            Name        = 'testGroup3'
+            Description = 'group 3 created for testing purposes'
         }
         @{
-            Name            = 'testGroup4'
-            Description     = '' # $null not accepted by New-LocalGroup
-            ObjectClass     = 'Group'
-            PrincipalSource = 'Local'
+            Name        = 'testGroup4'
+            Description = '' # $null not accepted by New-LocalGroup
         }
     )
 
@@ -151,8 +143,6 @@ Describe 'on action Export' {
             }
             $actual | Should -Not -BeNullOrEmpty
             $actual.Description | Should -Be $testGroup.Description
-            $actual.ObjectClass | Should -Be $testGroup.ObjectClass
-            $actual.PrincipalSource | Should -Be $testGroup.PrincipalSource
             
             foreach ($testMember in $testGroup.Members) {
                 $actual.Members | Where-Object {
@@ -182,11 +172,9 @@ Describe 'on action Import' {
     Context 'a new group is created' {
         It 'Description $null' {
             @{
-                Name            = $testGroups[0].Name
-                Description     = $null
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = $null
+                Name        = $testGroups[0].Name
+                Description = $null
+                Members     = $null
             } | 
             ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
@@ -202,11 +190,9 @@ Describe 'on action Import' {
         }
         It 'Description empty string' {
             @{
-                Name            = $testGroups[0].Name
-                Description     = ''
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = $null
+                Name        = $testGroups[0].Name
+                Description = ''
+                Members     = $null
             } | 
             ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
@@ -222,11 +208,9 @@ Describe 'on action Import' {
         }
         It 'Description' {
             @{
-                Name            = $testGroups[0].Name
-                Description     = 'test description'
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = $null
+                Name        = $testGroups[0].Name
+                Description = 'test description'
+                Members     = $null
             } | 
             ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
@@ -246,11 +230,9 @@ Describe 'on action Import' {
             New-LocalGroup -Name $testGroups[0].Name -Description 'wrong'
 
             @{
-                Name            = $testGroups[0].Name
-                Description     = $null
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = $null
+                Name        = $testGroups[0].Name
+                Description = $null
+                Members     = $null
             } | 
             ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
@@ -277,11 +259,9 @@ Describe 'on action Import' {
             New-LocalGroup -Name $testGroups[0].Name -Description 'wrong'
 
             @{
-                Name            = $testGroups[0].Name
-                Description     = ''
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = $null
+                Name        = $testGroups[0].Name
+                Description = ''
+                Members     = $null
             } | 
             ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
@@ -306,11 +286,9 @@ Describe 'on action Import' {
             New-LocalGroup -Name $testGroups[0].Name -Description 'wrong'
 
             @{
-                Name            = $testGroups[0].Name
-                Description     = 'test description'
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = $null
+                Name        = $testGroups[0].Name
+                Description = 'test description'
+                Members     = $null
             } | 
             ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
@@ -334,11 +312,9 @@ Describe 'on action Import' {
             New-LocalUser @testUserParams
 
             @{
-                Name            = $testGroups[0].Name
-                Description     = 'test group'
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = @($testUserNames[0])
+                Name        = $testGroups[0].Name
+                Description = 'test group'
+                Members     = @($testUserNames[0])
             } | 
             ConvertTo-Json -Depth 5 | 
             Out-File -LiteralPath $testFile -Encoding utf8
@@ -362,11 +338,9 @@ Describe 'on action Import' {
             New-LocalGroup -Name $testGroups[0].Name
 
             @{
-                Name            = $testGroups[0].Name
-                Description     = 'test group'
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = @($testUserNames[0])
+                Name        = $testGroups[0].Name
+                Description = 'test group'
+                Members     = @($testUserNames[0])
             } | 
             ConvertTo-Json -Depth 5 | 
             Out-File -LiteralPath $testFile -Encoding utf8
@@ -391,11 +365,9 @@ Describe 'on action Import' {
             Add-LocalGroupMember -Group $testGroups[0].Name -Member $testUserNames[0]
 
             @{
-                Name            = $testGroups[0].Name
-                Description     = 'test group'
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = @($testUserNames[0])
+                Name        = $testGroups[0].Name
+                Description = 'test group'
+                Members     = @($testUserNames[0])
             } | 
             ConvertTo-Json -Depth 5 | 
             Out-File -LiteralPath $testFile -Encoding utf8
@@ -414,11 +386,9 @@ Describe 'on action Import' {
             Mock Write-Error
 
             @{
-                Name            = $testGroups[0].Name
-                Description     = 'test group'
-                ObjectClass     = 'Group'
-                PrincipalSource = 'Local'
-                Members         = @('NotExisting')
+                Name        = $testGroups[0].Name
+                Description = 'test group'
+                Members     = @('NotExisting')
             } | 
             ConvertTo-Json -Depth 5 | 
             Out-File -LiteralPath $testFile -Encoding utf8

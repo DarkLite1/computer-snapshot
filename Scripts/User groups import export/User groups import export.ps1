@@ -94,12 +94,7 @@ Process {
             $groupsToExport = foreach ($group in $groups) {
                 Write-Verbose "Group '$($group.Name)'"
                 try {
-                    $groupMembers = Get-LocalGroupMember -Name $group.Name -EA Stop |
-                    Select-Object -Property Name, ObjectClass, 
-                    @{
-                        Name       = 'PrincipalSource'; 
-                        Expression = { [String]$_.PrincipalSource } 
-                    }
+                    $groupMembers = Get-LocalGroupMember -Name $group.Name -EA Stop
                 }
                 catch {
                     Write-Error "Failed to retrieve group members for group '$($group.Name)'. This group will most likely contain an invalid or orphaned account: $_"
@@ -111,7 +106,7 @@ Process {
                     Description     = $group.Description
                     ObjectClass     = $group.ObjectClass
                     PrincipalSource = [String]$group.PrincipalSource
-                    Members         = @($groupMembers)
+                    Members         = @($groupMembers.Name)
                 }
             }
             
@@ -183,14 +178,14 @@ Process {
                         try {
                             $addMemberParams = @{
                                 Group       = $group.Name
-                                Member      = $member.Name
+                                Member      = $member
                                 ErrorAction = 'Stop'
                             }
                             Add-LocalGroupMember @addMemberParams
-                            Write-Output "Group '$($group.Name)' added account member '$($member.Name)'"
+                            Write-Output "Group '$($group.Name)' added account member '$member'"
                         }
                         catch [Microsoft.PowerShell.Commands.MemberExistsException] {
-                            Write-Output "Group '$($group.Name)' account '$($member.Name)' is already a member"
+                            Write-Output "Group '$($group.Name)' account '$member' is already a member"
                             $Error.RemoveAt(0)
                         }
                         catch {
@@ -199,10 +194,10 @@ Process {
                                 'Object reference not set to an instance of an object.'
                             ) {
                                 $Error.RemoveAt(0)
-                                Write-Error "Failed to add member account '$($member.Name)' to group '$($group.Name)': member account not found"
+                                Write-Error "Failed to add member account '$member' to group '$($group.Name)': member account not found"
                             }
                             else {
-                                Write-Error "Failed to add member account '$($member.Name)' to group '$($group.Name)': $_"
+                                Write-Error "Failed to add member account '$member' to group '$($group.Name)': $_"
                                 $Error.RemoveAt(1)
                             }
                         }

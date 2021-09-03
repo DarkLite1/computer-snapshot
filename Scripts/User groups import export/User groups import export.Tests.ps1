@@ -7,13 +7,7 @@ BeforeAll {
         @{
             Name            = 'testGroup1'
             Description     = 'group 1 created for testing purposes'
-            Members         = @(
-                @{
-                    Name            = $testUserNames[0]
-                    ObjectClass     = 'User'
-                    PrincipalSource = 'Local'
-                }
-            )
+            Members         = @($testUserNames[0])
             ObjectClass     = 'Group'
             PrincipalSource = 'Local'
         }
@@ -21,21 +15,7 @@ BeforeAll {
             Name            = 'testGroup2'
             Description     = 'group 2 created for testing purposes'
             Members         = @(
-                @{
-                    Name            = $testUserNames[0]
-                    ObjectClass     = 'User'
-                    PrincipalSource = 'Local'
-                }
-                @{
-                    Name            = $testUserNames[1]
-                    ObjectClass     = 'User'
-                    PrincipalSource = 'Local'
-                }
-                @{
-                    Name            = $testUserNames[2]
-                    ObjectClass     = 'User'
-                    PrincipalSource = 'Local'
-                }
+                $testUserNames[0], $testUserNames[1], $testUserNames[2]
                 # local groups can not be added to other local groups
             )
             ObjectClass     = 'Group'
@@ -145,7 +125,7 @@ Describe 'on action Export' {
                 $testMembers | ForEach-Object {
                     $testGroupMemberParams = @{
                         Group  = $testGroup.Name 
-                        Member = $_.Name
+                        Member = $_
                     }
                     Add-LocalGroupMember @testGroupMemberParams
                 }
@@ -175,14 +155,9 @@ Describe 'on action Export' {
             $actual.PrincipalSource | Should -Be $testGroup.PrincipalSource
             
             foreach ($testMember in $testGroup.Members) {
-                $actualMember = $actual.Members | Where-Object {
-                    $_.Name -eq "$env:COMPUTERNAME\$($testMember.Name)"
-                }
-
-                $actualMember | Should -Not -BeNullOrEmpty
-                $actualMember.ObjectClass | Should -Be $testMember.ObjectClass
-                $actualMember.PrincipalSource | 
-                Should -Be $testMember.PrincipalSource
+                $actual.Members | Where-Object {
+                    $_ -eq "$env:COMPUTERNAME\$testMember"
+                } | Should -Not -BeNullOrEmpty
             }
         }
     }
@@ -363,13 +338,7 @@ Describe 'on action Import' {
                 Description     = 'test group'
                 ObjectClass     = 'Group'
                 PrincipalSource = 'Local'
-                Members         = @(
-                    @{
-                        Name            = $testUserNames[0]
-                        ObjectClass     = 'User'
-                        PrincipalSource = 'Local'
-                    }
-                )
+                Members         = @($testUserNames[0])
             } | 
             ConvertTo-Json -Depth 5 | 
             Out-File -LiteralPath $testFile -Encoding utf8
@@ -397,13 +366,7 @@ Describe 'on action Import' {
                 Description     = 'test group'
                 ObjectClass     = 'Group'
                 PrincipalSource = 'Local'
-                Members         = @(
-                    @{
-                        Name            = $testUserNames[0]
-                        ObjectClass     = 'User'
-                        PrincipalSource = 'Local'
-                    }
-                )
+                Members         = @($testUserNames[0])
             } | 
             ConvertTo-Json -Depth 5 | 
             Out-File -LiteralPath $testFile -Encoding utf8
@@ -432,13 +395,7 @@ Describe 'on action Import' {
                 Description     = 'test group'
                 ObjectClass     = 'Group'
                 PrincipalSource = 'Local'
-                Members         = @(
-                    @{
-                        Name            = $testUserNames[0]
-                        ObjectClass     = 'User'
-                        PrincipalSource = 'Local'
-                    }
-                )
+                Members         = @($testUserNames[0])
             } | 
             ConvertTo-Json -Depth 5 | 
             Out-File -LiteralPath $testFile -Encoding utf8
@@ -461,13 +418,7 @@ Describe 'on action Import' {
                 Description     = 'test group'
                 ObjectClass     = 'Group'
                 PrincipalSource = 'Local'
-                Members         = @(
-                    @{
-                        Name            = 'NotExisting'
-                        ObjectClass     = 'User'
-                        PrincipalSource = 'Local'
-                    }
-                )
+                Members         = @('NotExisting')
             } | 
             ConvertTo-Json -Depth 5 | 
             Out-File -LiteralPath $testFile -Encoding utf8

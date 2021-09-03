@@ -192,8 +192,8 @@ Process {
                                 $_.Exception.Message -eq 
                                 'Object reference not set to an instance of an object.'
                             ) {
-                                $Error.RemoveAt(0)
                                 Write-Error "Failed to add member account '$member' to group '$($group.Name)': member account not found"
+                                $Error.RemoveAt(1)
                             }
                             else {
                                 Write-Error "Failed to add member account '$member' to group '$($group.Name)': $_"

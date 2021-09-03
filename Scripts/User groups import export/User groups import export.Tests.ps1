@@ -222,7 +222,7 @@ Describe 'on action Import' {
             $actual.Description | Should -Be ''
 
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
-                $InputObject -eq "Created group '$($testGroups[0].Name)'"
+                $InputObject -eq "Group '$($testGroups[0].Name)' created"
             }
         }
         It 'Description empty string' {
@@ -242,7 +242,7 @@ Describe 'on action Import' {
             $actual.Description | Should -Be ''
 
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
-                $InputObject -eq "Created group '$($testGroups[0].Name)'"
+                $InputObject -eq "Group '$($testGroups[0].Name)' created"
             }
         }
         It 'Description' {
@@ -262,13 +262,13 @@ Describe 'on action Import' {
             $actual.Description | Should -Be 'test description'
 
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
-                $InputObject -eq "Created group '$($testGroups[0].Name)'"
+                $InputObject -eq "Group '$($testGroups[0].Name)' created"
             }
         }
     }
     Context 'an existing group is updated' {
         It 'Description $null' {
-            New-localGroup -Name $testGroups[0].Name -Description 'wrong'
+            New-LocalGroup -Name $testGroups[0].Name -Description 'wrong'
 
             @{
                 Name            = $testGroups[0].Name
@@ -299,7 +299,7 @@ Describe 'on action Import' {
             }
         }
         It 'Description empty string' {
-            New-localGroup -Name $testGroups[0].Name -Description 'wrong'
+            New-LocalGroup -Name $testGroups[0].Name -Description 'wrong'
 
             @{
                 Name            = $testGroups[0].Name
@@ -311,7 +311,7 @@ Describe 'on action Import' {
             ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
             .$testScript @testParams
-            
+
             $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
             $actual.Description | Should -Be ' ' 
 
@@ -328,7 +328,7 @@ Describe 'on action Import' {
             }
         }
         It 'Description' {
-            New-localGroup -Name $testGroups[0].Name -Description 'wrong'
+            New-LocalGroup -Name $testGroups[0].Name -Description 'wrong'
 
             @{
                 Name            = $testGroups[0].Name
@@ -350,5 +350,39 @@ Describe 'on action Import' {
             }
         }
     }
-    
+    Context 'group members' {
+        It 'are added to a a new group' {
+            $testUserParams = @{
+                Name     = $testUserNames[0]
+                Password = ConvertTo-SecureString 'P@s/-%*D!' -AsPlainText -Force
+            }
+            New-LocalUser @testUserParams
+
+            @{
+                Name            = $testGroups[0].Name
+                Description     = 'test group'
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = @(
+                    @{
+                        Name            = $testUserNames[0]
+                        ObjectClass     = 'User'
+                        PrincipalSource = 'Local'
+                    }
+                )
+            } | 
+            ConvertTo-Json -Depth 5 | 
+            Out-File -LiteralPath $testFile -Encoding utf8
+        
+            .$testScript @testParams    
+
+            $actual = Get-LocalGroupMember -Name $testGroups[0].Name -EA Ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.Name | Should -Be "$env:COMPUTERNAME\$($testUserNames[0])"
+
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Group '$($testGroups[0].Name)' added account member '$($testUserNames[0])'"
+            }
+        }
+    }   
 }

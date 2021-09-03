@@ -102,9 +102,9 @@ Process {
                     }
                 }
                 catch {
-                    Write-Error "Failed to retrieve group members for group '$($group.Name)'. This group will most likely contains invalid accounts: $_"
+                    Write-Error "Failed to retrieve group members for group '$($group.Name)'. This group will most likely contain an invalid or orphaned account: $_"
                     $Error.RemoveAt(1)
-                }    
+                }
 
                 [Ordered]@{
                     Name            = $group.Name
@@ -150,7 +150,7 @@ Process {
                         else {
                             New-LocalGroup @groupParams
                         }
-                        Write-Output "Created group '$($group.Name)'"
+                        Write-Output "Group '$($group.Name)' created"
                     }
                     elseif (
                         (
@@ -174,6 +174,38 @@ Process {
                         }
                         Set-LocalGroup @groupParams
                         Write-Output "Updated description of group '$($group.Name)'"
+                    }
+                    #endregion
+
+                    #region Set group members
+              
+                    foreach ($member in $group.Members) {
+                        try {
+                            $addMemberParams = @{
+                                Group       = $group.Name
+                                Member      = $member.Name
+                                ErrorAction = 'Stop'
+                            }
+                            Add-LocalGroupMember @addMemberParams
+                            Write-Output "Group '$($group.Name)' added account member '$($member.Name)'"
+                        }
+                        catch [Microsoft.PowerShell.Commands.MemberExistsException] {
+                            Write-Output "Group '$($group.Name)' account '$($member.Name)' is already a member"
+                            $Error.RemoveAt(0)
+                        }
+                        catch {
+                            if (
+                                $_.Exception.Message -eq 
+                                'Object reference not set to an instance of an object.'
+                            ) {
+                                $Error.RemoveAt(0)
+                                Write-Error "Failed to add member account '$($member.Name)' to group '$($group.Name)': member account not found"
+                            }
+                            else {
+                                Write-Error "Failed to add member account '$($member.Name)' to group '$($group.Name)': $_"
+                                $Error.RemoveAt(1)
+                            }
+                        }
                     }
                     #endregion
                 }

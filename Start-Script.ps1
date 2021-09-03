@@ -122,12 +122,14 @@ Param (
     [String]$Action = 'CreateSnapshot',
     [System.Collections.Specialized.OrderedDictionary]$Snapshot = [Ordered]@{
         UserAccounts  = $true
+        UserGroups    = $true
         FirewallRules = $true
         SmbShares     = $true
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
         UserAccounts  = 'Scripts\User accounts import export\User accounts import export.ps1'
+        UserGroups    = 'Scripts\User groups import export\User groups import export.ps1'
         FirewallRules = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
         SmbShares     = 'Scripts\Smb shares import export\Smb shares import export.ps1'
     },
@@ -477,7 +479,7 @@ End {
                     # $html += '<p>' + $_ + '</p>'
                     $html += '<li>' + $_ + '</li>'
                 }
-                $html +='</ul>'
+                $html += '</ul>'
             }
             if (
                 $TerminatingError = $script.TerminatingError

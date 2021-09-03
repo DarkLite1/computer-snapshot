@@ -95,6 +95,7 @@ Process {
                 Write-Verbose "Group '$($group.Name)'"
                 try {
                     $groupMembers = Get-LocalGroupMember -Name $group.Name -EA Stop
+                    Write-Verbose "Group '$($group.Name)' has $($groupMembers.Count) members"
                 }
                 catch {
                     Write-Error "Failed to retrieve group members for group '$($group.Name)'. This group will most likely contain an invalid or orphaned account: $_"
@@ -102,9 +103,9 @@ Process {
                 }
 
                 [Ordered]@{
-                    Name            = $group.Name
-                    Description     = $group.Description
-                    Members         = @($groupMembers.Name)
+                    Name        = $group.Name
+                    Description = $group.Description
+                    Members     = @($groupMembers.Name)
                 }
             }
             
@@ -113,13 +114,11 @@ Process {
             Out-File -FilePath $GroupsFile -Encoding UTF8
 
             Write-Output "Exported $($groups.count) groups"
-            
         }
         else {
             Write-Verbose "Import groups from file '$GroupsFile'"
-            $importedGroups = (
-                Get-Content -LiteralPath $GroupsFile -Raw
-            ) | ConvertFrom-Json -EA Stop
+            $importedGroups = Get-Content -LiteralPath $GroupsFile -Raw | 
+            ConvertFrom-Json -EA Stop
 
             $knownComputerGroups = Get-LocalGroup
 

@@ -2,7 +2,7 @@
 #Requires -Version 5.1
 
 BeforeAll {
-    $testUserNames = @('TestUser1', 'TestUser2')
+    $testUserNames = @('TestUser1', 'TestUser2', 'TestUser3')
     $testGroups = @(
         @{
             Name            = 'testGroup1'
@@ -31,6 +31,11 @@ BeforeAll {
                     ObjectClass     = 'User'
                     PrincipalSource = 'Local'
                 }
+                @{
+                    Name            = $testUserNames[2]
+                    ObjectClass     = 'User'
+                    PrincipalSource = 'Local'
+                }
                 # local groups can not be added to other local groups
             )
             ObjectClass     = 'Group'
@@ -39,6 +44,12 @@ BeforeAll {
         @{
             Name            = 'testGroup3'
             Description     = 'group 3 created for testing purposes'
+            ObjectClass     = 'Group'
+            PrincipalSource = 'Local'
+        }
+        @{
+            Name            = 'testGroup4'
+            Description     = '' # $null not accepted by New-LocalGroup
             ObjectClass     = 'Group'
             PrincipalSource = 'Local'
         }
@@ -107,7 +118,7 @@ Describe "Throw a terminating error on action 'Import' when" {
         Should -Throw "*groups file '$($testNewParams.DataFolder)\$($testNewParams.GroupsFileName)' not found"
     }
 }
-Describe "On action 'Export' a groups json file" {
+Describe 'on action Export' {
     BeforeAll {
         Get-ChildItem -Path $testParams.DataFolder | Remove-Item
         $testGroups | ForEach-Object { 
@@ -142,7 +153,7 @@ Describe "On action 'Export' a groups json file" {
         }
 
         $testParams.Action = 'Export'
-        .$testScript @testParams
+        .$testScript @testParams -EA SilentlyContinue
 
         $testImportParams = @{
             LiteralPath = "$($testParams.DataFolder)\$($testParams.GroupsFileName)"
@@ -150,10 +161,10 @@ Describe "On action 'Export' a groups json file" {
         }
         $testImport = Get-Content @testImportParams | ConvertFrom-Json -EA Stop
     }
-    It 'is created' {
+    It 'a json file is created' {
         $testImportParams.LiteralPath | Should -Exist
     }
-    It 'contains all local groups with their members' {
+    It 'the json file contains all local groups with their members' {
         foreach ($testGroup in $testGroups) {
             $actual = $testImport | Where-Object { 
                 $_.Name -eq $testGroup.Name 
@@ -175,99 +186,169 @@ Describe "On action 'Export' a groups json file" {
             }
         }
     }
-} -Tag test
-Describe "On action 'Import' the exported json file is read and" {
+}
+Describe 'on action Import' {
     BeforeAll {
+        Mock Write-Output
+
+        $testFile = Join-Path $testParams.DataFolder $testParams.GroupsFileName
         $testParams.Action = 'Import'
-        $testJoinParams = @{
-            Path      = $testParams.DataFolder 
-            ChildPath = $testParams.GroupsFileName
-        }
-        $testFile = Join-Path @testJoinParams
     }
     BeforeEach {
-        $testGroup = @{
-            Name = $testGroups[0].Name
-        }
-        Remove-Item -Path $testFile -EA Ignore
-        Remove-LocalGroup -Name $testGroup.Name -EA Ignore
-    }
-    Context 'a non existing group is created with' {
-        It 'Name only' {
-            New-LocalGroup @testGroup | 
-            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
-                    
-            Remove-LocalGroup -Name $testGroup.Name
+        $testFile | Remove-Item -EA Ignore
 
-            .$testScript @testParams
+        $testUserNames | ForEach-Object {
+            Remove-LocalUser -Name $_ -EA Ignore
+        }
+        $testGroups | ForEach-Object {
+            Remove-LocalGroup -Name $_.Name -EA Ignore
+        }
+    }
+    Context 'a new group is created' {
+        It 'Description $null' {
+            @{
+                Name            = $testGroups[0].Name
+                Description     = $null
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = $null
+            } | 
+            ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
-            $actual = Get-LocalGroup -Name $testGroup.Name -EA ignore
+            .$testScript @testParams    
+
+            $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
             $actual | Should -Not -BeNullOrEmpty
-            $actual.Description | Should -BeNullOrEmpty
+            $actual.Description | Should -Be ''
+
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Created group '$($testGroups[0].Name)'"
+            }
+        }
+        It 'Description empty string' {
+            @{
+                Name            = $testGroups[0].Name
+                Description     = ''
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = $null
+            } | 
+            ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
+        
+            .$testScript @testParams    
+
+            $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.Description | Should -Be ''
+
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Created group '$($testGroups[0].Name)'"
+            }
         }
         It 'Description' {
-            $testGroupDetails = @{
-                Description = 'Test group'
-            }
-            New-LocalGroup @testGroup @testGroupDetails | 
-            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
-
-            Remove-LocalGroup -Name $testGroup.Name
-
-            .$testScript @testParams
+            @{
+                Name            = $testGroups[0].Name
+                Description     = 'test description'
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = $null
+            } | 
+            ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
-            $actual = Get-LocalGroup -Name $testGroup.Name -EA ignore
+            .$testScript @testParams    
+
+            $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
             $actual | Should -Not -BeNullOrEmpty
-            $actual.Description | Should -Be $testGroupDetails.Description
+            $actual.Description | Should -Be 'test description'
+
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Created group '$($testGroups[0].Name)'"
+            }
         }
     }
     Context 'an existing group is updated' {
-        It 'Description' {
-            $testGroupDetails = @{
-                Description = 'Test group bob'
-            }
-            New-LocalGroup @testGroup @testGroupDetails | 
-            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
+        It 'Description $null' {
+            New-localGroup -Name $testGroups[0].Name -Description 'wrong'
+
+            @{
+                Name            = $testGroups[0].Name
+                Description     = $null
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = $null
+            } | 
+            ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
         
-            Remove-LocalGroup -Name $testGroup.Name
-            $testGroupDetailsWrong = @{
-                Description = 'Test group mike'
+            .$testScript @testParams
+
+            $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
+            $actual | Should -Not -BeNullOrEmpty
+            
+            $actual.Description | Should -Be ' ' 
+
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Updated description of group '$($testGroups[0].Name)'"
             }
-            New-LocalGroup @testGroup @testGroupDetailsWrong
 
             .$testScript @testParams
-        
-            $actual = Get-LocalGroup -Name $testGroup.Name -EA ignore
+            $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
             $actual | Should -Not -BeNullOrEmpty
-            $actual.Description | Should -Be $testGroupDetails.Description
-        }
-    }
-    Context 'a non terminating error is created when' {
-        It 'creating a group fails' {
-            $testFile = Join-Path @testJoinParams
-            New-LocalGroup @testGroup | 
-            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
-    
-            Mock Set-LocalGroup {
-                Write-Error 'Non terminating error Set-LocalGroup'
+            
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Group '$($testGroups[0].Name)' exists already and is correct"
             }
-            $Error.Clear()
-            .$testScript @testParams -EA SilentlyContinue
-            $Error.Exception.Message | Should -Be "Failed to create group '$($testGroup.Name)': Non terminating error Set-LocalGroup"
-        } 
-        It 'updating a group fails' {
-            $testFile = Join-Path @testJoinParams
-            New-LocalGroup @testGroup | 
-            ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
-    
-            Remove-LocalGroup -Name $testGroup.Name
+        }
+        It 'Description empty string' {
+            New-localGroup -Name $testGroups[0].Name -Description 'wrong'
 
-            Mock New-LocalGroup {
-                Write-Error 'Non terminating error New-LocalGroup'
+            @{
+                Name            = $testGroups[0].Name
+                Description     = ''
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = $null
+            } | 
+            ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
+        
+            .$testScript @testParams
+            
+            $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
+            $actual.Description | Should -Be ' ' 
+
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Updated description of group '$($testGroups[0].Name)'"
             }
-            $Error.Clear()
-            .$testScript @testParams -EA SilentlyContinue
-            $Error.Exception.Message | Should -Be "Failed to create group '$($testGroup.Name)': Non terminating error New-LocalGroup"
+
+            .$testScript @testParams
+            $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
+            $actual | Should -Not -BeNullOrEmpty
+            
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Group '$($testGroups[0].Name)' exists already and is correct"
+            }
+        }
+        It 'Description' {
+            New-localGroup -Name $testGroups[0].Name -Description 'wrong'
+
+            @{
+                Name            = $testGroups[0].Name
+                Description     = 'test description'
+                ObjectClass     = 'Group'
+                PrincipalSource = 'Local'
+                Members         = $null
+            } | 
+            ConvertTo-Json | Out-File -LiteralPath $testFile -Encoding utf8
+        
+            .$testScript @testParams    
+
+            $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
+            $actual | Should -Not -BeNullOrEmpty
+            $actual.Description | Should -Be 'test description'
+
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                $InputObject -eq "Updated description of group '$($testGroups[0].Name)'"
+            }
         }
     }
+    
 }

@@ -90,13 +90,9 @@ Process {
     Try {
         If ($Action -eq 'Export') {
             $groups = Get-LocalGroup
-            $groups | ForEach-Object {
-                Write-Verbose "group group '$($_.Name)' description '$($_.Description)'"
-            }
 
             $groupsToExport = foreach ($group in $groups) {
                 Write-Verbose "Group '$($group.Name)'"
-
                 try {
                     $groupMembers = Get-LocalGroupMember -Name $group.Name -EA Stop |
                     Select-Object -Property Name, ObjectClass, 
@@ -136,59 +132,53 @@ Process {
 
             foreach ($group in $importedGroups) {
                 try {                    
-                    Write-Verbose "group '$($group.Name)'"
-                    $passwordParams = @{
-                        groupName     = $group.Name 
-                        groupPassword = $group.Password 
-                        NewGroup      = $false
-                    }
-
-                    #region Create incomplete group
-                    if ($knownComputerGroups.Name -notContains $group.Name) {
-                        $passwordParams.NewGroup = $true
-                        Set-NewPasswordHC @passwordParams
-                    }
-                    #endregion
-
-                    #region Set group group details
-                    $setGroupParams = @{
-                        Name                   = $group.Name
-                        Description            = $group.Description
-                        FullName               = $group.FullName
-                        PasswordNeverExpires   = ![Boolean]$group.PasswordExpires
-                        groupMayChangePassword = $group.groupMayChangePassword
-                        ErrorAction            = 'Stop'
+                    Write-Verbose "Group '$($group.Name)'"
+                    
+                    #region Create group
+                    $groupParams = @{
+                        Name        = $group.Name 
+                        Description = $group.Description
                     }
                     
-                    Set-LocalGroup @setgroupParams
-                    #endregion
-
-                    if (-not $passwordParams.NewGroup) {
-                        if ($group.Password) {
-                            Set-NewPasswordHC @passwordParams
+                    $existingGroup = $knownComputerGroups | Where-Object {
+                        $_.Name -eq $group.Name
+                    }
+                    if (-not $existingGroup) {
+                        if (-not $group.Description) {
+                            New-LocalGroup -Name $group.Name
                         }
                         else {
-                            do { 
-                                $answer = (
-                                    Read-Host "Would you like to set a new password for group group '$($group.Name)'? [Y]es or [N]o"
-                                ).ToLower()
-                            } 
-                            until ('y', 'n' -contains $answer)
-                            if ($answer -eq 'y') {
-                                Set-NewPasswordHC @passwordParams
-                            }
+                            New-LocalGroup @groupParams
                         }
-                    }
-
-                    if ($passwordParams.NewGroup) {
                         Write-Output "Created group '$($group.Name)'"
                     }
+                    elseif (
+                        (
+                            (-not $group.Description) -and 
+                            (
+                                (-not $existingGroup.Description) -or
+                                ($existingGroup.Description -eq ' ')
+                            )
+                        ) -or (
+                            $group.Description -eq $existingGroup.Description
+                        )
+                    ) {
+                        Write-Output "Group '$($group.Name)' exists already and is correct"
+                    } 
                     else {
-                        Write-Output "updated group '$($group.Name)'"
+                        if (-not $group.Description) {
+                            # not supported
+                            # Set-LocalGroup -Description ''
+                            # Set-LocalGroup -Description $null
+                            $groupParams.Description = ' '
+                        }
+                        Set-LocalGroup @groupParams
+                        Write-Output "Updated description of group '$($group.Name)'"
                     }
+                    #endregion
                 }
                 catch {
-                    Write-Error "Failed to create group group '$($group.Name)': $_"
+                    Write-Error "Failed to create group '$($group.Name)': $_"
                     $Error.RemoveAt(1)
                 }
             }

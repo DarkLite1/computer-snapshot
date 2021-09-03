@@ -3,8 +3,13 @@
         Export or import smb shares.
 
     .DESCRIPTION
-        This script should be run on a computer that has the correct smb shares configured, then it can be run to export the smb shares. On another 
-        computer the exported shares can then be imported.
+        This script should be run on a computer that has the correct smb shares 
+        configured with action Export. This will create export files containing 
+        all the data needed to do a restore. Then on another computer run the 
+        script again with action Import and it will restore all smb shares in
+        the data folder.
+        
+        This script will never delete an smb share or folder.
         
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DataFolder, when 

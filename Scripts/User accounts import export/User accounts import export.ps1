@@ -10,6 +10,9 @@
 
         Disabled and Enabled user accounts will be recreated with their 
         respective status. 
+
+        This script only adds or updates user accounts and will never remove a
+        user account.
         
         TIP:
         It's encouraged to clean up the export file before running the script 

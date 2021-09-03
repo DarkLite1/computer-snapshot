@@ -5,8 +5,11 @@
     .DESCRIPTION
         This script should be run on a computer that has its firewall rules 
         correctly configured with the action 'Export'. This will save the 
-        current firewall rules. On another computer this data will be used to 
-        restore the firewall rules.
+        current firewall rules in the DataFolder. On another computer run this 
+        script to restore the firewall rules in the data folder.
+
+        On action Import, when a firewall rule with the same name already exits 
+        it will be removed and created again. Other rules will never be touched.
 
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DataFolder, when 

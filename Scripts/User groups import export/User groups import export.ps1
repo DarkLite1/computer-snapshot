@@ -9,7 +9,10 @@
         local groups.
 
         Only local group creation is supported. Azure AD groups or not supported
-        for creation.
+        for creation. 
+        
+        This script only adds or updates local groups and group members and 
+        will never remove a group or remove a group member.
         
         TIP:
         It's encouraged to clean up the export file before running the script 

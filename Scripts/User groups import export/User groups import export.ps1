@@ -172,8 +172,7 @@ Process {
                     }
                     #endregion
 
-                    #region Set group members
-              
+                    #region Add group members
                     foreach ($member in $group.Members) {
                         try {
                             $addMemberParams = @{

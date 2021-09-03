@@ -7,7 +7,7 @@
         computer the exported shares can then be imported.
         
     .PARAMETER Action
-        When action is 'Export' the data will be saved in the $DateFolder, when 
+        When action is 'Export' the data will be saved in the $DataFolder, when 
         action is 'Import' the data in the $DataFolder will be restored.
 
     .PARAMETER ImportFolder

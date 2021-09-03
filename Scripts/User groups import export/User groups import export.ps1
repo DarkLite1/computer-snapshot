@@ -1,19 +1,23 @@
 <#
     .SYNOPSIS
-        Export or import groups
+        Export or import local groups
 
     .DESCRIPTION
         This script should be run with action 'Export' on a computer that has 
-        all the required groups already created. Then on another computer this
-        script can be run with action 'Import' to recreate the exported group
-        groups.
+        already the required local groups already created. Then on another 
+        computer run this script with action 'Import' to recreate the exported 
+        local groups.
+
+        Only local group creation is supported. Azure AD groups or not supported
+        for creation.
         
         TIP:
         It's encouraged to clean up the export file before running the script 
-        with action 'Import'. Remove non relevant groups, update group details,, ...
+        with action 'Import'. Remove non relevant groups, update group details,
+        , ...
 
     .PARAMETER Action
-        When action is 'Export' the data will be saved in the $DateFolder, when 
+        When action is 'Export' the data will be saved in the $DataFolder, when 
         action is 'Import' the data in the $DataFolder will be restored.
 
     .PARAMETER DataFolder

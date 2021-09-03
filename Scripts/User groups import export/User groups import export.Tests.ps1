@@ -29,9 +29,9 @@ BeforeAll {
 
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        Action         = 'Export'
-        DataFolder     = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        GroupsFileName = 'Groups.json'
+        Action     = 'Export'
+        DataFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        FileName   = 'Groups.json'
     }
 }
 AfterAll {
@@ -87,7 +87,7 @@ Describe "Throw a terminating error on action 'Import' when" {
         '1' | Out-File -LiteralPath "$($testNewParams.DataFolder)\file.txt"
 
         { .$testScript @testNewParams } | 
-        Should -Throw "*groups file '$($testNewParams.DataFolder)\$($testNewParams.GroupsFileName)' not found"
+        Should -Throw "*groups file '$($testNewParams.DataFolder)\$($testNewParams.FileName)' not found"
     }
 }
 Describe 'on action Export' {
@@ -128,7 +128,7 @@ Describe 'on action Export' {
         .$testScript @testParams -EA SilentlyContinue
 
         $testImportParams = @{
-            LiteralPath = "$($testParams.DataFolder)\$($testParams.GroupsFileName)"
+            LiteralPath = "$($testParams.DataFolder)\$($testParams.FileName)"
             Raw         = $true
         }
         $testImport = Get-Content @testImportParams | ConvertFrom-Json -EA Stop
@@ -156,7 +156,7 @@ Describe 'on action Import' {
     BeforeAll {
         Mock Write-Output
 
-        $testFile = Join-Path $testParams.DataFolder $testParams.GroupsFileName
+        $testFile = Join-Path $testParams.DataFolder $testParams.FileName
         $testParams.Action = 'Import'
     }
     BeforeEach {

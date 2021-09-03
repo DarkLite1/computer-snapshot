@@ -23,14 +23,14 @@
     .PARAMETER DataFolder
         Folder where the export or import file can be found
 
-    .PARAMETER GroupsFileName
+    .PARAMETER FileName
         Name of the file that contains all local groups
 
     .EXAMPLE
         $exportParams = @{
-            Action               = 'Export'
-            DataFolder           = 'C:\Groups'
-            GroupsFileName = 'Groups.json'
+            Action     = 'Export'
+            DataFolder = 'C:\Groups'
+            FileName   = 'Groups.json'
         }
         & 'C:\Groups.ps1' @exportParams
 
@@ -39,9 +39,9 @@
 
     .EXAMPLE
         $importParams = @{
-            Action               = 'Import'
-            DataFolder           = 'C:\Groups'
-            GroupsFileName       = 'Groups.json'
+            Action         = 'Import'
+            DataFolder     = 'C:\Groups'
+            FileName = 'Groups.json'
         }
         & 'C:\Groups.ps1' @importParams
 
@@ -56,12 +56,12 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$GroupsFileName = 'Groups.json'
+    [String]$FileName = 'Groups.json'
 )
 
 Begin {
     Try {
-        $GroupsFile = Join-Path -Path $DataFolder -ChildPath $GroupsFileName
+        $GroupsFile = Join-Path -Path $DataFolder -ChildPath $FileName
 
         #region Test DataFolder
         If ($Action -eq 'Export') {

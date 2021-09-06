@@ -237,10 +237,8 @@ Process {
                     elseif (
                         (
                             (-not $group.Description) -and 
-                            (
-                                (-not $existingGroup.Description) -or
-                                ($existingGroup.Description -eq ' ')
-                            )
+                            (-not $existingGroup.Description) 
+                            
                         ) -or (
                             $group.Description -eq $existingGroup.Description
                         )

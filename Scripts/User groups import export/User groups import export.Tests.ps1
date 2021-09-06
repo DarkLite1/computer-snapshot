@@ -35,6 +35,9 @@ BeforeAll {
     }
 }
 AfterAll {
+    $testUserNames | ForEach-Object {
+        Remove-LocalUser -Name $_ -EA Ignore
+    }
     $testGroups | ForEach-Object {
         Remove-LocalGroup -Name $_.Name -EA Ignore
     }

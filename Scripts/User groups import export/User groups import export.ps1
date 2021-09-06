@@ -248,12 +248,6 @@ Process {
                         Write-Output "Group '$($group.Name)' exists already and is correct"
                     } 
                     else {
-                        # if (-not $group.Description) {
-                        #     # not supported
-                        #     # Set-LocalGroup -Description ''
-                        #     # Set-LocalGroup -Description $null
-                        #     $groupParams.Description = ' '
-                        # }
                         Set-LocalGroupHC @groupParams
                         Write-Output "Updated description of group '$($group.Name)'"
                     }

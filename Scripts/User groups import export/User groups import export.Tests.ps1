@@ -182,7 +182,7 @@ Describe 'on action Import' {
 
             $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
             $actual | Should -Not -BeNullOrEmpty
-            $actual.Description | Should -Be ''
+            $actual.Description | Should -BeNullOrEmpty
 
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
                 $InputObject -eq "Group '$($testGroups[0].Name)' created"
@@ -200,7 +200,7 @@ Describe 'on action Import' {
 
             $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
             $actual | Should -Not -BeNullOrEmpty
-            $actual.Description | Should -Be ''
+            $actual.Description | Should -BeNullOrEmpty
 
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
                 $InputObject -eq "Group '$($testGroups[0].Name)' created"
@@ -241,7 +241,7 @@ Describe 'on action Import' {
             $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
             $actual | Should -Not -BeNullOrEmpty
             
-            $actual.Description | Should -Be ' ' 
+            $actual.Description | Should -BeNullOrEmpty
 
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
                 $InputObject -eq "Updated description of group '$($testGroups[0].Name)'"
@@ -268,7 +268,7 @@ Describe 'on action Import' {
             .$testScript @testParams
 
             $actual = Get-LocalGroup -Name $testGroups[0].Name -EA Ignore
-            $actual.Description | Should -Be ' ' 
+            $actual.Description | Should -BeNullOrEmpty
 
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
                 $InputObject -eq "Updated description of group '$($testGroups[0].Name)'"

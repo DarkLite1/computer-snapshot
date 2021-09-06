@@ -130,7 +130,6 @@ Begin {
     
             [Parameter(ParameterSetName = 'Default', Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
             [ValidateNotNull()]
-            
             ${Name},
     
             [Parameter(ParameterSetName = 'SecurityIdentifier', Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
@@ -235,12 +234,10 @@ Process {
                         Write-Output "Group '$($group.Name)' created"
                     }
                     elseif (
+                        ($group.Description -eq $existingGroup.Description) -or
                         (
                             (-not $group.Description) -and 
                             (-not $existingGroup.Description) 
-                            
-                        ) -or (
-                            $group.Description -eq $existingGroup.Description
                         )
                     ) {
                         Write-Output "Group '$($group.Name)' exists already and is correct"

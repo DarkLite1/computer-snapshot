@@ -20,11 +20,9 @@ Plug in the same USB stick that contains all the script files and the collected 
 At this point the data of the latest snapshot will be used to create or update the current computer to the desired state. In case you want to restore another snapshot than the last one created use the `$RestoreSnapshotFolder`.
 
  # Tips
-- It is encouraged to modify the exported files to contain only the data you really need. This will speed up the process and reduces the risks. Use something like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. You can then use the updated files with `$action = 'RestoreSnapshot'` and `$RestoreSnapshotFolder` 
-*# less is more*
+- It is encouraged to modify the exported files to contain only the data you really need. This will speed up the process and reduces the risks. Use something like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. You can then use the updated files with `$action = 'RestoreSnapshot'` and `$RestoreSnapshotFolder` . **_Less is more_**
 
-- After making a snapshot it is advised to rename the folder in the snapshots folder to something more recognizable (ex. 'Image MyApp'). Then move it to another folder on the USB drive so you can start the restore process with the argument `$RestoreSnapshotFolder` set to the new folder (ex. `$RestoreSnapshotFolder = 'Production\Image MyApp'`). This way you are always certain the correct snapshot is restored. Otherwise, when not using `$RestoreSnapshotFolder`, the last created snapshot is restored which might lead to unexpected results. 
-*# know what you're doing*
+- After making a snapshot it is advised to rename the folder in the snapshots folder to something more recognizable (ex. 'Image MyApp'). Then move it to another folder on the USB drive so you can start the restore process with the argument `$RestoreSnapshotFolder` set to the new folder (ex. `$RestoreSnapshotFolder = 'Production\Image MyApp'`). This way you are always certain the correct snapshot is restored. Otherwise, when not using `$RestoreSnapshotFolder`, the last created snapshot is restored which might lead to unexpected results. **_Know what you're doing_**
 
 [Notepad++]: https://notepad-plus-plus.org/
 [VS Code]: https://code.visualstudio.com/

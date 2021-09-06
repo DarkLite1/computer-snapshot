@@ -115,35 +115,20 @@ Begin {
         # Set-LocalGroup -Description ''
         # Set-LocalGroup -Description $null
         # https://stackoverflow.com/questions/69041644/how-to-set-the-description-of-a-local-group-to-blank
-        [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium', HelpUri = 'https://go.microsoft.com/fwlink/?LinkId=717979')]
-        param(
-            [Parameter(Mandatory = $true)]
-            [AllowEmptyString()]            # <-- Modified to allow empty string
-            [ValidateLength(0, 48)]
-            [string]
-            ${Description},
-    
-            [Parameter(ParameterSetName = 'InputObject', Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
-            [ValidateNotNull()]
-            [Microsoft.PowerShell.Commands.LocalGroup]
-            ${InputObject},
-    
-            [Parameter(ParameterSetName = 'Default', Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
-            [ValidateNotNull()]
-            ${Name},
-    
-            [Parameter(ParameterSetName = 'SecurityIdentifier', Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
-            [ValidateNotNull()]
-            [System.Security.Principal.SecurityIdentifier]
-            ${SID})
-    
-        end {
-            if ($Description) { Set-LocalGroup @PSBoundParameters }
-            elseif ($Name) {
-                $Group = [ADSI]"WinNT://./$Name,group"
-                $Group.Put('Description', '')
-                $Group.SetInfo()
-            }
+        
+        Param(
+            [Parameter(Mandatory)]
+            [string]$Name,
+            [string]$Description
+        )
+        
+        if ($Description) { 
+            Set-LocalGroup @PSBoundParameters 
+        }
+        elseif ($Name) {
+            $Group = [ADSI]"WinNT://./$Name,group"
+            $Group.Put('Description', '')
+            $Group.SetInfo()
         }
     }
     

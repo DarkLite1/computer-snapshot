@@ -207,14 +207,14 @@ Process {
                         Name        = $group.Name 
                         Description = $group.Description
                     }
+                    if (-not $group.Description) {
+                        $groupParams.Remove('Description')
+                    }
                     
                     $existingGroup = $knownComputerGroups | Where-Object {
                         $_.Name -eq $group.Name
                     }
                     if (-not $existingGroup) {
-                        if (-not $group.Description) {
-                            $groupParams.Remove('Description')
-                        }
                         New-LocalGroup @groupParams
                         Write-Output "Group '$($group.Name)' created"
                     }
@@ -222,7 +222,7 @@ Process {
                         ($group.Description -eq $existingGroup.Description) -or
                         (
                             (-not $group.Description) -and 
-                            (-not $existingGroup.Description) 
+                            (-not $existingGroup.Description)
                         )
                     ) {
                         Write-Output "Group '$($group.Name)' exists already and is correct"

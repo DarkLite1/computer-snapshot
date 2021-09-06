@@ -2,7 +2,7 @@
 
 A PowerShell script designed to create and restore snapshots of Windows computers. 
 
-This script is intended to be run from a USB stick and is portable. The intend is to create a snapshot on one computer and restore a snapshot on another computer. Snapshots are stored on the USB stick or elsewhere if desired and can contain firewall rules, local user accounts, local user groups, smb shares and their permissions, ...
+This script is intended to be run from a USB stick and is portable. The intend is to create a snapshot on one computer and restore a snapshot on another computer. Snapshots are by default stored on the USB stick but can be stored on a network drive too. A snapshot can contain local user accounts, local user groups, smb shares and their permissions, firewall rules, ...
 
 # How to use this script
 

@@ -69,6 +69,9 @@
         Simply copy/paste the data you want to restore to a specific folder
         and add the folder path to '$RestoreSnapshotFolder'.
 
+        Ex: `$RestoreSnapshotFolder = 'Production\Image MyApp'`
+        The folder 'Production' is in the same folder as 'Start-Script.ps1'.
+
     .PARAMETER SnapshotsFolder
         The parent folder where all the snapshots will be store by computer name
         and snapshot date. By default this data is stored on the USB stick.
@@ -93,6 +96,7 @@
             Action = 'CreateSnapshot'
             Snapshot = [Ordered]@{
                 UserAccounts  = $true
+                UserGroups    = $true
                 FirewallRules = $false
                 SmbShares     = $true
             }
@@ -104,6 +108,7 @@
             Action = 'RestoreSnapshot'
             Snapshot = [Ordered]@{
                 UserAccounts  = $true
+                UserGroups    = $true
                 FirewallRules = $false
                 SmbShares     = $true
             }
@@ -114,6 +119,22 @@
         snapshot folder 'Snapshots' on the USB stick.
         On PC2 this snapshot is restored and the user accounts and smb shares
         that were on PC1 are recreated/updated as needed.
+
+    .EXAMPLE
+        $params = @{
+            Action                = 'RestoreSnapshot'
+            RestoreSnapshotFolder = 'Snapshots\MyCustomSnapshot'
+            Snapshot              = [Ordered]@{
+                UserAccounts  = $true
+                UserGroups    = $true
+                FirewallRules = $false
+                SmbShares     = $false
+            }
+        }
+        & 'Start-Script.ps1' @params
+
+        Restores the UserAccounts and UserGroups stored in the folder on the
+        USB stick 'Snapshots\MyCustomSnapshot' on the current computer.
 #>
 
 [CmdLetBinding()]

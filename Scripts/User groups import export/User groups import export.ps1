@@ -229,11 +229,9 @@ Process {
                     }
                     if (-not $existingGroup) {
                         if (-not $group.Description) {
-                            New-LocalGroup -Name $group.Name
+                            $groupParams.Remove('Description')
                         }
-                        else {
-                            New-LocalGroup @groupParams
-                        }
+                        New-LocalGroup @groupParams
                         Write-Output "Group '$($group.Name)' created"
                     }
                     elseif (

@@ -540,6 +540,7 @@ End {
             $html += '<p>No snapshot items selected</p>'
         }
 
+        $html += '</body>'
         $html | Out-File -FilePath $reportFile -Encoding utf8
 
         if ($OpenReportInBrowser) {

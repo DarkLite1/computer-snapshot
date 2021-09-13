@@ -462,7 +462,8 @@ Process {
                     #endregion
                 }
                 Catch {
-                    throw "Failed to create smb share '$($share.Name)': $_"
+                    Write-Error "Failed to create smb share '$($share.Name)': $_"
+                    $Error.RemoveAt(1)
                 }
             }
         }

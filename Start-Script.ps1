@@ -544,7 +544,18 @@ End {
         $html | Out-File -FilePath $reportFile -Encoding utf8
 
         if ($OpenReportInBrowser) {
-            Start-Process $reportFile
+            try {
+                # start IE with add-ons disabled
+                $startParams = @{
+                    FilePath     = 'iexplore.exe' 
+                    ArgumentList = '-extoff', $reportFile
+                    ErrorAction  = 'Stop'
+                }
+                Start-Process @startParams
+            }
+            catch {
+                Start-Process $reportFile
+            }
         }
     }
     Catch {

@@ -188,10 +188,51 @@ Begin {
             Join-Path -Path $PSScriptRoot -ChildPath $Path
         }
     }
+    Function Test-IsAdminHC {
+        <#
+            .SYNOPSIS
+                Check if a user is local administrator.
+    
+            .DESCRIPTION
+                Check if a user is member of the local group 'Administrators' 
+                and return true if he is and false if not.
+    
+            .EXAMPLE
+                Test-IsAdminHC -SamAccountName bob
+                Returns true in case bob is admin on this machine
+    
+            .EXAMPLE
+                Test-IsAdminHC
+                Returns true if the current user is admin on this machine
+        #>
+    
+        Param (
+            $SamAccountName = [Security.Principal.WindowsIdentity]::GetCurrent()
+        )
+    
+        Try {
+            $Identity = [Security.Principal.WindowsIdentity]$SamAccountName
+            $Principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $Identity
+            $Result = $Principal.IsInRole(
+                [Security.Principal.WindowsBuiltInRole]::Administrator
+            )
+            Write-Verbose "Administrator permissions: $Result"
+            $Result
+        }
+        Catch {
+            throw "Failed to determine if the user is member of the local administrators group: $_"
+        }
+    }
 
     Try {
         $Error.Clear()
         $Now = Get-Date
+
+        #region Test admin
+        if (($Action -ne 'CreateSnapshot') -and (-not (Test-IsAdminHC))) {
+            throw "User '$env:USERNAME' is not a member of the local administrators group. This is required to create or update the necessary details."
+        }
+        #endregion
 
         Write-Verbose "Start action '$Action'"
 

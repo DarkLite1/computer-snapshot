@@ -619,6 +619,34 @@ Describe "on 'Import' a user account password" {
                     ($Password) -and ($Name -eq $testUser.Name) 
                 }
             }
+            It 'the password can be blank when $AllowBlankPassword is true' {
+                New-LocalUser @testUser | Select-Object -Property *,
+                @{Name = 'Password'; Expression = { '' } } | 
+                ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
+
+                $testEncryptedPassword = New-Object System.Security.SecureString
+
+                Mock Read-Host { 'y' } -ParameterFilter {
+                    ($Prompt -eq "Would you like to set a new password for user account '$($testUser.Name)'? [Y]es or [N]o")
+                }
+                Mock Read-Host { $testEncryptedPassword } -ParameterFilter {
+                    ($Prompt -eq "Please type a password for user account '$($testUser.Name)'")
+                }
+                Mock Read-Host { $testEncryptedPassword } -ParameterFilter {
+                    ($Prompt -eq "Type the password again to confirm it's correct")
+                }
+                .$testScript @testParams -AllowBlankPassword
+
+                Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                    ($Prompt -eq "Would you like to set a new password for user account '$($testUser.Name)'? [Y]es or [N]o")
+                }
+                Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                    ($Prompt -eq "Please type a password for user account '$($testUser.Name)'")
+                }
+                Should -Invoke Set-LocalUser -Times 1 -Exactly -ParameterFilter {
+                    ($Password) -and ($Name -eq $testUser.Name) 
+                }
+            }
         }
         Context 'for a new user account' {
             It 'the password must be set' {
@@ -641,6 +669,37 @@ Describe "on 'Import' a user account password" {
                 Mock New-LocalUser
                 Mock Enable-LocalUser
                 .$testScript @testParams
+
+                Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                    ($Prompt -eq "Please type a password for user account '$($testUser.Name)'")
+                }
+                Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                    ($Prompt -eq "Type the password again to confirm it's correct")
+                }
+                Should -Invoke New-LocalUser -Times 1 -Exactly -ParameterFilter {
+                    ($Password) -and ($Name -eq $testUser.Name) 
+                }
+            }
+            It 'the password can be blank when $AllowBlankPassword is true' {
+                New-LocalUser @testUser | 
+                Select-Object -Property *,
+                @{Name = 'Password'; Expression = { '' } } | 
+                ConvertTo-Json | Out-File -FilePath $testFile -Encoding UTF8
+
+                Remove-LocalUser -Name $testUser.Name -EA Ignore
+
+                $testEncryptedPassword = New-Object System.Security.SecureString
+
+                Mock Read-Host { $testEncryptedPassword } -ParameterFilter {
+                    ($Prompt -eq "Please type a password for user account '$($testUser.Name)'")
+                }
+                Mock Read-Host { $testEncryptedPassword } -ParameterFilter {
+                    ($Prompt -eq "Type the password again to confirm it's correct")
+                }
+
+                Mock New-LocalUser
+                Mock Enable-LocalUser
+                .$testScript @testParams -AllowBlankPassword
 
                 Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
                     ($Prompt -eq "Please type a password for user account '$($testUser.Name)'")

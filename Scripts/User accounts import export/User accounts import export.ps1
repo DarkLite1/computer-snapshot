@@ -29,6 +29,11 @@
     .PARAMETER UserAccountsFileName
         Name of the file that contains all local user accounts
 
+    .PARAMETER AllowBlankPassword
+        Allow the creation of user accounts with a blank password. When set to 
+        true a blank password is accepted, when set to false the password can
+        not be blank.
+
     .EXAMPLE
         $exportParams = @{
             Action               = 'Export'
@@ -87,7 +92,8 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$UserAccountsFileName = 'UserAccounts.json'
+    [String]$UserAccountsFileName = 'UserAccounts.json',
+    [Switch]$AllowBlankPassword = $false
 )
 
 Begin {
@@ -158,7 +164,10 @@ Begin {
             if (-not $passwordsMatching) {
                 Write-Host 'Passwords are not matching, please try again' -ForegroundColor Red
             }
-            if ($compareParams.Password1.Length -eq 0) {
+            if (
+                (-not $AllowBlankPassword) -and 
+                ($compareParams.Password1.Length -eq 0)
+            ) {
                 $passwordsMatching = $false
                 Write-Host 'Passwords can not be blank, please try again' -ForegroundColor Red
             }

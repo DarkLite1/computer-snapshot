@@ -31,8 +31,9 @@
 
     .PARAMETER AllowBlankPassword
         Allow the creation of user accounts with a blank password. When set to 
-        true a blank password is accepted, when set to false the password can
-        not be blank.
+        true a blank password is accepted. This can be done by simply pressing
+        the ENTER key when asked for a new password for the user account. 
+        By default, blank passwords are not accepted.
 
     .EXAMPLE
         $exportParams = @{

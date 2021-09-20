@@ -635,7 +635,7 @@ Describe "on 'Import' a user account password" {
                 Mock Read-Host { $testEncryptedPassword } -ParameterFilter {
                     ($Prompt -eq "Type the password again to confirm it's correct")
                 }
-                .$testScript @testParams -AllowBlankPassword
+                .$testScript @testParams -AllowBlankPassword $true
 
                 Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
                     ($Prompt -eq "Would you like to set a new password for user account '$($testUser.Name)'? [Y]es or [N]o")
@@ -699,7 +699,7 @@ Describe "on 'Import' a user account password" {
 
                 Mock New-LocalUser
                 Mock Enable-LocalUser
-                .$testScript @testParams -AllowBlankPassword
+                .$testScript @testParams -AllowBlankPassword $true
 
                 Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
                     ($Prompt -eq "Please type a password for user account '$($testUser.Name)'")

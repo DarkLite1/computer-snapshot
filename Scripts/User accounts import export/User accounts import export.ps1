@@ -94,7 +94,7 @@ Param(
     [Parameter(Mandatory)]
     [String]$DataFolder,
     [String]$UserAccountsFileName = 'UserAccounts.json',
-    [Switch]$AllowBlankPassword = $false
+    [Boolean]$AllowBlankPassword = $true
 )
 
 Begin {

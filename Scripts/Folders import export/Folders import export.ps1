@@ -70,7 +70,8 @@ Process {
         }
         else {            
             Write-Verbose "Import folders from file '$foldersFile'"
-            $folders = Get-Content -LiteralPath $foldersFile -Encoding UTF8
+            $folders = Get-Content -LiteralPath $foldersFile -Encoding UTF8 | 
+            Where-Object { $_ }
         
             foreach ($folder in $folders) {
                 Try {

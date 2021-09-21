@@ -95,7 +95,7 @@ Process {
                             $folder -NotMatch 
                             '^([a-zA-Z]+:)?(\\[a-zA-Z0-9-_.-: :]+)*\\?$'
                         ) {
-                            throw "Path not valid"
+                            throw 'Path not valid'
                         }
                         $null = New-Item -Path $folder -ItemType Directory
                         Write-Output "Folder '$folder' created"

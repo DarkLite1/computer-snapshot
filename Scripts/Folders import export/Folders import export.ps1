@@ -63,10 +63,18 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            (Join-Path -Path $env:TEMP -ChildPath 1), 
+            $exampleFolders = (Join-Path -Path $env:TEMP -ChildPath 1), 
             (Join-Path -Path $env:TEMP -ChildPath 2),
-            (Join-Path -Path $env:TEMP -ChildPath 3) | 
+            (Join-Path -Path $env:TEMP -ChildPath 3)
+
+            $exampleFolders | 
             Out-File -LiteralPath $foldersFile -Encoding utf8
+
+            Write-Output 'Example folders exported, please update the file:'
+
+            $exampleFolders | ForEach-Object {
+                Write-Output "Exported folder '$_'"
+            }
         }
         else {            
             Write-Verbose "Import folders from file '$foldersFile'"

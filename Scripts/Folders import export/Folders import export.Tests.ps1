@@ -76,11 +76,14 @@ Describe "With Action set to 'Import'" {
         }
         $testFoldersFile = Join-Path @testJoinParams
         $testFolders | Out-File -FilePath $testFoldersFile
+
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'Import'
     }
     It 'folders are created when they do not exist' {
         $testFolders | Remove-Item
 
-        .$testScript @testParams
+        .$testScript @testNewParams
 
         foreach ($testFolder in $testFolders) {
             $testFolder | Should -Exist
@@ -95,7 +98,7 @@ Describe "With Action set to 'Import'" {
             New-Item -Path $testFolder -ItemType Directory -EA Ignore
         }
 
-        .$testScript @testParams
+        .$testScript @testNewParams
 
         foreach ($testFolder in $testFolders) {
             $testFolder | Should -Exist
@@ -110,11 +113,34 @@ Describe "With Action set to 'Import'" {
             'wrong' | Out-File -FilePath $testFoldersFile
 
             $Error.Clear()
-            .$testScript @testParams -EA SilentlyContinue
+            .$testScript @testNewParams -EA SilentlyContinue
 
             $Error.Exception.Message | Where-Object {
                 $_ -like "*Failed to create folder 'wrong': Path not valid"
             } | Should -Not -BeNullOrEmpty
+        }
+    }
+}
+Describe "With Action set to 'Export'" {
+    BeforeAll {
+        $testJoinParams = @{
+            Path      = $testParams.DataFolder
+            ChildPath = $testParams.foldersFileName
+        }
+        $testFoldersFile = Join-Path @testJoinParams
+        $testFolders | Out-File -FilePath $testFoldersFile
+    }
+    It 'a template file is exported to the data folder' {
+        $testFolders | Remove-Item
+
+        .$testScript @testParams
+
+        foreach ($testFolder in $testFolders) {
+            $testFolder | Should -Exist
+            
+            Should -Invoke Write-Output -ParameterFilter {
+                $InputObject -eq "Folder '$testFolder' created"
+            }
         }
     }
 }

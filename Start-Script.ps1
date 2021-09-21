@@ -146,6 +146,7 @@ Param (
         UserGroups    = $true
         FirewallRules = $true
         SmbShares     = $true
+        CreateFolders = $true
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
@@ -153,6 +154,7 @@ Param (
         UserGroups    = 'Scripts\User groups import export\User groups import export.ps1'
         FirewallRules = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
         SmbShares     = 'Scripts\Smb shares import export\Smb shares import export.ps1'
+        CreateFolders = 'Scripts\Folders import\Folders import.ps1'
     },
     [String]$SnapshotsFolder = 'Snapshots',
     [String]$ReportsFolder = 'Reports',

@@ -36,7 +36,7 @@ Describe 'Fail the export of folders when' {
         Should -Throw "*Export folder 'TestDrive:/xxx' not found"
     }
     It 'the data folder is not empty' {
-        $testFolder = (New-Item 'TestDrive:/B' -ItemType Directory).FullName 
+        $testFolder = (New-Item 'TestDrive:/D' -ItemType Directory).FullName 
         '1' | Out-File -LiteralPath "$testFolder\file.txt"
 
         $testNewParams.DataFolder = $testFolder

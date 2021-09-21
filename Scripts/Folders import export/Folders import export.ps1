@@ -39,7 +39,6 @@ Begin {
             }
         }
         else {
-            
             If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
                 throw "Import folder '$DataFolder' not found"
             }
@@ -59,30 +58,35 @@ Begin {
 
 Process {
     Try {
-        Write-Verbose "Import folders from file '$foldersFile'"
-        $folders = Get-Content -LiteralPath $foldersFile -Encoding UTF8
+        If ($Action -eq 'Export') {
+
+        }
+        else {            
+            Write-Verbose "Import folders from file '$foldersFile'"
+            $folders = Get-Content -LiteralPath $foldersFile -Encoding UTF8
         
-        foreach ($folder in $folders) {
-            Try {
-                Write-Verbose "Folder '$folder'"
+            foreach ($folder in $folders) {
+                Try {
+                    Write-Verbose "Folder '$folder'"
           
-                If (Test-Path -LiteralPath $folder -PathType Container) {
-                    Write-Output "Folder '$folder' exists already"
-                }
-                else {
-                    if (
-                        $folder -NotMatch 
-                        '^([a-zA-Z]+:)?(\\[a-zA-Z0-9-_.-: :]+)*\\?$'
-                    ) {
-                        throw "Path not valid"
+                    If (Test-Path -LiteralPath $folder -PathType Container) {
+                        Write-Output "Folder '$folder' exists already"
                     }
-                    $null = New-Item -Path $folder -ItemType Directory
-                    Write-Output "Folder '$folder' created"
+                    else {
+                        if (
+                            $folder -NotMatch 
+                            '^([a-zA-Z]+:)?(\\[a-zA-Z0-9-_.-: :]+)*\\?$'
+                        ) {
+                            throw "Path not valid"
+                        }
+                        $null = New-Item -Path $folder -ItemType Directory
+                        Write-Output "Folder '$folder' created"
+                    }
                 }
-            }
-            Catch {
-                Write-Error "Failed to create folder '$folder': $_"
-                $Error.RemoveAt(1)
+                Catch {
+                    Write-Error "Failed to create folder '$folder': $_"
+                    $Error.RemoveAt(1)
+                }
             }
         }
     }

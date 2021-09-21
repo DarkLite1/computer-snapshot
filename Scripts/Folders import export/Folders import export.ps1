@@ -7,28 +7,12 @@
         folders. This script will never delete a folder.
         
     .PARAMETER Action
-        When action is 'Import' the required folders will be created.
+        When action is 'Import' the required folders will be created from 
+        the import file. When action is 'Export' a template file is exported
+        that can be edited by the user.
 
     .PARAMETER DataFolder
         Folder where file can be found that contains the folder paths.
-
-    .EXAMPLE
-        $exportParams = @{
-            Action     = 'Export'
-            DataFolder = 'C:\SmbShares'
-        }
-        & 'C:\ImportExportSmbShares.ps1' @exportParams
-
-        Export all Folders on the current computer to the folder 'SmbShares'
-
-    .EXAMPLE
-        $importParams = @{
-            Action     = 'Import'
-            DataFolder = 'C:\SmbShares'
-        }
-        & 'C:\ImportExportSmbShares.ps1' @importParams
-
-        Import all Folders in the folder 'SmbShares'
 #>
 
 [CmdletBinding()]

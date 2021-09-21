@@ -71,7 +71,6 @@ Process {
             Try {
                 Write-Verbose "Folder '$folder'"
           
-                #region Create Folder
                 If (Test-Path -LiteralPath $folder -PathType Container) {
                     Write-Output "Folder '$folder' exists already"
                 }
@@ -85,7 +84,6 @@ Process {
                     $null = New-Item -Path $folder -ItemType Directory
                     Write-Output "Folder '$folder' created"
                 }
-                #endregion
             }
             Catch {
                 Write-Error "Failed to create folder '$folder': $_"

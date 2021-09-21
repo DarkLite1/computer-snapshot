@@ -33,7 +33,7 @@
 
 [CmdletBinding()]
 Param(
-    [ValidateSet('Import')]
+    [ValidateSet('Export', 'Import')]
     [Parameter(Mandatory)]
     [String]$Action,
     [Parameter(Mandatory)]
@@ -46,14 +46,25 @@ Begin {
         $foldersFile = Join-Path -Path $DataFolder -ChildPath $foldersFileName
 
         #region Test DataFolder
-        If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-            throw "Import folder '$DataFolder' not found"
+        If ($Action -eq 'Export') {
+            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
+                throw "Export folder '$DataFolder' not found"
+            }
+            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
+                throw "Export folder '$DataFolder' not empty"
+            }
         }
-        If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-            throw "Import folder '$DataFolder' empty"
-        }
-        If (-not (Test-Path -LiteralPath $foldersFile -PathType Leaf)) {
-            throw "Folders file '$foldersFile' not found"
+        else {
+            
+            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
+                throw "Import folder '$DataFolder' not found"
+            }
+            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
+                throw "Import folder '$DataFolder' empty"
+            }
+            If (-not (Test-Path -LiteralPath $foldersFile -PathType Leaf)) {
+                throw "Folders file '$foldersFile' not found"
+            }
         }
         #endregion
     }

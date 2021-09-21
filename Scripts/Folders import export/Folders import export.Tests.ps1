@@ -24,10 +24,32 @@ Describe 'the mandatory parameters are' {
         Should -BeTrue
     }
 }
+Describe 'Fail the export of folders when' {
+    BeforeAll {
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'Export'
+    }
+    It 'the data folder is not found' {
+        $testNewParams.DataFolder = 'TestDrive:/xxx'
+
+        { .$testScript @testNewParams } | 
+        Should -Throw "*Export folder 'TestDrive:/xxx' not found"
+    }
+    It 'the data folder is not empty' {
+        $testFolder = (New-Item 'TestDrive:/B' -ItemType Directory).FullName 
+        '1' | Out-File -LiteralPath "$testFolder\file.txt"
+
+        $testNewParams.DataFolder = $testFolder
+
+        { .$testScript @testNewParams } | 
+        Should -Throw "*Export folder '$testFolder' not empty"
+    }
+}
 Describe 'Fail the import of Folders when' {
     BeforeEach {
         Get-ChildItem $testParams.DataFolder | Remove-Item
         $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'Import'
     }
     It 'the data folder is not found' {
         $testNewParams.DataFolder = 'TestDrive:/xxx'

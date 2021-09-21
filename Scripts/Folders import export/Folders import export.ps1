@@ -70,11 +70,13 @@ Process {
             $exampleFolders | 
             Out-File -LiteralPath $foldersFile -Encoding utf8
 
-            Write-Output 'Example folders exported, please update the file:'
+            Write-Output 'Exported example folders:'
 
             $exampleFolders | ForEach-Object {
                 Write-Output "Exported folder '$_'"
             }
+
+            Write-Output 'Please update the export file by replacing the example folders with the folders you like to be created'
         }
         else {            
             Write-Verbose "Import folders from file '$foldersFile'"

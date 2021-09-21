@@ -12,7 +12,11 @@
         that can be edited by the user.
 
     .PARAMETER DataFolder
-        Folder where file can be found that contains the folder paths.
+        Folder where the file can be found that contains the folder paths.
+
+    .PARAMETER FoldersFileName
+        File containing strings representing the full path of the folders
+        that need to be created.
 #>
 
 [CmdletBinding()]
@@ -22,12 +26,12 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$foldersFileName = 'Folders.txt'
+    [String]$FoldersFileName = 'Folders.txt'
 )
 
 Begin {    
     Try {
-        $foldersFile = Join-Path -Path $DataFolder -ChildPath $foldersFileName
+        $foldersFile = Join-Path -Path $DataFolder -ChildPath $FoldersFileName
 
         #region Test DataFolder
         If ($Action -eq 'Export') {

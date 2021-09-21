@@ -59,7 +59,10 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-
+            (Join-Path -Path $env:TEMP -ChildPath 1), 
+            (Join-Path -Path $env:TEMP -ChildPath 2),
+            (Join-Path -Path $env:TEMP -ChildPath 3) | 
+            Out-File -LiteralPath $foldersFile -Encoding utf8
         }
         else {            
             Write-Verbose "Import folders from file '$foldersFile'"

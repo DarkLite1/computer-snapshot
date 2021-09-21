@@ -123,24 +123,21 @@ Describe "With Action set to 'Import'" {
 }
 Describe "With Action set to 'Export'" {
     BeforeAll {
+        Get-ChildItem $testParams.DataFolder | Remove-Item
+
         $testJoinParams = @{
             Path      = $testParams.DataFolder
             ChildPath = $testParams.foldersFileName
         }
         $testFoldersFile = Join-Path @testJoinParams
-        $testFolders | Out-File -FilePath $testFoldersFile
+
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'Export'
     }
     It 'a template file is exported to the data folder' {
-        $testFolders | Remove-Item
+        .$testScript @testNewParams
 
-        .$testScript @testParams
-
-        foreach ($testFolder in $testFolders) {
-            $testFolder | Should -Exist
-            
-            Should -Invoke Write-Output -ParameterFilter {
-                $InputObject -eq "Folder '$testFolder' created"
-            }
-        }
+        $testFoldersFile | Should -Exist
+        Get-Content $testFoldersFile | Should -HaveCount 3
     }
 }

@@ -76,7 +76,10 @@ Process {
                     Write-Output "Folder '$folder' exists already"
                 }
                 else {
-                    if ($folder -NotMatch '^([a-zA-Z]+:)?(\\[a-zA-Z0-9-_.-: :]+)*\\?$') {
+                    if (
+                        $folder -NotMatch 
+                        '^([a-zA-Z]+:)?(\\[a-zA-Z0-9-_.-: :]+)*\\?$'
+                    ) {
                         throw "Path not valid"
                     }
                     $null = New-Item -Path $folder -ItemType Directory

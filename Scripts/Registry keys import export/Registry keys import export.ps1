@@ -56,7 +56,7 @@ Begin {
         #endregion
     }
     Catch {
-        throw "$Action NTP servers failed: $_"
+        throw "$Action registry keys failed: $_"
     }
 }
 
@@ -131,6 +131,6 @@ Process {
         }
     }
     Catch {
-        throw "$Action NTP servers failed: $_"
+        throw "$Action registry keys failed: $_"
     }
 }

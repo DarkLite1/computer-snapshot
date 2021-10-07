@@ -137,7 +137,7 @@ Describe "With Action set to 'Import'" {
         }
         It 'output is generated' {
             Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
-                $InputObject -eq "Registry path '$($testKey.Path)' key '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
+                $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
             }
         }
     }
@@ -172,7 +172,7 @@ Describe "With Action set to 'Import'" {
         }
         It 'output is generated' {
             Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -eq "Registry path '$($testKey.Path)' key '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)'. Created key name and value on existing path."
+                $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)'. Created key name and value on existing path."
             }
         }
     }
@@ -215,7 +215,7 @@ Describe "With Action set to 'Import'" {
         }
         It 'output is generated' {
             Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -eq "Registry path '$($testKey.Path)' key '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' not correct. Updated old value '$($testNewItemParams.Value)' with new value '$($testKey.Value)'."
+                $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' not correct. Updated old value '$($testNewItemParams.Value)' with new value '$($testKey.Value)'."
             }
         }
     }
@@ -251,7 +251,7 @@ Describe "With Action set to 'Import'" {
         }
         It 'output is generated' {
             Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -eq "Registry path '$($testKey.Path)' key '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' correct. Nothing to update."
+                $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' correct. Nothing to update."
             }
         }
     }
@@ -270,7 +270,7 @@ Describe "With Action set to 'Import'" {
             .$testScript @testNewParams
 
             Should -Invoke Write-Error -Exactly -Times 1 -ParameterFilter {
-                $Message -like "Failed to set registry path '$($testKey.Path)' with key '$($testKey.Name)' to value '$($testKey.Value)' with type '$($testKey.Type)':*"
+                $Message -like "Failed to set registry path '$($testKey.Path)' with key name '$($testKey.Name)' to value '$($testKey.Value)' with type '$($testKey.Type)':*"
             }
         }
     }

@@ -83,7 +83,7 @@ Process {
             foreach ($key in $registryKeys) {
                 try {
                     try {
-                        $idString = "Registry path '$($key.Path)' key '$($key.Name)' value '$($key.Value)' type '$($key.Type)'"
+                        $idString = "Registry path '$($key.Path)' key name '$($key.Name)' value '$($key.Value)' type '$($key.Type)'"
                         Write-Verbose $idString
                         
                         $newParams = @{
@@ -124,7 +124,7 @@ Process {
                     }
                 }
                 catch {
-                    Write-Error "Failed to set registry path '$($key.Path)' with key '$($key.Name)' to value '$($key.Value)' with type '$($key.Type)': $_"
+                    Write-Error "Failed to set registry path '$($key.Path)' with key name '$($key.Name)' to value '$($key.Value)' with type '$($key.Type)': $_"
                     $Error.RemoveAt(1)
                 }
             }

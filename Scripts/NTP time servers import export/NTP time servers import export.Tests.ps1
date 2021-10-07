@@ -25,6 +25,7 @@ BeforeAll {
     Mock Set-SynchronizeTimeWithServerHC
     Mock Set-SynchronizeTimeWithDomainHC
     Mock Restart-Service
+    Mock Test-Connection { $true }
     Mock Write-Output
 }
 Describe 'the mandatory parameters are' {

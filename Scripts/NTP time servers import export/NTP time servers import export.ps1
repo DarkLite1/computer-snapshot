@@ -160,6 +160,13 @@ Process {
                 ForEach-Object { $_.trim() }
                 
                 if ($timeServerNames) {
+                    $timeServerNames | ForEach-Object {
+                        if (-not 
+                        (Test-Connection -ComputerName $_ -Count 2 -Quiet)
+                        ) {
+                            Write-Error "Failed to ping computer name '$_'"
+                        }
+                    }
                     Write-Verbose "Sync time with servers '$timeServerNames'"
                     Set-SynchronizeTimeWithServerHC -ComputerName $timeServerNames
                     

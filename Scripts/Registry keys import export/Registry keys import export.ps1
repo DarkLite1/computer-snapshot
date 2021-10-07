@@ -118,7 +118,7 @@ Process {
                     }
                     catch [System.Management.Automation.ItemNotFoundException] {
                         Write-Verbose 'Add new registry key'
-                        $null = New-Item -Path $key.Path
+                        $null = New-Item -Path $key.Path -ErrorAction Stop
                         $null = New-ItemProperty @newParams
                         Write-Output "$idString did not exist. Created new registry key."
                     }

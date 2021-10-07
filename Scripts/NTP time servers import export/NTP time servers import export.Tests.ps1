@@ -151,6 +151,14 @@ Describe "With Action set to 'Import'" {
 
             .$testScript @testNewParams
         }
+        It 'each time server is pinged for connectivity' {
+            Should -Invoke Test-Connection -Exactly -Times 1 -Scope Context -ParameterFilter {
+                $ComputerName -eq 'ntp1'
+            }
+            Should -Invoke Test-Connection -Exactly -Times 1 -Scope Context -ParameterFilter {
+                $ComputerName -eq 'ntp2'
+            }
+        }
         It 'time is synchronized with custom time servers' {
             Should -Invoke Set-SynchronizeTimeWithServerHC -Exactly -Times 1 -Scope Context -ParameterFilter {
                 ($ComputerName[0] -eq 'ntp1') -and

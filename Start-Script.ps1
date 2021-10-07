@@ -148,6 +148,7 @@ Param (
         SmbShares      = $true
         CreateFolders  = $true
         NtpTimeServers = $true
+        RegistryKeys   = $true
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
@@ -157,6 +158,7 @@ Param (
         SmbShares      = 'Scripts\Smb shares import export\Smb shares import export.ps1'
         CreateFolders  = 'Scripts\Folders import export\Folders import export.ps1'
         NtpTimeServers = 'Scripts\NTP time servers import export\NTP time servers import export.ps1'
+        RegistryKeys   = 'Scripts\Registry keys import export\Registry keys import export.ps1'
     },
     [String]$SnapshotsFolder = 'Snapshots',
     [String]$ReportsFolder = 'Reports',

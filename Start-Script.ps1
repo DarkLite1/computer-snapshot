@@ -142,19 +142,21 @@ Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
     [System.Collections.Specialized.OrderedDictionary]$Snapshot = [Ordered]@{
-        UserAccounts  = $true
-        UserGroups    = $true
-        FirewallRules = $true
-        SmbShares     = $true
-        CreateFolders = $true
+        UserAccounts   = $true
+        UserGroups     = $true
+        FirewallRules  = $true
+        SmbShares      = $true
+        CreateFolders  = $true
+        NtpTimeServers = $true
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
-        UserAccounts  = 'Scripts\User accounts import export\User accounts import export.ps1'
-        UserGroups    = 'Scripts\User groups import export\User groups import export.ps1'
-        FirewallRules = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
-        SmbShares     = 'Scripts\Smb shares import export\Smb shares import export.ps1'
-        CreateFolders = 'Scripts\Folders import export\Folders import export.ps1'
+        UserAccounts   = 'Scripts\User accounts import export\User accounts import export.ps1'
+        UserGroups     = 'Scripts\User groups import export\User groups import export.ps1'
+        FirewallRules  = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
+        SmbShares      = 'Scripts\Smb shares import export\Smb shares import export.ps1'
+        CreateFolders  = 'Scripts\Folders import export\Folders import export.ps1'
+        NtpTimeServers = 'Scripts\NTP time servers import export\NTP time servers import export.ps1'
     },
     [String]$SnapshotsFolder = 'Snapshots',
     [String]$ReportsFolder = 'Reports',

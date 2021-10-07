@@ -83,8 +83,6 @@ Process {
             foreach ($key in $registryKeys) {
                 try {
                     try {
-                        $ErrorActionPreference = 'Stop'
-
                         $idString = "Registry path '$($key.Path)' key '$($key.Name)' value '$($key.Value)' type '$($key.Type)'"
                         Write-Verbose $idString
                         
@@ -94,11 +92,12 @@ Process {
                             Value        = $key.Value
                             PropertyType = $key.Type
                             Force        = $true
+                            ErrorAction  = 'Stop'
                         }
                         $getParams = @{
-                            Path = $key.Path
-                            Name = $key.Name
-                            # ErrorAction = 'Stop' does not work on this CmdLet
+                            Path        = $key.Path
+                            Name        = $key.Name
+                            ErrorAction = 'Stop'
                         }
                         $currentValue = (Get-ItemProperty @getParams).($key.Name)
 
@@ -119,12 +118,9 @@ Process {
                     }
                     catch [System.Management.Automation.ItemNotFoundException] {
                         Write-Verbose 'Add new registry key'
-                        $null = New-Item -Path $key.Path -Force
+                        $null = New-Item -Path $key.Path
                         $null = New-ItemProperty @newParams
                         Write-Output "$idString did not exist. Created new registry key."
-                    }
-                    finally { 
-                        $ErrorActionPreference = 'Continue'
                     }
                 }
                 catch {

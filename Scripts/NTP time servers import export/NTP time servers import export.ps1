@@ -1,9 +1,10 @@
 <#
     .SYNOPSIS
-        Set the NTP server.
+        Configure the time synchronization system (NTP).
 
     .DESCRIPTION
-        Read the NTP server name from an input file and set the NTP server.
+        Export the NTP configuration to a file on one machine and apply the 
+        NTP configuration from the same file on another machine.
         
     .PARAMETER Action
         When action is 'Import' the NTP server will be read from the import 
@@ -13,8 +14,8 @@
     .PARAMETER DataFolder
         Folder where the file can be found that contains the NTP server name.
 
-    .PARAMETER FoldersFileName
-        File containing a string representing the NTP server name.
+    .PARAMETER NtpFileName
+        File containing the information to configure NTP.
 #>
 
 [CmdletBinding()]

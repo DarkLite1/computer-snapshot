@@ -123,7 +123,7 @@ Process {
                         $null = New-ItemProperty @newParams
                         Write-Output "$idString did not exist. Created new registry key."
                     }
-                    Finally { 
+                    finally { 
                         $ErrorActionPreference = 'Continue'
                     }
                 }

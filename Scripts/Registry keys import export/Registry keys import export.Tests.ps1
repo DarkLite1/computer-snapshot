@@ -4,8 +4,8 @@
 BeforeAll {
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        Action      = 'Import'
-        DataFolder  = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        Action               = 'Import'
+        DataFolder           = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
         RegistryKeysFileName = 'testRegKeys.json'
     }
 
@@ -22,7 +22,7 @@ Describe 'the mandatory parameters are' {
         (Get-Command $testScript).Parameters[$_].Attributes.Mandatory | 
         Should -BeTrue
     }
-}  -tag test
+}
 Describe 'Fail the export of the registry keys file when' {
     BeforeAll {
         $testNewParams = $testParams.clone()
@@ -43,7 +43,7 @@ Describe 'Fail the export of the registry keys file when' {
         { .$testScript @testNewParams } | 
         Should -Throw "*Export folder '$testFolder' not empty"
     }
-} -tag test
+}
 Describe 'Fail the import of the registry keys file when' {
     BeforeEach {
         Get-ChildItem $testParams.DataFolder | Remove-Item
@@ -66,7 +66,7 @@ Describe 'Fail the import of the registry keys file when' {
         { .$testScript @testNewParams } | 
         Should -Throw "*registry keys file '$($testNewParams.DataFolder)\$($testNewParams.RegistryKeysFileName)' not found"
     }
-}   -tag test
+}
 Describe "With Action set to 'Export'" {
     BeforeAll {
         $testFile | Remove-Item -EA Ignore
@@ -79,16 +79,27 @@ Describe "With Action set to 'Export'" {
     It 'a json file is created' {
         $testFile | Should -Exist
     }
-    Context 'the json file contains the fields' {
+    Context 'the json file contains an example object with fields' {
         BeforeAll {
-            $testJsonFile = Get-Content $testFile -Raw | ConvertFrom-Json
+            $testJsonFile = Get-Content $testFile -Raw | ConvertFrom-Json |
+            Select-Object -First 1
         }
-        It 'SyncTimeWithDomain' {
-            $testJsonFile.SyncTimeWithDomain | Should -BeFalse
+        It 'Path' {
+            $testJsonFile.Path | Should -Be 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
         }
-        It 'TimeServerNames' {
-            $testJsonFile.TimeServerNames[0] | Should -Be 'ntp1'
-            $testJsonFile.TimeServerNames[1] | Should -Be 'ntp2'
+        It 'Name' {
+            $testJsonFile.Name | Should -Be 'dontdisplaylastusername'
+        }
+        It 'Value' {
+            $testJsonFile.Value | Should -Be '1'
+        }
+        It 'Type' {
+            $testJsonFile.Type | Should -Be 'DWORD'
+        }
+    }
+    It 'output is generated' {
+        Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
+            $InputObject -eq 'Exported registry keys example'
         }
     }
 }
@@ -97,94 +108,169 @@ Describe "With Action set to 'Import'" {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Import'
     }
-    Context 'and SyncTimeWithDomain is true' {
+    Context 'and the registry path does not exist' {
         BeforeAll {
-            @{
-                SyncTimeWithDomain = $true
-                TimeServerNames    = @(' ntp1 ', ' ntp2 ')
-            } | 
-            ConvertTo-Json | Out-File -LiteralPath $testFile
+            $testKey = @{
+                Path  = 'TestRegistry:\testPath'
+                Name  = 'testName'
+                Value = '1'
+                Type  = 'DWORD'
+            }
+            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
 
             .$testScript @testNewParams
+        
+            $testGetParams = @{
+                Path = $testKey.Path
+                Name = $testKey.Name
+            }
+            $actual = Get-ItemProperty @testGetParams
         }
-        It 'time is synchronized with the domain' {
-            Should -Invoke Set-SynchronizeTimeWithDomainHC -Exactly -Times 1 -Scope Context
+        It 'the path is created' {
+            $testKey.Path | Should -Exist
+        }
+        It 'the key name is created' {
+            $actual | Should -Not -BeNullOrEmpty
+        }
+        It 'the key value is set' {
+            $actual.($testKey.Name) | Should -Be $testKey.Value
+        }
+        It 'output is generated' {
+            Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
+                $InputObject -eq "Registry path '$($testKey.Path)' key '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
+            }
+        }
+    }
+    Context 'and the registry path exists but the key name does not exist' {
+        BeforeAll {
+            $testKey = @{
+                Path  = 'TestRegistry:\testPath'
+                Name  = 'testNameSomethingElse'
+                Value = '2'
+                Type  = 'DWORD'
+            }
+            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+
+            $null = New-Item -Path $testKey.Path -Force
+
+            .$testScript @testNewParams
+        
+            $testGetParams = @{
+                Path = $testKey.Path
+                Name = $testKey.Name
+            }
+            $actual = Get-ItemProperty @testGetParams
+        }
+        It 'the path is still there' {
+            $testKey.Path | Should -Exist
+        }
+        It 'the key name is created' {
+            $actual | Should -Not -BeNullOrEmpty
+        }
+        It 'the key value is set' {
+            $actual.($testKey.Name) | Should -Be $testKey.Value
         }
         It 'output is generated' {
             Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -eq 'Time synchronized with the domain'
+                $InputObject -eq "Registry path '$($testKey.Path)' key '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)'. Created key name and value on existing path."
             }
-            Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -eq 'Custom time server names are disregarded'
-            }
-        }
-        It 'the time service is restarted' {
-            Should -Invoke Restart-Service -Exactly -Times 1 -Scope Context
         }
     }
-    Context 'and SyncTimeWithDomain is false and TimeServerNames are given' {
+    Context 'and the registry path and key name exists but the value is wrong' {
         BeforeAll {
-            @{
-                SyncTimeWithDomain = $false
-                TimeServerNames    = @(' ntp1 ', ' ntp2 ')
-            } | 
-            ConvertTo-Json | Out-File -LiteralPath $testFile
+            $testKey = @{
+                Path  = 'TestRegistry:\testPath'
+                Name  = 'testNameSomethingElse'
+                Value = '3'
+                Type  = 'DWORD'
+            }
+            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+
+            $null = New-Item -Path $testKey.Path -Force
+
+            $testNewItemParams = @{
+                Path  = $testKey.Path
+                Name  = $testKey.Name
+                Value = '5'
+                Type  = $testKey.Value
+            }
+            $null = New-ItemProperty @testNewItemParams
 
             .$testScript @testNewParams
+        
+            $testGetParams = @{
+                Path = $testKey.Path
+                Name = $testKey.Name
+            }
+            $actual = Get-ItemProperty @testGetParams
         }
-        It 'each time server is pinged for connectivity' {
-            Should -Invoke Test-Connection -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $ComputerName -eq 'ntp1'
-            }
-            Should -Invoke Test-Connection -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $ComputerName -eq 'ntp2'
-            }
+        It 'the path is still there' {
+            $testKey.Path | Should -Exist
         }
-        It 'time is synchronized with custom time servers' {
-            Should -Invoke Set-SynchronizeTimeWithServerHC -Exactly -Times 1 -Scope Context -ParameterFilter {
-                ($ComputerName[0] -eq 'ntp1') -and
-                ($ComputerName[1] -eq 'ntp2')
-            }
+        It 'the key name is created' {
+            $actual | Should -Not -BeNullOrEmpty
+        }
+        It 'the key value is set' {
+            $actual.($testKey.Name) | Should -Be $testKey.Value
         }
         It 'output is generated' {
             Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -eq "Time synchronized with custom time servers 'ntp1 ntp2'"
+                $InputObject -eq "Registry path '$($testKey.Path)' key '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' not correct. Updated old value '$($testNewItemParams.Value)' with new value '$($testKey.Value)'."
             }
         }
-        It 'the time service is restarted' {
-            Should -Invoke Restart-Service -Exactly -Times 1 -Scope Context
-        }
     }
-    Context 'a terminating error is thrown when' {
-        It 'SyncTimeWithDomain is false and TimeServerNames are blank' {
-            @{
-                SyncTimeWithDomain = $false
-                TimeServerNames    = @()
-            } | 
-            ConvertTo-Json | Out-File -LiteralPath $testFile
+    Context 'and the registry path, key name and value are correct' {
+        BeforeAll {
+            $testKey = @{
+                Path  = 'TestRegistry:\testPath'
+                Name  = 'testNameSomethingElse'
+                Value = '3'
+                Type  = 'DWORD'
+            }
+            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
 
-            { .$testScript @testNewParams } |
-            Should -Throw "*No time server names found in the import file"
+            $null = New-Item -Path $testKey.Path -Force
+            $null = New-ItemProperty @testKey
+
+            .$testScript @testNewParams
+        
+            $testGetParams = @{
+                Path = $testKey.Path
+                Name = $testKey.Name
+            }
+            $actual = Get-ItemProperty @testGetParams
+        }
+        It 'the path is still there' {
+            $testKey.Path | Should -Exist
+        }
+        It 'the key name is created' {
+            $actual | Should -Not -BeNullOrEmpty
+        }
+        It 'the key value is set' {
+            $actual.($testKey.Name) | Should -Be $testKey.Value
+        }
+        It 'output is generated' {
+            Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
+                $InputObject -eq "Registry path '$($testKey.Path)' key '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' correct. Nothing to update."
+            }
         }
     }
     Context 'a non terminating error is created when' {
-        It 'a time server cannot be pinged' {
-            @{
-                SyncTimeWithDomain = $false
-                TimeServerNames    = @('ntp1', 'ntp2')
-            } | 
-            ConvertTo-Json | Out-File -LiteralPath $testFile
+        It 'a registry key can not be created' {
+            $testKey = @{
+                Path  = 'TestRegistry:\testPath'
+                Name  = 'testNameSomethingElse'
+                Value = 'stringWhereNumberIsExpected'
+                Type  = 'DWORD'
+            }
+            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
 
             Mock Write-Error
-            Mock Test-Connection { $false }
-
+        
             .$testScript @testNewParams
 
             Should -Invoke Write-Error -Exactly -Times 1 -ParameterFilter {
-                $Message -eq "Failed to ping computer name 'ntp1'"
-            }
-            Should -Invoke Write-Error -Exactly -Times 1 -ParameterFilter {
-                $Message -eq "Failed to ping computer name 'ntp2'"
+                $Message -like "Failed to set registry path '$($testKey.Path)' with key '$($testKey.Name)' to value '$($testKey.Value)' with type '$($testKey.Type)':*"
             }
         }
     }

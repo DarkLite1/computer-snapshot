@@ -63,15 +63,14 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            @(
+            ConvertTo-Json @(
                 @{
                     Path  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
                     Name  = 'dontdisplaylastusername'
                     Value = '1'
                     Type  = 'DWORD'
                 }
-            ) | 
-            ConvertTo-Json | Out-File -LiteralPath $RegistryKeysFile -Encoding utf8
+            ) | Out-File -LiteralPath $RegistryKeysFile -Encoding utf8
 
             Write-Output 'Exported registry keys example'
         }

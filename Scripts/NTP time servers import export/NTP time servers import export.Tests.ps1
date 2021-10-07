@@ -186,5 +186,26 @@ Describe "With Action set to 'Import'" {
             Should -Throw "*No time server names found in the import file"
         }
     }
+    Context 'a non terminating error is created when' {
+        It 'a time server cannot be pinged' {
+            @{
+                SyncTimeWithDomain = $false
+                TimeServerNames    = @('ntp1', 'ntp2')
+            } | 
+            ConvertTo-Json | Out-File -LiteralPath $testFile
+
+            Mock Write-Error
+            Mock Test-Connection { $false }
+
+            .$testScript @testNewParams
+
+            Should -Invoke Write-Error -Exactly -Times 1 -ParameterFilter {
+                $Message -eq "Failed to ping computer name 'ntp1'"
+            }
+            Should -Invoke Write-Error -Exactly -Times 1 -ParameterFilter {
+                $Message -eq "Failed to ping computer name 'ntp2'"
+            }
+        }
+    }
 }
 

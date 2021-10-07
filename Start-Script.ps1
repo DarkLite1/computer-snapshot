@@ -231,6 +231,8 @@ Begin {
     }
 
     Try {
+        $VerbosePreference = 'Continue'
+        
         $Error.Clear()
         $Now = Get-Date
 

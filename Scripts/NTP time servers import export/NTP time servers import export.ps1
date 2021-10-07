@@ -94,10 +94,10 @@ Begin {
 
         $manualpeerlist = $ComputerName -join ' '
 
-        w32tm /config /manualpeerlist:"$manualpeerlist" /syncfromflags:manual /update
+        $null = w32tm /config /manualpeerlist:"$manualpeerlist" /syncfromflags:manual /update
     }
     Function Set-SynchronizeTimeWithDomainHC {
-        w32tm /config /syncfromflags:domhier /update
+        $null = w32tm /config /syncfromflags:domhier /update
     }
 
     Try {

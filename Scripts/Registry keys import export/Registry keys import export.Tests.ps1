@@ -141,117 +141,119 @@ Describe "With Action set to 'Import'" {
             }
         }
     }
-    Context 'and the registry path exists but the key name does not exist' {
-        BeforeAll {
-            $testKey = @{
-                Path  = 'TestRegistry:\testPath'
-                Name  = 'testNameSomethingElse'
-                Value = '2'
-                Type  = 'DWORD'
-            }
-            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+    Context 'and the registry path exists' {
+        Context 'but the key name does not exist' {
+            BeforeAll {
+                $testKey = @{
+                    Path  = 'TestRegistry:\testPath'
+                    Name  = 'testNameSomethingElse'
+                    Value = '2'
+                    Type  = 'DWORD'
+                }
+                @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
 
-            $null = New-Item -Path $testKey.Path -Force
+                $null = New-Item -Path $testKey.Path -Force
 
-            .$testScript @testNewParams
+                .$testScript @testNewParams
         
-            $testGetParams = @{
-                Path = $testKey.Path
-                Name = $testKey.Name
+                $testGetParams = @{
+                    Path = $testKey.Path
+                    Name = $testKey.Name
+                }
+                $actual = Get-ItemProperty @testGetParams
             }
-            $actual = Get-ItemProperty @testGetParams
-        }
-        It 'the path is still there' {
-            $testKey.Path | Should -Exist
-        }
-        It 'the key name is created' {
-            $actual | Should -Not -BeNullOrEmpty
-        }
-        It 'the key value is set' {
-            $actual.($testKey.Name) | Should -Be $testKey.Value
-        }
-        It 'output is generated' {
-            Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)'. Created key name and value on existing path."
+            It 'the path is still there' {
+                $testKey.Path | Should -Exist
+            }
+            It 'the key name is created' {
+                $actual | Should -Not -BeNullOrEmpty
+            }
+            It 'the key value is set' {
+                $actual.($testKey.Name) | Should -Be $testKey.Value
+            }
+            It 'output is generated' {
+                Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
+                    $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)'. Created key name and value on existing path."
+                }
             }
         }
-    }
-    Context 'and the registry path and key name exists but the value is wrong' {
-        BeforeAll {
-            $testKey = @{
-                Path  = 'TestRegistry:\testPath'
-                Name  = 'testNameSomethingElse'
-                Value = '3'
-                Type  = 'DWORD'
-            }
-            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+        Context 'and the key name exists but the value is wrong' {
+            BeforeAll {
+                $testKey = @{
+                    Path  = 'TestRegistry:\testPath'
+                    Name  = 'testNameSomethingElse'
+                    Value = '3'
+                    Type  = 'DWORD'
+                }
+                @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
 
-            $null = New-Item -Path $testKey.Path -Force
+                $null = New-Item -Path $testKey.Path -Force
 
-            $testNewItemParams = @{
-                Path  = $testKey.Path
-                Name  = $testKey.Name
-                Value = '5'
-                Type  = $testKey.Value
-            }
-            $null = New-ItemProperty @testNewItemParams
+                $testNewItemParams = @{
+                    Path  = $testKey.Path
+                    Name  = $testKey.Name
+                    Value = '5'
+                    Type  = $testKey.Value
+                }
+                $null = New-ItemProperty @testNewItemParams
 
-            .$testScript @testNewParams
+                .$testScript @testNewParams
         
-            $testGetParams = @{
-                Path = $testKey.Path
-                Name = $testKey.Name
+                $testGetParams = @{
+                    Path = $testKey.Path
+                    Name = $testKey.Name
+                }
+                $actual = Get-ItemProperty @testGetParams
             }
-            $actual = Get-ItemProperty @testGetParams
-        }
-        It 'the path is still there' {
-            $testKey.Path | Should -Exist
-        }
-        It 'the key name is created' {
-            $actual | Should -Not -BeNullOrEmpty
-        }
-        It 'the key value is set' {
-            $actual.($testKey.Name) | Should -Be $testKey.Value
-        }
-        It 'output is generated' {
-            Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' not correct. Updated old value '$($testNewItemParams.Value)' with new value '$($testKey.Value)'."
+            It 'the path is still there' {
+                $testKey.Path | Should -Exist
+            }
+            It 'the key name is still correct' {
+                $actual | Should -Not -BeNullOrEmpty
+            }
+            It 'the key value is updated' {
+                $actual.($testKey.Name) | Should -Be $testKey.Value
+            }
+            It 'output is generated' {
+                Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
+                    $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' not correct. Updated old value '$($testNewItemParams.Value)' with new value '$($testKey.Value)'."
+                }
             }
         }
-    }
-    Context 'and the registry path, key name and value are correct' {
-        BeforeAll {
-            $testKey = @{
-                Path  = 'TestRegistry:\testPath'
-                Name  = 'testNameSomethingElse'
-                Value = '3'
-                Type  = 'DWORD'
-            }
-            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+        Context 'and the complete registry key is correct' {
+            BeforeAll {
+                $testKey = @{
+                    Path  = 'TestRegistry:\testPath'
+                    Name  = 'testNameSomethingElse'
+                    Value = '3'
+                    Type  = 'DWORD'
+                }
+                @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
 
-            $null = New-Item -Path $testKey.Path -Force
-            $null = New-ItemProperty @testKey
+                $null = New-Item -Path $testKey.Path -Force
+                $null = New-ItemProperty @testKey
 
-            .$testScript @testNewParams
+                .$testScript @testNewParams
         
-            $testGetParams = @{
-                Path = $testKey.Path
-                Name = $testKey.Name
+                $testGetParams = @{
+                    Path = $testKey.Path
+                    Name = $testKey.Name
+                }
+                $actual = Get-ItemProperty @testGetParams
             }
-            $actual = Get-ItemProperty @testGetParams
-        }
-        It 'the path is still there' {
-            $testKey.Path | Should -Exist
-        }
-        It 'the key name is created' {
-            $actual | Should -Not -BeNullOrEmpty
-        }
-        It 'the key value is set' {
-            $actual.($testKey.Name) | Should -Be $testKey.Value
-        }
-        It 'output is generated' {
-            Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' correct. Nothing to update."
+            It 'the path is still there' {
+                $testKey.Path | Should -Exist
+            }
+            It 'the key name still exists' {
+                $actual | Should -Not -BeNullOrEmpty
+            }
+            It 'the key value is still correct' {
+                $actual.($testKey.Name) | Should -Be $testKey.Value
+            }
+            It 'output is generated' {
+                Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
+                    $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' correct. Nothing to update."
+                }
             }
         }
     }

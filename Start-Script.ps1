@@ -160,6 +160,7 @@ Param (
         Folders        = 'Scripts\Folders import export\Folders import export.ps1'
         NtpTimeServers = 'Scripts\NTP time servers import export\NTP time servers import export.ps1'
         RegistryKeys   = 'Scripts\Registry keys import export\Registry keys import export.ps1'
+        MonitorSSD     = 'Scripts\Monitor SSD import export\Monitor SSD import export.ps1'
     },
     [String]$SnapshotsFolder = 'Snapshots',
     [String]$ReportsFolder = 'Reports',

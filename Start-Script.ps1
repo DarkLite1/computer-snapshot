@@ -149,7 +149,7 @@ Param (
         Folders        = $true
         NtpTimeServers = $true
         RegistryKeys   = $true
-        MonitorSDD     = $true
+        MonitorSSD     = $true
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{

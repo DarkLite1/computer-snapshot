@@ -55,7 +55,8 @@ Param(
     [Parameter(Mandatory)]
     [String]$DataFolder,
     [String]$ScriptFileName = 'Monitor SSD.ps1',
-    [String]$ScheduledTaskFileName = 'Monitor SSD scheduled task.json'
+    [String]$ScheduledTaskFileName = 'Monitor SSD scheduled task.json',
+    [String]$DestinationFolder = 'C:\PowerShell'
 )
 
 Begin {

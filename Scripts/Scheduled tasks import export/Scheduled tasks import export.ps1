@@ -98,18 +98,22 @@ Begin {
                     $ExportFilePath = Join-Path -Path $ExportFolder -ChildPath $ExportFileName
     
                     Write-Verbose "Create file '$ExportFileName.xml'"
-                    $Params = @{
+                    $params = @{
                         LiteralPath = "$ExportFilePath.xml"
                         Force       = $true
                         ErrorAction = 'Stop'
                     }
-                    $Task | Export-Clixml @Params
-    
+                    $Task | Export-Clixml @params
+                    
                     Write-Verbose "Create file '$ExportFileName - Definition.xml'"
                     Export-ScheduledTask -TaskName $Task.TaskName -TaskPath $Task.TaskPath |
                     Out-File -LiteralPath "$ExportFilePath - Definition.xml" -Force
-    
+                    
+                    Write-Output "Exported scheduled task '$($Task.TaskName)'"
                 }
+            }
+            else {
+                Write-Error "No scheduled tasks found in the Task Scheduler under folder '$TaskPath'"
             }
         }
         Catch {
@@ -157,6 +161,8 @@ Begin {
                     TaskName = $Task.TaskName
                 }
                 Register-ScheduledTask @Params -Force
+
+                Write-Output "Created scheduled task '$($Task.TaskName)'"
             }
         }
         Catch {
@@ -192,7 +198,7 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            Write-Verbose "Export PowerShell script to file '$ExportScriptFile'"
+            Write-Verbose "Export scheduled tasks '$ExportScriptFile'"
             Write-Verbose "Export scheduled task file '$ScheduledTaskFile'"
         }
         else {

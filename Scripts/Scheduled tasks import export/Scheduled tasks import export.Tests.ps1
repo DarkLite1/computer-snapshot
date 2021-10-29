@@ -6,9 +6,7 @@ BeforeAll {
     $testParams = @{
         Action                = 'Export'
         DataFolder            = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        ScriptFileName        = 'test.ps1'
-        ScheduledTaskFileName = 'testScheduledTaskConfig.json'
-        ScriptFolder          = (New-Item 'TestDrive:/S' -ItemType Directory).FullName
+        ScheduledTaskFolder        = 'test'
     }
 
     Function Export-ScheduledTaskHC {}
@@ -58,18 +56,6 @@ Describe 'Fail the import when' {
     It 'the data folder is empty' {
         { .$testScript @testNewParams } | 
         Should -Throw "*Import folder '$($testNewParams.DataFolder)' empty"
-    }
-    It 'the data folder does not have the PowerShell script file' {
-        '1' | Out-File -LiteralPath "$($testNewParams.DataFolder)\$($testNewParams.ScheduledTaskFileName)"
-
-        { .$testScript @testNewParams } | 
-        Should -Throw "*PowerShell script file '$($testNewParams.DataFolder)\$($testNewParams.ScriptFileName)' not found"
-    }
-    It 'the data folder does not have the scheduled task configuration file' {
-        '1' | Out-File -LiteralPath "$($testNewParams.DataFolder)\$($testNewParams.ScriptFileName)"
-
-        { .$testScript @testNewParams } | 
-        Should -Throw "*Scheduled task configuration file '$($testNewParams.DataFolder)\$($testNewParams.ScheduledTaskFileName)' not found"
     }
 }
 Describe "when action is 'Import'" {

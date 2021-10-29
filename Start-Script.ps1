@@ -149,7 +149,8 @@ Param (
         Folders        = $true
         NtpTimeServers = $true
         RegistryKeys   = $true
-        MonitorSSD     = $true
+        ScheduledTasks = $true
+        CopyFiles      = $true
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
@@ -160,7 +161,8 @@ Param (
         Folders        = 'Scripts\Folders import export\Folders import export.ps1'
         NtpTimeServers = 'Scripts\NTP time servers import export\NTP time servers import export.ps1'
         RegistryKeys   = 'Scripts\Registry keys import export\Registry keys import export.ps1'
-        MonitorSSD     = 'Scripts\Monitor SSD import export\Monitor SSD import export.ps1'
+        ScheduledTasks = 'Scripts\Scheduled tasks import export\Scheduled tasks import export.ps1'
+        CopyFiles      = 'Scripts\Copy files import export\Copy files import export.ps1'
     },
     [String]$SnapshotsFolder = 'Snapshots',
     [String]$ReportsFolder = 'Reports',

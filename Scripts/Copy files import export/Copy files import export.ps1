@@ -1,15 +1,13 @@
 <#
     .SYNOPSIS
-        Export a script and a scheduled task.
+        Export scheduled tasks.
 
     .DESCRIPTION
-        When action is 'Export' the script will create 2 files in the data 
-        folder: one file containing the script to execute and another file
-        containing the configuration for the scheduled task that will 
-        trigger the script.
+        When action is 'Export' the script will export all scheduled tasks
+        in a specific folder of the Task Scheduler.
 
-        When action is 'Import' a scheduled task is created and the script
-        to execute is copied to the local computer.
+        When action is 'Import' the scheduled tasks are created the local 
+        computer.
 
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DataFolder, when 
@@ -60,6 +58,66 @@ Param(
 )
 
 Begin {
+    Function Export-ScheduledTaskHC {
+        <#
+        .SYNOPSIS
+            Export scheduled tasks.
+    
+        .DESCRIPTION
+            Export all scheduled tasks in a specific folder to allow them to be 
+            backed-up or to be able to import them on another machine. The complete 
+            object and the task definition are stored in xml files.
+    
+        .PARAMETER TaskPath
+            The folder in the Task Scheduler in which the tasks resided that will 
+            be backed-up.
+    
+        .PARAMETER ExportFolder
+            The folder on the file system where all xml files will be stored.
+        #>
+    
+        [CmdLetBinding()]
+        Param (
+            [Parameter(Mandatory)]
+            [String]$ExportFolder,
+            [String]$TaskPath = 'HC'
+        )
+    
+        Try {
+            $null = New-Item -Path $ExportFolder -ItemType Directory -Force -EA Ignore
+    
+            $Tasks = Get-ScheduledTask -TaskPath "\$TaskPath\*"
+            Write-Verbose "Retrieved $($Tasks.Count) tasks in folder '$TaskPath'"
+    
+            if ($Tasks) {
+                Write-Verbose "Export tasks to folder '$ExportFolder'"
+                $i = 0
+    
+                Foreach ($Task in $Tasks) {
+                    $i++
+                    $ExportFileName = "$i - $($Task.TaskName)"
+                    $ExportFilePath = Join-Path -Path $ExportFolder -ChildPath $ExportFileName
+    
+                    Write-Verbose "Create file '$ExportFileName.xml'"
+                    $Params = @{
+                        LiteralPath = "$ExportFilePath.xml"
+                        Force       = $true
+                        ErrorAction = 'Stop'
+                    }
+                    $Task | Export-Clixml @Params
+    
+                    Write-Verbose "Create file '$ExportFileName - Definition.xml'"
+                    Export-ScheduledTask -TaskName $Task.TaskName -TaskPath $Task.TaskPath |
+                    Out-File -LiteralPath "$ExportFilePath - Definition.xml" -Force
+    
+                }
+            }
+        }
+        Catch {
+            throw "Failed to export scheduled tasks: $_"
+        }
+    }
+
     Try {
         $ExportScriptFile = Join-Path -Path $DataFolder -ChildPath $ScriptFileName
         $ScheduledTaskFile = Join-Path -Path $DataFolder -ChildPath $ScheduledTaskFileName

@@ -8,6 +8,7 @@ BeforeAll {
         DataFolder            = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
         ScriptFileName        = 'test.ps1'
         ScheduledTaskFileName = 'testScheduledTaskConfig.json'
+        ScriptFolder          = (New-Item 'TestDrive:/S' -ItemType Directory).FullName
     }
 }
 Describe 'the mandatory parameters are' {
@@ -16,7 +17,7 @@ Describe 'the mandatory parameters are' {
         Should -BeTrue
     }
 }
-Describe 'Fail the export of firewall rules when' {
+Describe 'Fail the export when' {
     BeforeAll {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Export'
@@ -37,7 +38,7 @@ Describe 'Fail the export of firewall rules when' {
         Should -Throw "*Export folder '$testFolder' not empty"
     }
 }
-Describe 'Fail the import of firewall rules when' {
+Describe 'Fail the import when' {
     BeforeEach {
         Get-ChildItem $testParams.DataFolder | Remove-Item
         $testNewParams = $testParams.clone()
@@ -65,25 +66,22 @@ Describe 'Fail the import of firewall rules when' {
         { .$testScript @testNewParams } | 
         Should -Throw "*Scheduled task configuration file '$($testNewParams.DataFolder)\$($testNewParams.ScheduledTaskFileName)' not found"
     }
-} -tag test
-Describe 'when all tests pass call the function' {
-    It "'Export-FirewallRulesHC' on action 'Export'" {
-        Get-ChildItem $testParams.DataFolder | Remove-Item
-        $testNewParams = $testParams.clone()
-        $testNewParams.Action = 'Export'
+}
+Describe "when action is 'Import'" {
+    BeforeAll {
+        # $testScriptFile = "$($testNewParams.DataFolder)\$($testNewParams.ScriptFileName)"
+        # $testScheduledTaskFile = "$($testNewParams.DataFolder)\$($testNewParams.ScheduledTaskFileName)"
 
-        .$testScript @testNewParams 
-
-        Should -Invoke Export-FirewallRulesHC -Times 1 -Exactly
+        '1' | Out-File -LiteralPath "$($testParams.DataFolder)\$($testParams.ScheduledTaskFileName)"
+        '1' | Out-File -LiteralPath "$($testParams.DataFolder)\$($testParams.ScriptFileName)"
     }
-    It "'Import-FirewallRulesHC' on action 'Export'" {
-        Get-ChildItem $testParams.DataFolder | Remove-Item
+    It 'create the folder where the PowerShell script is stored' {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Import'
-        New-Item -Path "$($testParams.DataFolder)\$($testParams.ScriptFileName)" -ItemType File
+        $testNewParams.ScriptFolder = Join-Path 'TestDrive:/' 'C'
 
         .$testScript @testNewParams 
 
-        Should -Invoke Import-FirewallRulesHC -Times 1 -Exactly
+        $testNewParams.ScriptFolder | Should -Exist
     }
 }

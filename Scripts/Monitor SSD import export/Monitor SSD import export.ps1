@@ -56,7 +56,7 @@ Param(
     [String]$DataFolder,
     [String]$ScriptFileName = 'Monitor SSD.ps1',
     [String]$ScheduledTaskFileName = 'Monitor SSD scheduled task.json',
-    [String]$DestinationFolder = 'C:\PowerShell'
+    [String]$ScriptFolder = 'C:\PowerShell'
 )
 
 Begin {
@@ -101,6 +101,9 @@ Process {
             Write-Verbose "Export scheduled task file '$ScheduledTaskFile'"
         }
         else {
+            if (-not (Test-Path -Path $ScriptFolder -PathType Container)) {
+                New-Item $ScriptFolder -ItemType Directory -EA Stop
+            }
             Write-Verbose "Copy PowerShell script '$ExportScriptFile' to ''"
             Write-Verbose "Create scheduled task"
         }

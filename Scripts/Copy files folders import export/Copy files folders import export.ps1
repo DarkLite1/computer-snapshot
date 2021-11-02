@@ -76,7 +76,7 @@ Begin {
                 throw "Import folder '$DataFolder' empty"
             }
             If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
-                throw "Copy file '$ExportFile' not found"
+                throw "Import file '$ExportFile' not found"
             }
         }
         #endregion

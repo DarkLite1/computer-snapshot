@@ -4,11 +4,9 @@
 BeforeAll {
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        Action                = 'Export'
-        DataFolder            = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        ScriptFileName        = 'test.ps1'
-        ScheduledTaskFileName = 'testScheduledTaskConfig.json'
-        ScriptFolder          = (New-Item 'TestDrive:/S' -ItemType Directory).FullName
+        Action     = 'Export'
+        DataFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        FileName   = 'testCopy.json'
     }
 }
 Describe 'the mandatory parameters are' {
@@ -54,24 +52,15 @@ Describe 'Fail the import when' {
         { .$testScript @testNewParams } | 
         Should -Throw "*Import folder '$($testNewParams.DataFolder)' empty"
     }
-    It 'the data folder does not have the PowerShell script file' {
-        '1' | Out-File -LiteralPath "$($testNewParams.DataFolder)\$($testNewParams.ScheduledTaskFileName)"
+    It 'the data folder does not have the .json file' {
+        '1' | Out-File -LiteralPath "$($testNewParams.DataFolder)\test.txt"
 
         { .$testScript @testNewParams } | 
-        Should -Throw "*PowerShell script file '$($testNewParams.DataFolder)\$($testNewParams.ScriptFileName)' not found"
-    }
-    It 'the data folder does not have the scheduled task configuration file' {
-        '1' | Out-File -LiteralPath "$($testNewParams.DataFolder)\$($testNewParams.ScriptFileName)"
-
-        { .$testScript @testNewParams } | 
-        Should -Throw "*Scheduled task configuration file '$($testNewParams.DataFolder)\$($testNewParams.ScheduledTaskFileName)' not found"
+        Should -Throw "*Import file '$($testNewParams.DataFolder)\$($testNewParams.FileName)' not found"
     }
 }
 Describe "when action is 'Import'" {
     BeforeAll {
-        # $testScriptFile = "$($testNewParams.DataFolder)\$($testNewParams.ScriptFileName)"
-        # $testScheduledTaskFile = "$($testNewParams.DataFolder)\$($testNewParams.ScheduledTaskFileName)"
-
         '1' | Out-File -LiteralPath "$($testParams.DataFolder)\$($testParams.ScheduledTaskFileName)"
         '1' | Out-File -LiteralPath "$($testParams.DataFolder)\$($testParams.ScriptFileName)"
     }
@@ -84,4 +73,4 @@ Describe "when action is 'Import'" {
 
         $testNewParams.ScriptFolder | Should -Exist
     }
-}
+} -Skip

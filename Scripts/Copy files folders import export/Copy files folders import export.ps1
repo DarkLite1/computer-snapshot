@@ -50,9 +50,7 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$FileName = 'CopyFilesFolders.json',
-    [String]$ScheduledTaskFileName = 'Monitor SSD scheduled task.json',
-    [String]$ScriptFolder = 'C:\PowerShell'
+    [String]$FileName = 'CopyFilesFolders.json'
 )
 
 Begin {
@@ -90,13 +88,12 @@ Process {
     Try {
         If ($Action -eq 'Export') {
             Write-Verbose "Create example file '$ExportFile'"
-            ConvertTo-Json @(
-                @{
-                    From = 'Monitor SSD.ps1'
-                    To   = 'C:\HC'
-                }
-            ) | Out-File -FilePath $ExportFile -Encoding utf8
-            Write-Output "Created example file '$ExportFile'"
+            $params = @{
+                LiteralPath = Join-Path $PSScriptRoot 'Examples\CopyFilesFolders.json'
+                Destination = $ExportFile
+            }
+            Copy-Item @params
+            Write-Output "Created example config file '$ExportFile'"
         }
         else {
             if (-not (Test-Path -Path $ScriptFolder -PathType Container)) {

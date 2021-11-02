@@ -63,12 +63,13 @@ Begin {
     
         .DESCRIPTION
             Export all scheduled tasks in a specific folder to allow them to be 
-            backed-up or to be able to import them on another machine. The complete 
-            object and the task definition are stored in xml files.
+            backed-up or to be recreated another computer. 
+            
+            The complete object and the task definition are stored in xml files.
     
         .PARAMETER TaskPath
-            The folder in the Task Scheduler in which the tasks resided that will 
-            be backed-up.
+            The folder in the Task Scheduler in which the tasks resided that 
+            will be backed-up.
     
         .PARAMETER ExportFolder
             The folder on the file system where all xml files will be stored.

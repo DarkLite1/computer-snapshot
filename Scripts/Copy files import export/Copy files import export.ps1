@@ -1,48 +1,46 @@
 <#
     .SYNOPSIS
-        Export scheduled tasks.
+        Copy files from one location to another.
 
     .DESCRIPTION
-        When action is 'Export' the script will export all scheduled tasks
-        in a specific folder of the Task Scheduler.
+        When action is 'Export' the script will create an example file that can 
+        be used with action set to 'Import'.
 
-        When action is 'Import' the scheduled tasks are created the local 
-        computer.
+        When action is 'Import' the import file is read and all files and 
+        folder in the file will be copied.
 
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DataFolder, when 
         action is 'Import' the data in the $DataFolder will be restored.
 
-    .PARAMETER ScriptFileName
-        The script that will be copied to the local computer and that will get
-        executed when the scheduled task is triggered.
-
-    .PARAMETER ScheduledTaskFileName
-        The configuration for the scheduled task containing the path to the 
-        script, when to start the script, ... .
+    .PARAMETER FileName
+        The file containing the paths to the files or folders to copy, with the 
+        from and to fields.
 
     .PARAMETER DataFolder
-        Folder where the export or import files can be found.
+        Folder where the export or import file can be found.
 
     .EXAMPLE
-        $exportParams = @{
+        $params = @{
             Action     = 'Export'
-            DataFolder = 'C:\Monitor SSD'
+            DataFolder = 'C:\copy'
+            FileName   = 'copy.json'
         }
-        & 'C:\Monitor SSD.ps1' @exportParams
+        & 'C:\script' @params
 
-        Create a script file and a scheduled task configuration file in the 
-        export folder.
+        Create the example file 'C:\copy\copy.json' that can be used later on 
+        with action 'Import'.
 
     .EXAMPLE
-        $importParams = @{
+        $params = @{
             Action     = 'Import'
-            DataFolder = 'C:\Monitor SSD'
+            DataFolder = 'C:\copy'
+            FileName   = 'copy.json'
         }
-        & 'C:\Monitor SSD.ps1' @exportParams
+        & 'C:\script' @params
 
-        Create the scheduled task and copy the script file to the local 
-        computer.
+        Read the file 'C:\copy\copy.json' and execute all copy actions defined 
+        in the file.
 #>
 
 [CmdletBinding()]

@@ -108,11 +108,35 @@ Process {
             #endregion
         }
         else {
-            if (-not (Test-Path -Path $ScriptFolder -PathType Container)) {
-                New-Item $ScriptFolder -ItemType Directory -EA Stop
+            $itemsToCopy = Get-Content -Path $ExportFile -Raw | ConvertFrom-Json
+
+            foreach ($i in $itemsToCopy) {
+                try {
+                    if (-not ($from = $i.From)) {
+                        throw "The field 'From' is required"
+                    }
+                    if (-not ($to = $i.To)) {
+                        throw "The field 'To' is required"
+                    }
+                    
+
+                    if (-not ($item = Get-Item -LiteralPath $from -EA Ignore)) {
+                        throw "File or folder '$from' not found"
+                    }
+                    
+                    if ($item.PSIsContainer) {
+                        # Copy-Item -LiteralPath $From -Destination $Destination -Recurse
+                    }
+                }
+                catch {
+                    Write-Error "Failed to copy from '$($i.From)' to '$($i.To)': $_"
+                }
             }
-            Write-Verbose "Copy PowerShell script '$ExportScriptFile' to ''"
-            Write-Verbose "Create scheduled task"
+            # if (-not (Test-Path -Path $ScriptFolder -PathType Container)) {
+            #     New-Item $ScriptFolder -ItemType Directory -EA Stop
+            # }
+            # Write-Verbose "Copy PowerShell script '$ExportScriptFile' to ''"
+            # Write-Verbose "Create scheduled task"
         }
     }
     Catch {

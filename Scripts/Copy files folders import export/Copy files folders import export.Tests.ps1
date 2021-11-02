@@ -79,17 +79,22 @@ Describe "when action is 'Export'" {
     }
 }
 Describe "when action is 'Import'" {
-    BeforeAll {
-        '1' | Out-File -LiteralPath "$($testParams.DataFolder)\$($testParams.ScheduledTaskFileName)"
-        '1' | Out-File -LiteralPath "$($testParams.DataFolder)\$($testParams.ScriptFileName)"
-    }
-    It 'create the folder where the PowerShell script is stored' {
-        $testNewParams = $testParams.clone()
-        $testNewParams.Action = 'Import'
-        $testNewParams.ScriptFolder = Join-Path 'TestDrive:/' 'C'
+    Context 'an non terminating error is generated when' {
+        BeforeAll {
+            $testFile = "$($testParams.DataFolder)\$($testParams.FileName)"
+            $testNewParams = $testParams.clone()
+            $testNewParams.Action = 'Import'
+        }
+        It 'the field To is missing' {
+            ConvertTo-Json @(
+                @{
+                    From = ''
+                    To   = $testParams.DataFolder
+                }
+            ) | Out-File -FilePath $testFile
 
-        .$testScript @testNewParams 
-
-        $testNewParams.ScriptFolder | Should -Exist
+            { .$testScript @testNewParams -EA Stop } | 
+            Should -Throw "*Failed to copy from '' to '$($testParams.DataFolder)': The field 'From' is required"
+        }
     }
-} -Skip
+} -Tag test

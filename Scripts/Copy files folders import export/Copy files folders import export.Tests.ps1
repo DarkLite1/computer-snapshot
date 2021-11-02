@@ -137,5 +137,19 @@ Describe "when action is 'Import'" {
 
             "$($testNewItemParams.Path)\$($testParams.FileName)" | Should -Exist
         }
+        It 'the file is copied to the destination folder when the folder does not exist' {
+            $notExistingFolder = Join-Path $testParams.DataFolder 'NotExistingFolder'
+            
+            ConvertTo-Json @(
+                @{
+                    From = $testFile
+                    To   = "$notExistingFolder\$($testParams.FileName)"
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            "$notExistingFolder\$($testParams.FileName)" | Should -Exist
+        }
     } -Tag test
 } 

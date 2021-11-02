@@ -128,7 +128,6 @@ Process {
                         # destination folder manually 
                         $null = New-Item -Path (Split-Path -Path $to) -Type Directory -Force
                     }
-
                     $copyParams = @{
                         LiteralPath = $from 
                         Destination = $to
@@ -141,11 +140,6 @@ Process {
                     Write-Error "Failed to copy from '$($i.From)' to '$($i.To)': $_"
                 }
             }
-            # if (-not (Test-Path -Path $ScriptFolder -PathType Container)) {
-            #     New-Item $ScriptFolder -ItemType Directory -EA Stop
-            # }
-            # Write-Verbose "Copy PowerShell script '$ExportScriptFile' to ''"
-            # Write-Verbose "Create scheduled task"
         }
     }
     Catch {

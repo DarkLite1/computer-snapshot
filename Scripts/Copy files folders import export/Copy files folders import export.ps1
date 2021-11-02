@@ -118,12 +118,9 @@ Process {
                     if (-not ($to = $i.To)) {
                         throw "The field 'To' is required"
                     }
-                    
-
                     if (-not ($item = Get-Item -LiteralPath $from -EA Ignore)) {
                         throw "File or folder '$from' not found"
                     }
-                    
                     if ($item.PSIsContainer) {
                         # Copy-Item -LiteralPath $From -Destination $Destination -Recurse
                     }

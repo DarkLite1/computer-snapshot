@@ -107,5 +107,16 @@ Describe "when action is 'Import'" {
             { .$testScript @testNewParams -EA Stop } | 
             Should -Throw "*Failed to copy from '$($testParams.DataFolder)' to '': The field 'To' is required"
         }
+        It 'the source file or folder is not found' {
+            ConvertTo-Json @(
+                @{
+                    From = 'Non existing'
+                    To   = $testParams.DataFolder
+                }
+            ) | Out-File -FilePath $testFile
+
+            { .$testScript @testNewParams -EA Stop } | 
+            Should -Throw "*Failed to copy from 'Non existing' to '$($testParams.DataFolder)': File or folder 'Non existing' not found"
+        }
     }
 } -Tag test

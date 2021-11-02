@@ -6,20 +6,16 @@
         When action is 'Export' the script will export all scheduled tasks
         in a specific folder of the Task Scheduler.
 
-        When action is 'Import' the scheduled tasks are created the local 
-        computer.
+        When action is 'Import' the scheduled tasks found in the $DataFolder
+        will be created on the local computer.
 
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DataFolder, when 
         action is 'Import' the data in the $DataFolder will be restored.
 
-    .PARAMETER ScriptFileName
-        The script that will be copied to the local computer and that will get
-        executed when the scheduled task is triggered.
-
-    .PARAMETER ScheduledTaskFileName
-        The configuration for the scheduled task containing the path to the 
-        script, when to start the script, ... .
+    .PARAMETER ScheduledTaskFolder
+        The folder in the Windows Task Scheduler where the tasks to be exported 
+        are stored.
 
     .PARAMETER DataFolder
         Folder where the export or import files can be found.

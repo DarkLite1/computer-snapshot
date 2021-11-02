@@ -77,7 +77,7 @@ Begin {
         [CmdLetBinding()]
         Param (
             [Parameter(Mandatory)]
-            [ValidateScript({Test-Path -LiteralPath $_ -PathType Container})]
+            [ValidateScript({ Test-Path -LiteralPath $_ -PathType Container })]
             [String]$ExportFolder,
             [Parameter(Mandatory)]
             [String]$TaskPath
@@ -123,7 +123,7 @@ Begin {
         [CmdLetBinding()]
         Param (
             [Parameter(Mandatory)]
-            [ValidateScript({Test-Path -LiteralPath $_ -PathType Container})]
+            [ValidateScript({ Test-Path -LiteralPath $_ -PathType Container })]
             [String]$ImportFolder
         )
     
@@ -159,6 +159,9 @@ Begin {
                 Register-ScheduledTask @registerParams -Force
 
                 Write-Output "Created scheduled task '$($Task.TaskName)'"
+            }
+            if (-not $Tasks) {
+                Write-Error "No scheduled tasks found in folder '$ImportFolder' to create in the Task Scheduler"
             }
         }
         Catch {
@@ -203,7 +206,7 @@ Process {
         }
         else {
             Write-Verbose 'Import scheduled tasks'
-            
+            Import-ScheduledTaskHC -ImportFolder $DataFolder
         }
     }
     Catch {

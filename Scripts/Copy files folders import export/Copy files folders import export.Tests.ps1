@@ -59,6 +59,20 @@ Describe 'Fail the import when' {
         Should -Throw "*Import file '$($testNewParams.DataFolder)\$($testNewParams.FileName)' not found"
     }
 }
+Describe "when action is 'Export'" {
+    It 'create an example .json file in the data folder' {
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'Export'
+
+        .$testScript @testNewParams 
+
+        $testFile = "$($testNewParams.DataFolder)\$($testNewParams.FileName)"
+        $testFile | Should -Exist
+        {
+            Get-Content -Path $testFile -Raw | ConvertFrom-Json -EA Stop
+        } | Should -Not -Throw
+    }
+}
 Describe "when action is 'Import'" {
     BeforeAll {
         '1' | Out-File -LiteralPath "$($testParams.DataFolder)\$($testParams.ScheduledTaskFileName)"

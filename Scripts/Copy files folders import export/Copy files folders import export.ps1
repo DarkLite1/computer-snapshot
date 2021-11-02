@@ -89,8 +89,14 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            Write-Verbose "Export PowerShell script to file '$ExportScriptFile'"
-            Write-Verbose "Export scheduled task file '$ScheduledTaskFile'"
+            Write-Verbose "Create example file '$ExportFile'"
+            ConvertTo-Json @(
+                @{
+                    From = 'Monitor SSD.ps1'
+                    To   = 'C:\HC'
+                }
+            ) | Out-File -FilePath $ExportFile -Encoding utf8
+            Write-Output "Created example file '$ExportFile'"
         }
         else {
             if (-not (Test-Path -Path $ScriptFolder -PathType Container)) {

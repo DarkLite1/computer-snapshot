@@ -148,10 +148,6 @@ Begin {
                 }
                 $Xml = Get-Content (Join-Path @params) -Raw -EA Stop
     
-                # Replace drive letter
-                #$Xml = $xml -replace 'S:\\', 'T:\'
-            
-                #$TaskPath = $Task.TaskPath -replace 'PowerShell scripts', 'HCScripts'
                 $TaskPath = $Task.TaskPath
     
                 Write-Verbose "Create task $(Join-Path $TaskPath $Task.TaskName)"

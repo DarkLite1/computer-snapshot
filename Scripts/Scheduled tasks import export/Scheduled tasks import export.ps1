@@ -21,24 +21,25 @@
         Folder where the export or import files can be found.
 
     .EXAMPLE
-        $exportParams = @{
-            Action     = 'Export'
-            DataFolder = 'C:\Monitor SSD'
+        $params = @{
+            Action              = 'Export'
+            DataFolder          = 'C:\Scheduled tasks'
+            ScheduledTaskFolder = 'HC'
         }
-        & 'C:\Monitor SSD.ps1' @exportParams
+        & 'script.ps1' @params
 
-        Create a script file and a scheduled task configuration file in the 
-        export folder.
+        Export all tasks found in the Windows Task Scheduler within folder 'HC' 
+        and store them im the folder 'C:\Scheduled tasks'.
 
     .EXAMPLE
-        $importParams = @{
+        $params = @{
             Action     = 'Import'
-            DataFolder = 'C:\Monitor SSD'
+            DataFolder = 'C:\Scheduled tasks'
         }
-        & 'C:\Monitor SSD.ps1' @exportParams
+        & 'script.ps1' @params
 
-        Create the scheduled task and copy the script file to the local 
-        computer.
+        Import all tasks found in the folder 'C:\Scheduled tasks' and recreate 
+        them on the local computer.
 #>
 
 [CmdletBinding()]

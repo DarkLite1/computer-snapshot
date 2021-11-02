@@ -79,13 +79,13 @@ Describe "when action is 'Export'" {
     }
 }
 Describe "when action is 'Import'" {
-    Context 'an non terminating error is generated when' {
+    Context 'an error is generated when' {
         BeforeAll {
             $testFile = "$($testParams.DataFolder)\$($testParams.FileName)"
             $testNewParams = $testParams.clone()
             $testNewParams.Action = 'Import'
         }
-        It 'the field To is missing' {
+        It 'the field From is missing' {
             ConvertTo-Json @(
                 @{
                     From = ''

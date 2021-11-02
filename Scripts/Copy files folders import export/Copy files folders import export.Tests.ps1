@@ -96,5 +96,16 @@ Describe "when action is 'Import'" {
             { .$testScript @testNewParams -EA Stop } | 
             Should -Throw "*Failed to copy from '' to '$($testParams.DataFolder)': The field 'From' is required"
         }
+        It 'the field To is missing' {
+            ConvertTo-Json @(
+                @{
+                    From = $testParams.DataFolder
+                    To   = ''
+                }
+            ) | Out-File -FilePath $testFile
+
+            { .$testScript @testNewParams -EA Stop } | 
+            Should -Throw "*Failed to copy from '$($testParams.DataFolder)' to '': The field 'To' is required"
+        }
     }
 } -Tag test

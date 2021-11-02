@@ -58,21 +58,24 @@ Describe 'Fail the import when' {
         Should -Throw "*Import folder '$($testNewParams.DataFolder)' empty"
     }
 }
-Describe "when action is 'Import'" {
-    BeforeAll {
-        # $testScriptFile = "$($testNewParams.DataFolder)\$($testNewParams.ScriptFileName)"
-        # $testScheduledTaskFile = "$($testNewParams.DataFolder)\$($testNewParams.ScheduledTaskFileName)"
-
-        '1' | Out-File -LiteralPath "$($testParams.DataFolder)\$($testParams.ScheduledTaskFileName)"
-        '1' | Out-File -LiteralPath "$($testParams.DataFolder)\$($testParams.ScriptFileName)"
-    }
-    It 'create the folder where the PowerShell script is stored' {
+Describe 'when all tests pass call the function' {
+    It "'Export-ScheduledTaskHC' on action 'Export'" {
+        Get-ChildItem $testParams.DataFolder | Remove-Item
         $testNewParams = $testParams.clone()
-        $testNewParams.Action = 'Import'
-        $testNewParams.ScriptFolder = Join-Path 'TestDrive:/' 'C'
+        $testNewParams.Action = 'Export'
 
         .$testScript @testNewParams 
 
-        $testNewParams.ScriptFolder | Should -Exist
+        Should -Invoke Export-ScheduledTaskHC -Times 1 -Exactly
+    }
+    It "'Import-ScheduledTaskHC' on action 'Import'" {
+        Get-ChildItem $testParams.DataFolder | Remove-Item
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'Import'
+        New-Item -Path "$($testParams.DataFolder)\$($testParams.FileName)" -ItemType File
+
+        .$testScript @testNewParams 
+
+        Should -Invoke Import-ScheduledTaskHC -Times 1 -Exactly
     }
 }

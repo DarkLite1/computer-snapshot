@@ -77,14 +77,13 @@ Begin {
         [CmdLetBinding()]
         Param (
             [Parameter(Mandatory)]
+            [ValidateScript({Test-Path -LiteralPath $_ -PathType Container})]
             [String]$ExportFolder,
             [Parameter(Mandatory)]
             [String]$TaskPath
         )
     
         Try {
-            $null = New-Item -Path $ExportFolder -ItemType Directory -Force -EA Ignore
-    
             $Tasks = Get-ScheduledTask -TaskPath "\$TaskPath\*"
             Write-Verbose "Retrieved $($Tasks.Count) tasks in folder '$TaskPath'"
     
@@ -198,15 +197,16 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            Write-Verbose "Export scheduled tasks '$ExportScriptFile'"
-            Write-Verbose "Export scheduled task file '$ScheduledTaskFile'"
+            Write-Verbose 'Export scheduled tasks'
+            $params = @{
+                ExportFolder = $DataFolder 
+                TaskPath     = $ScheduledTaskFolder
+            }
+            Export-ScheduledTaskHC @params
         }
         else {
-            if (-not (Test-Path -Path $ScriptFolder -PathType Container)) {
-                New-Item $ScriptFolder -ItemType Directory -EA Stop
-            }
-            Write-Verbose "Copy PowerShell script '$ExportScriptFile' to ''"
-            Write-Verbose "Create scheduled task"
+            Write-Verbose 'Import scheduled tasks'
+            
         }
     }
     Catch {

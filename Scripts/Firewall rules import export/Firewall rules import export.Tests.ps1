@@ -73,7 +73,7 @@ Describe 'when all tests pass call the function' {
 
         Should -Invoke Export-FirewallRulesHC -Times 1 -Exactly
     }
-    It "'Import-FirewallRulesHC' on action 'Export'" {
+    It "'Import-FirewallRulesHC' on action 'Import'" {
         Get-ChildItem $testParams.DataFolder | Remove-Item
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Import'

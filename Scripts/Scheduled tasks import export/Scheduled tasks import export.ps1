@@ -123,6 +123,7 @@ Begin {
         [CmdLetBinding()]
         Param (
             [Parameter(Mandatory)]
+            [ValidateScript({Test-Path -LiteralPath $_ -PathType Container})]
             [String]$ImportFolder
         )
     

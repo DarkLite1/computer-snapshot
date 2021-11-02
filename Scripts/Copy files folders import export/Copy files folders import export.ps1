@@ -131,7 +131,8 @@ Process {
 
                     $copyParams = @{
                         LiteralPath = $from 
-                        Destination = $to 
+                        Destination = $to
+                        Recurse     = $true 
                         ErrorAction = 'Stop'
                     }
                     Copy-Item @copyParams

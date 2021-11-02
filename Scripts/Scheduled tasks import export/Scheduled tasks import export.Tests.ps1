@@ -4,9 +4,9 @@
 BeforeAll {
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        Action                = 'Export'
-        DataFolder            = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        ScheduledTaskFolder        = 'test'
+        Action              = 'Export'
+        DataFolder          = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        ScheduledTaskFolder = 'test'
     }
 
     Function Export-ScheduledTaskHC {}
@@ -69,10 +69,9 @@ Describe 'when all tests pass call the function' {
         Should -Invoke Export-ScheduledTaskHC -Times 1 -Exactly
     }
     It "'Import-ScheduledTaskHC' on action 'Import'" {
-        Get-ChildItem $testParams.DataFolder | Remove-Item
+        'task' | Out-File -FilePath "$($testParams.DataFolder)\task1.xml"
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Import'
-        New-Item -Path "$($testParams.DataFolder)\$($testParams.FileName)" -ItemType File
 
         .$testScript @testNewParams 
 

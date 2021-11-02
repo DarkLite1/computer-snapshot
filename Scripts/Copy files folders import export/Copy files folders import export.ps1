@@ -124,6 +124,13 @@ Process {
                     if ($item.PSIsContainer) {
                         # Copy-Item -LiteralPath $From -Destination $Destination -Recurse
                     }
+                    
+                    $copyParams = @{
+                        LiteralPath = $from 
+                        Destination = $to 
+                        ErrorAction = 'Stop'
+                    }
+                    Copy-Item @copyParams
                 }
                 catch {
                     Write-Error "Failed to copy from '$($i.From)' to '$($i.To)': $_"

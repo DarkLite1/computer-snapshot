@@ -79,12 +79,12 @@ Describe "when action is 'Export'" {
     }
 }
 Describe "when action is 'Import'" {
+    BeforeAll {
+        $testFile = "$($testParams.DataFolder)\$($testParams.FileName)"
+        $testNewParams = $testParams.clone()
+        $testNewParams.Action = 'Import'
+    }
     Context 'an error is generated when' {
-        BeforeAll {
-            $testFile = "$($testParams.DataFolder)\$($testParams.FileName)"
-            $testNewParams = $testParams.clone()
-            $testNewParams.Action = 'Import'
-        }
         It 'the field From is missing' {
             ConvertTo-Json @(
                 @{
@@ -119,4 +119,23 @@ Describe "when action is 'Import'" {
             Should -Throw "*Failed to copy from 'Non existing' to '$($testParams.DataFolder)': File or folder 'Non existing' not found"
         }
     }
-} -Tag test
+    Context 'and the source is a file' {
+        It 'the file is copied to the destination folder when the folder already exists' {
+            $testNewItemParams = @{
+                Path     = Join-Path $testParams.DataFolder 'Destination'
+                ItemType = 'Directory'
+            }
+            New-Item @testNewItemParams
+            ConvertTo-Json @(
+                @{
+                    From = $testFile
+                    To   = $testNewItemParams.Path
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            "$($testNewItemParams.Path)\$($testParams.FileName)" | Should -Exist
+        }
+    } -Tag test
+} 

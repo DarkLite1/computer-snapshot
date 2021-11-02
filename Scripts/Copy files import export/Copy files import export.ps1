@@ -50,75 +50,14 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$ScriptFileName = 'Monitor SSD.ps1',
+    [String]$FileName = 'CopyFilesFolders.json',
     [String]$ScheduledTaskFileName = 'Monitor SSD scheduled task.json',
     [String]$ScriptFolder = 'C:\PowerShell'
 )
 
 Begin {
-    Function Export-ScheduledTaskHC {
-        <#
-        .SYNOPSIS
-            Export scheduled tasks.
-    
-        .DESCRIPTION
-            Export all scheduled tasks in a specific folder to allow them to be 
-            backed-up or to be able to import them on another machine. The complete 
-            object and the task definition are stored in xml files.
-    
-        .PARAMETER TaskPath
-            The folder in the Task Scheduler in which the tasks resided that will 
-            be backed-up.
-    
-        .PARAMETER ExportFolder
-            The folder on the file system where all xml files will be stored.
-        #>
-    
-        [CmdLetBinding()]
-        Param (
-            [Parameter(Mandatory)]
-            [String]$ExportFolder,
-            [String]$TaskPath = 'HC'
-        )
-    
-        Try {
-            $null = New-Item -Path $ExportFolder -ItemType Directory -Force -EA Ignore
-    
-            $Tasks = Get-ScheduledTask -TaskPath "\$TaskPath\*"
-            Write-Verbose "Retrieved $($Tasks.Count) tasks in folder '$TaskPath'"
-    
-            if ($Tasks) {
-                Write-Verbose "Export tasks to folder '$ExportFolder'"
-                $i = 0
-    
-                Foreach ($Task in $Tasks) {
-                    $i++
-                    $ExportFileName = "$i - $($Task.TaskName)"
-                    $ExportFilePath = Join-Path -Path $ExportFolder -ChildPath $ExportFileName
-    
-                    Write-Verbose "Create file '$ExportFileName.xml'"
-                    $Params = @{
-                        LiteralPath = "$ExportFilePath.xml"
-                        Force       = $true
-                        ErrorAction = 'Stop'
-                    }
-                    $Task | Export-Clixml @Params
-    
-                    Write-Verbose "Create file '$ExportFileName - Definition.xml'"
-                    Export-ScheduledTask -TaskName $Task.TaskName -TaskPath $Task.TaskPath |
-                    Out-File -LiteralPath "$ExportFilePath - Definition.xml" -Force
-    
-                }
-            }
-        }
-        Catch {
-            throw "Failed to export scheduled tasks: $_"
-        }
-    }
-
     Try {
-        $ExportScriptFile = Join-Path -Path $DataFolder -ChildPath $ScriptFileName
-        $ScheduledTaskFile = Join-Path -Path $DataFolder -ChildPath $ScheduledTaskFileName
+        $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
 
         #region Test DataFolder
         If ($Action -eq 'Export') {
@@ -136,11 +75,8 @@ Begin {
             If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
                 throw "Import folder '$DataFolder' empty"
             }
-            If (-not (Test-Path -LiteralPath $ExportScriptFile -PathType Leaf)) {
-                throw "PowerShell script file '$ExportScriptFile' not found"
-            }
-            If (-not (Test-Path -LiteralPath $ScheduledTaskFile -PathType Leaf)) {
-                throw "Scheduled task configuration file '$ScheduledTaskFile' not found"
+            If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
+                throw "Copy file '$ExportFile' not found"
             }
         }
         #endregion

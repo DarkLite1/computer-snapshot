@@ -87,13 +87,25 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            Write-Verbose "Create example file '$ExportFile'"
+            #region Create example config file
+            Write-Verbose "Create example config file '$ExportFile'"
             $params = @{
                 LiteralPath = Join-Path $PSScriptRoot 'Examples\CopyFilesFolders.json'
                 Destination = $ExportFile
             }
             Copy-Item @params
             Write-Output "Created example config file '$ExportFile'"
+            #endregion
+
+            #region Create example copy file
+            Write-Verbose 'Create example copy file'
+            $params = @{
+                LiteralPath = Join-Path $PSScriptRoot 'Examples\Monitor SSD.ps1'
+                Destination = Join-Path $DataFolder 'Monitor SSD.ps1'
+            }
+            Copy-Item @params
+            Write-Output "Created example copy file '$($params.Destination)'"
+            #endregion
         }
         else {
             if (-not (Test-Path -Path $ScriptFolder -PathType Container)) {

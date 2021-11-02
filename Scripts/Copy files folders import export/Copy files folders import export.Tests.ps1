@@ -72,9 +72,9 @@ Describe "when action is 'Export'" {
         {
             Get-Content -Path $testFile -Raw | ConvertFrom-Json -EA Stop
         } | Should -Not -Throw
-    } -tag test
-    It 'create an example file that needs to be copied in the data folder' {
-        $testFile = "$($testNewParams.DataFolder)\Monitor SDD.ps1"
+    }
+    It 'create an example copy file in the data folder' {
+        $testFile = "$($testNewParams.DataFolder)\Monitor SSD.ps1"
         $testFile | Should -Exist
     }
 }

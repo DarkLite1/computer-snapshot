@@ -1,6 +1,6 @@
 <#
     .SYNOPSIS
-        Export scheduled tasks.
+        Export or import scheduled tasks.
 
     .DESCRIPTION
         When action is 'Export' the script will export all scheduled tasks

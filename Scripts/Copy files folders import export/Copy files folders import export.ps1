@@ -126,7 +126,12 @@ Process {
                     if (-not $fromItem.PSIsContainer) {
                         # when the source is a file 
                         # create the destination folder manually 
-                        $null = New-Item -Path (Split-Path -Path $to) -ItemType Directory -Force
+                        $newItemParams = @{
+                            Path     = (Split-Path -Path $to) 
+                            ItemType = 'Directory'
+                            Force    = $true
+                        }
+                        $null = New-Item @newItemParams
                     }
                     else {
                         $from = "$from\*"

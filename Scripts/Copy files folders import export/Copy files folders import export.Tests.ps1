@@ -151,5 +151,48 @@ Describe "when action is 'Import'" {
 
             "$notExistingFolder\$($testParams.FileName)" | Should -Exist
         }
-    } -Tag test
+    }
+    Context 'and the source is a folder' {
+        BeforeAll {
+            $testSourceParams = @{
+                Path     = Join-Path $testParams.DataFolder 'SourceFolder'
+                ItemType = 'Directory'
+            }
+            New-Item @testSourceParams
+
+            '1' | Out-File -FilePath "$($testSourceParams.Path)\test.txt"
+        }
+        It 'the content of the source folder is copied to the destination folder when the folder already exists' {
+            $testDestinationParams = @{
+                Path     = Join-Path $testParams.DataFolder 'DestinationFolder'
+                ItemType = 'Directory'
+            }
+            New-Item @testDestinationParams
+
+            ConvertTo-Json @(
+                @{
+                    From = $testSourceParams.Path
+                    To   = $testDestinationParams.Path
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            "$($testDestinationParams.Path)\test.txt" | Should -Exist
+        } -Tag test
+        It 'the content of the source folder is copied to the destination folder when the folder does not exist' {
+            $notExistingFolder = Join-Path $testParams.DataFolder 'NotExistingFolder'
+            
+            ConvertTo-Json @(
+                @{
+                    From = $testSourceParams.Path
+                    To   = $notExistingFolder
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            "$notExistingFolder\test.txt" | Should -Exist
+        }
+    } 
 } 

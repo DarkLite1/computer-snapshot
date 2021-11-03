@@ -124,17 +124,26 @@ Process {
                         throw "File or folder '$from' not found"
                     }
                     if (-not $fromItem.PSIsContainer) {
-                        # when the source is a file we need to create the 
-                        # destination folder manually 
-                        $null = New-Item -Path (Split-Path -Path $to) -Type Directory -Force
+                        # when the source is a file 
+                        # create the destination folder manually 
+                        $null = New-Item -Path (Split-Path -Path $to) -ItemType Directory -Force
                     }
+                    else {
+                        $from = "$from\*"
+                        $null = New-Item -Path $to -ItemType Directory -Force
+                    }
+
                     $copyParams = @{
-                        LiteralPath = $from 
+                        Path        = $from
                         Destination = $to
                         Recurse     = $true 
                         ErrorAction = 'Stop'
                     }
                     Copy-Item @copyParams
+
+                    if (-not (Test-Path -LiteralPath $to)) {
+                        throw "Path '$to' not created"
+                    }
                 }
                 catch {
                     Write-Error "Failed to copy from '$($i.From)' to '$($i.To)': $_"

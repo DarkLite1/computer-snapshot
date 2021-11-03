@@ -117,6 +117,16 @@ Describe "when action is 'Import'" {
 
             { .$testScript @testNewParams -EA Stop } | 
             Should -Throw "*Failed to copy from 'Non existing' to '$($testParams.DataFolder)': File or folder '$($testParams.DataFolder)\Non existing' not found"
+
+            ConvertTo-Json @(
+                @{
+                    From = 'C:\Non existing'
+                    To   = $testParams.DataFolder
+                }
+            ) | Out-File -FilePath $testFile
+
+            { .$testScript @testNewParams -EA Stop } | 
+            Should -Throw "*Failed to copy from 'C:\Non existing' to '$($testParams.DataFolder)': File or folder 'C:\Non existing' not found"
         }
     }
     Context 'and the source is a file it is copied to the destination folder' {

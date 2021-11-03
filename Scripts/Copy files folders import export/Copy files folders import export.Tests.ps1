@@ -119,8 +119,8 @@ Describe "when action is 'Import'" {
             Should -Throw "*Failed to copy from 'Non existing' to '$($testParams.DataFolder)': File or folder 'Non existing' not found"
         }
     }
-    Context 'and the source is a file' {
-        It 'the file is copied to the destination folder when the folder already exists' {
+    Context 'and the source is a file it is copied to the destination folder' {
+        It 'when the folder already exists' {
             $testNewItemParams = @{
                 Path     = Join-Path $testParams.DataFolder 'Destination'
                 ItemType = 'Directory'
@@ -137,7 +137,7 @@ Describe "when action is 'Import'" {
 
             "$($testNewItemParams.Path)\$($testParams.FileName)" | Should -Exist
         }
-        It 'the file is copied to the destination folder when the folder does not exist' {
+        It 'when the folder does not exist' {
             $notExistingFolder = Join-Path $testParams.DataFolder 'NotExistingFolder'
             
             ConvertTo-Json @(
@@ -152,7 +152,7 @@ Describe "when action is 'Import'" {
             "$notExistingFolder\$($testParams.FileName)" | Should -Exist
         }
     }
-    Context 'and the source is a folder' {
+    Context 'and the source is a folder the content of the source folder is copied to the destination folder' {
         BeforeAll {
             $testSourceParams = @{
                 Path     = Join-Path $testParams.DataFolder 'SourceFolder'
@@ -162,7 +162,7 @@ Describe "when action is 'Import'" {
 
             '1' | Out-File -FilePath "$($testSourceParams.Path)\test.txt"
         }
-        It 'the content of the source folder is copied to the destination folder when the folder already exists' {
+        It 'when the folder already exists' {
             $testDestinationParams = @{
                 Path     = Join-Path $testParams.DataFolder 'DestinationFolder'
                 ItemType = 'Directory'
@@ -180,7 +180,7 @@ Describe "when action is 'Import'" {
 
             "$($testDestinationParams.Path)\test.txt" | Should -Exist
         } -Tag test
-        It 'the content of the source folder is copied to the destination folder when the folder does not exist' {
+        It 'when the folder does not exist' {
             $notExistingFolder = Join-Path $testParams.DataFolder 'NotExistingFolder'
             
             ConvertTo-Json @(
@@ -194,5 +194,5 @@ Describe "when action is 'Import'" {
 
             "$notExistingFolder\test.txt" | Should -Exist
         }
-    } 
+    }
 } 

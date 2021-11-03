@@ -7,7 +7,24 @@
         be used with action set to 'Import'.
 
         When action is 'Import' the import file is read and all files and 
-        folder in the file will be copied.
+        folders in the file will be copied. 
+        
+        The import file needs to be explicit and contain the destination file 
+        name or folder name:
+
+        [
+            {
+                "From" = "C:\\Finance\\Reports",
+                "To" = "T:\\Backup\\Reports"
+            },
+            {
+                "From" = "C:\\Fruit\\Banana.txt",
+                "To" = "T:\\Basket\\Banana.txt"
+            }
+        ]
+
+        Files or folders with the same name will be overwritten in the 
+        destination, extra files or folders will not be removed.
 
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DataFolder, when 

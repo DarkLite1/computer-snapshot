@@ -1,3 +1,19 @@
+<#
+    .SYNOPSIS
+        Monitor the state of hard disks and send an e-mail when the status of
+        the disk is not healthy or ok.
+
+    .DESCRIPTION
+        This script is intended to be triggered by a scheduled task on a daily
+        basis. It will then check the hard disks for failures and send an e-mail
+        to inform someone.
+
+    .PARAMETER SmtpServer
+        The SMTP server name used to send the e-mail in case of failure.
+
+    .PARAMETER MailTo
+        One or more e-mail addresses.
+#>
 Param (
     [String]$SmtpServer,
     [String[]]$MailTo

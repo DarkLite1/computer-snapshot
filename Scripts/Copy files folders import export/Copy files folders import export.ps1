@@ -71,6 +71,20 @@ Param(
 )
 
 Begin {
+    Function Get-FullPathHC {
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Path
+        )
+
+        if ($Path -like '*:*') {
+            $Path
+        }
+        else {
+            Join-Path -Path $DataFolder -ChildPath $Path
+        }
+    }
+
     Try {
         $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
 
@@ -135,6 +149,7 @@ Process {
                     if (-not ($to = $i.To)) {
                         throw "The field 'To' is required"
                     }
+                    $from = Get-FullPathHC -Path $from
                     if (-not 
                         ($fromItem = Get-Item -LiteralPath $from -EA Ignore)
                     ) {

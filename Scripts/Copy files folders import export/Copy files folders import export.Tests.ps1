@@ -116,7 +116,7 @@ Describe "when action is 'Import'" {
             ) | Out-File -FilePath $testFile
 
             { .$testScript @testNewParams -EA Stop } | 
-            Should -Throw "*Failed to copy from 'Non existing' to '$($testParams.DataFolder)': File or folder 'Non existing' not found"
+            Should -Throw "*Failed to copy from 'Non existing' to '$($testParams.DataFolder)': File or folder '$($testParams.DataFolder)\Non existing' not found"
         }
     }
     Context 'and the source is a file it is copied to the destination folder' {

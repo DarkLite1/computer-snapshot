@@ -150,9 +150,10 @@ Begin {
     
                 Write-Verbose "Create task $(Join-Path $TaskPath $Task.TaskName)"
                 $registerParams = @{
-                    Xml      = $Xml
-                    TaskPath = $TaskPath
-                    TaskName = $Task.TaskName
+                    Xml         = $Xml
+                    TaskPath    = $TaskPath
+                    TaskName    = $Task.TaskName
+                    ErrorAction = 'Stop'
                 }
                 Register-ScheduledTask @registerParams -Force
 

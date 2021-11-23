@@ -166,7 +166,7 @@ Begin {
         Catch {
             $errorMessage = $_
             $error.RemoveAt(0)
-            throw "Failed importing scheduled tasks '$($Task.TaskName)': $errorMessage"
+            throw "Failed importing scheduled task '$($Task.TaskName)': $errorMessage"
         }
     }    
 

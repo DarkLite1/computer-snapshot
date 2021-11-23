@@ -153,6 +153,8 @@ Begin {
                     Xml         = $Xml
                     TaskPath    = $TaskPath
                     TaskName    = $Task.TaskName
+                    # essential for 'Run whether a user is logged in or not'
+                    User        = 'NT AUTHORITY\SYSTEM' 
                     ErrorAction = 'Stop'
                 }
                 Register-ScheduledTask @registerParams -Force

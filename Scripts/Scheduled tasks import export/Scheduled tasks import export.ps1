@@ -157,7 +157,7 @@ Begin {
                     User        = 'NT AUTHORITY\SYSTEM' 
                     ErrorAction = 'Stop'
                 }
-                Register-ScheduledTask @registerParams -Force
+                $null = Register-ScheduledTask @registerParams -Force
 
                 Write-Output "Created scheduled task '$($Task.TaskName)'"
             }

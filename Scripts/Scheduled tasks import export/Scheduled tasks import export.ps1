@@ -164,7 +164,9 @@ Begin {
             }
         }
         Catch {
-            throw "Failed importing scheduled tasks: $_"
+            $errorMessage = $_
+            $error.RemoveAt(0)
+            throw "Failed importing scheduled tasks '$($Task.TaskName)': $errorMessage"
         }
     }    
 
@@ -209,6 +211,8 @@ Process {
         }
     }
     Catch {
+        $errorMessage = $_
+        $error.RemoveAt(0)
         throw "$Action scheduled tasks failed: $_"
     }
 }

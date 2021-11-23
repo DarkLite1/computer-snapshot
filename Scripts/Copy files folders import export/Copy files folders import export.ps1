@@ -181,6 +181,8 @@ Process {
                     if (-not (Test-Path -LiteralPath $to)) {
                         throw "Path '$to' not created"
                     }
+
+                    Write-Output "Copied from '$from' to '$to'"
                 }
                 catch {
                     Write-Error "Failed to copy from '$($i.From)' to '$($i.To)': $_"

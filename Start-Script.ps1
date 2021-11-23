@@ -359,6 +359,12 @@ Begin {
                 #endregion
                 
                 #region Test valid import files
+                <# 
+                # Test not required as we use .json files everywhere
+                # only scheduled task creation is done with .xml files
+                # but these cannot be imported with Import-CliXml
+                # and will fail this test
+                
                 Foreach ($file in ($folderContent | 
                         Where-Object { $_.extension -eq '.xml' })
                 ) {
@@ -368,7 +374,8 @@ Begin {
                     catch {
                         throw "File '$($file.FullName)' is not a valid xml file for snapshot item '$($item.Key)'"
                     }
-                }
+                } 
+                #>
                 Foreach ($file in ($folderContent | 
                         Where-Object { $_.extension -eq '.json' })
                 ) {

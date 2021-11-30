@@ -42,23 +42,18 @@ Param(
 )
 
 Begin {
-    Function Get-FullPathHC {
+    Function Invoke-ScriptHC {
+        [CmdLetBinding()]
         Param (
             [Parameter(Mandatory)]
             [String]$Path
         )
 
-        if ($Path -like '*:*') {
-            $Path
-        }
-        else {
-            Join-Path -Path $DataFolder -ChildPath $Path
-        }
+        Write-Output "Invoke script '$Path'"
+        & $Path
     }
 
     Try {
-        $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
-
         #region Test DataFolder
         If ($Action -eq 'Export') {
             If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
@@ -72,11 +67,11 @@ Begin {
             If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
                 throw "Import folder '$DataFolder' not found"
             }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
-                throw "Import file '$ExportFile' not found"
+            If (
+                (Get-ChildItem -Path $DataFolder -Filter '*.ps1' | 
+                Measure-Object).Count -eq 0
+            ) {
+                throw "Import folder '$DataFolder' empty: No PowerShell files found"
             }
         }
         #endregion
@@ -89,74 +84,27 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            #region Create example config file
-            Write-Verbose "Create example config file '$ExportFile'"
-            $params = @{
-                LiteralPath = Join-Path $PSScriptRoot 'Examples\CopyFilesFolders.json'
-                Destination = $ExportFile
-            }
-            Copy-Item @params
-            Write-Output "Created example config file '$ExportFile'"
-            #endregion
-
-            #region Create example copy file
+            #region Create example files
             Write-Verbose 'Create example copy file'
             $params = @{
-                LiteralPath = Join-Path $PSScriptRoot 'Examples\Monitor SSD.ps1'
-                Destination = Join-Path $DataFolder 'Monitor SSD.ps1'
+                Path        = Join-Path $PSScriptRoot 'Examples\*'
+                Destination = $DataFolder
+                Recurse     = $true
+                Force       = $true
             }
             Copy-Item @params
-            Write-Output "Created example copy file '$($params.Destination)'"
+            Write-Output 'Created example script files in folder '$DataFolder'. Please update them as required or create new ones.'
             #endregion
         }
         else {
-            $itemsToCopy = Get-Content -Path $ExportFile -Raw | ConvertFrom-Json
+            $scriptsToExecute = Get-ChildItem -Path $DataFolder -Filter '*.ps1' 
 
-            foreach ($i in $itemsToCopy) {
+            foreach ($script in $scriptsToExecute) {
                 try {
-                    if (-not ($from = $i.From)) {
-                        throw "The field 'From' is required"
-                    }
-                    if (-not ($to = $i.To)) {
-                        throw "The field 'To' is required"
-                    }
-                    $from = Get-FullPathHC -Path $from
-                    if (-not 
-                        ($fromItem = Get-Item -LiteralPath $from -EA Ignore)
-                    ) {
-                        throw "File or folder '$from' not found"
-                    }
-                    if (-not $fromItem.PSIsContainer) {
-                        # when the source is a file 
-                        # create the destination folder manually 
-                        $newItemParams = @{
-                            Path     = (Split-Path -Path $to) 
-                            ItemType = 'Directory'
-                            Force    = $true
-                        }
-                        $null = New-Item @newItemParams
-                    }
-                    else {
-                        $from = "$from\*"
-                        $null = New-Item -Path $to -ItemType Directory -Force
-                    }
-
-                    $copyParams = @{
-                        Path        = $from
-                        Destination = $to
-                        Recurse     = $true 
-                        ErrorAction = 'Stop'
-                    }
-                    Copy-Item @copyParams
-
-                    if (-not (Test-Path -LiteralPath $to)) {
-                        throw "Path '$to' not created"
-                    }
-
-                    Write-Output "Copied from '$from' to '$to'"
+                    Invoke-ScriptHC -Path $script.FullName
                 }
                 catch {
-                    Write-Error "Failed to copy from '$($i.From)' to '$($i.To)': $_"
+                    Write-Error "Failed to execute script '$($script.Name)': $_"
                 }
             }
         }

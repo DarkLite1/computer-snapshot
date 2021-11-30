@@ -7,6 +7,14 @@ BeforeAll {
         Action     = 'Export'
         DataFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
     }
+
+    Function Invoke-ScriptHC {
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Path
+        )
+    }
+    Mock Invoke-ScriptHC
 }
 Describe 'the mandatory parameters are' {
     It '<_>' -ForEach 'Action', 'DataFolder' {
@@ -27,7 +35,7 @@ Describe 'Fail the export when' {
     }
     It 'the data folder is not empty' {
         $testFolder = (New-Item 'TestDrive:/B' -ItemType Directory).FullName 
-        '1' | Out-File -LiteralPath "$testFolder\file.txt"
+        '1' | Out-File -LiteralPath "$testFolder\file.ps1"
 
         $testNewParams.DataFolder = $testFolder
 
@@ -48,14 +56,9 @@ Describe 'Fail the import when' {
         Should -Throw "*Import folder 'TestDrive:/xxx' not found"
     }
     It 'the data folder is empty' {
-        { .$testScript @testNewParams } | 
-        Should -Throw "*Import folder '$($testNewParams.DataFolder)' empty"
-    }
-    It 'the data folder does not have the .json file' {
         '1' | Out-File -LiteralPath "$($testNewParams.DataFolder)\test.txt"
-
         { .$testScript @testNewParams } | 
-        Should -Throw "*Import file '$($testNewParams.DataFolder)\$($testNewParams.FileName)' not found"
+        Should -Throw "*Import folder '$($testNewParams.DataFolder)' empty: No PowerShell files found"
     }
 }
 Describe "when action is 'Export'" {
@@ -65,143 +68,21 @@ Describe "when action is 'Export'" {
 
         .$testScript @testNewParams 
     }
-    It 'create an example .json import file in the data folder' {
-        $testFile = "$($testNewParams.DataFolder)\$($testNewParams.FileName)"
-        $testFile | Should -Exist
-        {
-            Get-Content -Path $testFile -Raw | ConvertFrom-Json -EA Stop
-        } | Should -Not -Throw
-    }
-    It 'create an example copy file in the data folder' {
-        $testFile = "$($testNewParams.DataFolder)\Monitor SSD.ps1"
-        $testFile | Should -Exist
+    It 'create example .ps1 files in the data folder' {
+        Get-ChildItem -Path $testNewParams.DataFolder -Filter '*.ps1' |
+        Should -Not -BeNullOrEmpty
     }
 }
 Describe "when action is 'Import'" {
     BeforeAll {
-        $testFile = "$($testParams.DataFolder)\$($testParams.FileName)"
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Import'
+
+        's1' | Out-File -LiteralPath "$($testNewParams.DataFolder)\test1.ps1"
+        's2' | Out-File -LiteralPath "$($testNewParams.DataFolder)\test2.ps1"
     }
-    Context 'an error is generated when' {
-        It 'the field From is missing' {
-            ConvertTo-Json @(
-                @{
-                    From = ''
-                    To   = $testParams.DataFolder
-                }
-            ) | Out-File -FilePath $testFile
-
-            { .$testScript @testNewParams -EA Stop } | 
-            Should -Throw "*Failed to copy from '' to '$($testParams.DataFolder)': The field 'From' is required"
-        }
-        It 'the field To is missing' {
-            ConvertTo-Json @(
-                @{
-                    From = $testParams.DataFolder
-                    To   = ''
-                }
-            ) | Out-File -FilePath $testFile
-
-            { .$testScript @testNewParams -EA Stop } | 
-            Should -Throw "*Failed to copy from '$($testParams.DataFolder)' to '': The field 'To' is required"
-        }
-        It 'the source file or folder is not found' {
-            ConvertTo-Json @(
-                @{
-                    From = 'Non existing'
-                    To   = $testParams.DataFolder
-                }
-            ) | Out-File -FilePath $testFile
-
-            { .$testScript @testNewParams -EA Stop } | 
-            Should -Throw "*Failed to copy from 'Non existing' to '$($testParams.DataFolder)': File or folder '$($testParams.DataFolder)\Non existing' not found"
-
-            ConvertTo-Json @(
-                @{
-                    From = 'C:\Non existing'
-                    To   = $testParams.DataFolder
-                }
-            ) | Out-File -FilePath $testFile
-
-            { .$testScript @testNewParams -EA Stop } | 
-            Should -Throw "*Failed to copy from 'C:\Non existing' to '$($testParams.DataFolder)': File or folder 'C:\Non existing' not found"
-        }
+    It 'each script in the data folder is executed' {
+        .$testScript @testNewParams
+        Should -Invoke Invoke-ScriptHC -Exactly -Times 2 -Scope Describe
     }
-    Context 'and the source is a file it is copied to the destination folder' {
-        It 'when the folder already exists' {
-            $testNewItemParams = @{
-                Path     = Join-Path $testParams.DataFolder 'Destination'
-                ItemType = 'Directory'
-            }
-            New-Item @testNewItemParams
-            ConvertTo-Json @(
-                @{
-                    From = $testFile
-                    To   = $testNewItemParams.Path
-                }
-            ) | Out-File -FilePath $testFile
-
-            .$testScript @testNewParams 
-
-            "$($testNewItemParams.Path)\$($testParams.FileName)" | Should -Exist
-        }
-        It 'when the folder does not exist' {
-            $notExistingFolder = Join-Path $testParams.DataFolder 'NotExistingFolder'
-            
-            ConvertTo-Json @(
-                @{
-                    From = $testFile
-                    To   = "$notExistingFolder\$($testParams.FileName)"
-                }
-            ) | Out-File -FilePath $testFile
-
-            .$testScript @testNewParams 
-
-            "$notExistingFolder\$($testParams.FileName)" | Should -Exist
-        }
-    }
-    Context 'and the source is a folder the content of the source folder is copied to the destination folder' {
-        BeforeAll {
-            $testSourceParams = @{
-                Path     = Join-Path $testParams.DataFolder 'SourceFolder'
-                ItemType = 'Directory'
-            }
-            New-Item @testSourceParams
-
-            '1' | Out-File -FilePath "$($testSourceParams.Path)\test.txt"
-        }
-        It 'when the folder already exists' {
-            $testDestinationParams = @{
-                Path     = Join-Path $testParams.DataFolder 'DestinationFolder'
-                ItemType = 'Directory'
-            }
-            New-Item @testDestinationParams
-
-            ConvertTo-Json @(
-                @{
-                    From = $testSourceParams.Path
-                    To   = $testDestinationParams.Path
-                }
-            ) | Out-File -FilePath $testFile
-
-            .$testScript @testNewParams 
-
-            "$($testDestinationParams.Path)\test.txt" | Should -Exist
-        } -Tag test
-        It 'when the folder does not exist' {
-            $notExistingFolder = Join-Path $testParams.DataFolder 'NotExistingFolder'
-            
-            ConvertTo-Json @(
-                @{
-                    From = $testSourceParams.Path
-                    To   = $notExistingFolder
-                }
-            ) | Out-File -FilePath $testFile
-
-            .$testScript @testNewParams 
-
-            "$notExistingFolder\test.txt" | Should -Exist
-        }
-    }
-} 
+} -Tag test

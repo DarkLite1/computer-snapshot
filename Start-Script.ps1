@@ -142,15 +142,16 @@ Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
     [System.Collections.Specialized.OrderedDictionary]$Snapshot = [Ordered]@{
-        UserAccounts     = $true
-        UserGroups       = $true
-        FirewallRules    = $true
-        SmbShares        = $true
-        Folders          = $true
-        NtpTimeServers   = $true
-        RegistryKeys     = $true
-        ScheduledTasks   = $true
-        CopyFilesFolders = $true
+        UserAccounts       = $true
+        UserGroups         = $true
+        FirewallRules      = $true
+        SmbShares          = $true
+        Folders            = $true
+        NtpTimeServers     = $true
+        RegistryKeys       = $true
+        ScheduledTasks     = $true
+        CopyFilesFolders   = $true
+        StartCustomScripts = $true
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
@@ -163,6 +164,7 @@ Param (
         RegistryKeys     = 'Scripts\Registry keys import export\Registry keys import export.ps1'
         ScheduledTasks   = 'Scripts\Scheduled tasks import export\Scheduled tasks import export.ps1'
         CopyFilesFolders = 'Scripts\Copy files folders import export\Copy files folders import export.ps1'
+        StartCustomScripts = 'Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
     },
     [String]$SnapshotsFolder = 'Snapshots',
     [String]$ReportsFolder = 'Reports',

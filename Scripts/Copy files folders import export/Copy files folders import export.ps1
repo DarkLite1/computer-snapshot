@@ -43,7 +43,7 @@
             DataFolder = 'C:\copy'
             FileName   = 'copy.json'
         }
-        & 'C:\script' @params
+        & 'C:\script.ps1' @params
 
         Create the example file 'C:\copy\copy.json' that can be used later on 
         with action 'Import'.
@@ -54,7 +54,7 @@
             DataFolder = 'C:\copy'
             FileName   = 'copy.json'
         }
-        & 'C:\script' @params
+        & 'C:\script.ps1' @params
 
         Read the file 'C:\copy\copy.json' and execute all copy actions defined 
         in the file.

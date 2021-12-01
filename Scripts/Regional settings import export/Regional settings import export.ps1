@@ -126,28 +126,52 @@ Process {
             #endregion
 
             #region Set WinSystemLocale
-            $newWinSystemLocaleName = $importFile.WinSystemLocaleName
             $oldWinSystemLocaleName = (Get-WinSystemLocale).Name
+            $newWinSystemLocaleName = $importFile.WinSystemLocaleName
             if ($oldWinSystemLocaleName -ne $newWinSystemLocaleName) {
                 Set-WinSystemLocale -SystemLocale $newWinSystemLocaleName
-                Write-Output "Regional format changed from '$oldWinSystemLocaleName' to '$newWinSystemLocaleName'"
+                Write-Output "Changed regional format from '$oldWinSystemLocaleName' to '$newWinSystemLocaleName'"
             }
             else {
                 Write-Output "Regional format '$oldWinSystemLocaleName' is already correct"
             }
             #endregion
 
-            $TimeZoneId = $importFile.TimeZoneId
-            Set-TimeZone -Id $TimeZoneId
-            Write-Output "Time zone set to '$TimeZoneId'"
+            #region Set TimeZone
+            $oldTimeZoneId = (Get-TimeZone).Id
+            $newTimeZoneId = $importFile.TimeZoneId
+            if ($oldTimeZoneId -ne $newTimeZoneId) {
+                Set-TimeZone -Id $newTimeZoneId
+                Write-Output "Changed time zone from '$oldTimeZoneId' to '$newTimeZoneId'"
+            }
+            else {
+                Write-Output "Time zone '$oldTimeZoneId' is already correct"
+            }
+            #endregion
 
-            $WinHomeLocationGeoId = $importFile.WinHomeLocationGeoId
-            Set-WinHomeLocation -GeoId $WinHomeLocationGeoId
-            Write-Output "Country/region set to GeoId '$WinHomeLocationGeoId'"
+            #region Set WinHomeLocation
+            $oldWinHomeLocation = Get-WinHomeLocation
+            $newWinHomeLocationGeoId = $importFile.WinHomeLocationGeoId
+            if ($oldWinHomeLocation.GeoId -ne $newWinHomeLocationGeoId) {
+                Set-WinHomeLocation -GeoId $newWinHomeLocationGeoId
+                Write-Output "Changed country/region from '$($oldWinHomeLocation.GeoId) - $($oldWinHomeLocation.HomeLocation)' to '$newWinHomeLocationGeoId'"
+            }
+            else {
+                Write-Output "Country/region '$($oldWinHomeLocation.GeoId) - $($oldWinHomeLocation.HomeLocation)' is already correct"
+            }
+            #endregion
 
-            $CultureName = $importFile.CultureName
-            Set-Culture -CultureInfo $CultureName
-            Write-Output "Region format set to '$CultureName'"
+            #region Set Culture
+            $oldCultureName = (Get-Culture).Name
+            $newCultureName = $importFile.CultureName
+            if ($oldCultureName -ne $newCultureName) {
+                Set-Culture -CultureInfo $newCultureName
+                Write-Output "Changed region format from '$oldCultureName' to '$newCultureName'"
+            }
+            else {
+                Write-Output "Region format '$oldCultureName' is already correct"
+            }
+            #endregion
 
             Write-Output 'Changes take effect after the computer is restarted'
         }

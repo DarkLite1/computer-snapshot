@@ -49,7 +49,6 @@ Begin {
             [String]$Path
         )
 
-        Write-Output "Invoke script '$Path'"
         & $Path
     }
 
@@ -77,7 +76,9 @@ Begin {
         #endregion
     }
     Catch {
-        throw "$Action failed: $_"
+        $errorMessage = $_
+        $Error.RemoveAt(0)
+        throw "$Action failed: $errorMessage"
     }
 }
 
@@ -101,15 +102,20 @@ Process {
 
             foreach ($script in $scriptsToExecute) {
                 try {
+                    Write-Output "---------------- Script '$($script.Name)' ----------------"
                     Invoke-ScriptHC -Path $script.FullName
                 }
                 catch {
-                    Write-Error "Failed to execute script '$($script.Name)': $_"
+                    $errorMessage = $_
+                    $Error.RemoveAt(0)
+                    Write-Error "Failed to execute script '$($script.Name)': $errorMessage"
                 }
             }
         }
     }
     Catch {
-        throw "$Action failed: $_"
+        $errorMessage = $_
+        $Error.RemoveAt(0)
+        throw "$Action failed: $errorMessage"
     }
 }

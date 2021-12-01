@@ -147,6 +147,7 @@ Param (
         FirewallRules      = $true
         SmbShares          = $true
         Folders            = $true
+        RegionalSettings   = $true
         NtpTimeServers     = $true
         RegistryKeys       = $true
         ScheduledTasks     = $true
@@ -155,15 +156,16 @@ Param (
     },
     [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
-        UserAccounts     = 'Scripts\User accounts import export\User accounts import export.ps1'
-        UserGroups       = 'Scripts\User groups import export\User groups import export.ps1'
-        FirewallRules    = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
-        SmbShares        = 'Scripts\Smb shares import export\Smb shares import export.ps1'
-        Folders          = 'Scripts\Folders import export\Folders import export.ps1'
-        NtpTimeServers   = 'Scripts\NTP time servers import export\NTP time servers import export.ps1'
-        RegistryKeys     = 'Scripts\Registry keys import export\Registry keys import export.ps1'
-        ScheduledTasks   = 'Scripts\Scheduled tasks import export\Scheduled tasks import export.ps1'
-        CopyFilesFolders = 'Scripts\Copy files folders import export\Copy files folders import export.ps1'
+        UserAccounts       = 'Scripts\User accounts import export\User accounts import export.ps1'
+        UserGroups         = 'Scripts\User groups import export\User groups import export.ps1'
+        FirewallRules      = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
+        SmbShares          = 'Scripts\Smb shares import export\Smb shares import export.ps1'
+        Folders            = 'Scripts\Folders import export\Folders import export.ps1'
+        RegionalSettings = 'Scripts\Regional settings import export\Regional settings import export.ps1'
+        NtpTimeServers     = 'Scripts\NTP time servers import export\NTP time servers import export.ps1'
+        RegistryKeys       = 'Scripts\Registry keys import export\Registry keys import export.ps1'
+        ScheduledTasks     = 'Scripts\Scheduled tasks import export\Scheduled tasks import export.ps1'
+        CopyFilesFolders   = 'Scripts\Copy files folders import export\Copy files folders import export.ps1'
         StartCustomScripts = 'Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
     },
     [String]$SnapshotsFolder = 'Snapshots',

@@ -9,6 +9,20 @@ BeforeAll {
         FileName   = 'testRegionalSettings.json'
     }
 
+    
+
+    Mock Get-WinSystemLocale {
+        @{Name = 'en-US' }
+    }
+    Mock Get-TimeZone {
+        @{Id = 'Sao Tome Standard Time' }
+    }
+    Mock Get-WinHomeLocation {
+        @{GeoId = '200' }
+    }
+    Mock Get-Culture {
+        @{Name = 'en-US' }
+    }
     Mock Set-WinSystemLocale
     Mock Set-TimeZone
     Mock Set-WinHomeLocation
@@ -169,9 +183,9 @@ Describe "when action is 'Import'" {
         BeforeAll {
             ConvertTo-Json @(
                 @{
-                    WinSystemLocaleName  = 'en-US'
+                    WinSystemLocaleName  = 'de-DE'
                     TimeZoneId           = 'Central Europe Standard Time'
-                    CultureName          = 'en-US'
+                    CultureName          = 'de-DE'
                     WinHomeLocationGeoId = 244
                 }
             ) | Out-File -FilePath $testFile
@@ -181,7 +195,7 @@ Describe "when action is 'Import'" {
         }
         It 'Set-WinSystemLocale' {
             Should -Invoke Set-WinSystemLocale -Times 1 -Exactly -Scope Context -ParameterFilter {
-                $SystemLocale -eq 'en-US'
+                $SystemLocale -eq 'de-DE'
             }
         }
         It 'Set-TimeZone' {
@@ -196,7 +210,7 @@ Describe "when action is 'Import'" {
         }
         It 'Set-Culture' {
             Should -Invoke Set-Culture -Times 1 -Exactly -Scope Context -ParameterFilter {
-                $CultureInfo -eq 'en-US'
+                $CultureInfo -eq 'de-DE'
             }
         }
     }

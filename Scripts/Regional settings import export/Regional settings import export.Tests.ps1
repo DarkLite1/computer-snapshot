@@ -185,7 +185,7 @@ Describe "when action is 'Import'" {
                 @{
                     WinSystemLocaleName  = 'de-DE'
                     TimeZoneId           = 'Central Europe Standard Time'
-                    CultureName          = 'de-DE'
+                    CultureName          = 'nl-BE'
                     WinHomeLocationGeoId = 244
                 }
             ) | Out-File -FilePath $testFile
@@ -210,7 +210,7 @@ Describe "when action is 'Import'" {
         }
         It 'Set-Culture' {
             Should -Invoke Set-Culture -Times 1 -Exactly -Scope Context -ParameterFilter {
-                $CultureInfo -eq 'de-DE'
+                $CultureInfo -eq 'nl-BE'
             }
         }
     }

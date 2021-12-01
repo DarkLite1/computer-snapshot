@@ -125,12 +125,15 @@ Process {
             }
             #endregion
 
+            $rebootRequired = $false
+
             #region Set WinSystemLocale
             $oldWinSystemLocaleName = (Get-WinSystemLocale).Name
             $newWinSystemLocaleName = $importFile.WinSystemLocaleName
             if ($oldWinSystemLocaleName -ne $newWinSystemLocaleName) {
                 Set-WinSystemLocale -SystemLocale $newWinSystemLocaleName
                 Write-Output "Changed regional format from '$oldWinSystemLocaleName' to '$newWinSystemLocaleName'"
+                $rebootRequired = $true
             }
             else {
                 Write-Output "Regional format '$oldWinSystemLocaleName' is already correct"
@@ -143,6 +146,7 @@ Process {
             if ($oldTimeZoneId -ne $newTimeZoneId) {
                 Set-TimeZone -Id $newTimeZoneId
                 Write-Output "Changed time zone from '$oldTimeZoneId' to '$newTimeZoneId'"
+                $rebootRequired = $true
             }
             else {
                 Write-Output "Time zone '$oldTimeZoneId' is already correct"
@@ -155,6 +159,7 @@ Process {
             if ($oldWinHomeLocation.GeoId -ne $newWinHomeLocationGeoId) {
                 Set-WinHomeLocation -GeoId $newWinHomeLocationGeoId
                 Write-Output "Changed country/region from '$($oldWinHomeLocation.GeoId) - $($oldWinHomeLocation.HomeLocation)' to '$newWinHomeLocationGeoId'"
+                $rebootRequired = $true
             }
             else {
                 Write-Output "Country/region '$($oldWinHomeLocation.GeoId) - $($oldWinHomeLocation.HomeLocation)' is already correct"
@@ -167,13 +172,16 @@ Process {
             if ($oldCultureName -ne $newCultureName) {
                 Set-Culture -CultureInfo $newCultureName
                 Write-Output "Changed region format from '$oldCultureName' to '$newCultureName'"
+                $rebootRequired = $true
             }
             else {
                 Write-Output "Region format '$oldCultureName' is already correct"
             }
             #endregion
 
-            Write-Output 'Changes take effect after the computer is restarted'
+            if ($rebootRequired) {
+                Write-Output 'Changes take effect after the computer is restarted'
+            }
         }
     }
     Catch {

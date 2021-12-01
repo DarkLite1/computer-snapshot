@@ -8,6 +8,11 @@ BeforeAll {
         DataFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
         FileName   = 'testRegionalSettings.json'
     }
+
+    Mock Set-WinSystemLocale
+    Mock Set-TimeZone
+    Mock Set-WinHomeLocation
+    Mock Set-Culture
 }
 Describe 'the mandatory parameters are' {
     It '<_>' -ForEach 'Action', 'DataFolder' {
@@ -148,9 +153,9 @@ Describe "when action is 'Import'" {
         It 'the field WinHomeLocationGeoId is missing' {
             ConvertTo-Json @(
                 @{
-                    WinSystemLocaleName  = 'en-US'
-                    TimeZoneId           = 'Central Europe Standard Time'
-                    CultureName          = 'en-US'
+                    WinSystemLocaleName = 'en-US'
+                    TimeZoneId          = 'Central Europe Standard Time'
+                    CultureName         = 'en-US'
                     # WinHomeLocationGeoId = 244
                     
                 }
@@ -158,6 +163,41 @@ Describe "when action is 'Import'" {
 
             { .$testScript @testNewParams -EA Stop } | 
             Should -Throw "*The field 'WinHomeLocationGeoId' is required"
+        }
+    }
+    Context 'Regional settings are applied by calling' {
+        BeforeAll {
+            ConvertTo-Json @(
+                @{
+                    WinSystemLocaleName  = 'en-US'
+                    TimeZoneId           = 'Central Europe Standard Time'
+                    CultureName          = 'en-US'
+                    WinHomeLocationGeoId = 244
+                }
+            ) | Out-File -FilePath $testFile
+
+            { .$testScript @testNewParams -EA Stop } |
+            Should -Not -Throw
+        }
+        It 'Set-WinSystemLocale' {
+            Should -Invoke Set-WinSystemLocale -Times 1 -Exactly -Scope Context -ParameterFilter {
+                $SystemLocale -eq 'en-US'
+            }
+        }
+        It 'Set-TimeZone' {
+            Should -Invoke Set-TimeZone -Times 1 -Exactly -Scope Context -ParameterFilter {
+                $Id -eq 'Central Europe Standard Time'
+            }
+        }
+        It 'Set-WinHomeLocation' {
+            Should -Invoke Set-WinHomeLocation -Times 1 -Exactly -Scope Context -ParameterFilter {
+                $GeoId -eq '244'
+            }
+        }
+        It 'Set-Culture' {
+            Should -Invoke Set-Culture -Times 1 -Exactly -Scope Context -ParameterFilter {
+                $CultureInfo -eq 'en-US'
+            }
         }
     }
 }

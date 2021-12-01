@@ -125,6 +125,23 @@ Process {
             }
             #endregion
 
+            $WinSystemLocaleName = $importFile.WinSystemLocaleName
+            Set-WinSystemLocale -SystemLocale $WinSystemLocaleName
+            Write-Output "Regional format set to '$WinSystemLocaleName'"
+
+            $TimeZoneId = $importFile.TimeZoneId
+            Set-TimeZone -Id $TimeZoneId
+            Write-Output "Time zone set to '$TimeZoneId'"
+
+            $WinHomeLocationGeoId = $importFile.WinHomeLocationGeoId
+            Set-WinHomeLocation -GeoId $WinHomeLocationGeoId
+            Write-Output "Country/region set to GeoId '$WinHomeLocationGeoId'"
+
+            $CultureName = $importFile.CultureName
+            Set-Culture $CultureName
+            Write-Output "Region format set to '$CultureName'"
+
+            Write-Output 'Changes take effect after the computer is restarted'
         }
     }
     Catch {

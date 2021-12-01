@@ -98,7 +98,21 @@ Process {
             Out-File -LiteralPath $ExportFile -Encoding utf8
         }
         else {
-        
+            $importFile = Get-Content -Path $ExportFile -Raw | 
+            ConvertFrom-Json
+
+            if (-not $importFile.WinSystemLocaleName) {
+                throw "The field 'WinSystemLocaleName' is required"
+            }
+            if (-not $importFile.TimeZoneId) {
+                throw "The field 'TimeZoneId' is required"
+            }
+            if (-not $importFile.CultureName) {
+                throw "The field 'CultureName' is required"
+            }
+            if (-not $importFile.WinHomeLocationGeoId) {
+                throw "The field 'WinHomeLocationGeoId' is required"
+            }
         }
     }
     Catch {

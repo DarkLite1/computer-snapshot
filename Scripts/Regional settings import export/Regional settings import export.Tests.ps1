@@ -21,7 +21,7 @@ BeforeAll {
         @{GeoId = '200' }
     }
     Mock Get-Culture {
-        @{Name = 'en-US' }
+        @{Name = 'en-GB' }
     }
     Mock Set-WinSystemLocale
     Mock Set-TimeZone
@@ -102,16 +102,16 @@ Describe "when action is 'Export'" {
             ConvertFrom-Json
         }
         It 'WinSystemLocaleName' {
-            $testJson.WinSystemLocaleName | Should -Not -BeNullOrEmpty
+            $testJson.WinSystemLocaleName | Should -Be 'en-US'
         }
         It 'TimeZoneId' {
-            $testJson.TimeZoneId | Should -Not -BeNullOrEmpty
+            $testJson.TimeZoneId | Should -Be 'Sao Tome Standard Time'
         }
         It 'WinHomeLocationGeoId' {
-            $testJson.WinHomeLocationGeoId | Should -Not -BeNullOrEmpty
+            $testJson.WinHomeLocationGeoId | Should -Be 200
         }
         It 'CultureName' {
-            $testJson.CultureName | Should -Not -BeNullOrEmpty
+            $testJson.CultureName | Should -Be 'en-GB'
         }
     }
 }

@@ -125,9 +125,17 @@ Process {
             }
             #endregion
 
-            $WinSystemLocaleName = $importFile.WinSystemLocaleName
-            Set-WinSystemLocale -SystemLocale $WinSystemLocaleName
-            Write-Output "Regional format set to '$WinSystemLocaleName'"
+            #region Set WinSystemLocale
+            $newWinSystemLocaleName = $importFile.WinSystemLocaleName
+            $oldWinSystemLocaleName = (Get-WinSystemLocale).Name
+            if ($oldWinSystemLocaleName -ne $newWinSystemLocaleName) {
+                Set-WinSystemLocale -SystemLocale $newWinSystemLocaleName
+                Write-Output "Regional format changed from '$oldWinSystemLocaleName' to '$newWinSystemLocaleName'"
+            }
+            else {
+                Write-Output "Regional format '$oldWinSystemLocaleName' is already correct"
+            }
+            #endregion
 
             $TimeZoneId = $importFile.TimeZoneId
             Set-TimeZone -Id $TimeZoneId
@@ -138,7 +146,7 @@ Process {
             Write-Output "Country/region set to GeoId '$WinHomeLocationGeoId'"
 
             $CultureName = $importFile.CultureName
-            Set-Culture $CultureName
+            Set-Culture -CultureInfo $CultureName
             Write-Output "Region format set to '$CultureName'"
 
             Write-Output 'Changes take effect after the computer is restarted'

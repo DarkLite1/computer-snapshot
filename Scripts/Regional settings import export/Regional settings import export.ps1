@@ -1,0 +1,107 @@
+<#
+    .SYNOPSIS
+        Create a backup of the regional settings and or restore them.
+
+    .DESCRIPTION
+        When action is 'Export' the regional settings of the computer are 
+        exported. When action is 'Import' the regional settings found in the 
+        input file are restored.
+
+    .PARAMETER Action
+        When action is 'Export' the data will be saved in the $DataFolder, when 
+        action is 'Import' the data in the $DataFolder will be restored.
+
+    .PARAMETER FileName
+        The file containing the regional settings that will be exported or need
+        to be restored.
+
+    .PARAMETER DataFolder
+        Folder where the export or import file can be found.
+
+    .EXAMPLE
+        $params = @{
+            Action     = 'Export'
+            DataFolder = 'C:\folder'
+            FileName   = 'RegionalSettings.json'
+        }
+        & 'C:\script.ps1' @params
+
+        Export the regional settings on the current computer to the file 
+        'C:\folder\RegionalSettings.json'.
+
+    .EXAMPLE
+        $params = @{
+            Action     = 'Import'
+            DataFolder = 'C:\folder'
+            FileName   = 'RegionalSettings.json'
+        }
+        & 'C:\script.ps1' @params
+
+        Restore the regional settings found in the file 
+        'C:\folder\RegionalSettings.json' on the current computer.
+#>
+
+[CmdletBinding()]
+Param(
+    [ValidateSet('Export', 'Import')]
+    [Parameter(Mandatory)]
+    [String]$Action,
+    [Parameter(Mandatory)]
+    [String]$DataFolder,
+    [String]$FileName = 'RegionalSettings.json'
+)
+
+Begin {
+    Try {
+        $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
+
+        #region Test DataFolder
+        If ($Action -eq 'Export') {
+            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
+                throw "Export folder '$DataFolder' not found"
+            }
+            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
+                throw "Export folder '$DataFolder' not empty"
+            }
+        }
+        else {
+            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
+                throw "Import folder '$DataFolder' not found"
+            }
+            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
+                throw "Import folder '$DataFolder' empty"
+            }
+            If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
+                throw "Import file '$ExportFile' not found"
+            }
+        }
+        #endregion
+    }
+    Catch {
+        throw "$Action failed: $_"
+    }
+}
+
+Process {
+    Try {
+        If ($Action -eq 'Export') {
+            Write-Verbose "Export regional settings to file '$ExportFile'"
+            (
+                @{
+                    WinSystemLocaleName  = (Get-WinSystemLocale).Name
+                    TimeZoneId           = (Get-TimeZone).Id
+                    WinHomeLocationGeoId = (Get-WinHomeLocation).GeoId
+                    CultureName          = (Get-Culture).Name
+                }
+            ) | 
+            ConvertTo-Json | 
+            Out-File -LiteralPath $ExportFile -Encoding utf8
+        }
+        else {
+        
+        }
+    }
+    Catch {
+        throw "$Action failed: $_"
+    }
+}

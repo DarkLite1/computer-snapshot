@@ -78,7 +78,9 @@ Begin {
         #endregion
     }
     Catch {
-        throw "$Action failed: $_"
+        $errorMessage = $_
+        $Error.RemoveAt(0)
+        throw "$Action failed: $errorMessage"
     }
 }
 
@@ -101,21 +103,33 @@ Process {
             $importFile = Get-Content -Path $ExportFile -Raw | 
             ConvertFrom-Json
 
-            if (-not $importFile.WinSystemLocaleName) {
-                throw "The field 'WinSystemLocaleName' is required"
+            #region Test required fields
+            try {
+                if (-not $importFile.WinSystemLocaleName) {
+                    throw "The field 'WinSystemLocaleName' is required"
+                }
+                if (-not $importFile.TimeZoneId) {
+                    throw "The field 'TimeZoneId' is required"
+                }
+                if (-not $importFile.CultureName) {
+                    throw "The field 'CultureName' is required"
+                }
+                if (-not $importFile.WinHomeLocationGeoId) {
+                    throw "The field 'WinHomeLocationGeoId' is required"
+                }                
             }
-            if (-not $importFile.TimeZoneId) {
-                throw "The field 'TimeZoneId' is required"
+            catch {
+                $errorMessage = $_
+                $Error.RemoveAt(0)
+                throw "The following fields are required 'WinSystemLocaleName', 'TimeZoneId', 'CultureName' and 'WinHomeLocationGeoId': $errorMessage"
             }
-            if (-not $importFile.CultureName) {
-                throw "The field 'CultureName' is required"
-            }
-            if (-not $importFile.WinHomeLocationGeoId) {
-                throw "The field 'WinHomeLocationGeoId' is required"
-            }
+            #endregion
+
         }
     }
     Catch {
-        throw "$Action failed: $_"
+        $errorMessage = $_
+        $Error.RemoveAt(0)
+        throw "$Action failed: $errorMessage"
     }
 }

@@ -180,6 +180,7 @@ Process {
             }    
            
             Restart-Service w32time
+            w32tm /resync
         }
     }
     Catch {

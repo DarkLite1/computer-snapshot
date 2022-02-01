@@ -94,10 +94,11 @@ Begin {
 
         $manualpeerlist = $ComputerName -join ' '
 
-        $null = w32tm /config /manualpeerlist:"$manualpeerlist" /syncfromflags:manual /reliable:yes /update
+        $null = w32tm /config /manualpeerlist:"$manualpeerlist" /syncfromflags:manual /reliable:YES /update
+        $null = w32tm /config /update
     }
     Function Set-SynchronizeTimeWithDomainHC {
-        $null = w32tm /config /syncfromflags:domhier /update
+        $null = w32tm /config /syncfromflags:domhier /reliable:NO /update
     }
 
     Try {
@@ -163,7 +164,7 @@ Process {
                 if ($timeServerNames) {
                     $timeServerNames | ForEach-Object {
                         if (-not 
-                        (Test-Connection -ComputerName $_ -Count 2 -Quiet)
+                            (Test-Connection -ComputerName $_ -Count 2 -Quiet)
                         ) {
                             Write-Error "Failed to ping computer name '$_'"
                         }

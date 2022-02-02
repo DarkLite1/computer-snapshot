@@ -184,27 +184,6 @@ Describe "when action is 'Import'" {
             { .$testScript @testNewParams -EA Stop } | 
             Should -Throw "*The field 'NetworkCategory' is required"
         }
-        It 'the source file or folder is not found' {
-            ConvertTo-Json @(
-                @{
-                    From = 'Non existing'
-                    To   = $testParams.DataFolder
-                }
-            ) | Out-File -FilePath $testFile
-
-            { .$testScript @testNewParams -EA Stop } | 
-            Should -Throw "*Failed to copy from 'Non existing' to '$($testParams.DataFolder)': File or folder '$($testParams.DataFolder)\Non existing' not found"
-
-            ConvertTo-Json @(
-                @{
-                    From = 'C:\Non existing'
-                    To   = $testParams.DataFolder
-                }
-            ) | Out-File -FilePath $testFile
-
-            { .$testScript @testNewParams -EA Stop } | 
-            Should -Throw "*Failed to copy from 'C:\Non existing' to '$($testParams.DataFolder)': File or folder 'C:\Non existing' not found"
-        }
     } -Tag test
     Context 'and the source is a file it is copied to the destination folder' {
         It 'when the folder already exists' {
@@ -237,49 +216,6 @@ Describe "when action is 'Import'" {
             .$testScript @testNewParams 
 
             "$notExistingFolder\$($testParams.FileName)" | Should -Exist
-        }
-    }
-    Context 'and the source is a folder the content of the source folder is copied to the destination folder' {
-        BeforeAll {
-            $testSourceParams = @{
-                Path     = Join-Path $testParams.DataFolder 'SourceFolder'
-                ItemType = 'Directory'
-            }
-            New-Item @testSourceParams
-
-            '1' | Out-File -FilePath "$($testSourceParams.Path)\test.txt"
-        }
-        It 'when the folder already exists' {
-            $testDestinationParams = @{
-                Path     = Join-Path $testParams.DataFolder 'DestinationFolder'
-                ItemType = 'Directory'
-            }
-            New-Item @testDestinationParams
-
-            ConvertTo-Json @(
-                @{
-                    From = $testSourceParams.Path
-                    To   = $testDestinationParams.Path
-                }
-            ) | Out-File -FilePath $testFile
-
-            .$testScript @testNewParams 
-
-            "$($testDestinationParams.Path)\test.txt" | Should -Exist
-        }
-        It 'when the folder does not exist' {
-            $notExistingFolder = Join-Path $testParams.DataFolder 'NotExistingFolder'
-            
-            ConvertTo-Json @(
-                @{
-                    From = $testSourceParams.Path
-                    To   = $notExistingFolder
-                }
-            ) | Out-File -FilePath $testFile
-
-            .$testScript @testNewParams 
-
-            "$notExistingFolder\test.txt" | Should -Exist
         }
     }
 } 

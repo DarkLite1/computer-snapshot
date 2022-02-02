@@ -180,6 +180,7 @@ Process {
                     throw "The field 'NetworkCardName' is required"
                 }
                 if (-not $_.NetworkCardDescription) {
+                    # cannot be blank like the others
                     throw "The field 'NetworkCardDescription' is required"
                 }
                 if ($_.PSobject.Properties.Name -notContains "NetworkCategory") {

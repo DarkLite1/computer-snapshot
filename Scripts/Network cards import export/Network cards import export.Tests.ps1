@@ -35,7 +35,7 @@ Describe 'Fail the export when' {
         { .$testScript @testNewParams } | 
         Should -Throw "*Export folder '$testFolder' not empty"
     }
-}
+} 
 Describe 'Fail the import when' {
     BeforeEach {
         Get-ChildItem $testParams.DataFolder | Remove-Item
@@ -61,23 +61,81 @@ Describe 'Fail the import when' {
 }
 Describe "when action is 'Export'" {
     BeforeAll {
+        Mock Get-NetAdapter {
+            @(
+                @{
+                    Name                 = 'Ethernet0'
+                    InterfaceDescription = 'bla Broadcom bla'
+                }
+                @{
+                    Name                 = 'Ethernet1'
+                    InterfaceDescription = 'bla Intel bla'
+                }
+            )
+        }
+        Mock Get-NetConnectionProfile {
+            @(
+                @{
+                    InterfaceAlias  = 'Ethernet0'
+                    InterfaceIndex  = '1'
+                    NetworkCategory = 'Private'
+                }
+            )
+        }
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Export'
 
-        .$testScript @testNewParams 
+        .$testScript @testNewParams
+
+        $testExportFile = (Get-ChildItem $testNewParams.DataFolder | 
+            Where-Object { $_.Name -eq "$($testNewParams.FileName)" }).FullName
     }
-    It 'create an example .json import file in the data folder' {
-        $testFile = "$($testNewParams.DataFolder)\$($testNewParams.FileName)"
-        $testFile | Should -Exist
+    It 'a .json file is created in the data folder' {
+        $testExportFile | Should -Exist
+        $testExportFile | Should -Not -BeNullOrEmpty
+
         {
-            Get-Content -Path $testFile -Raw | ConvertFrom-Json -EA Stop
+            Get-Content -Path $testExportFile -Raw | ConvertFrom-Json -EA Stop
         } | Should -Not -Throw
-    }
-    It 'create an example copy file in the data folder' {
-        $testFile = "$($testNewParams.DataFolder)\Monitor SSD.ps1"
-        $testFile | Should -Exist
-    }
-}
+    } 
+    Context 'the .json file contains' {
+        BeforeAll {
+            $testJson = Get-Content -Path $testExportFile -Raw | 
+            ConvertFrom-Json
+            $testBroadcomCard = $testJson | Where-Object {
+                $_.NetworkCardDescription -like '*Broadcom*'
+            }
+            $testIntelCard = $testJson | Where-Object {
+                $_.NetworkCardDescription -like '*Intel*'
+            }
+        }
+        It 'an object for each network card' {
+            $testJson | Should -HaveCount 2
+            $testBroadcomCard | Should -Not -BeNullOrEmpty
+            $testIntelCard | Should -Not -BeNullOrEmpty
+        }
+        Context 'the property' {
+            It 'NetworkCardName' {
+                $testBroadcomCard.NetworkCardName | 
+                Should -Be 'Ethernet0'
+                $testIntelCard.NetworkCardName | 
+                Should -Be 'Ethernet1'
+            }
+            It 'NetworkCardDescription' {
+                $testBroadcomCard.NetworkCardDescription | 
+                Should -Be 'bla Broadcom bla'
+                $testIntelCard.NetworkCardDescription | 
+                Should -Be 'bla Intel bla'
+            }
+            It 'NetworkCategory' {
+                $testBroadcomCard.NetworkCategory | 
+                Should -Be 'Private'
+                $testIntelCard.NetworkCategory | 
+                Should -BeNullOrEmpty
+            }
+        }
+    } -Tag test
+} 
 Describe "when action is 'Import'" {
     BeforeAll {
         $testFile = "$($testParams.DataFolder)\$($testParams.FileName)"
@@ -189,7 +247,7 @@ Describe "when action is 'Import'" {
             .$testScript @testNewParams 
 
             "$($testDestinationParams.Path)\test.txt" | Should -Exist
-        } -Tag test
+        }
         It 'when the folder does not exist' {
             $notExistingFolder = Join-Path $testParams.DataFolder 'NotExistingFolder'
             

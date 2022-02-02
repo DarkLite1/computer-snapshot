@@ -1,12 +1,12 @@
 Param (
     [HashTable[]]$NetworkCards = @(
         @{
-            Manufacturer = 'Broadcom'
+            NetworkCardDescription = 'Broadcom'
             NetworkCardName = 'LAN FABRIEK'
             NetworkCategory = $null
         },
         @{
-            Manufacturer = 'Intel'
+            NetworkCardDescription = 'Intel'
             NetworkCardName = 'LAN KANTOOR'
             NetworkCategory = 'Private'
         }
@@ -19,7 +19,7 @@ $netAdapters = Get-NetAdapter
 foreach ($card in $NetworkCards) {
     foreach ($adapter in $netAdapters) {    
         if (
-            ($adapter.InterfaceDescription -like "*$($card.Manufacturer)*") -and
+            ($adapter.InterfaceDescription -like "*$($card.NetworkCardDescription)*") -and
             ($adapter.Name -ne $card.NetworkCardName)
         ) {
             Rename-NetAdapter -Name $adapter.Name -NewName $card.NetworkCardName
@@ -30,11 +30,11 @@ foreach ($card in $NetworkCards) {
 #endregion
 
 #region Set network connection profile
-$netConnectionProfile = Get-NetConnectionProfile
+$netConnectionProfiles = Get-NetConnectionProfile
 
 foreach ($card in $NetworkCards) {
     foreach ($profile in 
-        $netConnectionProfile | Where-Object {
+        $netConnectionProfiles | Where-Object {
             ($_.InterfaceAlias -eq $card.NetworkCardName) -and
             ($_.NetworkCategory -ne $card.NetworkCategory) 
         }

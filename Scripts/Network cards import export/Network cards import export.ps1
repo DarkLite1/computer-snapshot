@@ -16,14 +16,14 @@
 
         [
             {
-                "Description"     = "Broadcom",
-                "NetworkCardName" = "LAN FABRIEK",
-                "NetworkCategory" = $null
+                "NetworkCardName"        = "LAN FABRIEK",
+                "NetworkCardDescription" = "Broadcom",
+                "NetworkCategory"        = $null
             },
             {
-                "Description"     = "Intel",
-                "NetworkCardName" = "LAN KANTOOR",
-                "NetworkCategory" = "Private"
+                "NetworkCardName"        = "LAN KANTOOR",
+                "NetworkCardDescription" = "Intel",
+                "NetworkCategory"        = "Private"
             }
         ]
 
@@ -120,26 +120,56 @@ Begin {
 
 Process {
     Try {
+        $netAdapters = Get-NetAdapter
+        $netConnectionProfiles = Get-NetConnectionProfile
+
         If ($Action -eq 'Export') {
-            #region Create example config file
-            Write-Verbose "Create example config file '$ExportFile'"
-            $params = @{
-                LiteralPath = Join-Path $PSScriptRoot 'Examples\CopyFilesFolders.json'
-                Destination = $ExportFile
+            #region Export example config file
+            $cardsToExport = foreach ($card in $netAdapters) {
+                $NetworkCategory = ($netConnectionProfiles | Where-Object { 
+                    $_.InterfaceAlias -eq $card.name
+                }).NetworkCategory
+                @{
+                    NetworkCardName        = $card.Name
+                    NetworkCardDescription = $card.InterfaceDescription
+                    NetworkCategory        = [String]$NetworkCategory
+                }
             }
-            Copy-Item @params
+  
+            if (-not $cardsToExport) {
+                Write-Verbose 'No network cards found, create template'
+                $cardsToExport = @(
+                    @{
+                        NetworkCardName        = 'LAN FACTORY'
+                        NetworkCardDescription = 'Broadcom'
+                        NetworkCategory        = $null
+                    },
+                    @{
+                        NetworkCardName        = 'LAN OFFICE'
+                        NetworkCardDescription = 'Intel'
+                        NetworkCategory        = 'Private'
+                    }
+                )
+                Write-Output 'No network cards found, template created'
+            } 
+            else {
+                Write-Output "Found $($cardsToExport.Count) network cards:"
+                $cardsToExport | ForEach-Object {
+                    Write-Output "Name '$($_.NetworkCardName)' description '$($_.NetworkCardDescription)' profile '$($_.NetworkCategory)'"
+                }
+            }
+            
+            Write-Verbose "Create example config file '$ExportFile'"
+
+            $outParams = @{
+                LiteralPath = $ExportFile 
+                Encoding    = 'UTF8'
+            }
+            $cardsToExport | ConvertTo-Json | Out-File @outParams
+ 
             Write-Output "Created example config file '$ExportFile'"
             #endregion
 
-            #region Create example copy file
-            Write-Verbose 'Create example copy file'
-            $params = @{
-                LiteralPath = Join-Path $PSScriptRoot 'Examples\Monitor SSD.ps1'
-                Destination = Join-Path $DataFolder 'Monitor SSD.ps1'
-            }
-            Copy-Item @params
-            Write-Output "Created example copy file '$($params.Destination)'"
-            #endregion
         }
         else {
             $itemsToCopy = Get-Content -Path $ExportFile -Raw | ConvertFrom-Json

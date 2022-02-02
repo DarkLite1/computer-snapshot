@@ -10,9 +10,17 @@
         will be renamed and or given the correct connection profile (Public, 
         Private, ...).
         
-        The network card is identified by the NetworkCardDescription field. This
-        field usually contains the name of the manufacturer. The field is 
-        queried with a wildcard so the complete description is not required.
+        Identifying the correct network card to rename is done by using the 
+        NetworkCardDescription field. Identifying the correct network card to 
+        change the category is done by using the NetworkCardName. 
+
+        Renaming a card is done first, so if you need to rename and change the
+        category only the NetworkCardDescription is used to identify the 
+        correct network card. 
+
+        The field NetworkCardDescription usually contains the name of the 
+        manufacturer. When querying we use wildcards so the complete 
+        description is not required.
 
         [
             {

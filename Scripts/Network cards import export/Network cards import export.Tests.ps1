@@ -139,7 +139,7 @@ Describe "when action is 'Export'" {
                 Should -BeNullOrEmpty
             }
         }
-    } -Tag test
+    }
 } 
 Describe "when action is 'Import'" {
     BeforeAll {
@@ -148,27 +148,41 @@ Describe "when action is 'Import'" {
         $testNewParams.Action = 'Import'
     }
     Context 'an error is generated when' {
-        It 'the field From is missing' {
+        It 'the field NetworkCardName is missing' {
             ConvertTo-Json @(
                 @{
-                    From = ''
-                    To   = $testParams.DataFolder
+                    # NetworkCardName        = 'LAN'
+                    NetworkCardDescription = 'Intel card'
+                    NetworkCategory        = 'Private'
                 }
             ) | Out-File -FilePath $testFile
 
             { .$testScript @testNewParams -EA Stop } | 
-            Should -Throw "*Failed to copy from '' to '$($testParams.DataFolder)': The field 'From' is required"
+            Should -Throw "*The field 'NetworkCardName' is required"
         }
-        It 'the field To is missing' {
+        It 'the field NetworkCardDescription is missing' {
             ConvertTo-Json @(
                 @{
-                    From = $testParams.DataFolder
-                    To   = ''
+                    NetworkCardName = 'LAN'
+                    # NetworkCardDescription = 'Intel card'
+                    NetworkCategory = $null
                 }
             ) | Out-File -FilePath $testFile
 
             { .$testScript @testNewParams -EA Stop } | 
-            Should -Throw "*Failed to copy from '$($testParams.DataFolder)' to '': The field 'To' is required"
+            Should -Throw "*The field 'NetworkCardDescription' is required"
+        }
+        It 'the field NetworkCategory is missing' {
+            ConvertTo-Json @(
+                @{
+                    NetworkCardName        = 'LAN'
+                    NetworkCardDescription = 'Intel card'
+                    # NetworkCategory        = 'Private'
+                }
+            ) | Out-File -FilePath $testFile
+
+            { .$testScript @testNewParams -EA Stop } | 
+            Should -Throw "*The field 'NetworkCategory' is required"
         }
         It 'the source file or folder is not found' {
             ConvertTo-Json @(
@@ -191,7 +205,7 @@ Describe "when action is 'Import'" {
             { .$testScript @testNewParams -EA Stop } | 
             Should -Throw "*Failed to copy from 'C:\Non existing' to '$($testParams.DataFolder)': File or folder 'C:\Non existing' not found"
         }
-    }
+    } -Tag test
     Context 'and the source is a file it is copied to the destination folder' {
         It 'when the folder already exists' {
             $testNewItemParams = @{

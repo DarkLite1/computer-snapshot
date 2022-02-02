@@ -171,8 +171,22 @@ Process {
             #endregion
         }
         else {
-            $NetworkCards = Get-Content -Path $ExportFile -Raw | 
+            $NetworkCards = (Get-Content -Path $ExportFile -Raw) | 
             ConvertFrom-Json
+            
+            #region Test required fields
+            $NetworkCards | ForEach-Object {
+                if ($_.PSobject.Properties.Name -notContains "NetworkCardName") {
+                    throw "The field 'NetworkCardName' is required"
+                }
+                if (-not $_.NetworkCardDescription) {
+                    throw "The field 'NetworkCardDescription' is required"
+                }
+                if ($_.PSobject.Properties.Name -notContains "NetworkCategory") {
+                    throw "The field 'NetworkCategory' is required"
+                }
+            }
+            #endregion
 
             #region Rename network cards
             foreach ($card in $NetworkCards) {

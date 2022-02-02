@@ -187,7 +187,7 @@ Describe "when action is 'Import'" {
         }
     }
     Context 'the network card name is' {
-        It 'renamed when NetworkCardName is not null and the name is wrong' {
+        It 'renamed when it is wrong' {
             Mock Get-NetAdapter {
                 @(
                     @{
@@ -223,6 +223,39 @@ Describe "when action is 'Import'" {
                 ($InputObject -eq "Renamed network card with description 'bla Intel bla' from 'WrongName' to 'NewName'") 
             }
         }
+        It 'not renamed when it is correct' {
+            Mock Get-NetAdapter {
+                @(
+                    @{
+                        Name                 = 'LAN'
+                        InterfaceDescription = 'bla Intel bla'
+                    }
+                )
+            }
+            Mock Get-NetConnectionProfile {
+                @(
+                    @{
+                        InterfaceAlias  = 'LAN'
+                        InterfaceIndex  = '1'
+                        NetworkCategory = 'Private'
+                    }
+                )
+            }
+            ConvertTo-Json @(
+                @{
+                    NetworkCardName        = 'LAN'
+                    NetworkCardDescription = 'Intel'
+                    NetworkCategory        = $null
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            Should -Not -Invoke Rename-NetAdapter
+            Should -Not -Invoke Write-Output -ParameterFilter {
+                ($InputObject -like "Renamed network card *") 
+            }
+        }
         It 'not renamed when NetworkCardName is null' {
             Mock Get-NetAdapter {
                 @(
@@ -244,39 +277,6 @@ Describe "when action is 'Import'" {
             ConvertTo-Json @(
                 @{
                     NetworkCardName        = $null
-                    NetworkCardDescription = 'Intel'
-                    NetworkCategory        = $null
-                }
-            ) | Out-File -FilePath $testFile
-
-            .$testScript @testNewParams 
-
-            Should -Not -Invoke Rename-NetAdapter
-            Should -Not -Invoke Write-Output -ParameterFilter {
-                ($InputObject -like "Renamed network card *") 
-            }
-        }
-        It 'not renamed when NetworkCardName is correct' {
-            Mock Get-NetAdapter {
-                @(
-                    @{
-                        Name                 = 'LAN'
-                        InterfaceDescription = 'bla Intel bla'
-                    }
-                )
-            }
-            Mock Get-NetConnectionProfile {
-                @(
-                    @{
-                        InterfaceAlias  = 'LAN'
-                        InterfaceIndex  = '1'
-                        NetworkCategory = 'Private'
-                    }
-                )
-            }
-            ConvertTo-Json @(
-                @{
-                    NetworkCardName        = 'LAN'
                     NetworkCardDescription = 'Intel'
                     NetworkCategory        = $null
                 }

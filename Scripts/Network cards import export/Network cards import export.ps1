@@ -42,23 +42,23 @@
     .EXAMPLE
         $params = @{
             Action     = 'Export'
-            DataFolder = 'C:\copy'
+            DataFolder = 'C:\folder'
             FileName   = 'NetworkCards.json'
         }
         & 'C:\script.ps1' @params
 
-        Create the example file 'C:\copy\NetworkCards.json' that can be used 
+        Create the example file 'C:\folder\NetworkCards.json' that can be used 
         later on with action 'Import'.
 
     .EXAMPLE
         $params = @{
             Action     = 'Import'
-            DataFolder = 'C:\copy'
+            DataFolder = 'C:\folder'
             FileName   = 'NetworkCards.json'
         }
         & 'C:\script.ps1' @params
 
-        Read the file 'C:\copy\NetworkCards.json' and rename the network cards
+        Read the file 'C:\folder\NetworkCards.json' and rename the network cards
         matching the description and set the connection profile.
 #>
 

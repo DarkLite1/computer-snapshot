@@ -148,6 +148,7 @@ Param (
         SmbShares          = $true
         Folders            = $true
         RegionalSettings   = $true
+        NetworkCards       = $true
         NtpTimeServers     = $true
         RegistryKeys       = $true
         ScheduledTasks     = $true
@@ -161,7 +162,8 @@ Param (
         FirewallRules      = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
         SmbShares          = 'Scripts\Smb shares import export\Smb shares import export.ps1'
         Folders            = 'Scripts\Folders import export\Folders import export.ps1'
-        RegionalSettings = 'Scripts\Regional settings import export\Regional settings import export.ps1'
+        RegionalSettings   = 'Scripts\Regional settings import export\Regional settings import export.ps1'
+        NetworkCards       = 'Scripts\Network cards import export\Network cards import export.ps1'
         NtpTimeServers     = 'Scripts\NTP time servers import export\NTP time servers import export.ps1'
         RegistryKeys       = 'Scripts\Registry keys import export\Registry keys import export.ps1'
         ScheduledTasks     = 'Scripts\Scheduled tasks import export\Scheduled tasks import export.ps1'

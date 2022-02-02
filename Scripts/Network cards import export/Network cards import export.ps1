@@ -26,7 +26,7 @@
             {
                 "NetworkCardName"        = "LAN FACTORY",
                 "NetworkCardDescription" = "Broadcom",
-                "NetworkCategory"        = $null
+                "NetworkCategory"        = null
             },
             {
                 "NetworkCardName"        = "LAN OFFICE",

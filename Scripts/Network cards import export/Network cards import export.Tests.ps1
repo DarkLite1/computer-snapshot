@@ -8,6 +8,11 @@ BeforeAll {
         DataFolder = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
         FileName   = 'NetworkCards.json'
     }
+
+    Mock Get-NetAdapter
+    Mock Get-NetConnectionProfile
+    Mock Set-NetConnectionProfile
+    Mock Rename-NetAdapter
 }
 Describe 'the mandatory parameters are' {
     It '<_>' -ForEach 'Action', 'DataFolder' {

@@ -127,8 +127,8 @@ Process {
             #region Export example config file
             $cardsToExport = foreach ($card in $netAdapters) {
                 $NetworkCategory = ($netConnectionProfiles | Where-Object { 
-                    $_.InterfaceAlias -eq $card.name
-                }).NetworkCategory
+                        $_.InterfaceAlias -eq $card.name
+                    }).NetworkCategory
                 @{
                     NetworkCardName        = $card.Name
                     NetworkCardDescription = $card.InterfaceDescription
@@ -169,58 +169,38 @@ Process {
  
             Write-Output "Created example config file '$ExportFile'"
             #endregion
-
         }
         else {
-            $itemsToCopy = Get-Content -Path $ExportFile -Raw | ConvertFrom-Json
+            $NetworkCards = Get-Content -Path $ExportFile -Raw | 
+            ConvertFrom-Json
 
-            foreach ($i in $itemsToCopy) {
-                try {
-                    if (-not ($from = $i.From)) {
-                        throw "The field 'From' is required"
-                    }
-                    if (-not ($to = $i.To)) {
-                        throw "The field 'To' is required"
-                    }
-                    $from = Get-FullPathHC -Path $from
-                    if (-not 
-                        ($fromItem = Get-Item -LiteralPath $from -EA Ignore)
+            #region Rename network cards
+            foreach ($card in $NetworkCards) {
+                foreach ($adapter in $netAdapters) {    
+                    if (
+            ($adapter.InterfaceDescription -like "*$($card.NetworkCardDescription)*") -and
+            ($adapter.Name -ne $card.NetworkCardName)
                     ) {
-                        throw "File or folder '$from' not found"
+                        Rename-NetAdapter -Name $adapter.Name -NewName $card.NetworkCardName
+                        Write-Output "Renamed network card with description '$($adapter.InterfaceDescription)' from '$($adapter.Name)' to '$($card.NetworkCardName)'"
                     }
-                    if (-not $fromItem.PSIsContainer) {
-                        # when the source is a file 
-                        # create the destination folder manually 
-                        $newItemParams = @{
-                            Path     = (Split-Path -Path $to) 
-                            ItemType = 'Directory'
-                            Force    = $true
-                        }
-                        $null = New-Item @newItemParams
-                    }
-                    else {
-                        $from = "$from\*"
-                        $null = New-Item -Path $to -ItemType Directory -Force
-                    }
-
-                    $copyParams = @{
-                        Path        = $from
-                        Destination = $to
-                        Recurse     = $true 
-                        ErrorAction = 'Stop'
-                    }
-                    Copy-Item @copyParams
-
-                    if (-not (Test-Path -LiteralPath $to)) {
-                        throw "Path '$to' not created"
-                    }
-
-                    Write-Output "Copied from '$from' to '$to'"
-                }
-                catch {
-                    Write-Error "Failed to copy from '$($i.From)' to '$($i.To)': $_"
                 }
             }
+            #endregion
+
+            #region Set network connection profile
+            foreach ($card in $NetworkCards) {
+                foreach ($profile in 
+                    $netConnectionProfiles | Where-Object {
+            ($_.InterfaceAlias -eq $card.NetworkCardName) -and
+            ($_.NetworkCategory -ne $card.NetworkCategory) 
+                    }
+                ) {    
+                    Set-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -NetworkCategory $card.NetworkCategory
+                    Write-Output "Changed network connection profile on card '$($card.NetworkCardName)' from '$($profile.NetworkCategory)' to '$($card.NetworkCategory)'"
+                }
+            }
+            #endregion
         }
     }
     Catch {

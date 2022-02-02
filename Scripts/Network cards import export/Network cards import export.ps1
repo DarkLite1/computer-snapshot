@@ -8,27 +8,26 @@
 
         When action is 'Import' the import file is read and the network cards 
         will be renamed and or given the correct connection profile (Public, 
-        Private, ...)
+        Private, ...).
         
-        The import file needs to be explicit and contain the a part of the 
-        description to identify the correct network card. Usually the 
-        description is the name of the manufacturer:
+        The network card is identified by the NetworkCardDescription field. This
+        field usually contains the name of the manufacturer. The field is 
+        queried with a wildcard so the complete description is not required.
 
         [
             {
-                "NetworkCardName"        = "LAN FABRIEK",
+                "NetworkCardName"        = "LAN FACTORY",
                 "NetworkCardDescription" = "Broadcom",
                 "NetworkCategory"        = $null
             },
             {
-                "NetworkCardName"        = "LAN KANTOOR",
+                "NetworkCardName"        = "LAN OFFICE",
                 "NetworkCardDescription" = "Intel",
                 "NetworkCategory"        = "Private"
             }
         ]
 
-        When a field contains the value NULL it is simply ignored and nothing is
-        changed.
+        When a field contains the value NULL or is empty it will be ignored. 
 
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DataFolder, when 

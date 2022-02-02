@@ -13,6 +13,7 @@ BeforeAll {
     Mock Get-NetConnectionProfile
     Mock Set-NetConnectionProfile
     Mock Rename-NetAdapter
+    Mock Write-Output
 }
 Describe 'the mandatory parameters are' {
     It '<_>' -ForEach 'Action', 'DataFolder' {
@@ -217,6 +218,9 @@ Describe "when action is 'Import'" {
             Should -Invoke Rename-NetAdapter -Times 1 -Exactly -ParameterFilter {
                 ($Name -eq 'WrongName') -and
                 ($NewName -eq 'NewName')
+            }
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                ($InputObject -eq "Renamed network card with description 'bla Intel bla' from 'WrongName' to 'NewName'") 
             }
         } -Tag test
     }

@@ -289,5 +289,109 @@ Describe "when action is 'Import'" {
                 ($InputObject -like "Renamed network card *") 
             }
         }
-    } -Tag test
+    }
+    Context 'the network category is' {
+        It 'corrected when it is wrong' {
+            Mock Get-NetAdapter {
+                @(
+                    @{
+                        Name                 = 'LAN'
+                        InterfaceDescription = 'bla Intel bla'
+                    }
+                )
+            }
+            Mock Get-NetConnectionProfile {
+                @(
+                    @{
+                        InterfaceAlias  = 'LAN'
+                        InterfaceIndex  = '1'
+                        NetworkCategory = 'Private'
+                    }
+                )
+            }
+            ConvertTo-Json @(
+                @{
+                    NetworkCardName        = 'LAN'
+                    NetworkCardDescription = 'Intel'
+                    NetworkCategory        = 'Public'
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            Should -Invoke Set-NetConnectionProfile -Times 1 -Exactly -ParameterFilter {
+                ($InterfaceIndex -eq '1') -and
+                ($NetworkCategory -eq 'Public')
+            }
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                ($InputObject -eq "Changed network category on card 'LAN' from 'Private' to 'Public'") 
+            }
+        }
+        It 'not corrected when it is correct' {
+            Mock Get-NetAdapter {
+                @(
+                    @{
+                        Name                 = 'LAN'
+                        InterfaceDescription = 'bla Intel bla'
+                    }
+                )
+            }
+            Mock Get-NetConnectionProfile {
+                @(
+                    @{
+                        InterfaceAlias  = 'LAN'
+                        InterfaceIndex  = '1'
+                        NetworkCategory = 'Private'
+                    }
+                )
+            }
+            ConvertTo-Json @(
+                @{
+                    NetworkCardName        = $null
+                    NetworkCardDescription = 'Intel'
+                    NetworkCategory        = 'Private'
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            Should -Not -Invoke Set-NetConnectionProfile
+            Should -Not -Invoke Write-Output -ParameterFilter {
+                ($InputObject -like "Changed network category*") 
+            }
+        }
+        It 'not changed when NetworkCategory is null' {
+            Mock Get-NetAdapter {
+                @(
+                    @{
+                        Name                 = 'LAN'
+                        InterfaceDescription = 'bla Intel bla'
+                    }
+                )
+            }
+            Mock Get-NetConnectionProfile {
+                @(
+                    @{
+                        InterfaceAlias  = 'LAN'
+                        InterfaceIndex  = '1'
+                        NetworkCategory = 'Private'
+                    }
+                )
+            }
+            ConvertTo-Json @(
+                @{
+                    NetworkCardName        = 'LAN'
+                    NetworkCardDescription = 'Intel'
+                    NetworkCategory        = $null
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            Should -Not -Invoke Set-NetConnectionProfile
+            Should -Not -Invoke Write-Output -ParameterFilter {
+                ($InputObject -like "Changed network category*") 
+            }
+        }
+    }
 } 

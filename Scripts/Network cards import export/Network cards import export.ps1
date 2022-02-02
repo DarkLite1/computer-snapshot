@@ -209,7 +209,7 @@ Process {
             }
             #endregion
 
-            #region Set network connection profile
+            #region Set network category
             foreach ($card in $NetworkCards) {
                 foreach (
                     $profile in 
@@ -220,7 +220,9 @@ Process {
                     }
                 ) {    
                     Set-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -NetworkCategory $card.NetworkCategory
-                    Write-Output "Changed network connection profile on card '$($card.NetworkCardName)' from '$($profile.NetworkCategory)' to '$($card.NetworkCategory)'"
+                    $M = "Changed network category on card '$($card.NetworkCardName)' from '$($profile.NetworkCategory)' to '$($card.NetworkCategory)'"
+                    Write-Verbose $M
+                    Write-Output $M
                 }
             }
             #endregion

@@ -184,38 +184,40 @@ Describe "when action is 'Import'" {
             { .$testScript @testNewParams -EA Stop } | 
             Should -Throw "*The field 'NetworkCategory' is required"
         }
-    } -Tag test
-    Context 'and the source is a file it is copied to the destination folder' {
-        It 'when the folder already exists' {
-            $testNewItemParams = @{
-                Path     = Join-Path $testParams.DataFolder 'Destination'
-                ItemType = 'Directory'
+    }
+    Context 'the network card name is' {
+        It 'renamed when NetworkCardName is not null and the name is wrong' {
+            Mock Get-NetAdapter {
+                @(
+                    @{
+                        Name                 = 'WrongName'
+                        InterfaceDescription = 'bla Intel bla'
+                    }
+                )
             }
-            New-Item @testNewItemParams
+            Mock Get-NetConnectionProfile {
+                @(
+                    @{
+                        InterfaceAlias  = 'WrongName'
+                        InterfaceIndex  = '1'
+                        NetworkCategory = 'Private'
+                    }
+                )
+            }
             ConvertTo-Json @(
                 @{
-                    From = $testFile
-                    To   = $testNewItemParams.Path
+                    NetworkCardName        = 'NewName'
+                    NetworkCardDescription = 'Intel'
+                    NetworkCategory        = $null
                 }
             ) | Out-File -FilePath $testFile
 
             .$testScript @testNewParams 
 
-            "$($testNewItemParams.Path)\$($testParams.FileName)" | Should -Exist
-        }
-        It 'when the folder does not exist' {
-            $notExistingFolder = Join-Path $testParams.DataFolder 'NotExistingFolder'
-            
-            ConvertTo-Json @(
-                @{
-                    From = $testFile
-                    To   = "$notExistingFolder\$($testParams.FileName)"
-                }
-            ) | Out-File -FilePath $testFile
-
-            .$testScript @testNewParams 
-
-            "$notExistingFolder\$($testParams.FileName)" | Should -Exist
-        }
+            Should -Invoke Rename-NetAdapter -Times 1 -Exactly -ParameterFilter {
+                ($Name -eq 'WrongName') -and
+                ($NewName -eq 'NewName')
+            }
+        } -Tag test
     }
 } 

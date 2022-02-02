@@ -155,7 +155,9 @@ Process {
             else {
                 Write-Output "Found $($cardsToExport.Count) network cards:"
                 $cardsToExport | ForEach-Object {
-                    Write-Output "Name '$($_.NetworkCardName)' description '$($_.NetworkCardDescription)' profile '$($_.NetworkCategory)'"
+                    $M = "Name '$($_.NetworkCardName)' description '$($_.NetworkCardDescription)' network profile '$($_.NetworkCategory)'"
+                    Write-Verbose $M
+                    Write-Output $M
                 }
             }
             

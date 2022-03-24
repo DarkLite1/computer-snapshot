@@ -90,6 +90,9 @@
         Once the script is done an HTML report will be opened in the browser for
         further inspection.
 
+    .PARAMETER RebootComputerAfterRestoreSnapshot
+        Reboot the current machine once the action 'RestoreSnapshot' is finished
+
     .EXAMPLE
         # on PC1
         $params = @{

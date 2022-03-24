@@ -48,12 +48,28 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$FileName = 'RegionalSettings.json'
+    [String]$FileName = 'RegionalSettings.json',
+    [String]$NewAccountsScriptName = 'Regional settings new accounts.ps1'
 )
 
 Begin {
+    Function Start-ScriptHC {
+        Param (
+            [Parameter(Mandatory)]
+            [ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })]
+            [String]$Path
+        )
+        try {
+            & $Path
+        }
+        catch {
+            throw "Failed to execute script '$Path': $_"
+        }
+    }
+
     Try {
         $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
+        $NewAccountsScript = Join-Path $PSScriptRoot $NewAccountsScriptName
 
         #region Test DataFolder
         If ($Action -eq 'Export') {
@@ -74,6 +90,12 @@ Begin {
             If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
                 throw "Import file '$ExportFile' not found"
             }
+        }
+        #endregion
+
+        #region Test NewAccountsScript
+        If (-not (Test-Path -LiteralPath $NewAccountsScript -PathType Leaf)) {
+            throw "Script file '$NewAccountsScript' not found"
         }
         #endregion
     }
@@ -182,6 +204,8 @@ Process {
             if ($rebootRequired) {
                 Write-Output 'Changes take effect after the computer is restarted'
             }
+
+            Start-ScriptHC -Path $NewAccountsScript
         }
     }
     Catch {

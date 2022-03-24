@@ -9,7 +9,13 @@ BeforeAll {
         FileName   = 'testRegionalSettings.json'
     }
 
-    
+    Function Start-ScriptHC {
+        Param (
+            [Parameter(Mandatory)]
+            [ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })]
+            [String]$Path
+        )
+    }
 
     Mock Get-WinSystemLocale {
         @{Name = 'en-US' }
@@ -27,6 +33,7 @@ BeforeAll {
     Mock Set-TimeZone
     Mock Set-WinHomeLocation
     Mock Set-Culture
+    Mock Start-ScriptHC
 }
 Describe 'the mandatory parameters are' {
     It '<_>' -ForEach 'Action', 'DataFolder' {
@@ -178,6 +185,24 @@ Describe "when action is 'Import'" {
             { .$testScript @testNewParams -EA Stop } | 
             Should -Throw "*The field 'WinHomeLocationGeoId' is required"
         }
+        It 'the NewAccountsScriptName file is not found' {
+            $testNewParams2 = $testParams.clone()
+            $testNewParams2.Action = 'Import'
+            $testNewParams2.NewAccountsScriptName = 'xxx.ps1'
+    
+            ConvertTo-Json @(
+                @{
+                    WinSystemLocaleName  = 'en-US'
+                    TimeZoneId           = 'Central Europe Standard Time'
+                    CultureName          = 'en-US'
+                    WinHomeLocationGeoId = 244
+                    
+                }
+            ) | Out-File -FilePath $testFile
+
+            { .$testScript @testNewParams2 } | 
+            Should -Throw "*Script file '*\xxx.ps1' not found"
+        } -tag test
     }
     Context 'Regional settings are applied by calling' {
         BeforeAll {

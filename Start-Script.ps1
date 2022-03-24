@@ -142,12 +142,12 @@ Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
     [System.Collections.Specialized.OrderedDictionary]$Snapshot = [Ordered]@{
+        RegionalSettings   = $true
         UserAccounts       = $true
         UserGroups         = $true
         FirewallRules      = $true
         SmbShares          = $true
         Folders            = $true
-        RegionalSettings   = $true
         NetworkCards       = $true
         NtpTimeServers     = $true
         RegistryKeys       = $true

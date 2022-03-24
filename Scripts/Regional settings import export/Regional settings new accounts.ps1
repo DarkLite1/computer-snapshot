@@ -15,8 +15,6 @@ Param (
     )
 )
 
-$VerbosePreference = 'Continue'
-
 $tempFileComplete = New-TemporaryFile
 
 $encoding = @{

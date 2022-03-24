@@ -30,6 +30,7 @@ BeforeAll {
         )
     }
     Mock Invoke-ScriptHC
+    Mock Restart-Computer
     Mock Write-Host
     Mock Write-Warning
 }
@@ -184,6 +185,16 @@ Describe "When action is 'RestoreSnapshot'" {
             }
         }
     }
+    It 'the computer is restarted when using RebootComputerAfterRestoreSnapshot' {
+        $testSnapshot = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot2\Script2" -ItemType Directory).FullName
+        New-Item "$testSnapshot\Export.csv" -ItemType file
+
+        $testNewParams.RebootComputerAfterRestoreSnapshot = $true
+
+        .$testScript @testNewParams
+
+        Should -Invoke Restart-Computer -Exactly -Times 1
+    } -tag test
 }
 Describe 'Other scripts are still executed when' {
     BeforeAll {

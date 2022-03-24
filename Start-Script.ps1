@@ -141,6 +141,8 @@
 Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
+    [String]$RestoreSnapshotFolder,
+    [Boolean]$RebootComputerAfterRestoreSnapshot = $false,
     [System.Collections.Specialized.OrderedDictionary]$Snapshot = [Ordered]@{
         StartCustomScriptsBefore = $true
         RegionalSettings         = $true
@@ -156,7 +158,6 @@ Param (
         CopyFilesFolders         = $true
         StartCustomScriptsAfter  = $false
     },
-    [String]$RestoreSnapshotFolder,
     [HashTable]$Script = @{
         UserAccounts             = 'Scripts\User accounts import export\User accounts import export.ps1'
         UserGroups               = 'Scripts\User groups import export\User groups import export.ps1'
@@ -618,12 +619,21 @@ End {
                     FilePath     = 'iexplore.exe' 
                     ArgumentList = '-extoff', $reportFile
                     ErrorAction  = 'Stop'
+                    Wait         = $true
                 }
                 Start-Process @startParams
             }
             catch {
                 Start-Process $reportFile
             }
+        }
+
+        if (
+            ($Action -eq 'RestoreSnapshot') -and 
+            ($RebootComputerAfterRestoreSnapshot)
+        ) {
+            Write-Host 'Restart computer' @writeParams
+            Restart-Computer
         }
     }
     Catch {

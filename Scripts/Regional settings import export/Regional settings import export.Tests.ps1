@@ -202,7 +202,7 @@ Describe "when action is 'Import'" {
 
             { .$testScript @testNewParams2 } | 
             Should -Throw "*Script file '*\xxx.ps1' not found"
-        } -tag test
+        }
     }
     Context 'Regional settings are applied by calling' {
         BeforeAll {
@@ -236,6 +236,11 @@ Describe "when action is 'Import'" {
         It 'Set-Culture' {
             Should -Invoke Set-Culture -Times 1 -Exactly -Scope Context -ParameterFilter {
                 $CultureInfo -eq 'nl-BE'
+            }
+        }
+        It 'Start-ScriptHC for newly created accounts' {
+            Should -Invoke Start-ScriptHC -Times 1 -Exactly -Scope Context -ParameterFilter {
+                $Path -like '*\Regional settings new accounts.ps1'
             }
         }
     }

@@ -119,3 +119,5 @@ if ($process.ExitCode) {
     throw "Failed to unload the temporary profile: exit code $($process.ExitCode)"
 }
 #endregion
+
+'Set regional settings to be applied the newly created accounts too'

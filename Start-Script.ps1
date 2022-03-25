@@ -145,7 +145,7 @@ Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
     [String]$RestoreSnapshotFolder,
-    [Boolean]$RebootComputerAfterRestoreSnapshot = $false,
+    [Boolean]$RebootComputerAfterRestoreSnapshot = $true,
     [System.Collections.Specialized.OrderedDictionary]$Snapshot = [Ordered]@{
         StartCustomScriptsBefore = $true
         RegionalSettings         = $true
@@ -159,7 +159,7 @@ Param (
         RegistryKeys             = $true
         ScheduledTasks           = $true
         CopyFilesFolders         = $true
-        StartCustomScriptsAfter  = $false
+        StartCustomScriptsAfter  = $true
     },
     [HashTable]$Script = @{
         UserAccounts             = 'Scripts\User accounts import export\User accounts import export.ps1'

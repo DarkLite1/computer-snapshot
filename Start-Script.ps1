@@ -472,45 +472,66 @@ End {
         <head>
         <style>
         table {
-            
             border-collapse: collapse;
             width: 80%;
             margin-bottom: 25px;
         }
-
         h2 {
             text-align: center;
             color: White;
             background-color: MediumSeaGreen;
         }
-
-        h4{
+        h4 {
             font-style: italic;
             color: Gray;
         }
-
         td, th {
             border: 1px solid #dddddd;
             text-align: left;
             padding: 8px;
         }
-
         th {
             width: 1px;
             white-space: nowrap;
             color: Gray;
         }
-
         div {
             
             width: 80%;
             margin-bottom: 25px;
         }
-
+        .rebootHeader {
+			font-size: xx-large;
+			margin-top: 25px;
+			background-color: Red;
+			color: White;
+			text-align: center;
+			margin-bottom: 0px;
+		}
+		.rebootParagraph {
+			font-size: large;
+			background-color: Red;
+			color: White;
+			text-align: center;
+		}
         </style>
         </head>
         <body>
         "
+
+        if (
+            ($Action -eq 'RestoreSnapshot') -and 
+            ($RebootComputerAfterRestoreSnapshot)
+        ) {
+            $html += "
+            <div class=`"rebootHeader`">
+                REBOOT IMMINENT
+            </div>
+            <div class=`"rebootParagraph`">
+                >> After closing this window the computer will restart <<
+            </div>
+            "
+        }
 
         #region console summary for end user
         $writeParams = @{

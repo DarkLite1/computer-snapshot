@@ -2,151 +2,6 @@
 #Requires -Version 5.1
 
 BeforeAll {
-    Function Push-AclInheritanceHC {
-        <#
-            .SYNOPSIS
-                Function to push the same permissions as the top folder to all of its subfolders and files.
-        
-            .DESCRIPTION
-                This function erases the permissions of the subfolders and files and activates the inheritance on all of them,  so they have the same permissions as the top folder. In the process the local administrator is added with 'Full control' permissions on every subfolder and file, and he is added as 'Owner' of all the files and folders.
-        
-            .PARAMETER Target
-                The top folder under which all the subfolders and files will inherit their permissions from.
-        
-            .EXAMPLE
-                Push-AclInheritanceHC 'T:\Departments\Finance\Reports'
-                All subfolders of 'Reports' will receive the same permissions as the folder 'Reports' itself, this includes files.
-#>
-        
-        [CmdletBinding(SupportsShouldProcess = $True)]
-        Param (
-            [parameter(Mandatory = $true, HelpMessage = 'The path where we need to activate inheritance on all of its subfolders')]
-            [ValidateScript({ Test-Path $_ -PathType Container })]
-            [String]$Target
-        )
-        
-        Begin {
-            $ReadFolder = New-Item -Type Directory -Path "$env:TEMP\ACLfolder"
-            $ReadFile = New-Item -Type File -Path "$env:TEMP\ACLfile"
-        
-            $AdjustTokenPrivileges = @"
-        using System;
-        using System.Runtime.InteropServices;
-        
-         public class TokenManipulator
-         {
-          [DllImport("advapi32.dll", ExactSpelling = true, SetLastError = true)]
-          internal static extern bool AdjustTokenPrivileges(IntPtr htok, bool disall,
-          ref TokPriv1Luid newst, int len, IntPtr prev, IntPtr relen);
-          [DllImport("kernel32.dll", ExactSpelling = true)]
-          internal static extern IntPtr GetCurrentProcess();
-          [DllImport("advapi32.dll", ExactSpelling = true, SetLastError = true)]
-          internal static extern bool OpenProcessToken(IntPtr h, int acc, ref IntPtr
-          phtok);
-          [DllImport("advapi32.dll", SetLastError = true)]
-          internal static extern bool LookupPrivilegeValue(string host, string name,
-          ref long pluid);
-          [StructLayout(LayoutKind.Sequential, Pack = 1)]
-          internal struct TokPriv1Luid
-          {
-           public int Count;
-           public long Luid;
-           public int Attr;
-          }
-          internal const int SE_PRIVILEGE_DISABLED = 0x00000000;
-          internal const int SE_PRIVILEGE_ENABLED = 0x00000002;
-          internal const int TOKEN_QUERY = 0x00000008;
-          internal const int TOKEN_ADJUST_PRIVILEGES = 0x00000020;
-          public static bool AddPrivilege(string privilege)
-          {
-           try
-           {
-            bool retVal;
-            TokPriv1Luid tp;
-            IntPtr hproc = GetCurrentProcess();
-            IntPtr htok = IntPtr.Zero;
-            retVal = OpenProcessToken(hproc, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, ref htok);
-            tp.Count = 1;
-            tp.Luid = 0;
-            tp.Attr = SE_PRIVILEGE_ENABLED;
-            retVal = LookupPrivilegeValue(null, privilege, ref tp.Luid);
-            retVal = AdjustTokenPrivileges(htok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
-            return retVal;
-           }
-           catch (Exception ex)
-           {
-            throw ex;
-           }
-          }
-          public static bool RemovePrivilege(string privilege)
-          {
-           try
-           {
-            bool retVal;
-            TokPriv1Luid tp;
-            IntPtr hproc = GetCurrentProcess();
-            IntPtr htok = IntPtr.Zero;
-            retVal = OpenProcessToken(hproc, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, ref htok);
-            tp.Count = 1;
-            tp.Luid = 0;
-            tp.Attr = SE_PRIVILEGE_DISABLED;
-            retVal = LookupPrivilegeValue(null, privilege, ref tp.Luid);
-            retVal = AdjustTokenPrivileges(htok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
-            return retVal;
-           }
-           catch (Exception ex)
-           {
-            throw ex;
-           }
-          }
-         }
-"@
-        
-        }
-        
-        Process {
-            # Folders
-            Get-ChildItem -Path $Target -Directory -Recurse | Select-Object -ExpandProperty FullName |
-            ForEach-Object {
-                Write-Verbose $_
-                Add-Type $AdjustTokenPrivileges
-                $Folder = Get-Item $_
-                [void][TokenManipulator]::AddPrivilege("SeRestorePrivilege")
-                [void][TokenManipulator]::AddPrivilege("SeBackupPrivilege")
-                [void][TokenManipulator]::AddPrivilege("SeTakeOwnershipPrivilege")
-                $Owner = New-Object System.Security.AccessControl.DirectorySecurity
-                $Admin = New-Object System.Security.Principal.NTAccount("BUILTIN\Administrators")
-                $Owner.SetOwner($Admin)
-                $Folder.SetAccessControl($Owner)
-        
-                # Add folder Admins to ACL with Full Control to descend folder structure
-                $acl = Get-Acl -Path $ReadFolder
-                $aclr = New-Object  system.security.accesscontrol.filesystemaccessrule("BUILTIN\Administrators", "FullControl", "Allow")
-                $acl.SetAccessRule($aclr)
-                Set-Acl $_ $acl
-            }
-            Remove-Item $ReadFolder
-        
-        
-            # Files
-            Get-ChildItem -Path $Target -File -Recurse | Select-Object -ExpandProperty FullName |
-            ForEach-Object {
-                Write-Verbose $_
-                $Admin = New-Object System.Security.Principal.NTAccount("BUILTIN\Administrators")
-                $Owner = New-Object System.Security.AccessControl.FileSecurity
-                $Owner.SetOwner($Admin)
-                [System.IO.File]::SetAccessControl($_, $Owner)
-        
-                # Add file Admins to ACL with Full Control and activate inheritance
-                $acl = Get-Acl -Path $ReadFile
-                $aclr = New-Object  system.security.accesscontrol.filesystemaccessrule("BUILTIN\Administrators", "FullControl", "Allow")
-                $acl.SetAccessRule($aclr)
-                Set-Acl $_ $acl
-            }
-            Remove-Item $ReadFile
-        }
-    }
-
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
         Action               = 'Import'
@@ -450,13 +305,8 @@ Describe "With Action set to 'Import' for 'RunAsOtherUser'" {
 
         $testProfileFolder = "C:\Users\$testUserName"
 
-        if (Test-Path $testProfileFolder) {
-            # Push-AclInheritanceHC $testProfileFolder
-            Remove-Item $testProfileFolder -Recurse -Force
-        }
-        if (Get-LocalUser $testUserName -EA Ignore) {
-            Remove-LocalUser $testUserName 
-        }
+        Remove-Item $testProfileFolder -Recurse -Force -EA Ignore
+        Remove-LocalUser $testUserName -EA Ignore
         New-LocalUser $testUserName -Password $testSecurePassword
         #endregion
 
@@ -515,20 +365,10 @@ Describe "With Action set to 'Import' for 'RunAsOtherUser'" {
         if ($testProcess.ExitCode) {
             throw "Failed to unload the test temporary profile: exit code $($testProcess.ExitCode)"
         }
-        #endregion
 
-        # Get-ChildItem $testProfileFolder | ForEach-Object {
-        #     If ([System.IO.File]::Exists($_.FullName)) {
-        #         $FileStream = [System.IO.File]::Open(
-        #             $testNtUserFile, 'Open', 'Write')
-          
-        #         $FileStream.Close()
-        #         $FileStream.Dispose()
-        #     }
-        # }
-        # Start-Sleep -sec 5
-        # Remove-LocalUser $testUserName
-        # Remove-Item -Path $testProfileFolder -Recurse -Force
+        Remove-Item $testProfileFolder -Recurse -Force -EA Ignore
+        Remove-LocalUser $testUserName -EA Ignore
+        #endregion
     }
     Context 'and the registry path does not exist' {
         It 'the path is created' {

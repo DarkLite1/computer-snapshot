@@ -63,16 +63,15 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            ConvertTo-Json @(
-                @{
-                    Path  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
-                    Name  = 'dontdisplaylastusername'
-                    Value = '1'
-                    Type  = 'DWORD'
-                }
-            ) | Out-File -LiteralPath $RegistryKeysFile -Encoding utf8
-
-            Write-Output 'Exported registry keys example'
+            #region Create example config file
+            Write-Verbose "Create example config file '$ExportFile'"
+            $params = @{
+                LiteralPath = Join-Path $PSScriptRoot 'Example.json'
+                Destination = $RegistryKeysFile
+            }
+            Copy-Item @params
+            Write-Output "Created example registry keys file '$RegistryKeysFile'"
+            #endregion
         }
         else {            
             Write-Verbose "Import registry keys from file '$RegistryKeysFile'"

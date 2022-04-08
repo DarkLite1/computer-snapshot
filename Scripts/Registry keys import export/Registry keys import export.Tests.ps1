@@ -76,27 +76,16 @@ Describe "With Action set to 'Export'" {
 
         .$testScript @testNewParams
     }
-    It 'a json file is created' {
+    It 'a valid json file is created' {
         $testFile | Should -Exist
+        { Get-Content $testFi -Raw | ConvertFrom-Json } | Should -Not -Throw
     }
-    Context 'the json file contains an example object with fields' {
-        BeforeAll {
-            $testJsonFile = Get-Content $testFile -Raw | ConvertFrom-Json |
-            Select-Object -First 1
-        }
-        It 'Path' {
-            $testJsonFile.Path | Should -Be 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
-        }
-        It 'Name' {
-            $testJsonFile.Name | Should -Be 'dontdisplaylastusername'
-        }
-        It 'Value' {
-            $testJsonFile.Value | Should -Be '1'
-        }
-        It 'Type' {
-            $testJsonFile.Type | Should -Be 'DWORD'
-        }
-    }
+    It 'the .json file is a copy of Example.json' {
+        $testJsonFile = Get-Content $testFile -Raw
+        $testExampleJsonFile = Get-Content (Join-Path $PSScriptRoot 'Example.json') -Raw
+
+        $testJsonFile | Should -Be $testExampleJsonFile
+    } -Tag test
     It 'output is generated' {
         Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
             $InputObject -eq 'Exported registry keys example'

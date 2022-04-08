@@ -99,18 +99,18 @@ Describe "With Action set to 'Import' for 'RunAsCurrentUser'" {
     }
     Context 'and the registry path does not exist' {
         BeforeAll {
-            $testKey = [PSCustomObject]@{
+            $testKey = @{
                 Path  = 'TestRegistry:\testPath'
                 Name  = 'testName'
                 Value = '1'
                 Type  = 'DWORD'
             }
-            [PSCustomObject]@{
-                RunAsCurrentUser = [PSCustomObject]@{
+            @{
+                RunAsCurrentUser = @{
                     RegistryKeys = @($testKey)
                 }
                 RunAsOtherUser   = $null
-            } | ConvertTo-Json | Out-File -LiteralPath $testFile
+            } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
             .$testScript @testNewParams
         

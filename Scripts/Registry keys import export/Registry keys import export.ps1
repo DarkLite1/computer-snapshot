@@ -64,7 +64,6 @@ Begin {
                 if ($currentValue -ne $Value) {
                     Write-Verbose "Update old value '$currentValue' with new value '$Value'"
                     $null = New-ItemProperty @newParams
-                    # $n.Handle.Close()
                     Write-Output "$idString not correct. Updated old value '$currentValue' with new value '$Value'."
                 }
                 else {
@@ -75,7 +74,6 @@ Begin {
             catch [System.Management.Automation.PSArgumentException] {
                 Write-Verbose 'Add key name and value on existing path'
                 $null = New-ItemProperty @newParams
-                # $n.Handle.Close()
                 Write-Output "$idString. Created key name and value on existing path."
             }
             catch [System.Management.Automation.ItemNotFoundException] {
@@ -84,7 +82,6 @@ Begin {
                 $n.Handle.Close()
 
                 $null = New-ItemProperty @newParams
-                # $n.Handle.Close()
                 Write-Output "$idString did not exist. Created new registry key."
             }
         }

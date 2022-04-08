@@ -1,0 +1,38 @@
+{
+  "RunAsCurrentUser": {
+    "RegistryKeys": [
+      {
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+        "Name": "startCustomScriptOnLogin",
+        "Value": "%SystemRoot%\\system32\\WindowsPowerShell\\v1.0\\powershell.exe -ExecutionPolicy Bypass -File \"C:\\Path\\To\\File.ps1\"",
+        "Type": "STRING"
+      }
+    ]
+  },
+  "RunAsOtherUser": [
+    {
+      "UserName": "bob",
+      "UserPassword": "123",
+      "RegistryKeys": [
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
+          "Name": "DisableTaskMgr",
+          "Value": "00000000",
+          "Type": "DWORD"
+        },
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
+          "Name": "DisableChangePassword",
+          "Value": "00000000",
+          "Type": "DWORD"
+        },
+        {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
+          "Name": "Shell",
+          "Value": "powershell.exe C:\\Users\\Public\\Documents\\test.ps1",
+          "Type": "STRING"
+        }
+      ]
+    }
+  ]
+}

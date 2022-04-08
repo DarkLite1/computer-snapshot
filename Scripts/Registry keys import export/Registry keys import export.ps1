@@ -30,6 +30,65 @@ Param(
 )
 
 Begin {
+    $scriptBlock = {
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Path,
+            [Parameter(Mandatory)]
+            [String]$Name,
+            [Parameter(Mandatory)]
+            [String]$Value,
+            [Parameter(Mandatory)]
+            [String]$Type
+        )
+        try {
+            try {
+                $idString = "Registry path '$Path' key name '$Name' value '$Value' type '$Type'"
+                Write-Verbose $idString
+            
+                $newParams = @{
+                    Path         = $Path
+                    Name         = $Name
+                    Value        = $Value
+                    PropertyType = $Type
+                    Force        = $true
+                    ErrorAction  = 'Stop'
+                }
+                $getParams = @{
+                    Path        = $Path
+                    Name        = $Name
+                    ErrorAction = 'Stop'
+                }
+                $currentValue = (Get-ItemProperty @getParams).($Name)
+
+                if ($currentValue -ne $Value) {
+                    Write-Verbose "Update old value '$currentValue' with new value '$Value'"
+                    $null = New-ItemProperty @newParams
+                    Write-Output "$idString not correct. Updated old value '$currentValue' with new value '$Value'."
+                }
+                else {
+                    Write-Verbose 'Registry key correct'
+                    Write-Output "$idString correct. Nothing to update."
+                }
+            }
+            catch [System.Management.Automation.PSArgumentException] {
+                Write-Verbose 'Add key name and value on existing path'
+                $null = New-ItemProperty @newParams
+                Write-Output "$idString. Created key name and value on existing path."
+            }
+            catch [System.Management.Automation.ItemNotFoundException] {
+                Write-Verbose 'Add new registry key'
+                $null = New-Item -Path $Path -ErrorAction Stop
+                $null = New-ItemProperty @newParams
+                Write-Output "$idString did not exist. Created new registry key."
+            }
+        }
+        catch {
+            Write-Error "Failed to set registry path '$Path' with key name '$Name' to value '$Value' with type '$Type': $_"
+            $Error.RemoveAt(1)
+        }
+    }
+
     Try {
         $RegistryKeysFile = Join-Path -Path $DataFolder -ChildPath $RegistryKeysFileName
 
@@ -79,52 +138,8 @@ Process {
             ConvertFrom-Json -EA Stop
      
             foreach ($key in $registryKeys) {
-                try {
-                    try {
-                        $idString = "Registry path '$($key.Path)' key name '$($key.Name)' value '$($key.Value)' type '$($key.Type)'"
-                        Write-Verbose $idString
-                        
-                        $newParams = @{
-                            Path         = $key.Path
-                            Name         = $key.Name
-                            Value        = $key.Value
-                            PropertyType = $key.Type
-                            Force        = $true
-                            ErrorAction  = 'Stop'
-                        }
-                        $getParams = @{
-                            Path        = $key.Path
-                            Name        = $key.Name
-                            ErrorAction = 'Stop'
-                        }
-                        $currentValue = (Get-ItemProperty @getParams).($key.Name)
-
-                        if ($currentValue -ne $key.Value) {
-                            Write-Verbose "Update old value '$currentValue' with new value '$($key.Value)'"
-                            $null = New-ItemProperty @newParams
-                            Write-Output "$idString not correct. Updated old value '$currentValue' with new value '$($key.Value)'."
-                        }
-                        else {
-                            Write-Verbose 'Registry key correct'
-                            Write-Output "$idString correct. Nothing to update."
-                        }
-                    }
-                    catch [System.Management.Automation.PSArgumentException] {
-                        Write-Verbose 'Add key name and value on existing path'
-                        $null = New-ItemProperty @newParams
-                        Write-Output "$idString. Created key name and value on existing path."
-                    }
-                    catch [System.Management.Automation.ItemNotFoundException] {
-                        Write-Verbose 'Add new registry key'
-                        $null = New-Item -Path $key.Path -ErrorAction Stop
-                        $null = New-ItemProperty @newParams
-                        Write-Output "$idString did not exist. Created new registry key."
-                    }
-                }
-                catch {
-                    Write-Error "Failed to set registry path '$($key.Path)' with key name '$($key.Name)' to value '$($key.Value)' with type '$($key.Type)': $_"
-                    $Error.RemoveAt(1)
-                }
+                & $scriptBlock -Path $key.Path -Name $key.Name -Value $key.Value -Type $key.Type
+                
             }
         }
     }

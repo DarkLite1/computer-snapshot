@@ -91,21 +91,26 @@ Describe "With Action set to 'Export'" {
             $InputObject -like 'Created example registry keys file*'
         }
     }
-} -Tag test
-Describe "With Action set to 'Import'" {
+}
+Describe "With Action set to 'Import' for 'RunAsCurrentUser'" {
     BeforeAll {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Import'
     }
     Context 'and the registry path does not exist' {
         BeforeAll {
-            $testKey = @{
+            $testKey = [PSCustomObject]@{
                 Path  = 'TestRegistry:\testPath'
                 Name  = 'testName'
                 Value = '1'
                 Type  = 'DWORD'
             }
-            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+            [PSCustomObject]@{
+                RunAsCurrentUser = [PSCustomObject]@{
+                    RegistryKeys = @($testKey)
+                }
+                RunAsOtherUser   = $null
+            } | ConvertTo-Json | Out-File -LiteralPath $testFile
 
             .$testScript @testNewParams
         
@@ -129,7 +134,7 @@ Describe "With Action set to 'Import'" {
                 $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
             }
         }
-    }
+    } -Tag test
     Context 'and the registry path exists' {
         Context 'but the key name does not exist' {
             BeforeAll {

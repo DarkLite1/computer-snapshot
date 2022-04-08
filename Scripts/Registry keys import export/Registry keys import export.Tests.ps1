@@ -144,7 +144,12 @@ Describe "With Action set to 'Import' for 'RunAsCurrentUser'" {
                     Value = '2'
                     Type  = 'DWORD'
                 }
-                @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+                @{
+                    RunAsCurrentUser = @{
+                        RegistryKeys = @($testKey)
+                    }
+                    RunAsOtherUser   = $null
+                } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
                 $null = New-Item -Path $testKey.Path -Force
 
@@ -179,7 +184,12 @@ Describe "With Action set to 'Import' for 'RunAsCurrentUser'" {
                     Value = '3'
                     Type  = 'DWORD'
                 }
-                @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+                @{
+                    RunAsCurrentUser = @{
+                        RegistryKeys = @($testKey)
+                    }
+                    RunAsOtherUser   = $null
+                } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
                 $null = New-Item -Path $testKey.Path -Force
 
@@ -222,7 +232,12 @@ Describe "With Action set to 'Import' for 'RunAsCurrentUser'" {
                     Value = '3'
                     Type  = 'DWORD'
                 }
-                @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+                @{
+                    RunAsCurrentUser = @{
+                        RegistryKeys = @($testKey)
+                    }
+                    RunAsOtherUser   = $null
+                } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
                 $null = New-Item -Path $testKey.Path -Force
                 $null = New-ItemProperty @testKey
@@ -259,7 +274,12 @@ Describe "With Action set to 'Import' for 'RunAsCurrentUser'" {
                 Value = 'stringWhereNumberIsExpected'
                 Type  = 'DWORD'
             }
-            @($testKey) | ConvertTo-Json | Out-File -LiteralPath $testFile
+            @{
+                RunAsCurrentUser = @{
+                    RegistryKeys = @($testKey)
+                }
+                RunAsOtherUser   = $null
+            } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
             Mock Write-Error
         

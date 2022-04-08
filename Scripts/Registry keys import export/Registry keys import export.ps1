@@ -137,9 +137,8 @@ Process {
             $registryKeys = Get-Content -LiteralPath $RegistryKeysFile -Encoding UTF8 -Raw | 
             ConvertFrom-Json -EA Stop
      
-            foreach ($key in $registryKeys) {
+            foreach ($key in $registryKeys.RunAsCurrentUser.RegistryKeys) {
                 & $scriptBlock -Path $key.Path -Name $key.Name -Value $key.Value -Type $key.Type
-                
             }
         }
     }

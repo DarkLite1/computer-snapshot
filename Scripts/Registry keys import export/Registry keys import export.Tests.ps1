@@ -381,12 +381,12 @@ Describe "With Action set to 'Import' for 'RunAsOtherUser'" {
             $actual.($testKey.Name) | Should -Be $testKey.Value
         }
         It 'output is generated' {
-            Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
-                $InputObject -eq "Registry path 'Registry::HKEY_USERS\$testUserName\testPath' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
-            }
             # Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
-            #     $InputObject -eq "Registry path 'HKU:\$testUserName\testPath' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
+            #     $InputObject -eq "Registry path 'Registry::HKEY_USERS\$testUserName\testPath' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
             # }
+            Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
+                $InputObject -eq "Registry path 'HKU:\$testUserName\testPath' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
+            }
         }
     } 
 } -Tag test

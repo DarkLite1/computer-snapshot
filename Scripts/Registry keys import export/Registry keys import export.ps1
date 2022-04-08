@@ -209,24 +209,24 @@ Process {
                 #endregion
                 
                 #region Map user's profile
-                # $driveParams = @{
-                #     PSProvider = 'Registry'
-                #     Name       = 'HKU'
-                #     Root       = 'HKEY_USERS'
-                # }
-                # $null = New-PSDrive @driveParams
+                $driveParams = @{
+                    PSProvider = 'Registry'
+                    Name       = 'HKU'
+                    Root       = 'HKEY_USERS'
+                }
+                $null = New-PSDrive @driveParams
                 
-                # if (-not (Test-Path -Path "HKU:\$($user.UserName)")) {
-                #     throw "Failed to load the registry for user '$($user.UserName)'"
-                # }
+                if (-not (Test-Path -Path "HKU:\$($user.UserName)")) {
+                    throw "Failed to load the registry for user '$($user.UserName)'"
+                }
                 #endregion
                 
                 #region apply changes to user's profile
                 foreach ($key in $user.RegistryKeys) {
                     $path = if ($key.Path -match '^HKCU:\\') {
-                        $key.Path -replace '^HKCU:\\', 
-                        "Registry::HKEY_USERS\$($user.UserName)\"
-                        # $key.Path -replace '^HKCU:\\', "HKU:\$($user.UserName)\"
+                        # $key.Path -replace '^HKCU:\\', 
+                        # "Registry::HKEY_USERS\$($user.UserName)\"
+                        $key.Path -replace '^HKCU:\\', "HKU:\$($user.UserName)\"
                     }
                     else {
                         $key.Path
@@ -237,9 +237,9 @@ Process {
                 #endregion
                 
                 #region Unload user's profile
-                # Remove-PSDrive -Name $driveParams.Name
                 [gc]::Collect()
                 [gc]::WaitForPendingFinalizers()
+                Remove-PSDrive -Name $driveParams.Name
 
                 $startParams = @{
                     FilePath     = 'reg.exe'

@@ -78,20 +78,20 @@ Describe "With Action set to 'Export'" {
     }
     It 'a valid json file is created' {
         $testFile | Should -Exist
-        { Get-Content $testFi -Raw | ConvertFrom-Json } | Should -Not -Throw
+        { Get-Content $testFile -Raw | ConvertFrom-Json } | Should -Not -Throw
     }
     It 'the .json file is a copy of Example.json' {
         $testJsonFile = Get-Content $testFile -Raw
         $testExampleJsonFile = Get-Content (Join-Path $PSScriptRoot 'Example.json') -Raw
 
         $testJsonFile | Should -Be $testExampleJsonFile
-    } -Tag test
+    }
     It 'output is generated' {
         Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
-            $InputObject -eq 'Exported registry keys example'
+            $InputObject -like 'Created example registry keys file*'
         }
     }
-}
+} -Tag test
 Describe "With Action set to 'Import'" {
     BeforeAll {
         $testNewParams = $testParams.clone()

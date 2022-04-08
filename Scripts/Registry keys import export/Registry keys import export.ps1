@@ -64,6 +64,7 @@ Begin {
                 if ($currentValue -ne $Value) {
                     Write-Verbose "Update old value '$currentValue' with new value '$Value'"
                     $null = New-ItemProperty @newParams
+                    # $n.Handle.Close()
                     Write-Output "$idString not correct. Updated old value '$currentValue' with new value '$Value'."
                 }
                 else {
@@ -74,12 +75,16 @@ Begin {
             catch [System.Management.Automation.PSArgumentException] {
                 Write-Verbose 'Add key name and value on existing path'
                 $null = New-ItemProperty @newParams
+                # $n.Handle.Close()
                 Write-Output "$idString. Created key name and value on existing path."
             }
             catch [System.Management.Automation.ItemNotFoundException] {
                 Write-Verbose 'Add new registry key'
-                $null = New-Item -Path $Path -ErrorAction Stop
+                $n = New-Item -Path $Path -ErrorAction Stop
+                $n.Handle.Close()
+
                 $null = New-ItemProperty @newParams
+                # $n.Handle.Close()
                 Write-Output "$idString did not exist. Created new registry key."
             }
         }
@@ -137,9 +142,123 @@ Process {
             $registryKeys = Get-Content -LiteralPath $RegistryKeysFile -Encoding UTF8 -Raw | 
             ConvertFrom-Json -EA Stop
      
+            #region Run registry keys for current user
             foreach ($key in $registryKeys.RunAsCurrentUser.RegistryKeys) {
                 & $scriptBlock -Path $key.Path -Name $key.Name -Value $key.Value -Type $key.Type
             }
+            #endregion
+
+            #region Run registry keys for another user
+            foreach ($user in $registryKeys.RunAsOtherUser) {
+                if (-not $user.UserName) {
+                    Throw "Property 'UserName' is mandatory in 'RunAsOtherUser'"
+                }
+
+                $ntUserFile = "C:\Users\$($user.UserName)\NTUSER.DAT"
+                $tempKey = "HKEY_USERS\$($user.UserName)"
+
+                #region Create other user's profile
+                if (-not (Test-Path -LiteralPath $ntUserFile -PathType Leaf)) {
+                    if (-not $user.UserPassword) {
+                        Throw "Property 'UserPassword' is mandatory in 'RunAsOtherUser' when the user account doesn't exist yet"
+                    }
+
+                    $convertParams = @{
+                        String      = $user.UserPassword
+                        AsPlainText = $true
+                        Force       = $true
+                    }
+                    $securePassword = ConvertTo-SecureString @convertParams
+                    $credential = New-Object System.Management.Automation.PSCredential $user.UserName, $securePassword
+
+                    Write-Verbose "Create user profile folders"
+                    $params = @{
+                        FilePath         = 'powershell.exe'
+                        WorkingDirectory = 'C:\Windows\System32'
+                        Credential       = $credential
+                        ArgumentList     = '-Command', 1
+                        WindowStyle      = 'Hidden'
+                        LoadUserProfile  = $true
+                        Wait             = $true
+                    }
+                    Start-Process @params
+                    "Created user profile folders for '$($user.UserName)'"
+                }
+
+                if (-not (Test-Path -LiteralPath $ntUserFile -PathType Leaf)) {
+                    throw "File '$ntUserFile' not found for user '$($user.UserName)'"
+                }
+                #endregion
+                
+                #region Load other user's profile
+                $startParams = @{
+                    FilePath     = 'reg.exe'
+                    ArgumentList = "load `"$tempKey`" `"$ntUserFile`"" 
+                    WindowStyle  = 'Hidden'
+                    Wait         = $true
+                    PassThru     = $true
+                }
+                $process = Start-Process @startParams
+                
+                if ($process.ExitCode) {
+                    throw "Failed to load the user profile '$($user.UserName)': exit code $($process.ExitCode)"
+                }
+                
+                if (
+                    -not (Test-Path -Path "Registry::HKEY_USERS\$($user.UserName)")
+                ) {
+                    throw "Failed to load the registry for user '$($user.UserName)'"
+                }
+                #endregion
+                
+                #region Map user's profile
+                # $driveParams = @{
+                #     PSProvider = 'Registry'
+                #     Name       = 'HKU'
+                #     Root       = 'HKEY_USERS'
+                # }
+                # $null = New-PSDrive @driveParams
+                
+                # if (-not (Test-Path -Path "HKU:\$($user.UserName)")) {
+                #     throw "Failed to load the registry for user '$($user.UserName)'"
+                # }
+                #endregion
+                
+                #region apply changes to user's profile
+                foreach ($key in $user.RegistryKeys) {
+                    $path = if ($key.Path -match '^HKCU:\\') {
+                        $key.Path -replace '^HKCU:\\', 
+                        "Registry::HKEY_USERS\$($user.UserName)\"
+                        # $key.Path -replace '^HKCU:\\', "HKU:\$($user.UserName)\"
+                    }
+                    else {
+                        $key.Path
+                    }
+
+                    & $scriptBlock -Path $path -Name $key.Name -Value $key.Value -Type $key.Type
+                }
+                #endregion
+                
+                #region Unload user's profile
+                # Remove-PSDrive -Name $driveParams.Name
+                [gc]::Collect()
+                [gc]::WaitForPendingFinalizers()
+
+                $startParams = @{
+                    FilePath     = 'reg.exe'
+                    ArgumentList = "unload `"$tempKey`""
+                    WindowStyle  = 'Hidden'
+                    Wait         = $true
+                    PassThru     = $true
+                }
+                $process = Start-Process @startParams
+                
+                if ($process.ExitCode) {
+                    throw "Failed to unload the temporary profile: exit code $($process.ExitCode)"
+                }
+                #endregion
+            }
+            #endregion
         }
     }
     Catch {

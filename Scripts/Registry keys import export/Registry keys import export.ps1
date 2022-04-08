@@ -204,7 +204,7 @@ Process {
                 if (
                     -not (Test-Path -Path "Registry::HKEY_USERS\$($user.UserName)")
                 ) {
-                    throw "Failed to load the registry for user '$($user.UserName)'"
+                    throw "Failed to load the registry hive '$tempKey' from file '$ntUserFile' for user '$($user.UserName)'"
                 }
                 #endregion
                 

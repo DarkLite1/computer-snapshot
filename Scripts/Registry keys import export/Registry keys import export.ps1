@@ -224,8 +224,6 @@ Process {
                 #region apply changes to user's profile
                 foreach ($key in $user.RegistryKeys) {
                     $path = if ($key.Path -match '^HKCU:\\') {
-                        # $key.Path -replace '^HKCU:\\', 
-                        # "Registry::HKEY_USERS\$($user.UserName)\"
                         $key.Path -replace '^HKCU:\\', "HKU:\$($user.UserName)\"
                     }
                     else {

@@ -111,19 +111,21 @@ Describe "With Action set to 'Import'" {
             }
         }
     }
-} -Tag test
-Context 'non terminating errors are generated when' {
-    It 'a folder cannot be created' {
-        'wrong' | Out-File -FilePath $testFile
+    Context 'non terminating errors are generated when' {
+        It 'a folder cannot be created' {
+            @{
+                FolderPaths = @('wrong')
+            } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
-        $Error.Clear()
-        .$testScript @testNewParams -EA SilentlyContinue
+            $Error.Clear()
+            .$testScript @testNewParams -EA SilentlyContinue
 
-        $Error.Exception.Message | Where-Object {
-            $_ -like "*Failed to create folder 'wrong': Path not valid"
-        } | Should -Not -BeNullOrEmpty
+            $Error.Exception.Message | Where-Object {
+                $_ -like "*Failed to create folder 'wrong': Path not valid"
+            } | Should -Not -BeNullOrEmpty
+        }
     }
-}
+} -Tag test
 Describe "With Action set to 'Export'" {
     BeforeAll {
         $testFile | Remove-Item -EA Ignore

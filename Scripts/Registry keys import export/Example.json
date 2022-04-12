@@ -3,7 +3,7 @@
     "RegistryKeys": [
       {
         "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
-        "Name": "dontdisplaylastusername",
+        "Name": "DontDisplayLastUserName",
         "Value": "1",
         "Type": "DWORD"
       },

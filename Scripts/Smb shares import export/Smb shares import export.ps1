@@ -9,7 +9,8 @@
         script again with action Import and it will restore all smb shares in
         the data folder.
         
-        This script will never delete an smb share or folder.
+        This script will never delete an smb share or folder. SMB share folders
+        that do not exist will be created.
         
     .PARAMETER Action
         When action is 'Export' the data will be saved in the $DataFolder, when 

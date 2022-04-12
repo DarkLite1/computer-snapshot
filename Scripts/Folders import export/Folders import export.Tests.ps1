@@ -75,14 +75,16 @@ Describe 'Fail the import of Folders when' {
     }
 }
 Describe "With Action set to 'Import'" {
-    BeforeAll {
-        $testFolders | Out-File -FilePath $testFile
-
+    BeforeEach {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Import'
+
+        $testFolders | Remove-Item -EA Ignore
     }
     It 'folders are created when they do not exist' {
-        $testFolders | Remove-Item
+        @{
+            FolderPaths = @($testFolders)
+        } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
         .$testScript @testNewParams
 
@@ -96,7 +98,7 @@ Describe "With Action set to 'Import'" {
     }
     It 'folders are left alone when they already exist' {
         foreach ($testFolder in $testFolders) {
-            New-Item -Path $testFolder -ItemType Directory -EA Ignore
+            New-Item -Path $testFolder -ItemType Directory
         }
 
         .$testScript @testNewParams
@@ -109,7 +111,7 @@ Describe "With Action set to 'Import'" {
             }
         }
     }
-}
+} -Tag test
 Context 'non terminating errors are generated when' {
     It 'a folder cannot be created' {
         'wrong' | Out-File -FilePath $testFile
@@ -141,4 +143,4 @@ Describe "With Action set to 'Export'" {
 
         $testJsonFile | Should -Be $testExampleJsonFile
     }
-} -Tag test
+}

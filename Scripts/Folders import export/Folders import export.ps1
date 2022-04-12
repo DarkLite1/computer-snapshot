@@ -73,31 +73,37 @@ Process {
             Write-Output "Created example file '$foldersFile'"
             #endregion
         }
-        else {            
+        else {
+            #region Import .JSON file
             Write-Verbose "Import folders from file '$foldersFile'"
-            $folders = Get-Content -LiteralPath $foldersFile -Encoding UTF8 | 
-            Where-Object { $_ }
-        
-            foreach ($folder in $folders) {
+            $getParams = @{
+                LiteralPath = $foldersFile 
+                Encoding    = 'UTF8'
+                Raw         = $true
+            }
+            $folders = Get-Content @getParams | ConvertFrom-Json -EA Stop
+            #endregion
+
+            foreach ($path in $folders.FolderPaths) {
                 Try {
-                    Write-Verbose "Folder '$folder'"
+                    Write-Verbose "Folder '$path'"
           
-                    If (Test-Path -LiteralPath $folder -PathType Container) {
-                        Write-Output "Folder '$folder' exists already"
+                    If (Test-Path -LiteralPath $path -PathType Container) {
+                        Write-Output "Folder '$path' exists already"
                     }
                     else {
                         if (
-                            $folder -NotMatch 
+                            $path -NotMatch 
                             '^([a-zA-Z]+:)?(\\[a-zA-Z0-9-_.-: :]+)*\\?$'
                         ) {
                             throw 'Path not valid'
                         }
-                        $null = New-Item -Path $folder -ItemType Directory
-                        Write-Output "Folder '$folder' created"
+                        $null = New-Item -Path $path -ItemType Directory
+                        Write-Output "Folder '$path' created"
                     }
                 }
                 Catch {
-                    Write-Error "Failed to create folder '$folder': $_"
+                    Write-Error "Failed to create folder '$path': $_"
                     $Error.RemoveAt(1)
                 }
             }

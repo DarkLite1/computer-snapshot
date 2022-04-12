@@ -152,8 +152,8 @@ Param (
         UserAccounts             = $true
         UserGroups               = $true
         FirewallRules            = $true
+        CreateFolders            = $true
         SmbShares                = $true
-        Folders                  = $true
         NetworkCards             = $true
         NtpTimeServers           = $true
         RegistryKeys             = $true
@@ -165,8 +165,8 @@ Param (
         UserAccounts             = 'Scripts\User accounts import export\User accounts import export.ps1'
         UserGroups               = 'Scripts\User groups import export\User groups import export.ps1'
         FirewallRules            = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
+        CreateFolders            = 'Scripts\Folders import export\Folders import export.ps1'
         SmbShares                = 'Scripts\Smb shares import export\Smb shares import export.ps1'
-        Folders                  = 'Scripts\Folders import export\Folders import export.ps1'
         RegionalSettings         = 'Scripts\Regional settings import export\Regional settings import export.ps1'
         NetworkCards             = 'Scripts\Network cards import export\Network cards import export.ps1'
         NtpTimeServers           = 'Scripts\NTP time servers import export\NTP time servers import export.ps1'

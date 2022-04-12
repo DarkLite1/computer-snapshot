@@ -72,11 +72,13 @@ Begin {
                 }
             }
             catch [System.Management.Automation.PSArgumentException] {
+                $Error.RemoveAt(0)
                 Write-Verbose 'Add key name and value on existing path'
                 $null = New-ItemProperty @newParams
                 Write-Output "$idString. Created key name and value on existing path."
             }
             catch [System.Management.Automation.ItemNotFoundException] {
+                $Error.RemoveAt(0)
                 Write-Verbose 'Add new registry key'
                 $n = New-Item -Path $Path -ErrorAction Stop
                 $n.Handle.Close()

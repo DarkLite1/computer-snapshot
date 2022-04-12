@@ -140,4 +140,4 @@ Describe "With Action set to 'Export'" {
         $testFoldersFile | Should -Exist
         Get-Content $testFoldersFile | Should -HaveCount 3
     }
-}
+} -Tag test

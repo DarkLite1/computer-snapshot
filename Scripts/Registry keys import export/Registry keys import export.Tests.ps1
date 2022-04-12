@@ -300,14 +300,23 @@ Describe "With Action set to 'Import' for 'RunAsOtherUser'" {
         $testUserName = 'pesterTestUser'
         $testUserPassword = 'te2@!Dst' 
 
+        $testProfileFolder = "C:\Users\$testUserName"
+        $testNtUserFile = Join-Path $testProfileFolder 'NTUSER.DAT'
+        $testTempKey = "HKEY_USERS\$testUserName"
+
         $testSecurePassword = ConvertTo-SecureString $testUserPassword -AsPlainText -Force
         $testCredential = New-Object System.Management.Automation.PSCredential $testUserName, $testSecurePassword
 
-        $testProfileFolder = "C:\Users\$testUserName"
+        if (Test-Path $testProfileFolder) {
+            # App Data folder might have a corrupt owner
+            Push-AclInheritanceHC -Target $testProfileFolder
+            Remove-Item $testProfileFolder -Recurse -Force                
+        }
 
-        Remove-Item $testProfileFolder -Recurse -Force -EA Ignore
         Remove-LocalUser $testUserName -EA Ignore
         New-LocalUser $testUserName -Password $testSecurePassword
+
+        $testNtUserFile | Should -Not -Exist
         #endregion
 
         #region Create test .json file
@@ -331,8 +340,6 @@ Describe "With Action set to 'Import' for 'RunAsOtherUser'" {
 
         .$testScript @testNewParams
 
-        $testNtUserFile = "C:\Users\$testUserName\NTUSER.DAT"
-        $testTempKey = "HKEY_USERS\$testUserName"
 
         #region Load other user's profile
         $testStartParams = @{
@@ -384,6 +391,6 @@ Describe "With Action set to 'Import' for 'RunAsOtherUser'" {
             Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
                 $InputObject -eq "Registry path 'HKU:\$testUserName\testPath' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
             }
-        }
+        } -Tag test
     } 
-} -Tag test
+}

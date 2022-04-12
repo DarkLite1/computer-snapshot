@@ -26,7 +26,7 @@ Param(
     [String]$Action,
     [Parameter(Mandatory)]
     [String]$DataFolder,
-    [String]$FoldersFileName = 'Folders.txt'
+    [String]$FoldersFileName = 'CreateFolders.json'
 )
 
 Begin {    
@@ -63,20 +63,15 @@ Begin {
 Process {
     Try {
         If ($Action -eq 'Export') {
-            $exampleFolders = (Join-Path -Path $env:TEMP -ChildPath 1), 
-            (Join-Path -Path $env:TEMP -ChildPath 2),
-            (Join-Path -Path $env:TEMP -ChildPath 3)
-
-            $exampleFolders | 
-            Out-File -LiteralPath $foldersFile -Encoding utf8
-
-            Write-Output 'Exported example folders:'
-
-            $exampleFolders | ForEach-Object {
-                Write-Output "Exported folder '$_'"
+            #region Create example file
+            Write-Verbose "Create example file '$foldersFile'"
+            $params = @{
+                LiteralPath = Join-Path $PSScriptRoot 'Example.json'
+                Destination = $foldersFile
             }
-
-            Write-Output 'Please update the export file by replacing the example folders with the folders you like to be created'
+            Copy-Item @params
+            Write-Output "Created example file '$foldersFile'"
+            #endregion
         }
         else {            
             Write-Verbose "Import folders from file '$foldersFile'"

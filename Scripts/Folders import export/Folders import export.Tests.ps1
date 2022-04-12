@@ -10,13 +10,19 @@ BeforeAll {
     $testParams = @{
         Action          = 'Import'
         DataFolder      = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
-        foldersFileName = 'folders.txt'
+        foldersFileName = 'testCreateFolders.json'
     }
+
+    $testJoinParams = @{
+        Path      = $testParams.DataFolder
+        ChildPath = $testParams.foldersFileName
+    }
+    $testFile = Join-Path @testJoinParams
 
     Mock Write-Output
 }
 AfterAll {
-    $testFolders | Remove-Item
+    $testFile | Remove-Item -EA Ignore
 }
 Describe 'the mandatory parameters are' {
     It '<_>' -ForEach 'Action', 'DataFolder' {
@@ -70,12 +76,7 @@ Describe 'Fail the import of Folders when' {
 }
 Describe "With Action set to 'Import'" {
     BeforeAll {
-        $testJoinParams = @{
-            Path      = $testParams.DataFolder
-            ChildPath = $testParams.foldersFileName
-        }
-        $testFoldersFile = Join-Path @testJoinParams
-        $testFolders | Out-File -FilePath $testFoldersFile
+        $testFolders | Out-File -FilePath $testFile
 
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Import'
@@ -108,36 +109,36 @@ Describe "With Action set to 'Import'" {
             }
         }
     }
-    Context 'non terminating errors are generated when' {
-        It 'a folder cannot be created' {
-            'wrong' | Out-File -FilePath $testFoldersFile
+}
+Context 'non terminating errors are generated when' {
+    It 'a folder cannot be created' {
+        'wrong' | Out-File -FilePath $testFile
 
-            $Error.Clear()
-            .$testScript @testNewParams -EA SilentlyContinue
+        $Error.Clear()
+        .$testScript @testNewParams -EA SilentlyContinue
 
-            $Error.Exception.Message | Where-Object {
-                $_ -like "*Failed to create folder 'wrong': Path not valid"
-            } | Should -Not -BeNullOrEmpty
-        }
+        $Error.Exception.Message | Where-Object {
+            $_ -like "*Failed to create folder 'wrong': Path not valid"
+        } | Should -Not -BeNullOrEmpty
     }
 }
 Describe "With Action set to 'Export'" {
     BeforeAll {
-        Get-ChildItem $testParams.DataFolder | Remove-Item
-
-        $testJoinParams = @{
-            Path      = $testParams.DataFolder
-            ChildPath = $testParams.foldersFileName
-        }
-        $testFoldersFile = Join-Path @testJoinParams
+        $testFile | Remove-Item -EA Ignore
 
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'Export'
-    }
-    It 'a template file is exported to the data folder' {
-        .$testScript @testNewParams
 
-        $testFoldersFile | Should -Exist
-        Get-Content $testFoldersFile | Should -HaveCount 3
+        .$testScript @testNewParams
+    }
+    It 'a valid json file is created' {
+        $testFile | Should -Exist
+        { Get-Content $testFile -Raw | ConvertFrom-Json } | Should -Not -Throw
+    }
+    It 'the .json file is a copy of Example.json' {
+        $testJsonFile = Get-Content $testFile -Raw
+        $testExampleJsonFile = Get-Content (Join-Path $PSScriptRoot 'Example.json') -Raw
+
+        $testJsonFile | Should -Be $testExampleJsonFile
     }
 } -Tag test

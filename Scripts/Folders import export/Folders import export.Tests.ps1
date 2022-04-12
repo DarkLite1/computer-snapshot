@@ -134,7 +134,7 @@ Describe "With Action set to 'Import'" {
 
             {.$testScript @testNewParams} | Should -Throw "*Property 'FolderPaths' is empty, no folder to create. Please update the input file '$testFile'*"
         }
-    } -Tag test
+    }
 }
 Describe "With Action set to 'Export'" {
     BeforeAll {

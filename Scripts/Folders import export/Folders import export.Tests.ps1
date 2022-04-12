@@ -125,7 +125,17 @@ Describe "With Action set to 'Import'" {
             } | Should -Not -BeNullOrEmpty
         }
     }
-} -Tag test
+    Context 'terminating errors are generated when' {
+        It "the property 'FolderPaths' is empty in the .JSON file" {
+            @{
+                NotImportant = @('wrong')
+            } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
+
+
+            {.$testScript @testNewParams} | Should -Throw "*Property 'FolderPaths' is empty, no folder to create. Please update the input file '$testFile'*"
+        }
+    } -Tag test
+}
 Describe "With Action set to 'Export'" {
     BeforeAll {
         $testFile | Remove-Item -EA Ignore

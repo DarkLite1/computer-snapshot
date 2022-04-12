@@ -84,6 +84,12 @@ Process {
             $folders = Get-Content @getParams | ConvertFrom-Json -EA Stop
             #endregion
 
+            #region Test .JSON file
+            if (-not $folders.FolderPaths) {
+                throw "Property 'FolderPaths' is empty, no folder to create. Please update the input file '$foldersFile'"
+            }
+            #endregion
+
             foreach ($path in $folders.FolderPaths) {
                 Try {
                     Write-Verbose "Folder '$path'"

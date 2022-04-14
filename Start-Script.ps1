@@ -159,6 +159,7 @@ Param (
         RegistryKeys             = $true
         ScheduledTasks           = $true
         CopyFilesFolders         = $true
+        Software                 = $true
         StartCustomScriptsAfter  = $true
     },
     [HashTable]$Script = @{
@@ -173,6 +174,7 @@ Param (
         RegistryKeys             = 'Scripts\Registry keys import export\Registry keys import export.ps1'
         ScheduledTasks           = 'Scripts\Scheduled tasks import export\Scheduled tasks import export.ps1'
         CopyFilesFolders         = 'Scripts\Copy files folders import export\Copy files folders import export.ps1'
+        Software                 = 'Scripts\Software import export\Software import export.ps1'
         StartCustomScriptsBefore = 'Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
         StartCustomScriptsAfter  = 'Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
     },

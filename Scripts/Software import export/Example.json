@@ -1,19 +1,19 @@
 {
-  "SoftwarePackages": [
-    {
-      "InstalledName": "Notepad++ (64-bit x64)",
-      "ExecutableName": "npp.8.3.3.Installer.x64.exe",
-      "UninstallBeforeInstallation": false
-    },
-    {
-      "InstalledName": "Microsoft Edge",
-      "ExecutableName": "MicrosoftEdgeSetup.exe",
-      "UninstallBeforeInstallation": false
-    },
-    {
-      "InstalledName": "NA",
-      "ExecutableName": "Remote Access-windows64-offline.exe",
-      "UninstallBeforeInstallation": false
-    }
-  ]
+  "SoftwarePackages": {
+    "Remove": ["Notepad++ (64-bit x64)"],
+    "Install": [
+      {
+        "ExecutableName": "npp.8.3.3.Installer.x64.exe",
+        "Arguments": "/S"
+      },
+      {
+        "ExecutableName": "MicrosoftEdgeSetup.exe",
+        "Arguments": null
+      },
+      {
+        "ExecutableName": "Remote Access-windows64-offline.exe",
+        "Arguments": null
+      }
+    ]
+  }
 }

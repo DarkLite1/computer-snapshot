@@ -188,12 +188,6 @@ Describe "With Action set to 'Import'" {
             } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
             .$testScript @testNewParams
-        
-            $testGetParams = @{
-                Path = $testKey.Path
-                Name = $testKey.Name
-            }
-            
         }
         It 'when their ExecutableName is in the Install property' {
             Should -Invoke Start-Process -Scope Context -Times 1 -Exactly -ParameterFilter {

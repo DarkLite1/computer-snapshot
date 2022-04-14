@@ -435,7 +435,7 @@ Begin {
 Process {
     $childScriptResults = @()
     foreach ($item in $Snapshot.GetEnumerator() | Where-Object { $_.Value }) {
-        #region Start progress bar
+        #region Continue progress bar
         $progressBarCount.CompletedPercentage = 
         [int]($progressBarCount.CurrentStep * 
             (100 / $progressBarCount.TotalSteps))

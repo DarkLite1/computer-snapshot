@@ -4,8 +4,8 @@
 
     .DESCRIPTION
         The .JSON file contains a list of software packages to install or 
-        remove. When a package is in requested to both be installed and 
-        removed, it will  first be uninstalled and then installed again.
+        remove. When a package is requested to be installed and removed, it 
+        will first be uninstalled and then installed again.
         
     .PARAMETER Action
         When action is 'Export' a template file is created that can be edited 

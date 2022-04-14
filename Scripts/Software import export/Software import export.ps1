@@ -1,10 +1,11 @@
 <#
     .SYNOPSIS
-        Install software packages
+        Install or remove software packages
 
     .DESCRIPTION
-        Read which software packages to install from an input file and
-        install the required packages on the current machine.
+        The .JSON file contains a list of software packages to install or 
+        remove. When a package is in requested to both be installed and 
+        removed, it will  first be uninstalled and then installed again.
         
     .PARAMETER Action
         When action is 'Export' a template file is created that can be edited 

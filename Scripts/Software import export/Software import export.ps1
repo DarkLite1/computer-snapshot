@@ -201,6 +201,7 @@ Process {
             #region Install packages
             foreach ($application in $import.SoftwarePackages.Install) {
                 try {
+                    #region Test executable file
                     if (-not $application.ExecutableName) {
                         throw "Property 'ExecutableName' is mandatory"
                     }
@@ -211,10 +212,16 @@ Process {
                     }
                     $executablePath = Join-Path @joinParams
 
-                    if (-not (Test-Path -LiteralPath $executablePath -PathType leaf)) {
+                    $testPathParams = @{
+                        LiteralPath = $executablePath
+                        PathType    = 'leaf'
+                    }
+                    if (-not (Test-Path @testPathParams)) {
                         throw "Executable file '$executablePath' not found"
                     }
+                    #endregion
 
+                    #region Install software package
                     Write-Verbose "Install executable '$($application.ExecutableName)'"
 
                     $startParams = @{
@@ -232,8 +239,9 @@ Process {
                         throw "Installation failed with ExitCode '$($process.ExitCode)'"
                     }
                     else {
-                        Write-Output "Executable '$($application.ExecutableName)' installed"
+                        Write-Output "Installed executable '$($application.ExecutableName)' with arguments '$($application.Arguments)'"
                     }
+                    #endregion
                 }
                 catch {
                     $errorMessage = $_; $Error.RemoveAt(0)

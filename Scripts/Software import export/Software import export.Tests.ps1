@@ -201,5 +201,5 @@ Describe "With Action set to 'Import'" {
                 ($ArgumentList -eq '\x \x \z')
             }
         }
-    } -tag test
+    }
 }

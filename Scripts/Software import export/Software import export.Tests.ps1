@@ -97,7 +97,7 @@ Describe 'Fail the import of the software packages file when' {
     It 'the software folder is empty' {
         @{
             SoftwarePackages = @{
-                Remove = $null
+                Remove  = $null
                 Install = $null
             }
         } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
@@ -107,7 +107,7 @@ Describe 'Fail the import of the software packages file when' {
         } | 
         Should -Throw "*Software folder '$testSoftwareFolder' empty"
     } 
-} -tag test
+}
 Describe "With Action set to 'Export'" {
     BeforeAll {
         $testFile | Remove-Item -EA Ignore
@@ -134,7 +134,7 @@ Describe "With Action set to 'Export'" {
     }
     It 'an empty Software folder is created' {
         $testSoftwareFolder | Should -Exist
-    } -Tag test
+    }
 } 
 Describe "With Action set to 'Import'" {
     BeforeAll {
@@ -143,17 +143,22 @@ Describe "With Action set to 'Import'" {
     }
     Context 'software packages are removed' {
         BeforeAll {
-            $testKey = @{
-                Path  = 'TestRegistry:\testPath'
-                Name  = 'testName'
-                Value = '1'
-                Type  = 'DWORD'
-            }
-            @{
-                RunAsCurrentUser = @{
-                    RegistryKeys = @($testKey)
+            New-Item -Path $testSoftwareFolder -ItemType Directory
+            '1' | Out-File -FilePath "$testSoftwareFolder\package1.exe"
+
+            Mock Get-InstalledApplicationsHC {
+                [PSCustomObject]@{
+                    DisplayName          = 'Package1'
+                    UninstallString      = "C:\Program Files\app\uninstall.exe"
+                    QuietUninstallString = '"C:\Program Files\app\install.exe" /S'
                 }
-                RunAsOtherUser   = $null
+            }
+
+            @{
+                SoftwarePackages = @{
+                    Remove  = @('Package1')
+                    Install = $null
+                }
             } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
             .$testScript @testNewParams
@@ -164,18 +169,10 @@ Describe "With Action set to 'Import'" {
             }
             
         }
-        It 'when installed path is created' {
-            $testKey.Path | Should -Exist
-        }
-        It 'the key name is created' {
-            $actual | Should -Not -BeNullOrEmpty
-        }
-        It 'the key value is set' {
-            $actual.($testKey.Name) | Should -Be $testKey.Value
-        }
-        It 'output is generated' {
-            Should -Invoke Write-Output -Exactly -Times 1 -Scope Describe -ParameterFilter {
-                $InputObject -eq "Registry path '$($testKey.Path)' key name '$($testKey.Name)' value '$($testKey.Value)' type '$($testKey.Type)' did not exist. Created new registry key."
+        It 'when their name is in the Remove property' {
+            Should -Invoke Remove-ApplicationHC -Scope Context -Times 1 -Exactly -ParameterFilter {
+                ($ApplicationName -eq 'Package1') -and
+                ($UninstallString -eq '"C:\Program Files\app\install.exe" /S')
             }
         }
     }

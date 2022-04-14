@@ -249,10 +249,29 @@ Begin {
     }
 
     Try {
-        $VerbosePreference = 'Continue'
-        
+        # $VerbosePreference = 'Continue'
         $Error.Clear()
         $Now = Get-Date
+
+        #region Start progress bar
+        $progressBarCount = @{
+            TotalSteps          = ($Snapshot.GetEnumerator() | Where-Object { $_.Value } | Measure-Object).Count + 1
+            CurrentStep         = 0
+            CompletedPercentage = 0
+        }        
+        
+        $progressBarCount.CompletedPercentage = 
+        [int]($progressBarCount.CurrentStep * 
+        (100 / $progressBarCount.TotalSteps))
+    
+        $progressParams = @{
+            Activity         = "Action '$Action'"
+            CurrentOperation = 'Preflight check'
+            Status           = "Complete: $($progressBarCount.CompletedPercentage) %"
+            PercentComplete  = $progressBarCount.CompletedPercentage
+        }
+        Write-Progress @progressParams
+        #endregion
 
         #region Test admin
         if (($Action -ne 'CreateSnapshot') -and (-not (Test-IsAdminHC))) {
@@ -405,6 +424,8 @@ Begin {
             }
         }
         #endregion
+
+        $progressBarCount.CurrentStep++
     }    
     Catch {
         throw "Failed to perform action '$Action'. Nothing done, please fix this error first: $_"
@@ -414,6 +435,20 @@ Begin {
 Process {
     $childScriptResults = @()
     foreach ($item in $Snapshot.GetEnumerator() | Where-Object { $_.Value }) {
+        #region Start progress bar
+        $progressBarCount.CompletedPercentage = 
+        [int]($progressBarCount.CurrentStep * 
+            (100 / $progressBarCount.TotalSteps))
+    
+        $progressParams = @{
+            Activity         = "Action '$Action'"
+            CurrentOperation = "Executing script '$($item.Key)'"
+            Status           = "Complete: $($progressBarCount.CompletedPercentage) %"
+            PercentComplete  = $progressBarCount.CompletedPercentage
+        }
+        Write-Progress @progressParams
+        #endregion
+
         Try {
             $Error.Clear()
 
@@ -450,6 +485,8 @@ Process {
                 $childScriptResult.NonTerminatingErrors = $Error.Exception.Message
             }
             $childScriptResults += $childScriptResult
+
+            $progressBarCount.CurrentStep++
         }
     }
 }

@@ -33,6 +33,7 @@ BeforeAll {
     Mock Restart-Computer
     Mock Write-Host
     Mock Write-Warning
+    Mock Write-Progress
 }
 Describe "Throw a terminating error for action 'CreateSnapshot' when" {
     BeforeEach {

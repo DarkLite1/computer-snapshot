@@ -127,7 +127,7 @@ Process {
     Try {
         If ($Action -eq 'Export') {
             #region Create example config file
-            Write-Verbose "Create example config file '$ExportFile'"
+            Write-Verbose "Create example file '$RegistryKeysFile'"
             $params = @{
                 LiteralPath = Join-Path $PSScriptRoot 'Example.json'
                 Destination = $RegistryKeysFile

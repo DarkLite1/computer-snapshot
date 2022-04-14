@@ -124,6 +124,10 @@ Process {
             Copy-Item @params
             Write-Output "Created example file '$ImportFilePath'"
             #endregion
+
+            #region Create empty software folder
+            $null = New-Item -Path "$DataFolder\Software" -ItemType Directory
+            #endregion
         }
         else {
             #region Import .JSON file

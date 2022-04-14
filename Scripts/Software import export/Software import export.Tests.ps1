@@ -113,7 +113,15 @@ Describe "With Action set to 'Export'" {
             $InputObject -like 'Created example file*'
         }
     }
-} -Tag test
+    It 'an empty Software folder is created' {
+        $testJoinSoftwareParams = @{
+            Path      = $testParams.DataFolder
+            ChildPath = 'Software'
+        }
+        $testPackageFolder = Join-Path @testJoinSoftwareParams
+        $testPackageFolder | Should -Exist
+    } -Tag test
+} 
 Describe "With Action set to 'Import'" {
     BeforeAll {
         $testNewParams = $testParams.clone()

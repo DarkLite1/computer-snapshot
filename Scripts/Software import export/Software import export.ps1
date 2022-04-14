@@ -211,7 +211,7 @@ Process {
                     }
                     $executablePath = Join-Path @joinParams
 
-                    if (-not (Test-Path -LiteralPath $executablePath -PathType -leaf)) {
+                    if (-not (Test-Path -LiteralPath $executablePath -PathType leaf)) {
                         throw "Executable file '$executablePath' not found"
                     }
 

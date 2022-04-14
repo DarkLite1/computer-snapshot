@@ -162,12 +162,6 @@ Describe "With Action set to 'Import'" {
             } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
             .$testScript @testNewParams
-        
-            $testGetParams = @{
-                Path = $testKey.Path
-                Name = $testKey.Name
-            }
-            
         }
         It 'when their name is in the Remove property' {
             Should -Invoke Remove-ApplicationHC -Scope Context -Times 1 -Exactly -ParameterFilter {
@@ -176,4 +170,36 @@ Describe "With Action set to 'Import'" {
             }
         }
     }
+    Context 'software packages are installed' {
+        BeforeAll {
+            New-Item -Path $testSoftwareFolder -ItemType Directory
+            '1' | Out-File -FilePath "$testSoftwareFolder\package1.exe"
+
+            @{
+                SoftwarePackages = @{
+                    Remove  = $null
+                    Install = @(
+                        @{
+                            ExecutableName = "package1.exe"
+                            Arguments      = '\x \x \z'
+                        }
+                    )
+                }
+            } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
+
+            .$testScript @testNewParams
+        
+            $testGetParams = @{
+                Path = $testKey.Path
+                Name = $testKey.Name
+            }
+            
+        }
+        It 'when their ExecutableName is in the Install property' {
+            Should -Invoke Start-Process -Scope Context -Times 1 -Exactly -ParameterFilter {
+                ($FilePath -eq "$testSoftwareFolder\Package1.exe") -and
+                ($ArgumentList -eq '\x \x \z')
+            }
+        }
+    } -tag test
 }

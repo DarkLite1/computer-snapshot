@@ -14,6 +14,12 @@ BeforeAll {
         ChildPath = $testParams.ImportFileName
     }
     $testFile = Join-Path @testJoinParams
+
+    $testJoinParams = @{
+        Path      = $testParams.DataFolder
+        ChildPath = 'Software'
+    }
+    $testSoftwareFolder = Join-Path @testJoinParams
     
     Function Remove-ApplicationHC {
         Param (
@@ -88,7 +94,20 @@ Describe 'Fail the import of the software packages file when' {
         { .$testScript @testNewParams } | 
         Should -Throw "*Input file '$($testNewParams.DataFolder)\$($testNewParams.ImportFileName)' not found"
     }
-}
+    It 'the software folder is empty' {
+        @{
+            SoftwarePackages = @{
+                Remove = $null
+                Install = $null
+            }
+        } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
+
+        { 
+            .$testScript @testNewParams 
+        } | 
+        Should -Throw "*Software folder '$testSoftwareFolder' empty"
+    } 
+} -tag test
 Describe "With Action set to 'Export'" {
     BeforeAll {
         $testFile | Remove-Item -EA Ignore
@@ -114,12 +133,7 @@ Describe "With Action set to 'Export'" {
         }
     }
     It 'an empty Software folder is created' {
-        $testJoinSoftwareParams = @{
-            Path      = $testParams.DataFolder
-            ChildPath = 'Software'
-        }
-        $testPackageFolder = Join-Path @testJoinSoftwareParams
-        $testPackageFolder | Should -Exist
+        $testSoftwareFolder | Should -Exist
     } -Tag test
 } 
 Describe "With Action set to 'Import'" {

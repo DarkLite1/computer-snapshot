@@ -84,6 +84,7 @@ Begin {
 
     Try {
         $ImportFilePath = Join-Path -Path $DataFolder -ChildPath $ImportFileName
+        $softwareFolder = Join-Path -Path $DataFolder -ChildPath 'Software'
 
         #region Test DataFolder
         If ($Action -eq 'Export') {
@@ -104,11 +105,18 @@ Begin {
             If (-not (Test-Path -LiteralPath $ImportFilePath -PathType Leaf)) {
                 throw "Input file '$ImportFilePath' not found"
             }
+            If (
+                (-not (Test-Path -LiteralPath $softwareFolder -PathType Container)) -or
+                ((Get-ChildItem -Path $softwareFolder | Measure-Object).Count -eq 0)
+            ) {
+                throw "Software folder '$softwareFolder' empty"
+            }
         }
         #endregion
     }
     Catch {
-        throw "$Action software packages failed: $_"
+        $errorMessage = $_; $Error.RemoveAt(0)
+        throw "$Action software packages failed: $errorMessage"
     }
 }
 
@@ -126,7 +134,7 @@ Process {
             #endregion
 
             #region Create empty software folder
-            $null = New-Item -Path "$DataFolder\Software" -ItemType Directory
+            $null = New-Item -Path $softwareFolder -ItemType Directory
             #endregion
         }
         else {
@@ -198,7 +206,7 @@ Process {
                     }
     
                     $joinParams = @{
-                        Path      = $DataFolder
+                        Path      = $softwareFolder
                         ChildPath = $application.ExecutableName
                     }
                     $executablePath = Join-Path @joinParams
@@ -236,6 +244,7 @@ Process {
         }
     }
     Catch {
-        throw "$Action software packages failed: $_"
+        $errorMessage = $_; $Error.RemoveAt(0)
+        throw "$Action software packages failed: $errorMessage"
     }
 }

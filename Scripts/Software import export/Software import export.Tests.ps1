@@ -201,5 +201,10 @@ Describe "With Action set to 'Import'" {
                 ($ArgumentList -eq '\x \x \z')
             }
         }
+        It 'output is generated' {
+            Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
+                $InputObject -like "Installed executable 'package1.exe' with arguments '\x \x \z'"
+            }
+        }
     }
 }

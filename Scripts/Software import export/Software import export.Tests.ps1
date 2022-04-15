@@ -161,7 +161,10 @@ Describe "With Action set to 'Import'" {
                 }
             } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
 
-            .$testScript @testNewParams
+            # throws because Get-InstalledApplicationsHC returns
+            # the same installed package as output and as such
+            # the package seems to be still installed
+            { .$testScript @testNewParams } | Should -Throw
         }
         It 'when their name is in the Remove property' {
             Should -Invoke Remove-ApplicationHC -Scope Context -Times 1 -Exactly -ParameterFilter {

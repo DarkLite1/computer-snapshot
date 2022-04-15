@@ -72,15 +72,10 @@ Begin {
 
         Write-Verbose "Remove application '$ApplicationName'"
 
-        cmd /C $UninstallString
+        $global:LASTEXITCODE = 0
 
-        if ($LASTEXITCODE) {
-            throw "ExitCode '$LASTEXITCODE'"
-        }
-        else {
-            $M = "Removed application '$ApplicationName'"
-            Write-Verbose $M; Write-Output $M
-        }
+        # suppress error messages
+        cmd /C $UninstallString 2> $null
     }
 
     Try {
@@ -176,11 +171,28 @@ Process {
                 
                         #region Remove application
                         if ($uninstallString) {
+                            #region Remove application
                             $params = @{
                                 ApplicationName = $applicationName
                                 UninstallString = $uninstallString
                             }
                             Remove-ApplicationHC @params
+                            #endregion
+
+                            #region Test uninstall
+                            $allApplications = Get-InstalledApplicationsHC
+
+                            if (
+                                $allApplications | 
+                                Where-Object { $_.DisplayName -eq $applicationName }
+                            ) {
+                                throw "Uninstall failed with ExitCode '$LASTEXITCODE'"
+                            }
+                            else {
+                                $M = "Removed application '$ApplicationName'"
+                                Write-Verbose $M; Write-Output $M
+                            }
+                            #endregion
                         }
                         else {
                             throw 'No removal string found in the registry'

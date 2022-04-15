@@ -1,3 +1,31 @@
+<#
+    .SYNOPSIS
+        Execute 'Start-Script.ps1' with the correct arguments.
+
+    .DESCRIPTION
+        This script serves as a launcher script for ease of use. 
+
+        Once the shortcut in the parent folder is clicked this script will
+        display a list of pre-configured arguments to use for calling 
+        'Start-Script.ps1'.
+        
+        Each .JSON file in the folder 'Preconfigured callers' represents a set
+        of pre-configured arguments to call 'Start-Script.ps1'. Many different
+        .JSON files can be created for many different occasions of restoring
+        snapshots.
+
+        This allows the user to leave with a USB stick full of ready to use
+        configurations to go on site and restore a specific snapshot on a 
+        machine.
+
+    .PARAMETER StartScript
+        Path to the script that will execute the different types of snapshots.
+
+    .PARAMETER PreconfiguredCallersFolder
+        Folder where the .JSON files are stored. Each file represents a set of
+        arguments to be used with 'Start-Script.ps1'.
+#>
+
 Param (
     [String]$StartScript = '.\Start-Script.ps1',
     [String]$PreconfiguredCallersFolder = '.\Preconfigured callers'
@@ -65,38 +93,46 @@ Begin {
 }
 
 Process {
-    if (Test-IsStartedElevatedHC) {
-        $params = @{
-            Action                             = 'RestoreSnapshot'
-            RestoreSnapshotFolder              = 'Snapshots\AGG SGX Borne NL'
-            RebootComputerAfterRestoreSnapshot = $true
-            OpenReportInBrowser                = $true
-            Snapshot                           = [Ordered]@{
-                StartCustomScriptsBefore = $true
-                RegionalSettings         = $false # on
-                UserAccounts             = $false # on
-                UserGroups               = $false
-                FirewallRules            = $false
-                CreateFolders            = $false
-                SmbShares                = $false
-                Software                 = $false # on
-                NetworkCards             = $false
-                NtpTimeServers           = $false # on
-                RegistryKeys             = $false # on
-                ScheduledTasks           = $false # on
-                CopyFilesFolders         = $false # on
-                StartCustomScriptsAfter  = $false # on
+    try {
+        if (Test-IsStartedElevatedHC) {
+            $params = @{
+                Action                             = 'RestoreSnapshot'
+                RestoreSnapshotFolder              = 'Snapshots\AGG SGX Borne NL'
+                RebootComputerAfterRestoreSnapshot = $true
+                OpenReportInBrowser                = $true
+                Snapshot                           = [Ordered]@{
+                    StartCustomScriptsBefore = $true
+                    RegionalSettings         = $false # on
+                    UserAccounts             = $false # on
+                    UserGroups               = $false
+                    FirewallRules            = $false
+                    CreateFolders            = $false
+                    SmbShares                = $false
+                    Software                 = $false # on
+                    NetworkCards             = $false
+                    NtpTimeServers           = $false # on
+                    RegistryKeys             = $false # on
+                    ScheduledTasks           = $false # on
+                    CopyFilesFolders         = $false # on
+                    StartCustomScriptsAfter  = $false # on
+                }
             }
-        }
-        # & $StartScript @params
+            # & $StartScript @params
         
-        Start-Sleep -Seconds 15
-    }
-    else {
-        # relaunch current script as an elevated process
-        Write-Host 'Please accept the prompt to start the script in elevated mode'
+            Start-Sleep -Seconds 15
+        }
+        else {
+            # relaunch current script as an elevated process
+            Write-Host 'Please accept the prompt to start the script in elevated mode'
       
-        Start-Process powershell.exe "-File", ('"{0}"' -f $MyInvocation.MyCommand.Path) -Verb RunAs
+            Start-Process powershell.exe "-File", ('"{0}"' -f $MyInvocation.MyCommand.Path) -Verb RunAs
+            Exit
+        }
+    }
+    catch {
+        Write-Warning 'Failed to start the preconfigured caller script:'
+        Write-Warning $_
+        Start-Sleep -Seconds 20
         Exit
     }
 }

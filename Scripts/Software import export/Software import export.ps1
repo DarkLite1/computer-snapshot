@@ -80,7 +80,7 @@ Begin {
 
     Try {
         $ImportFilePath = Join-Path -Path $DataFolder -ChildPath $ImportFileName
-        $softwareFolder = Join-Path -Path $DataFolder -ChildPath 'Software'
+        $softwareFolder = Join-Path -Path $DataFolder -ChildPath 'Packages'
 
         #region Test DataFolder
         If ($Action -eq 'Export') {

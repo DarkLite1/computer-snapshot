@@ -17,7 +17,7 @@ BeforeAll {
 
     $testJoinParams = @{
         Path      = $testParams.DataFolder
-        ChildPath = 'Software'
+        ChildPath = 'Packages'
     }
     $testSoftwareFolder = Join-Path @testJoinParams
     

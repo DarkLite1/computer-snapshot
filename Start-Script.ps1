@@ -212,39 +212,23 @@ Begin {
             Join-Path -Path $PSScriptRoot -ChildPath $Path
         }
     }
-    Function Test-IsAdminHC {
+    Function Test-IsStartedElevatedHC {
         <#
-            .SYNOPSIS
-                Check if a user is local administrator.
-    
-            .DESCRIPTION
-                Check if a user is member of the local group 'Administrators' 
-                and return true if he is and false if not.
-    
-            .EXAMPLE
-                Test-IsAdminHC -SamAccountName bob
-                Returns true in case bob is admin on this machine
-    
-            .EXAMPLE
-                Test-IsAdminHC
-                Returns true if the current user is admin on this machine
+        .SYNOPSIS
+            Check if the script is started in elevated mode
+        
+        .DESCRIPTION
+            Some PowerShell scripts required to be run as adminstrator 
+            and in elavated mode to functino propertly.
         #>
-    
-        Param (
-            $SamAccountName = [Security.Principal.WindowsIdentity]::GetCurrent()
-        )
-    
+        
         Try {
-            $Identity = [Security.Principal.WindowsIdentity]$SamAccountName
-            $Principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $Identity
-            $Result = $Principal.IsInRole(
-                [Security.Principal.WindowsBuiltInRole]::Administrator
-            )
-            Write-Verbose "Administrator permissions: $Result"
-            $Result
+            $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+            $principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $identity
+            $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
         }
         Catch {
-            throw "Failed to determine if the user is member of the local administrators group: $_"
+            throw "Failed to determine if the script is started in elevated mode: $_"
         }
     }
 
@@ -274,7 +258,10 @@ Begin {
         #endregion
 
         #region Test admin
-        if (($Action -ne 'CreateSnapshot') -and (-not (Test-IsAdminHC))) {
+        if (
+            ($Action -ne 'CreateSnapshot') -and 
+            (-not (Test-IsStartedElevatedHC))
+        ) {
             throw "User '$env:USERNAME' is not a member of the local administrators group. This is required to create or update the necessary details."
         }
         #endregion

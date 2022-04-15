@@ -1,0 +1,24 @@
+{
+  "StartScript": {
+    "Action": "CreateSnapshot",
+    "RestoreSnapshotFolder": "Snapshots\\Special PC config",
+    "RebootComputerAfterRestoreSnapshot": true,
+    "OpenReportInBrowser": true,
+    "Snapshot": {
+      "StartCustomScriptsBefore": true,
+      "RegionalSettings": true,
+      "UserAccounts": true,
+      "UserGroups": true,
+      "FirewallRules": true,
+      "CreateFolders": true,
+      "SmbShares": true,
+      "NetworkCards": true,
+      "NtpTimeServers": true,
+      "RegistryKeys": true,
+      "ScheduledTasks": true,
+      "CopyFilesFolders": true,
+      "Software": true,
+      "StartCustomScriptsAfter": true
+    }
+  }
+}

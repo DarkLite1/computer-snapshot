@@ -15,6 +15,7 @@ BeforeAll {
     $testFile = Join-Path @testJoinParams
     
     Mock Write-Output
+    Mock Write-Warning
     Mock Start-Sleep
 }
 Describe 'the script fails when' {
@@ -25,19 +26,28 @@ Describe 'the script fails when' {
     It 'the start script is not found' {
         $testNewParams.StartScript = 'TestDrive:/xxx.ps1'
 
-        { .$testScript @testNewParams } | 
-        Should -Throw "*Start script 'TestDrive:/xxx.ps1' not found"
+        .$testScript @testNewParams 
+
+        Should -Invoke Write-Warning -Times 1 -Exactly -parameterFilter {
+            $Message -eq "Start script 'TestDrive:/xxx.ps1' not found"
+        }
     }
     It 'the preconfigured callers folder is not found' {
         $testNewParams.PreconfiguredCallersFolder = 'TestDrive:/xxx'
 
-        { .$testScript @testNewParams } | 
-        Should -Throw "*Preconfigured callers folder 'TestDrive:/xxx' not found"
+        .$testScript @testNewParams 
+
+        Should -Invoke Write-Warning -Times 1 -Exactly -parameterFilter {
+            $Message -eq "Preconfigured callers folder 'TestDrive:/xxx' not found"
+        }
     }
     It 'the preconfigured callers folder has no .JSON file' {
         '1' | Out-File -LiteralPath "$($testParams.PreconfiguredCallersFolder)\file.txt"
 
-        { .$testScript @testNewParams } | 
-        Should -Throw "*No .JSON file found in folder '$($testParams.PreconfiguredCallersFolder)'. Please create a pre-configuration file first."
+        .$testScript @testNewParams 
+
+        Should -Invoke Write-Warning -Times 1 -Exactly -parameterFilter {
+            $Message -eq "No .JSON file found in folder '$($testParams.PreconfiguredCallersFolder)'. Please create a pre-configuration file first."
+        }
     }
 }

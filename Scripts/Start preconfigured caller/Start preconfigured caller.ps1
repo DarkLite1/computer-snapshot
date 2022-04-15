@@ -57,9 +57,10 @@ Begin {
         #endregion
     }
     catch {
+        Write-Warning 'Failed to start the preconfigured caller script:'
         Write-Warning $_
         Start-Sleep -Seconds 20
-        throw "Failed to start the preconfigured caller script: $_"   
+        Exit
     }
 }
 

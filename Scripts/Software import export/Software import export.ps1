@@ -145,12 +145,10 @@ Process {
             ConvertFrom-Json -EA Stop
             #endregion
      
-            $allApplications = Get-InstalledApplicationsHC
-
             #region Remove packages
             foreach ($applicationName in $import.SoftwarePackages.Remove) {
                 if (
-                    $installedApp = $allApplications |
+                    $installedApplication = Get-InstalledApplicationsHC |
                     Where-Object { $_.DisplayName -eq $applicationName }
                 ) {
                     try {
@@ -158,18 +156,17 @@ Process {
             
                         #region Get removal string
                         $uninstallString = if (
-                            $installedApp.QuietUninstallString
+                            $installedApplication.QuietUninstallString
                         ) {
-                            $installedApp.QuietUninstallString
+                            $installedApplication.QuietUninstallString
                         }
                         else {
-                            $installedApp.UninstallString
+                            $installedApplication.UninstallString
                         }
                 
                         Write-Verbose "Removal string '$uninstallString'"
                         #endregion
                 
-                        #region Remove application
                         if ($uninstallString) {
                             #region Remove application
                             $params = @{
@@ -180,11 +177,10 @@ Process {
                             #endregion
 
                             #region Test uninstall
-                            $allApplications = Get-InstalledApplicationsHC
-
                             if (
-                                $allApplications | 
-                                Where-Object { $_.DisplayName -eq $applicationName }
+                                Get-InstalledApplicationsHC | Where-Object { 
+                                    $_.DisplayName -eq $applicationName 
+                                }
                             ) {
                                 throw "Uninstall failed with ExitCode '$LASTEXITCODE'"
                             }
@@ -197,7 +193,6 @@ Process {
                         else {
                             throw 'No removal string found in the registry'
                         }       
-                        #endregion
                     }
                     catch {
                         $errorMessage = $_; $Error.RemoveAt(0)

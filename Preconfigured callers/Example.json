@@ -20,5 +20,6 @@
       "Software": true,
       "StartCustomScriptsAfter": true
     }
-  }
+  },
+  "RunInElevatedPowerShellSession": false
 }

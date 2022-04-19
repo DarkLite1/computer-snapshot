@@ -24,6 +24,7 @@ BeforeAll {
         )
     }
     Mock Invoke-ScriptHC
+    Mock Out-GridView
     Mock Write-Output
     Mock Write-Warning
     Mock Start-Sleep
@@ -43,22 +44,24 @@ Describe 'the script fails when' {
             $Message -eq "Start script 'TestDrive:/xxx.ps1' not found"
         }
     }
-    It 'the preconfigured callers folder is not found' {
-        $testNewParams.PreconfiguredCallersFolder = 'TestDrive:/xxx'
+    Context 'parameter PreconfiguredCallerFilePath not used' {
+        It 'the preconfigured callers folder is not found' {
+            $testNewParams.PreconfiguredCallersFolder = 'TestDrive:/xxx'
 
-        .$testScript @testNewParams 
+            .$testScript @testNewParams 
 
-        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-            $Message -eq "Preconfigured callers folder 'TestDrive:/xxx' not found"
-        }
-    }
-    It 'the preconfigured callers folder has no .JSON file' {
-        '1' | Out-File -LiteralPath "$($testParams.PreconfiguredCallersFolder)\file.txt"
+            Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+                $Message -eq "Preconfigured callers folder 'TestDrive:/xxx' not found"
+            }
+        } 
+        It 'the preconfigured callers folder has no .JSON file' {
+            '1' | Out-File -LiteralPath "$($testParams.PreconfiguredCallersFolder)\file.txt"
 
-        .$testScript @testNewParams 
+            .$testScript @testNewParams 
 
-        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-            $Message -eq "No .JSON file found in folder '$($testParams.PreconfiguredCallersFolder)'. Please create a pre-configuration file first."
+            Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+                $Message -eq "No .JSON file found in folder '$($testParams.PreconfiguredCallersFolder)'. Please create a pre-configuration file first."
+            }
         }
     }
 }
@@ -82,5 +85,5 @@ Describe 'when all tests pass' {
             ($Path -eq $testParams.StartScript) -and
             ($Arguments)
         }
-    } -Tag Test
+    }
 }

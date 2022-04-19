@@ -14,9 +14,20 @@ BeforeAll {
     }
     $testFile = Join-Path @testJoinParams
     
+    Function Test-IsStartedElevatedHC {}
+    Function Invoke-ScriptHC {
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Path,
+            [Parameter(Mandatory)]
+            [HashTable]$Arguments
+        )
+    }
+    Mock Invoke-ScriptHC
     Mock Write-Output
     Mock Write-Warning
     Mock Start-Sleep
+    Mock Test-IsStartedElevatedHC { $true }
 }
 Describe 'the script fails when' {
     BeforeEach {
@@ -28,7 +39,7 @@ Describe 'the script fails when' {
 
         .$testScript @testNewParams 
 
-        Should -Invoke Write-Warning -Times 1 -Exactly -parameterFilter {
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
             $Message -eq "Start script 'TestDrive:/xxx.ps1' not found"
         }
     }
@@ -37,7 +48,7 @@ Describe 'the script fails when' {
 
         .$testScript @testNewParams 
 
-        Should -Invoke Write-Warning -Times 1 -Exactly -parameterFilter {
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
             $Message -eq "Preconfigured callers folder 'TestDrive:/xxx' not found"
         }
     }
@@ -46,8 +57,30 @@ Describe 'the script fails when' {
 
         .$testScript @testNewParams 
 
-        Should -Invoke Write-Warning -Times 1 -Exactly -parameterFilter {
+        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
             $Message -eq "No .JSON file found in folder '$($testParams.PreconfiguredCallersFolder)'. Please create a pre-configuration file first."
         }
     }
+}
+Describe 'when all tests pass' {
+    It 'Start-Script.ps1 is called' {
+        @{
+            StartScript = @{
+                Action                = 'CreateSnapshot'
+                RestoreSnapshotFolder = 'Snapshots\Special PC config'
+                RebootComputer        = $true
+                Snapshot              = @{
+                    ScriptA = $true
+                    ScriptB = $false
+                }
+            }
+        } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
+
+        . $testScript @testParams
+
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
+            ($Path -eq $testParams.StartScript) -and
+            ($Arguments)
+        }
+    } -Tag Test
 }

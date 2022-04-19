@@ -85,7 +85,7 @@ Begin {
         #endregion
     }
     catch {
-        Write-Warning 'Failed to start the preconfigured caller script:'
+        Write-Warning 'Failed to start the pre-configured caller script:'
         Write-Warning $_
         Start-Sleep -Seconds 20
         Exit
@@ -93,9 +93,22 @@ Begin {
 }
 
 Process {
+    Function Invoke-ScriptHC {
+        [CmdLetBinding()]
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Path,
+            [Parameter(Mandatory)]
+            [HashTable]$Arguments
+        )
+
+        Write-Debug "Invoke script '$Path'"
+        & $Path @Arguments
+    }
+
     try {
         if (Test-IsStartedElevatedHC) {
-            $params = @{
+            $arguments = @{
                 Action                             = 'RestoreSnapshot'
                 RestoreSnapshotFolder              = 'Snapshots\AGG SGX Borne NL'
                 RebootComputerAfterRestoreSnapshot = $true
@@ -117,9 +130,7 @@ Process {
                     StartCustomScriptsAfter  = $false # on
                 }
             }
-            # & $StartScript @params
-        
-            Start-Sleep -Seconds 15
+            Invoke-ScriptHC -Path $StartScript -Arguments $arguments
         }
         else {
             # relaunch current script as an elevated process
@@ -130,7 +141,7 @@ Process {
         }
     }
     catch {
-        Write-Warning 'Failed to start the preconfigured caller script:'
+        Write-Warning 'Failed to start the pre-configured caller script:'
         Write-Warning $_
         Start-Sleep -Seconds 20
         Exit

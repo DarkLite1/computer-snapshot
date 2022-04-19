@@ -32,6 +32,18 @@ Param (
 )
 
 Begin {
+    Function Invoke-ScriptHC {
+        [CmdLetBinding()]
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Path,
+            [Parameter(Mandatory)]
+            [HashTable]$Arguments
+        )
+
+        Write-Debug "Invoke script '$Path'"
+        & $Path @Arguments
+    }
     Function Test-IsStartedElevatedHC {
         <#
         .SYNOPSIS
@@ -93,19 +105,6 @@ Begin {
 }
 
 Process {
-    Function Invoke-ScriptHC {
-        [CmdLetBinding()]
-        Param (
-            [Parameter(Mandatory)]
-            [String]$Path,
-            [Parameter(Mandatory)]
-            [HashTable]$Arguments
-        )
-
-        Write-Debug "Invoke script '$Path'"
-        & $Path @Arguments
-    }
-
     try {
         if (Test-IsStartedElevatedHC) {
             $arguments = @{

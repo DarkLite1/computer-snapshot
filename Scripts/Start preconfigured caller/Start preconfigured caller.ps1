@@ -106,14 +106,22 @@ Begin {
     }
 
     try {
-        '
+        Write-Host  '
         ________        .__        __     .__                             .__                  
         \_____  \  __ __|__| ____ |  | __ |  | _____   __ __  ____   ____ |  |__   ___________ 
          /  / \  \|  |  \  |/ ___\|  |/ / |  | \__  \ |  |  \/    \_/ ___\|  |  \_/ __ \_  __ \
         /   \_/.  \  |  /  \  \___|    <  |  |__/ __ \|  |  /   |  \  \___|   Y  \  ___/|  | \/
         \_____\ \_/____/|__|\___  >__|_ \ |____(____  /____/|___|  /\___  >___|  /\___  >__|   
                \__>             \/     \/           \/           \/     \/     \/     \/       
-        '
+        ' -ForegroundColor Cyan
+        
+        
+        Write-Host (
+            "{0} - {1} - {2}`r`n" -f
+            (Get-Date).ToString('dddd dd/MM/yyyy HH:ss'),
+            $env:USERNAME, 
+            [System.Net.Dns]::GetHostEntry([string]$env:computername).HostName
+        ) -ForegroundColor Gray
 
         $params = @{
             Path        = $StartScript

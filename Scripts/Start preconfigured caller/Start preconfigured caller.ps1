@@ -106,6 +106,15 @@ Begin {
     }
 
     try {
+        '
+        ________        .__        __     .__                             .__                  
+        \_____  \  __ __|__| ____ |  | __ |  | _____   __ __  ____   ____ |  |__   ___________ 
+         /  / \  \|  |  \  |/ ___\|  |/ / |  | \__  \ |  |  \/    \_/ ___\|  |  \_/ __ \_  __ \
+        /   \_/.  \  |  /  \  \___|    <  |  |__/ __ \|  |  /   |  \  \___|   Y  \  ___/|  | \/
+        \_____\ \_/____/|__|\___  >__|_ \ |____(____  /____/|___|  /\___  >___|  /\___  >__|   
+               \__>             \/     \/           \/           \/     \/     \/     \/       
+        '
+
         $params = @{
             Path        = $StartScript
             ErrorAction = 'Ignore'
@@ -184,6 +193,7 @@ Process {
             #endregion
 
             #region Display GUI to select the correct .JSON file
+            Write-Host 'Select a pre-configured caller'
             $outParams = @{
                 Title      = 'Select the configuration you want to execute:'
                 OutputMode = 'Single'
@@ -258,8 +268,9 @@ Process {
         #endregion
     }
     catch {
-        Write-Warning 'Failed to start the pre-configured caller script:'
+        Write-Warning 'Failed to start the script:'
         Write-Warning $_
+        Write-Host 'You can close this window at any time'
         Start-Sleep -Seconds 20
         Exit
     }

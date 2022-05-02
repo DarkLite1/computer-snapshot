@@ -13,6 +13,13 @@ BeforeAll {
         ChildPath = 'testCaller.json'
     }
     $testFile = Join-Path @testJoinParams
+
+    'Param (
+        $Action,
+        $RestoreSnapshotFolder,
+        $RebootComputer,
+        $Snapshot
+    )' | Out-File -FilePath $testParams.StartScript
     
     Function Test-IsStartedElevatedHC {}
     Function Invoke-ScriptHC {
@@ -24,7 +31,11 @@ BeforeAll {
         )
     }
     Mock Invoke-ScriptHC
-    Mock Out-GridView
+    Mock Out-GridView {
+        @{
+            'Pre-configuration file name' = 'testCaller'
+        }
+    }
     Mock Write-Output
     Mock Write-Warning
     Mock Start-Sleep
@@ -69,8 +80,8 @@ Describe 'when all tests pass' {
     It 'Start-Script.ps1 is called' {
         @{
             StartScript = @{
-                Action                = 'CreateSnapshot'
-                RestoreSnapshotFolder = 'Snapshots\Special PC config'
+                Action                = 'A'
+                RestoreSnapshotFolder = 'B'
                 RebootComputer        = $true
                 Snapshot              = @{
                     ScriptA = $true
@@ -83,7 +94,11 @@ Describe 'when all tests pass' {
 
         Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
             ($Path -eq $testParams.StartScript) -and
-            ($Arguments)
+            ($Arguments.Action -eq 'A') -and
+            ($Arguments.RestoreSnapshotFolder -eq 'B') -and
+            ($Arguments.RebootComputer -eq $true) -and
+            ($Arguments.Snapshot.ScriptA -eq $true) -and
+            ($Arguments.Snapshot.ScriptB -eq $false)
         }
-    }
+    } -Tag test
 }

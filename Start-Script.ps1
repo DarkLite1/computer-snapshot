@@ -258,11 +258,8 @@ Begin {
         #endregion
 
         #region Test admin
-        if (
-            ($Action -ne 'CreateSnapshot') -and 
-            (-not (Test-IsStartedElevatedHC))
-        ) {
-            throw "User '$env:USERNAME' is not a member of the local administrators group. This is required to create or update the necessary details."
+        if (-not (Test-IsStartedElevatedHC)) {
+            Write-Warning "Script not launched in elevated mode. Some changes might be prohibited. Use 'RunAs Administrator' if required."
         }
         #endregion
 

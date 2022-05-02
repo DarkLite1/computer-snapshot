@@ -399,8 +399,8 @@ Describe 'on action Import' {
             .$testScript @testParams 
 
             Should -Invoke Write-Error -Times 1 -Exactly -ParameterFilter {
-                $Message -eq "Failed to add member account 'NotExisting' to group '$($testGroups[0].Name)': member account not found"
+                $Message -eq "Failed to add account 'NotExisting' to group '$($testGroups[0].Name)': account not found"
             }
-        }
-    }   
+        } -tag test
+    }
 }

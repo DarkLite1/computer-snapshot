@@ -248,18 +248,13 @@ Process {
                             Write-Output "Group '$($group.Name)' account '$member' is already a member"
                             $Error.RemoveAt(0)
                         }
+                        catch [Microsoft.PowerShell.Commands.PrincipalNotFoundException] {
+                            Write-Error "Failed to add account '$member' to group '$($group.Name)': account not found"
+                            $Error.RemoveAt(1)
+                        }
                         catch {
-                            if (
-                                $_.Exception.Message -eq 
-                                'Object reference not set to an instance of an object.'
-                            ) {
-                                Write-Error "Failed to add member account '$member' to group '$($group.Name)': member account not found"
-                                $Error.RemoveAt(1)
-                            }
-                            else {
-                                Write-Error "Failed to add member account '$member' to group '$($group.Name)': $_"
-                                $Error.RemoveAt(1)
-                            }
+                            Write-Error "Failed to add member account '$member' to group '$($group.Name)': $_"
+                            $Error.RemoveAt(1)
                         }
                     }
                     #endregion

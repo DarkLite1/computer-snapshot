@@ -478,7 +478,7 @@ Process {
 
 End {
     Try {
-        #region Finish progress barr
+        #region Finish progress bar
         $progressParams.CurrentOperation = 'All scripts executed'
         $progressParams.Status = 'Complete: 100 %'
         $progressParams.PercentComplete = 100

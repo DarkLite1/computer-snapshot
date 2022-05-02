@@ -118,7 +118,7 @@ Begin {
         
         Write-Host (
             "{0} - {1} - {2}`r`n" -f
-            (Get-Date).ToString('dddd dd/MM/yyyy HH:ss'),
+            (Get-Date).ToString('dddd dd/MM/yyyy HH:mm'),
             $env:USERNAME, 
             [System.Net.Dns]::GetHostEntry([string]$env:computername).HostName
         ) -ForegroundColor Gray

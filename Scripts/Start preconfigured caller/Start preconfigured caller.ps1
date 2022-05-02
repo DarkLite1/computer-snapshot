@@ -231,7 +231,7 @@ Process {
    
         #region Test Start-Script arguments
         if (-not $jsonFile.StartScript) {
-            "The parameter 'StartScript' is missing in file '$jsonFilePath'."
+            throw "The parameter 'StartScript' is missing in file '$jsonFilePath'."
         }
 
         $jsonFile.StartScript.PSObject.Properties.Name | Where-Object {

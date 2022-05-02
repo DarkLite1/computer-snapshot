@@ -100,5 +100,5 @@ Describe 'when all tests pass' {
             ($Arguments.Snapshot.ScriptA -eq $true) -and
             ($Arguments.Snapshot.ScriptB -eq $false)
         }
-    } -Tag test
+    }
 }

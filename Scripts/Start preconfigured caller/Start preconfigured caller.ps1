@@ -228,7 +228,7 @@ Process {
             $startScriptParameters.Key -notContains $_
         } | ForEach-Object {
             $invalidParameter = $_
-            throw "The parameter '$invalidParameter' in file '$jsonFilePath' is not accepted by script '$scriptPath'."
+            throw "The parameter '$invalidParameter' in file '$jsonFilePath' is not accepted by script '$startScriptPath'."
         }
         #endregion
             

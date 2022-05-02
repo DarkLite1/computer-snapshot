@@ -411,8 +411,6 @@ Begin {
             }
         }
         #endregion
-
-        $progressBarCount.CurrentStep++
     }    
     Catch {
         throw "Failed to perform action '$Action'. Nothing done, please fix this error first: $_"
@@ -423,6 +421,8 @@ Process {
     $childScriptResults = @()
     foreach ($item in $Snapshot.GetEnumerator() | Where-Object { $_.Value }) {
         #region Continue progress bar
+        $progressBarCount.CurrentStep++
+
         $progressBarCount.CompletedPercentage = 
         [int]($progressBarCount.CurrentStep * 
             (100 / $progressBarCount.TotalSteps))
@@ -472,14 +472,19 @@ Process {
                 $childScriptResult.NonTerminatingErrors = $Error.Exception.Message
             }
             $childScriptResults += $childScriptResult
-
-            $progressBarCount.CurrentStep++
         }
     }
 }
 
 End {
     Try {
+        #region Finish progress barr
+        $progressParams.CurrentOperation = 'All scripts executed'
+        $progressParams.Status = 'Complete: 100 %'
+        $progressParams.PercentComplete = 100
+        Write-Progress @progressParams
+        #endregion
+
         Write-Verbose "End action '$Action'"
         
         $joinParams = @{

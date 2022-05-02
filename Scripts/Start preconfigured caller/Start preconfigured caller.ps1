@@ -251,6 +251,7 @@ Process {
         }
         #endregion
             
+        #region Relaunch current script elevated if needed
         if (
             ($jsonFile.RunInElevatedPowerShellSession) -and
             (-not (Test-IsStartedElevatedHC))
@@ -268,7 +269,9 @@ Process {
             Start-Process @startParams
             Exit
         }
+        #endregion
     
+        #region Execute script
         $invokeParams = @{
             Path      = $startScriptPath
             Arguments = ConvertTo-HashtableHC $jsonFile.StartScript

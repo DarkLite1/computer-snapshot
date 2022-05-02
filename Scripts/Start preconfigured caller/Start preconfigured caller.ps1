@@ -171,6 +171,7 @@ Begin {
     catch {
         Write-Warning 'Failed to start the pre-configured caller script:'
         Write-Warning $_
+        Write-Host 'You can close this window at any time'
         Start-Sleep -Seconds 20
         Exit
     }

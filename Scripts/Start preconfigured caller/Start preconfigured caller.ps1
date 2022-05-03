@@ -215,9 +215,8 @@ Process {
                 Title      = 'Select the configuration you want to execute:'
                 OutputMode = 'Single'
             }
-            $titleBarName = 'Pre-configuration file name'
             $selectedJsonFile = $jsonFiles | Select-Object @{
-                Name       = $titleBarName; 
+                Name       = 'Configuration file'; 
                 Expression = { $_.BaseName } 
             } | 
             Out-GridView @outParams
@@ -227,7 +226,7 @@ Process {
             }
 
             $jsonFilePath = $jsonFiles | Where-Object {
-                $_.BaseName -eq $selectedJsonFile.$titleBarName 
+                $_.BaseName -eq $selectedJsonFile.PSObject.Properties.Value
             } | Select-Object -ExpandProperty FullName
             #endregion
         }
@@ -239,7 +238,6 @@ Process {
         try {
             $jsonFile = Get-Content -Path $jsonFilePath -Raw | 
             ConvertFrom-Json -ErrorAction Stop
-            Write-Verbose "User parameters '$jsonFile'"
         }
         catch {
             throw "Parameter file '$jsonFilePath' is invalid: $_"
@@ -279,7 +277,13 @@ Process {
         }
         #endregion
 
-        #region 
+        #region Display settings
+        Write-Host "Selected file '$($selectedJsonFile.PSObject.Properties.Value)':" -ForegroundColor Gray
+        $jsonFile.StartScript | Format-List
+        Write-Host "`r`n"
+        #endregion
+
+        #region Confirm selection before executing
         if (-not $NoConfirmQuestion) {
             $answer = $null
 

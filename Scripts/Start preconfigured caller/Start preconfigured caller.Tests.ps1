@@ -33,8 +33,8 @@ BeforeAll {
     }
     Mock Invoke-ScriptHC
     Mock Out-GridView {
-        @{
-            'Pre-configuration file name' = 'testCaller'
+        [PSCustomObject]@{
+            'File name' = 'testCaller'
         }
     }
     Mock Write-Output
@@ -101,7 +101,7 @@ Describe 'when all tests pass' {
             ($Arguments.Snapshot.ScriptA -eq $true) -and
             ($Arguments.Snapshot.ScriptB -eq $false)
         }
-    }
+    } -tag test
     It 'ask confirmation before executing Start-Script.ps1' {
         Mock Read-Host { 'y' }
         @{

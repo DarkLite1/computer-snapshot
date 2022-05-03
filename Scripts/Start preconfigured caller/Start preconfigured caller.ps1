@@ -33,7 +33,7 @@
 
 Param (
     [String]$StartScript = '.\Start-Script.ps1',
-    [String]$PreconfiguredCallersFolder = '.\Preconfigured callers',
+    [String]$PreconfiguredCallersFolder = '.\Configurations',
     [String]$PreconfiguredCallerFilePath,
     [Switch]$NoConfirmQuestion
 )

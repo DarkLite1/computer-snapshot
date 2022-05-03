@@ -37,6 +37,7 @@ BeforeAll {
         }
     }
     Mock Write-Output
+    Mock Write-Host
     Mock Write-Warning
     Mock Start-Sleep
     Mock Test-IsStartedElevatedHC { $true }

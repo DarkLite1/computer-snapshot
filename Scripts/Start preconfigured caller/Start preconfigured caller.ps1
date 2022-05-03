@@ -106,6 +106,7 @@ Begin {
     }
 
     try {
+        #region ASCI art
         Write-Host  '
         ________        .__        __     .__                             .__                  
         \_____  \  __ __|__| ____ |  | __ |  | _____   __ __  ____   ____ |  |__   ___________ 
@@ -122,6 +123,7 @@ Begin {
             $env:USERNAME, 
             [System.Net.Dns]::GetHostEntry([string]$env:computername).HostName
         ) -ForegroundColor Gray
+        #endregion
 
         $params = @{
             Path        = $StartScript

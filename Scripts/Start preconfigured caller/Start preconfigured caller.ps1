@@ -24,12 +24,18 @@
     .PARAMETER PreconfiguredCallersFolder
         Folder where the .JSON files are stored. Each file represents a set of
         arguments to be used with 'Start-Script.ps1'.
+
+    .PARAMETER NoConfirmQuestion
+        When a configuration file is selected a question is asked to make sure
+        the user selected the correct file before executing it. When using this
+        switch no question is asked.
 #>
 
 Param (
     [String]$StartScript = '.\Start-Script.ps1',
     [String]$PreconfiguredCallersFolder = '.\Preconfigured callers',
-    [String]$PreconfiguredCallerFilePath
+    [String]$PreconfiguredCallerFilePath,
+    [Switch]$NoConfirmQuestion
 )
 
 Begin {
@@ -263,13 +269,28 @@ Process {
       
             $startParams = @{
                 FilePath     = 'powershell.exe'
-                ArgumentList = '-Command "& ''{0}'' -PreconfiguredCaller ''{1}''"' -f 
+                ArgumentList = '-Command "& ''{0}'' -PreconfiguredCaller ''{1}'' -NoConfirmQuestion"' -f 
                 $MyInvocation.MyCommand.Path, 
                 $PreconfiguredCallerFilePath
                 Verb         = 'RunAs'
             }
             Start-Process @startParams
             Exit
+        }
+        #endregion
+
+        #region 
+        if (-not $NoConfirmQuestion) {
+            $answer = $null
+
+            while ($answer -notMatch '^y$|^n$') {
+                $answer = Read-Host 'Are you sure you want to continue (y/n)'
+                $answer = $answer.ToLower()
+            }
+
+            if ($answer -ne 'y') {
+                Exit
+            }
         }
         #endregion
     

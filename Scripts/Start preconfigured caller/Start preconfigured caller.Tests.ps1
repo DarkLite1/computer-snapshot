@@ -6,6 +6,7 @@ BeforeAll {
     $testParams = @{
         StartScript                = (New-Item 'TestDrive:/testStartScript.ps1' -ItemType File).FullName 
         PreconfiguredCallersFolder = (New-Item 'TestDrive:/testCallers' -ItemType Directory).FullName 
+        NoConfirmQuestion          = $true
     }
 
     $testJoinParams = @{
@@ -45,7 +46,6 @@ BeforeAll {
 Describe 'the script fails when' {
     BeforeEach {
         $testNewParams = $testParams.clone()
-        $testNewParams.Action = 'Export'
     }
     It 'the start script is not found' {
         $testNewParams.StartScript = 'TestDrive:/xxx.ps1'
@@ -100,6 +100,29 @@ Describe 'when all tests pass' {
             ($Arguments.RebootComputer -eq $true) -and
             ($Arguments.Snapshot.ScriptA -eq $true) -and
             ($Arguments.Snapshot.ScriptB -eq $false)
+        }
+    }
+    It 'ask confirmation before executing Start-Script.ps1' {
+        Mock Read-Host { 'y' }
+        @{
+            StartScript = @{
+                Action                = 'A'
+                RestoreSnapshotFolder = 'B'
+                RebootComputer        = $true
+                Snapshot              = @{
+                    ScriptA = $true
+                    ScriptB = $false
+                }
+            }
+        } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
+
+        $testNewParams = $testParams.clone()
+        $testNewParams.NoConfirmQuestion = $false
+
+        . $testScript @testNewParams
+
+        Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+            ($Prompt -eq 'Are you sure you want to continue (y/n)') 
         }
     }
 }

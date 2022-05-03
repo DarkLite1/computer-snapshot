@@ -118,6 +118,9 @@ Begin {
 
 Process {
     Try {
+        $workPath = Get-Location
+        Set-Location $softwareFolder
+
         If ($Action -eq 'Export') {
             #region Create example config file
             Write-Verbose "Create example file '$ImportFilePath'"
@@ -213,18 +216,25 @@ Process {
                     if (-not $application.ExecutableName) {
                         throw "Property 'ExecutableName' is mandatory"
                     }
-    
-                    $joinParams = @{
-                        Path      = $softwareFolder
-                        ChildPath = $application.ExecutableName
-                    }
-                    $executablePath = Join-Path @joinParams
+                    #endregion
 
+                    #region Get executable path from software folder
+                    $params = @{
+                        Path        = $application.ExecutableName
+                        ErrorAction = 'Ignore'
+                    }
+                    $executablePath = Convert-Path @params
+                    #endregion
+
+                    #region Test executable file
                     $testPathParams = @{
                         LiteralPath = $executablePath
                         PathType    = 'leaf'
                     }
-                    if (-not (Test-Path @testPathParams)) {
+                    if (
+                        (-not $executablePath) -or
+                        (-not (Test-Path @testPathParams))
+                    ) {
                         throw "Executable file '$executablePath' not found"
                     }
                     #endregion
@@ -241,6 +251,7 @@ Process {
                     }
                     if ($application.Arguments) {
                         $startParams.ArgumentList = $application.Arguments
+                        Write-Verbose "Arguments '$($application.Arguments)'"
                     }
                     $process = Start-Process @startParams
                     if ($process.ExitCode) {
@@ -262,5 +273,8 @@ Process {
     Catch {
         $errorMessage = $_; $Error.RemoveAt(0)
         throw "$Action software packages failed: $errorMessage"
+    }
+    Finally {
+        Set-Location $workPath
     }
 }

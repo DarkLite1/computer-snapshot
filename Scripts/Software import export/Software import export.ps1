@@ -118,9 +118,6 @@ Begin {
 
 Process {
     Try {
-        $workPath = Get-Location
-        Set-Location $softwareFolder
-
         If ($Action -eq 'Export') {
             #region Create example config file
             Write-Verbose "Create example file '$ImportFilePath'"
@@ -137,6 +134,9 @@ Process {
             #endregion
         }
         else {
+            $workPath = Get-Location
+            Set-Location $softwareFolder
+
             #region Import .JSON file
             Write-Verbose "Import from file '$ImportFilePath'"
             $getParams = @{
@@ -275,6 +275,8 @@ Process {
         throw "$Action software packages failed: $errorMessage"
     }
     Finally {
-        Set-Location $workPath
+        If ($Action -eq 'Import') {
+            Set-Location $workPath
+        }
     }
 }

@@ -21,22 +21,18 @@
       "UserPassword": "123",
       "RegistryKeys": [
         {
+          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer",
+          "Name": "EnableAutoTray",
+          "Value": "00000001",
+          "Type": "DWORD",
+          "?": "Hide task bar"
+        },
+        {
           "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
           "Name": "DisableTaskMgr",
-          "Value": "00000000",
-          "Type": "DWORD"
-        },
-        {
-          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
-          "Name": "DisableChangePassword",
-          "Value": "00000000",
-          "Type": "DWORD"
-        },
-        {
-          "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
-          "Name": "Shell",
-          "Value": "powershell.exe C:\\Users\\Public\\Documents\\test.ps1",
-          "Type": "STRING"
+          "Value": "00000001",
+          "Type": "DWORD",
+          "?": "Disable Ctrl+Alt+Del"
         }
       ]
     }

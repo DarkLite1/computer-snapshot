@@ -13,6 +13,10 @@
       {
         "ExecutableName": "Remote Access-windows64-offline.exe",
         "Arguments": null
+      },
+      {
+        "ExecutableName": "C:\\WINDOWS\\SysWOW64\\cscript.exe",
+        "Arguments": "DELL_COMMANDUPDATE_4.2.1_EN_X86_R02417\\_Install_Silent.vbs"
       }
     ]
   }

@@ -35,7 +35,7 @@ Plug in the same USB stick that contains all the script files and the collected 
 At this point the data of the latest snapshot will be used to create or update the current computer to the desired state. In case you want to restore another snapshot than the last one created use the `$RestoreSnapshotFolder`.
 
 # Quick and easy execution
-The folder 'Configurations' holds .JSON files that represent the arguments used in 'Start-Script.ps1'. This can be convenient when you have multiple configurations on the USB stick but you only want to apply a a specific snapshot. 
+The folder 'Configurations' holds .JSON files that represent the arguments used in 'Start-Script.ps1'. This can be convenient when you have multiple configurations on the USB stick but you only want to apply a specific snapshot. 
 
 Click on 'Quick launcher.lnk' to open a new window. In the new window all files in the folder 'Configurations' are displayed. Select a single file to apply that configuration on the current machine.
 

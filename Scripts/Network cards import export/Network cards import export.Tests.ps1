@@ -69,13 +69,27 @@ Describe 'Fail the import when' {
 }
 Describe "when action is 'Export'" {
     BeforeAll {
+        Mock Get-DnsClient {
+            @(
+                @{
+                    InterfaceIndex           = '1'
+                    ConnectionSpecificSuffix = 'CONTOSO.COM'
+                }
+                @{
+                    InterfaceIndex           = '2'
+                    ConnectionSpecificSuffix = ''
+                }
+            )
+        }
         Mock Get-NetAdapter {
             @(
                 @{
+                    InterfaceIndex       = '1'
                     Name                 = 'Ethernet0'
                     InterfaceDescription = 'bla Broadcom bla'
                 }
                 @{
+                    InterfaceIndex       = '2'
                     Name                 = 'Ethernet1'
                     InterfaceDescription = 'bla Intel bla'
                 }
@@ -139,6 +153,12 @@ Describe "when action is 'Export'" {
                 $testBroadcomCard.NetworkCategory | 
                 Should -Be 'Private'
                 $testIntelCard.NetworkCategory | 
+                Should -BeNullOrEmpty
+            }
+            It 'NetworkCardDnsSuffix' {
+                $testBroadcomCard.NetworkCardDnsSuffix | 
+                Should -Be 'CONTOSO.COM'
+                $testIntelCard.NetworkCardDnsSuffix | 
                 Should -BeNullOrEmpty
             }
         }
@@ -442,7 +462,7 @@ Describe "when action is 'Import'" {
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
                 ($InputObject -eq "Changed DNS suffix for network card with id '1' and description 'bla Intel bla' from '' to 'CONTOSO.COM'") 
             }
-        } -Tag test
+        }
         It 'not corrected when it is correct' {
             Mock Get-DnsClient {
                 @(

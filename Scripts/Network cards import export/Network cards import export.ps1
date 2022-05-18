@@ -133,14 +133,17 @@ Process {
 
         If ($Action -eq 'Export') {
             #region Export example config file
-            $cardsToExport = foreach ($card in $netAdapters) {
+            $cardsToExport = foreach ($adapter in $netAdapters) {
                 $NetworkCategory = ($netConnectionProfiles | Where-Object { 
-                        $_.InterfaceAlias -eq $card.name
+                        $_.InterfaceAlias -eq $adapter.name
                     }).NetworkCategory
                 @{
-                    NetworkCardName        = $card.Name
-                    NetworkCardDescription = $card.InterfaceDescription
+                    NetworkCardName        = $adapter.Name
+                    NetworkCardDescription = $adapter.InterfaceDescription
                     NetworkCategory        = [String]$NetworkCategory
+                    NetworkCardDnsSuffix   = ($dnsClients | Where-Object {
+                            $_.InterfaceIndex -eq $adapter.InterfaceIndex
+                        }).ConnectionSpecificSuffix
                 }
             }
   

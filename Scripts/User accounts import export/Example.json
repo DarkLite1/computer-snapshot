@@ -1,0 +1,29 @@
+[
+  {
+    "Name": "SuperAdmin",
+    "FullName": "Super administrator",
+    "Description": "Built-in account for administering the computer/domain",
+    "Enabled": true,
+    "PasswordExpires": null,
+    "UserMayChangePassword": true,
+    "Password": "98udfna;slkjdf"
+  },
+  {
+    "Name": "cnorris",
+    "FullName": "Chuck Norris",
+    "Description": "Texas Ranger",
+    "Enabled": false,
+    "PasswordExpires": null,
+    "UserMayChangePassword": false,
+    "Password": ""
+  },
+  {
+    "Name": "bswagger",
+    "FullName": "Bob Lee swagger",
+    "Description": "Shooter",
+    "Enabled": true,
+    "PasswordExpires": null,
+    "UserMayChangePassword": true,
+    "Password": ""
+  }
+]

@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "Administrators",
+    "Description": "",
+    "Members": ["PC1\\bswagger", "CONTOSO\\Domain Admins", "CONTOSO\\cnorris"]
+  },
+  {
+    "Name": "Captains",
+    "Description": "",
+    "Members": ["PC1\\picard", "CONTOSO\\kirk"]
+  },
+  {
+    "Name": "Directors",
+    "Description": "Directors of Star Fleet",
+    "Members": [null]
+  }
+]

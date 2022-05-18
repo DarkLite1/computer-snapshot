@@ -221,7 +221,8 @@ Process {
                         $_.InterfaceIndex -eq $adapter.InterfaceIndex
                     }
                     if (
-                        $dnsClient.ConnectionSpecificSuffix -ne $card.NetworkCardDnsSuffix
+                        ($card.NetworkCardDnsSuffix) -and
+                        ($dnsClient.ConnectionSpecificSuffix -ne $card.NetworkCardDnsSuffix)
                     ) {
                         $setDnsParams = @{
                             InterfaceIndex           = $adapter.InterfaceIndex
@@ -229,7 +230,7 @@ Process {
                         }
                         Set-DnsClient @setDnsParams
 
-                        Write-Output "Changed DNS suffix for network card with id '$($adapter.InterfaceIndex)' from '$($dnsClient.ConnectionSpecificSuffix)' to '$($card.NetworkCardDnsSuffix)'"
+                        Write-Output "Changed DNS suffix for network card with id '$($adapter.InterfaceIndex)' and description '$($adapter.InterfaceDescription)' from '$($dnsClient.ConnectionSpecificSuffix)' to '$($card.NetworkCardDnsSuffix)'"
                     }
                     #endregion
                 }

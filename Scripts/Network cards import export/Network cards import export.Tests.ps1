@@ -440,46 +440,22 @@ Describe "when action is 'Import'" {
                 ($ConnectionSpecificSuffix -eq 'CONTOSO.COM')
             }
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
-                ($InputObject -eq "Changed DNS suffix for network card with id '1' from '' to 'CONTOSO.COM'") 
+                ($InputObject -eq "Changed DNS suffix for network card with id '1' and description 'bla Intel bla' from '' to 'CONTOSO.COM'") 
             }
         } -Tag test
         It 'not corrected when it is correct' {
-            Mock Get-NetAdapter {
+            Mock Get-DnsClient {
                 @(
                     @{
-                        Name                 = 'LAN'
-                        InterfaceDescription = 'bla Intel bla'
+                        InterfaceIndex           = '1'
+                        ConnectionSpecificSuffix = 'CONTOSO.COM'
                     }
                 )
             }
-            Mock Get-NetConnectionProfile {
-                @(
-                    @{
-                        InterfaceAlias  = 'LAN'
-                        InterfaceIndex  = '1'
-                        NetworkCategory = 'Private'
-                    }
-                )
-            }
-            ConvertTo-Json @(
-                @{
-                    NetworkCardName        = $null
-                    NetworkCardDescription = 'Intel'
-                    NetworkCategory        = 'Private'
-                }
-            ) | Out-File -FilePath $testFile
-
-            .$testScript @testNewParams 
-
-            Should -Not -Invoke Set-NetConnectionProfile
-            Should -Not -Invoke Write-Output -ParameterFilter {
-                ($InputObject -like "Changed network category*") 
-            }
-        }
-        It 'not changed when NetworkCardDnsSuffix is null' {
             Mock Get-NetAdapter {
                 @(
                     @{
+                        InterfaceIndex       = '1'
                         Name                 = 'LAN'
                         InterfaceDescription = 'bla Intel bla'
                     }
@@ -498,15 +474,59 @@ Describe "when action is 'Import'" {
                 @{
                     NetworkCardName        = 'LAN'
                     NetworkCardDescription = 'Intel'
-                    NetworkCategory        = $null
+                    NetworkCategory        = 'Private'
+                    NetworkCardDnsSuffix   = 'CONTOSO.COM'
                 }
             ) | Out-File -FilePath $testFile
 
             .$testScript @testNewParams 
 
-            Should -Not -Invoke Set-NetConnectionProfile
+            Should -Not -Invoke Set-DnsClient
             Should -Not -Invoke Write-Output -ParameterFilter {
-                ($InputObject -like "Changed network category*") 
+                ($InputObject -like "Changed DNS suffix*") 
+            }
+        }
+        It 'not changed when NetworkCardDnsSuffix is null' {
+            Mock Get-DnsClient {
+                @(
+                    @{
+                        InterfaceIndex           = '1'
+                        ConnectionSpecificSuffix = 'CONTOSO.COM'
+                    }
+                )
+            }
+            Mock Get-NetAdapter {
+                @(
+                    @{
+                        InterfaceIndex       = '1'
+                        Name                 = 'LAN'
+                        InterfaceDescription = 'bla Intel bla'
+                    }
+                )
+            }
+            Mock Get-NetConnectionProfile {
+                @(
+                    @{
+                        InterfaceAlias  = 'LAN'
+                        InterfaceIndex  = '1'
+                        NetworkCategory = 'Private'
+                    }
+                )
+            }
+            ConvertTo-Json @(
+                @{
+                    NetworkCardName        = 'LAN'
+                    NetworkCardDescription = 'Intel'
+                    NetworkCategory        = 'Private'
+                    NetworkCardDnsSuffix   = ''
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            Should -Not -Invoke Set-DnsClient
+            Should -Not -Invoke Write-Output -ParameterFilter {
+                ($InputObject -like "Changed DNS suffix*") 
             }
         }
     }

@@ -147,7 +147,7 @@ Process {
                 #region Create example config file
                 Write-Verbose 'No network cards found, create template'
                 $getParams = @{
-                    Path     = Join-Path $PSScriptRoot $FileName
+                    Path     = Join-Path $PSScriptRoot 'Example.json'
                     Encoding = 'UTF8'
                     Raw      = $true
                 }

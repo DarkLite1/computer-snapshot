@@ -1,0 +1,12 @@
+[
+  {
+    "NetworkCategory": "Private",
+    "NetworkCardDescription": "Intel",
+    "NetworkCardName": "LAN OFFICE"
+  },
+  {
+    "NetworkCategory": "",
+    "NetworkCardDescription": "Broadcom",
+    "NetworkCardName": "LAN FACTORY"
+  }
+]

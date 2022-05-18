@@ -144,27 +144,22 @@ Process {
             }
   
             if (-not $cardsToExport) {
+                #region Create example config file
                 Write-Verbose 'No network cards found, create template'
-                $cardsToExport = @(
-                    @{
-                        NetworkCardName        = 'LAN FACTORY'
-                        NetworkCardDescription = 'Broadcom'
-                        NetworkCategory        = $null
-                    },
-                    @{
-                        NetworkCardName        = 'LAN OFFICE'
-                        NetworkCardDescription = 'Intel'
-                        NetworkCategory        = 'Private'
-                    }
-                )
-                Write-Output 'No network cards found, template created'
+                $getParams = @{
+                    Path     = Join-Path $PSScriptRoot 'Example.json'
+                    Encoding = 'UTF8'
+                    Raw      = $true
+                }
+                $cardsToExport = Get-Content @getParams | 
+                ConvertFrom-Json -EA Stop
+                #endregion
             } 
             else {
                 Write-Output "Found $($cardsToExport.Count) network cards:"
                 $cardsToExport | ForEach-Object {
                     $M = "Name '$($_.NetworkCardName)' description '$($_.NetworkCardDescription)' network profile '$($_.NetworkCategory)'"
-                    Write-Verbose $M
-                    Write-Output $M
+                    Write-Verbose $M; Write-Output $M
                 }
             }
             

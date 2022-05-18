@@ -129,6 +129,7 @@ Process {
     Try {
         $netAdapters = Get-NetAdapter
         $netConnectionProfiles = Get-NetConnectionProfile
+        $dnsClients = Get-DnsClient
 
         If ($Action -eq 'Export') {
             #region Export example config file
@@ -193,23 +194,29 @@ Process {
             }
             #endregion
 
-            #region Rename network cards
-            foreach (
-                $card in 
-                $NetworkCards | Where-Object { $_.NetworkCardName }
-            ) {
+            foreach ($card in $NetworkCards) {
                 foreach (
                     $adapter in 
                     $netAdapters | Where-Object { 
-                        ($_.InterfaceDescription -like "*$($card.NetworkCardDescription)*") -and
-                        ($_.Name -ne $card.NetworkCardName)            
+                        ($_.InterfaceDescription -like "*$($card.NetworkCardDescription)*")
                     }
-                ) {    
-                    Rename-NetAdapter -Name $adapter.Name -NewName $card.NetworkCardName
-                    Write-Output "Renamed network card with description '$($adapter.InterfaceDescription)' from '$($adapter.Name)' to '$($card.NetworkCardName)'"
+                ) {
+                    #region Rename network card
+                    if (
+                        ($card.NetworkCardName) -and
+                        ($adapter.Name -ne $card.NetworkCardName)
+                    ) {
+                        $renameParams = @{
+                            Name    = $adapter.Name 
+                            NewName = $card.NetworkCardName
+                        }
+                        Rename-NetAdapter @renameParams
+
+                        Write-Output "Renamed network card with description '$($adapter.InterfaceDescription)' from '$($adapter.Name)' to '$($card.NetworkCardName)'"
+                    }
+                    #endregion
                 }
             }
-            #endregion
 
             #region Set network category
             foreach ($card in $NetworkCards) {
@@ -220,12 +227,26 @@ Process {
                         ($_.InterfaceAlias -eq $card.NetworkCardName) -and
                         ($_.NetworkCategory -ne $card.NetworkCategory) 
                     }
-                ) {    
-                    Set-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -NetworkCategory $card.NetworkCategory
+                ) {
+                    $setNetConnectionParams = @{
+                        InterfaceIndex  = $profile.InterfaceIndex 
+                        NetworkCategory = $card.NetworkCategory
+                    }
+                    Set-NetConnectionProfile @setNetConnectionParams
+
                     $M = "Changed network category on card '$($card.NetworkCardName)' from '$($profile.NetworkCategory)' to '$($card.NetworkCategory)'"
-                    Write-Verbose $M
-                    Write-Output $M
+                    Write-Verbose $M; Write-Output $M
                 }
+            }
+            #endregion
+
+            #region Set DNS suffix
+            if ($dnsClient.ConnectionSpecificSuffix -ne $ConnectionSpecificSuffix) {
+                $setParams = @{
+                    InterfaceIndex           = $adapter[1].InterfaceIndex
+                    ConnectionSpecificSuffix = $ConnectionSpecificSuffix
+                }
+                Set-DnsClient @setParams
             }
             #endregion
         }

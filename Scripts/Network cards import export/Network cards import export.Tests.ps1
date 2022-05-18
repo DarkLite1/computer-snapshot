@@ -9,9 +9,11 @@ BeforeAll {
         FileName   = 'NetworkCards.json'
     }
 
+    Mock Get-DnsClient
     Mock Get-NetAdapter
     Mock Get-NetConnectionProfile
     Mock Set-NetConnectionProfile
+    Mock Set-DnsClient
     Mock Rename-NetAdapter
     Mock Write-Output
 }
@@ -361,6 +363,119 @@ Describe "when action is 'Import'" {
             }
         }
         It 'not changed when NetworkCategory is null' {
+            Mock Get-NetAdapter {
+                @(
+                    @{
+                        Name                 = 'LAN'
+                        InterfaceDescription = 'bla Intel bla'
+                    }
+                )
+            }
+            Mock Get-NetConnectionProfile {
+                @(
+                    @{
+                        InterfaceAlias  = 'LAN'
+                        InterfaceIndex  = '1'
+                        NetworkCategory = 'Private'
+                    }
+                )
+            }
+            ConvertTo-Json @(
+                @{
+                    NetworkCardName        = 'LAN'
+                    NetworkCardDescription = 'Intel'
+                    NetworkCategory        = $null
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            Should -Not -Invoke Set-NetConnectionProfile
+            Should -Not -Invoke Write-Output -ParameterFilter {
+                ($InputObject -like "Changed network category*") 
+            }
+        }
+    }
+    Context 'the network DNS suffix is' {
+        It 'corrected when it is wrong' {
+            Mock Get-DnsClient {
+                @(
+                    @{
+                        InterfaceIndex           = '1'
+                        ConnectionSpecificSuffix = ''
+                    }
+                )
+            }
+            Mock Get-NetAdapter {
+                @(
+                    @{
+                        Name                 = 'LAN'
+                        InterfaceDescription = 'bla Intel bla'
+                    }
+                )
+            }
+            Mock Get-NetConnectionProfile {
+                @(
+                    @{
+                        InterfaceAlias  = 'LAN'
+                        InterfaceIndex  = '1'
+                        NetworkCategory = 'Private'
+                    }
+                )
+            }
+            ConvertTo-Json @(
+                @{
+                    NetworkCardName        = 'LAN'
+                    NetworkCardDescription = 'Intel'
+                    NetworkCategory        = 'Private'
+                    NetworkCardDnsSuffix   = 'CONTOSO.COM'
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            Should -Invoke Set-DnsClient -Times 1 -Exactly -ParameterFilter {
+                ($InterfaceIndex -eq '1') -and
+                ($ConnectionSpecificSuffix -eq 'CONTOSO.COM')
+            }
+            Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
+                ($InputObject -eq "Changed DNS suffix on card 'LAN' from '' to 'CONTOSO.COM'") 
+            }
+        } -Tag test
+        It 'not corrected when it is correct' {
+            Mock Get-NetAdapter {
+                @(
+                    @{
+                        Name                 = 'LAN'
+                        InterfaceDescription = 'bla Intel bla'
+                    }
+                )
+            }
+            Mock Get-NetConnectionProfile {
+                @(
+                    @{
+                        InterfaceAlias  = 'LAN'
+                        InterfaceIndex  = '1'
+                        NetworkCategory = 'Private'
+                    }
+                )
+            }
+            ConvertTo-Json @(
+                @{
+                    NetworkCardName        = $null
+                    NetworkCardDescription = 'Intel'
+                    NetworkCategory        = 'Private'
+                }
+            ) | Out-File -FilePath $testFile
+
+            .$testScript @testNewParams 
+
+            Should -Not -Invoke Set-NetConnectionProfile
+            Should -Not -Invoke Write-Output -ParameterFilter {
+                ($InputObject -like "Changed network category*") 
+            }
+        }
+        It 'not changed when NetworkCardDnsSuffix is null' {
             Mock Get-NetAdapter {
                 @(
                     @{

@@ -216,10 +216,8 @@ Process {
                     }
                     #endregion
                 }
-            }
-
-            #region Set network category
-            foreach ($card in $NetworkCards) {
+            
+                #region Set network category
                 foreach (
                     $profile in 
                     $netConnectionProfiles | Where-Object {
@@ -237,8 +235,8 @@ Process {
                     $M = "Changed network category on card '$($card.NetworkCardName)' from '$($profile.NetworkCategory)' to '$($card.NetworkCategory)'"
                     Write-Verbose $M; Write-Output $M
                 }
+                #endregion
             }
-            #endregion
 
             #region Set DNS suffix
             if ($dnsClient.ConnectionSpecificSuffix -ne $ConnectionSpecificSuffix) {

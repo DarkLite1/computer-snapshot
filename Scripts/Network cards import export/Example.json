@@ -2,11 +2,13 @@
   {
     "NetworkCategory": "Private",
     "NetworkCardDescription": "Intel",
-    "NetworkCardName": "LAN OFFICE"
+    "NetworkCardName": "LAN OFFICE",
+    "NetworkCardDnsSuffix": "CONTOSO.COM"
   },
   {
     "NetworkCategory": "",
     "NetworkCardDescription": "Broadcom",
-    "NetworkCardName": "LAN FACTORY"
+    "NetworkCardName": "LAN FACTORY",
+    "NetworkCardDnsSuffix": ""
   }
 ]

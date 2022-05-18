@@ -215,6 +215,23 @@ Process {
                         Write-Output "Renamed network card with description '$($adapter.InterfaceDescription)' from '$($adapter.Name)' to '$($card.NetworkCardName)'"
                     }
                     #endregion
+
+                    #region Set DNS suffix
+                    $dnsClient = $dnsClients | Where-Object {
+                        $_.InterfaceIndex -eq $adapter.InterfaceIndex
+                    }
+                    if (
+                        $dnsClient.ConnectionSpecificSuffix -ne $card.NetworkCardDnsSuffix
+                    ) {
+                        $setDnsParams = @{
+                            InterfaceIndex           = $adapter.InterfaceIndex
+                            ConnectionSpecificSuffix = $card.NetworkCardDnsSuffix
+                        }
+                        Set-DnsClient @setDnsParams
+
+                        Write-Output "Changed DNS suffix for network card with id '$($adapter.InterfaceIndex)' from '$($dnsClient.ConnectionSpecificSuffix)' to '$($card.NetworkCardDnsSuffix)'"
+                    }
+                    #endregion
                 }
             
                 #region Set network category
@@ -237,16 +254,6 @@ Process {
                 }
                 #endregion
             }
-
-            #region Set DNS suffix
-            if ($dnsClient.ConnectionSpecificSuffix -ne $ConnectionSpecificSuffix) {
-                $setParams = @{
-                    InterfaceIndex           = $adapter[1].InterfaceIndex
-                    ConnectionSpecificSuffix = $ConnectionSpecificSuffix
-                }
-                Set-DnsClient @setParams
-            }
-            #endregion
         }
     }
     Catch {

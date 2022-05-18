@@ -409,6 +409,7 @@ Describe "when action is 'Import'" {
             Mock Get-NetAdapter {
                 @(
                     @{
+                        InterfaceIndex       = '1'
                         Name                 = 'LAN'
                         InterfaceDescription = 'bla Intel bla'
                     }
@@ -439,7 +440,7 @@ Describe "when action is 'Import'" {
                 ($ConnectionSpecificSuffix -eq 'CONTOSO.COM')
             }
             Should -Invoke Write-Output -Times 1 -Exactly -ParameterFilter {
-                ($InputObject -eq "Changed DNS suffix on card 'LAN' from '' to 'CONTOSO.COM'") 
+                ($InputObject -eq "Changed DNS suffix for network card with id '1' from '' to 'CONTOSO.COM'") 
             }
         } -Tag test
         It 'not corrected when it is correct' {

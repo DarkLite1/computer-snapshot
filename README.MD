@@ -1,5 +1,4 @@
 # Description
-
 A PowerShell script designed to create and restore snapshots of Windows computers. 
 
 This script is intended to run from a USB stick and is portable. The intent is to create a snapshot on one computer and restore the snapshot on another computer. Snapshots are by default stored on the USB stick in easily editable .JSON files.
@@ -32,12 +31,12 @@ At this point a snapshot is created and saved on the USB stick in the `$Snapshot
 ## Step 3: Restore the snapshot on another computer
 Plug in the same USB stick that contains all the script files and the collected snapshot data and run the script `Start-Script.ps1` with `$Action = 'RestoreSnapshot'` and set the `$Snapshot` items to `$true` for the data you want to restore.
 
-At this point the data of the latest snapshot will be used to create or update the current computer to the desired state. In case you want to restore another snapshot than the last one created use the `$RestoreSnapshotFolder`.
+At this point the data of the latest snapshot will be used to update the current computer to the desired state. In case you want to restore another snapshot than the last one created use the `$RestoreSnapshotFolder`.
 
 # Quick and easy execution
-The folder 'Configurations' holds .JSON files that represent the arguments used in 'Start-Script.ps1'. This can be convenient when you have multiple configurations on the USB stick but you only want to apply a specific snapshot. 
+The folder `Configurations` holds .JSON files that represent the arguments used in `Start-Script.ps1`. This can be convenient when you have multiple snapshots on the USB stick but you only want to apply a specific one.
 
-Click on 'Quick launcher.lnk' to open a new window. In the new window all files in the folder 'Configurations' are displayed. Select a single file to apply that configuration on the current machine.
+Click on `Quick launcher.lnk` to open a new window. In the new window all files in the folder `Configurations` are displayed. Select a single file to apply that configuration on the current machine.
 
  # Tips
 - It is encouraged to modify the exported files to contain only the data you really need. This will speed up the process and reduces the risks. Use a text file editor like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. You can then use the updated files with `$action = 'RestoreSnapshot'` and `$RestoreSnapshotFolder` . **_Less is more_**

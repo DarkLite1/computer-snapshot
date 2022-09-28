@@ -1,5 +1,5 @@
 # Description
-A PowerShell script designed to create and restore snapshots of Windows computers. 
+A PowerShell script designed to create and restore snapshots on Windows computers.
 
 This script is intended to run from a USB stick and is portable. The intent is to create a snapshot on one computer and restore the snapshot on another computer. Snapshots are by default stored on the USB stick in easily editable .JSON files.
 

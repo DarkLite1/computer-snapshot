@@ -94,19 +94,6 @@ Describe 'Fail the import of the software packages file when' {
         { .$testScript @testNewParams } | 
         Should -Throw "*Input file '$($testNewParams.DataFolder)\$($testNewParams.ImportFileName)' not found"
     }
-    It 'the software folder is empty' {
-        @{
-            SoftwarePackages = @{
-                Remove  = $null
-                Install = $null
-            }
-        } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
-
-        { 
-            .$testScript @testNewParams 
-        } | 
-        Should -Throw "*Software folder '$testSoftwareFolder' empty"
-    } 
 }
 Describe "With Action set to 'Export'" {
     BeforeAll {
@@ -173,35 +160,73 @@ Describe "With Action set to 'Import'" {
             }
         }
     }
-    Context 'software packages are installed' {
-        BeforeAll {
-            New-Item -Path $testSoftwareFolder -ItemType Directory
-            '1' | Out-File -FilePath "$testSoftwareFolder\package1.exe"
+    Context 'software packages are installed from' {
+        Context "a relative path in the 'Software' folder" {
+            BeforeAll {
+                $testExecutablePath = "$testSoftwareFolder\Package1.exe"
 
-            @{
-                SoftwarePackages = @{
-                    Remove  = $null
-                    Install = @(
-                        @{
-                            ExecutableName = "package1.exe"
-                            Arguments      = '\x \x \z'
-                        }
-                    )
+                New-Item -Path $testSoftwareFolder -ItemType Directory
+                '1' | Out-File -FilePath $testExecutablePath
+
+                @{
+                    SoftwarePackages = @{
+                        Remove  = $null
+                        Install = @(
+                            @{
+                                ExecutablePath = ".\Packages\package1.exe"
+                                Arguments      = '\x \x \z'
+                            }
+                        )
+                    }
+                } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
+
+                .$testScript @testNewParams
+            }
+            It 'when their ExecutablePath is in the Install property' {
+                Should -Invoke Start-Process -Scope Context -Times 1 -Exactly -ParameterFilter {
+                    ($FilePath -eq $testExecutablePath) -and
+                    ($ArgumentList -eq '\x \x \z')
                 }
-            } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
-
-            .$testScript @testNewParams
-        }
-        It 'when their ExecutableName is in the Install property' {
-            Should -Invoke Start-Process -Scope Context -Times 1 -Exactly -ParameterFilter {
-                ($FilePath -eq "$testSoftwareFolder\Package1.exe") -and
-                ($ArgumentList -eq '\x \x \z')
+            }
+            It 'output is generated' {
+                Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
+                    $InputObject -like "Installed executable '$testExecutablePath' with arguments '\x \x \z'"
+                }
             }
         }
-        It 'output is generated' {
-            Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
-                $InputObject -like "Installed executable 'package1.exe' with arguments '\x \x \z'"
+        Context 'a literal path' {
+            BeforeAll {
+                $testFolder = (New-Item 'TestDrive:/B' -ItemType Directory).FullName
+                $testExecutablePath = Join-Path $testFolder 'package2.exe'
+
+                New-Item -Path $testSoftwareFolder -ItemType Directory
+                '1' | Out-File -FilePath $testExecutablePath
+
+                @{
+                    SoftwarePackages = @{
+                        Remove  = $null
+                        Install = @(
+                            @{
+                                ExecutablePath = $testExecutablePath
+                                Arguments      = '\x \x \z'
+                            }
+                        )
+                    }
+                } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
+
+                .$testScript @testNewParams
+            }
+            It 'when their ExecutablePath is custom' {
+                Should -Invoke Start-Process -Scope Context -Times 1 -Exactly -ParameterFilter {
+                ($FilePath -eq $testExecutablePath) -and
+                ($ArgumentList -eq '\x \x \z')
+                }
+            }
+            It 'output is generated' {
+                Should -Invoke Write-Output -Exactly -Times 1 -Scope Context -ParameterFilter {
+                    $InputObject -like "Installed executable '$testExecutablePath' with arguments '\x \x \z'"
+                }
             }
         }
     }
-}
+} -Tag test

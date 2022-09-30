@@ -3,27 +3,27 @@
     "Remove": ["Notepad++ (64-bit x64)"],
     "Install": [
       {
-        "ExecutableName": "npp.8.3.3.Installer.x64.exe",
+        "ExecutablePath": ".\\Packages\\npp.8.3.3.Installer.x64.exe",
         "Arguments": "/S"
       },
       {
-        "ExecutableName": "MicrosoftEdgeSetup.exe",
+        "ExecutablePath": ".\\Packages\\MicrosoftEdgeSetup.exe",
         "Arguments": null
       },
       {
-        "ExecutableName": "Remote Access-windows64-offline.exe",
+        "ExecutablePath": ".\\Packages\\Remote Access-windows64-offline.exe",
         "Arguments": null
       },
       {
-        "ExecutableName": "Remote Access-windows64-offline.exe",
+        "ExecutablePath": ".\\Packages\\Remote Access-windows64-offline.exe",
         "Arguments": "/S /NAME=AUTODETECT \"/HOST=http://5.5.5.5:10555\""
       },
       {
-        "ExecutableName": "Firebird-2.1.3.18185_0_x64.exe",
+        "ExecutablePath": ".\\Packages\\Firebird-2.1.3.18185_0_x64.exe",
         "Arguments": "/Silent"
       },
       {
-        "ExecutableName": "C:\\WINDOWS\\SysWOW64\\cscript.exe",
+        "ExecutablePath": "C:\\WINDOWS\\SysWOW64\\cscript.exe",
         "Arguments": "DELL_COMMANDUPDATE_4.2.1_EN_X86_R02417\\_Install_Silent.vbs"
       }
     ]

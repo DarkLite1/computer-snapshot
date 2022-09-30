@@ -80,7 +80,7 @@ Begin {
 
     Try {
         $ImportFilePath = Join-Path -Path $DataFolder -ChildPath $ImportFileName
-        $softwareFolder = Join-Path -Path $DataFolder -ChildPath 'Packages'
+        $packagesFolder = Join-Path -Path $DataFolder -ChildPath 'Packages'
 
         #region Test DataFolder
         If ($Action -eq 'Export') {
@@ -100,12 +100,6 @@ Begin {
             }
             If (-not (Test-Path -LiteralPath $ImportFilePath -PathType Leaf)) {
                 throw "Input file '$ImportFilePath' not found"
-            }
-            If (
-                (-not (Test-Path -LiteralPath $softwareFolder -PathType Container)) -or
-                ((Get-ChildItem -Path $softwareFolder | Measure-Object).Count -eq 0)
-            ) {
-                throw "Software folder '$softwareFolder' empty"
             }
         }
         #endregion
@@ -129,13 +123,13 @@ Process {
             Write-Output "Created example file '$ImportFilePath'"
             #endregion
 
-            #region Create empty software folder
-            $null = New-Item -Path $softwareFolder -ItemType Directory
+            #region Create empty packages folder
+            $null = New-Item -Path $packagesFolder -ItemType Directory
             #endregion
         }
         else {
             $workPath = Get-Location
-            Set-Location $softwareFolder
+            Set-Location $DataFolder
 
             #region Import .JSON file
             Write-Verbose "Import from file '$ImportFilePath'"
@@ -213,34 +207,35 @@ Process {
             foreach ($application in $import.SoftwarePackages.Install) {
                 try {
                     #region Test executable file
-                    if (-not $application.ExecutableName) {
-                        throw "Property 'ExecutableName' is mandatory"
+                    if (-not $application.ExecutablePath) {
+                        throw "Property 'ExecutablePath' is mandatory"
                     }
                     #endregion
 
                     #region Get executable path from software folder
                     $params = @{
-                        Path        = $application.ExecutableName
+                        Path        = $application.ExecutablePath
                         ErrorAction = 'Ignore'
                     }
                     $executablePath = Convert-Path @params
                     #endregion
 
                     #region Test executable file
+                    if (-not $executablePath) {
+                        throw "Executable file '$($application.ExecutablePath)' not found"
+                    }
+
                     $testPathParams = @{
                         LiteralPath = $executablePath
-                        PathType    = 'leaf'
+                        PathType    = 'Leaf'
                     }
-                    if (
-                        (-not $executablePath) -or
-                        (-not (Test-Path @testPathParams))
-                    ) {
-                        throw "Executable file '$executablePath' not found"
+                    if (-not (Test-Path @testPathParams)) {
+                        throw "Executable path '$executablePath' is not a file"
                     }
                     #endregion
 
                     #region Install software package
-                    Write-Verbose "Install executable '$($application.ExecutableName)'"
+                    Write-Verbose "Install executable '$executablePath'"
 
                     $startParams = @{
                         FilePath    = $executablePath
@@ -258,13 +253,13 @@ Process {
                         throw "Installation failed with ExitCode '$($process.ExitCode)'"
                     }
                     else {
-                        Write-Output "Installed executable '$($application.ExecutableName)' with arguments '$($application.Arguments)'"
+                        Write-Output "Installed executable '$executablePath' with arguments '$($application.Arguments)'"
                     }
                     #endregion
                 }
                 catch {
                     $errorMessage = $_; $Error.RemoveAt(0)
-                    throw "Failed to install executable '$($application.ExecutableName)' with arguments '$($application.Arguments)': $errorMessage"
+                    throw "Failed to install executable '$($application.ExecutablePath)' with arguments '$($application.Arguments)': $errorMessage"
                 } 
             }
             #endregion

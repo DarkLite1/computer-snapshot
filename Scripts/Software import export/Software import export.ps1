@@ -259,7 +259,7 @@ Process {
                 }
                 catch {
                     $errorMessage = $_; $Error.RemoveAt(0)
-                    throw "Failed to install executable '$($application.ExecutablePath)' with arguments '$($application.Arguments)': $errorMessage"
+                    Write-Error "Failed to install executable '$($application.ExecutablePath)' with arguments '$($application.Arguments)': $errorMessage"
                 } 
             }
             #endregion

@@ -235,6 +235,8 @@ Begin {
     Try {
         # $VerbosePreference = 'Continue'
         $Error.Clear()
+
+        Set-Location $PSScriptRoot
         $Now = Get-Date
 
         #region Start progress bar
@@ -280,6 +282,10 @@ Begin {
         #endregion
 
         If ($Action -eq 'CreateSnapshot') {
+            if ($RestoreSnapshotFolder) {
+                throw "When using 'Action = CreateSnapshot' the parameter 'RestoreSnapshotFolder' is not supported. Please remove the parameter 'RestoreSnapshotFolder' or change to 'Action = RestoreSnapshot'."
+            }
+
             #region Create snapshot folder
             try {
                 $joinParams = @{
@@ -297,48 +303,32 @@ Begin {
             #endregion
         }
         else {
-            If ($RestoreSnapshotFolder) {
-                $RestoreSnapshotFolder = Get-FullPathHC -Path $RestoreSnapshotFolder
-
-                #region Test RestoreSnapshotFolder
-                If (-not (Test-Path -Path $RestoreSnapshotFolder -PathType Container)) {
-                    throw "Restore snapshot folder '$RestoreSnapshotFolder' not found"
-                }
-                #endregion
-
-                $SnapshotFolder = $RestoreSnapshotFolder
+            if (-not $RestoreSnapshotFolder) {
+                throw "The parameter 'RestoreSnapshotFolder' is mandatory. Please specify the folder containing the snapshot data that needs to be restored on the current computer."
             }
-            else {
-                #region Test snapshot folder
-                If (-not (Test-Path -Path $SnapshotsFolder -PathType Container)) {
-                    throw "Snapshot folder '$SnapshotsFolder' not found. Please create your first snapshot with action 'CreateSnapshot'"
-                }
-                #endregion
 
-                #region Get latest snapshot folder
-                $getParams = @{
-                    Path        = $SnapshotsFolder
-                    Directory   = $true
-                    ErrorAction = 'Stop'
-                }
-                $SnapshotFolder = Get-ChildItem @getParams | Sort-Object LastWriteTime | 
-                Select-Object -Last 1 -ExpandProperty FullName
-                #endregion
+            $RestoreSnapshotFolder = Get-FullPathHC -Path $RestoreSnapshotFolder
 
-                #region Test latest snapshot
-                If (-not $SnapshotFolder) {
-                    throw "No data found in snapshot folder '$($getParams.Path)' to restore. Please create a snapshot first with Action 'CreateSnapshot'"
-                }
-                #endregion
+            #region Test RestoreSnapshotFolder
+            If (-not 
+                (Test-Path -Path $RestoreSnapshotFolder -PathType Container)
+            ) {
+                throw "Restore snapshot folder '$RestoreSnapshotFolder' not found"
             }
+            #endregion
+
+            $SnapshotFolder = $RestoreSnapshotFolder
 
             #region Test snapshot folder
-            If ((Get-ChildItem -LiteralPath $SnapshotFolder | Measure-Object).Count -eq 0) {
+            If (
+                (Get-ChildItem -LiteralPath $SnapshotFolder | 
+                Measure-Object).Count -eq 0
+            ) {
                 throw "No data found in snapshot folder '$SnapshotFolder'"
             }
-            #endregion        
+            #endregion
         }
-
+    
         Write-Verbose "Snapshot folder '$SnapshotFolder'"
 
         #region Test scripts and data folders
@@ -364,14 +354,16 @@ Begin {
     
             If ($Action -eq 'RestoreSnapshot') {
                 #region Test script folder
-                If (-not (Test-Path -LiteralPath $invokeScriptParams.DataFolder -PathType Container)) {
-                    throw "Snapshot folder '$($invokeScriptParams.DataFolder)' not found"
+                If (-not (
+                        Test-Path -LiteralPath $invokeScriptParams.DataFolder -PathType 'Container')
+                ) {
+                    throw "Restore folder '$($invokeScriptParams.DataFolder)' for snapshot item '$($item.Key)' not found"
                 }
     
                 $folderContent = @(Get-ChildItem -LiteralPath $invokeScriptParams.DataFolder)
                 
                 If ($folderContent.Count -eq 0) {
-                    throw "No data found for snapshot item '$($item.Key)' in folder '$($invokeScriptParams.DataFolder)'"
+                    throw "Restore folder '$($invokeScriptParams.DataFolder)' for snapshot item '$($item.Key)' is empty"
                 }
                 #endregion
                 

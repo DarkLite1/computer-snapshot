@@ -17,6 +17,7 @@ BeforeAll {
         ReportsFolder       = (New-Item 'TestDrive:/R' -ItemType Directory).FullName
         OpenReportInBrowser = $false
     }
+    $testFolder = (New-Item 'TestDrive:/B' -ItemType Directory).FullName
 
     Function Invoke-ScriptHC {
         Param (
@@ -65,58 +66,52 @@ Describe "Throw a terminating error for action 'CreateSnapshot' when" {
 }
 Describe "Throw a terminating error for action 'RestoreSnapshot' when" {
     BeforeEach {
-        Remove-Item $testParams.SnapshotsFolder -Recurse -EA Ignore
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'RestoreSnapshot'
+        $testNewParams.RestoreSnapshotFolder = $testFolder
     }
-    It 'no snapshot has been made yet' {
-        $testNewParams.SnapshotsFolder | Should -Not -Exist
+    It "The parameter 'RestoreSnapshotFolder' is missing" {
+        $testNewParams.Remove('RestoreSnapshotFolder')
+
         { .$testScript @testNewParams } | 
-        Should -Throw "*Snapshot folder '$($testNewParams.SnapshotsFolder)' not found. Please create your first snapshot with action 'CreateSnapshot'"
+        Should -Throw "*The parameter 'RestoreSnapshotFolder' is mandatory. Please specify the folder containing the snapshot data that needs to be restored on the current computer*"
     }
-    It "the 'RestoreSnapshotFolder' folder is not found'" {
+    It "the 'RestoreSnapshotFolder' is not found'" {
         $testNewParams.RestoreSnapshotFolder = 'TestDrive:/xxx'
+
         { .$testScript @testNewParams } | 
         Should -Throw "*Restore snapshot folder 'TestDrive:/xxx' not found"
     }
     It "the 'RestoreSnapshotFolder' is empty" {
-        $testNewParams.RestoreSnapshotFolder = (New-Item 'TestDrive:/B' -ItemType Directory).FullName
         { .$testScript @testNewParams } | 
         Should -Throw "*No data found in snapshot folder '$($testNewParams.RestoreSnapshotFolder)'"
     }
-    It 'no data is found in the snapshot folder' {
-        New-Item $testNewParams.SnapshotsFolder -ItemType Directory
+    It "the script restore folder is not found" {
+        New-Item "$testFolder/a" -ItemType Directory
+        $testScriptFolder = Join-Path $testFolder 'Script2'
+
         { .$testScript @testNewParams } | 
-        Should -Throw "*No data found in snapshot folder '$($testNewParams.SnapshotsFolder)' to restore. Please create a snapshot first with Action 'CreateSnapshot'"
+        Should -Throw "*Restore folder '$testScriptFolder' for snapshot item 'Script2' not found"
     }
-    It 'no data is found for the specified script to restore' {
-        $testSnapshotFolder = New-Item "$($testNewParams.SnapshotsFolder)/Snapshot1/Script2" -ItemType Directory
+    It "the script restore folder is empty" {
+        $testScriptFolder = New-Item "$testFolder\Script2" -ItemType Directory
+
         { .$testScript @testNewParams } | 
-        Should -Throw "*No data found for snapshot item 'Script2' in folder '$testSnapshotFolder'"
+        Should -Throw "*Restore folder '$testScriptFolder' for snapshot item 'Script2' is empty"
     }
     It 'the script does not exist' {
-        New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script1" -ItemType Directory
-        New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script1\Export.csv" -ItemType file
         $testNewParams.Snapshot = [Ordered]@{
             Script1 = $true
         }
         $testNewParams.Script = @{
             Script1 = 'TestDrive:/xxx.ps1'
         }
+        
         { .$testScript @testNewParams } | 
         Should -Throw "*Script file 'TestDrive:/xxx.ps1' not found for snapshot item 'Script1'"
-    }
-    # It 'an xml file could not be imported' {
-    #     $testSnapshotFolder = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script2" -ItemType Directory).FullName
-    #     $testFile = Join-Path $testSnapshotFolder 'export.xml'
-    #     'a' | Out-File -LiteralPath $testFile
-        
-    #     { .$testScript @testNewParams } | 
-    #     Should -Throw "*File '$testFile' is not a valid xml file for snapshot item 'Script2'"
-    # }
-    It 'an json file could not be imported' {
-        $testSnapshotFolder = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script2" -ItemType Directory).FullName
-        $testFile = Join-Path $testSnapshotFolder 'export.json'
+    } 
+    It 'the json file could not be imported' {
+        $testFile = "$testFolder\Script2\export.json"
         'a' | Out-File -LiteralPath $testFile
         
         { .$testScript @testNewParams } | 
@@ -145,58 +140,41 @@ Describe "When action is 'CreateSnapshot'" {
         }
     }
 }
-Describe "When action is 'RestoreSnapshot'" {
-    BeforeEach {
-        Remove-Item $testParams.SnapshotsFolder -Recurse -EA Ignore
+Describe "When action is 'RestoreSnapshot' and 'RestoreSnapshotFolder' is set" {
+    BeforeAll {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'RestoreSnapshot'
-    }
-    Context 'a script is called for enabled snapshot items only' {
-        It 'on the most recently created snapshot' {
-            $testSnapshot1 = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1\Script2" -ItemType Directory).FullName
-            New-Item "$testSnapshot1\Export.csv" -ItemType file
-            Start-Sleep -Milliseconds 1
-            $testSnapshot2 = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot2\Script2" -ItemType Directory).FullName
-            New-Item "$testSnapshot2\Export.csv" -ItemType file
-
-            .$testScript @testNewParams
-            Should -Invoke Invoke-ScriptHC -Exactly -Times 1
-            Should -Invoke Invoke-ScriptHC -Exactly -Times 1 -ParameterFilter {
-                ($Path -eq $testNewParams.Script.Script2) -and
-                ($DataFolder -eq $testSnapshot2) -and
-                ($Type -eq 'Import')
-            }
-        }
-        It "on the snapshot in the folder 'RestoreSnapshotFolder'" {
-            $testSnapshotFolder = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot1" -ItemType Directory).FullName
-            $testSnapshot1 = (New-Item "$testSnapshotFolder\Script2" -ItemType Directory).FullName
-            New-Item "$testSnapshot1\Export.csv" -ItemType file
-            Start-Sleep -Milliseconds 1
-            $testSnapshot2 = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot2\Script2" -ItemType Directory).FullName
-            New-Item "$testSnapshot2\Export.csv" -ItemType file
-
-            $testNewParams.RestoreSnapshotFolder = $testSnapshotFolder
-
-            .$testScript @testNewParams
-            Should -Invoke Invoke-ScriptHC -Exactly -Times 1
-            Should -Invoke Invoke-ScriptHC -Exactly -Times 1 -ParameterFilter {
-                ($Path -eq $testNewParams.Script.Script2) -and
-                ($DataFolder -eq $testSnapshot1) -and
-                ($Type -eq 'Import')
-            }
-        }
-    }
-    It 'the computer is restarted when using RebootComputerAfterRestoreSnapshot' {
-        $testSnapshot = (New-Item "$($testNewParams.SnapshotsFolder)\Snapshot2\Script2" -ItemType Directory).FullName
-        New-Item "$testSnapshot\Export.csv" -ItemType file
-
+        $testNewParams.RestoreSnapshotFolder = $testFolder
         $testNewParams.RebootComputerAfterRestoreSnapshot = $true
+        $testNewParams.Snapshot = [Ordered]@{
+            Script1 = $false
+            Script2 = $true
+        }
+
+        $testScriptFolder = (New-Item "$testFolder\Script2" -ItemType Directory).FullName
+        New-Item "$testScriptFolder\Export.csv" -ItemType file
 
         .$testScript @testNewParams
-
-        Should -Invoke Restart-Computer -Exactly -Times 1
-    } -tag test
-}
+    }
+    It 'a script is called for enabled snapshot items only' {
+        Should -Invoke Invoke-ScriptHC -Exactly -Times 1 -Scope Describe
+        Should -Invoke Invoke-ScriptHC -Exactly -Times 1 -Scope Describe -ParameterFilter {
+            ($Path -eq $testNewParams.Script.Script2) -and
+            ($DataFolder -eq $testScriptFolder) -and
+            ($Type -eq 'Import')
+        }
+    } 
+    It 'restart the computer when using RebootComputerAfterRestoreSnapshot' {
+        Should -Invoke Restart-Computer -Exactly -Times 1 -Scope Describe
+    }
+    Context 'the RestoreSnapshotFolder can be' {
+        It 'a relative path' {
+            .$testScript @testNewParams
+    
+            Should -Invoke Restart-Computer -Exactly -Times 1
+        }
+    }
+} -Tag test
 Describe 'Other scripts are still executed when' {
     BeforeAll {
         Get-ChildItem -Path 'TestDrive:/' -Filter '*.ps1' |

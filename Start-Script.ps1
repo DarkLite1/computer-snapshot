@@ -178,8 +178,8 @@ Param (
         StartCustomScriptsBefore = 'Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
         StartCustomScriptsAfter  = 'Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
     },
-    [String]$SnapshotsFolder = 'Snapshots',
-    [String]$ReportsFolder = 'Reports',
+    [String]$SnapshotsFolder = '.\Snapshots',
+    [String]$ReportsFolder = '.\Reports',
     [Boolean]$OpenReportInBrowser = $true
 )
 
@@ -267,12 +267,23 @@ Begin {
 
         Write-Verbose "Start action '$Action'"
 
-        $ReportsFolder = Get-FullPathHC -Path $ReportsFolder
+        #region Get path ReportsFolder
+        $params = @{
+            Path        = $ReportsFolder
+            ErrorAction = 'Ignore'
+        }
+        $ReportsFolderPath = Convert-Path @params
+        #endregion
 
-        #region Create reports folder
-        if (-not (Test-Path -Path $ReportsFolder -PathType Container)) {
+        #region Create ReportsFolder
+        If (-not $ReportsFolderPath) {
             try {
-                $null = New-Item -Path $ReportsFolder -ItemType Directory -EA Stop
+                $params = @{
+                    Path        = $ReportsFolder 
+                    ItemType    = 'Directory'
+                    ErrorAction = 'Stop'
+                }
+                $ReportsFolderPath = (New-Item @params).FullName
             }
             catch {
                 throw "Failed to created reports folder '$ReportsFolder': $_"
@@ -504,7 +515,7 @@ End {
         Write-Verbose "End action '$Action'"
         
         $joinParams = @{
-            Path      = $ReportsFolder
+            Path      = $ReportsFolderPath
             ChildPath = '{0} - {1} - {2}.html' -f 
             $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff'), $Action
         }

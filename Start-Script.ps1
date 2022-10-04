@@ -163,20 +163,20 @@ Param (
         StartCustomScriptsAfter  = $true
     },
     [HashTable]$Script = @{
-        UserAccounts             = 'Scripts\User accounts import export\User accounts import export.ps1'
-        UserGroups               = 'Scripts\User groups import export\User groups import export.ps1'
-        FirewallRules            = 'Scripts\Firewall rules import export\Firewall rules import export.ps1'
-        CreateFolders            = 'Scripts\Folders import export\Folders import export.ps1'
-        SmbShares                = 'Scripts\Smb shares import export\Smb shares import export.ps1'
-        RegionalSettings         = 'Scripts\Regional settings import export\Regional settings import export.ps1'
-        NetworkCards             = 'Scripts\Network cards import export\Network cards import export.ps1'
-        NtpTimeServers           = 'Scripts\NTP time servers import export\NTP time servers import export.ps1'
-        RegistryKeys             = 'Scripts\Registry keys import export\Registry keys import export.ps1'
-        ScheduledTasks           = 'Scripts\Scheduled tasks import export\Scheduled tasks import export.ps1'
-        CopyFilesFolders         = 'Scripts\Copy files folders import export\Copy files folders import export.ps1'
-        Software                 = 'Scripts\Software import export\Software import export.ps1'
-        StartCustomScriptsBefore = 'Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
-        StartCustomScriptsAfter  = 'Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
+        UserAccounts             = '.\Scripts\User accounts import export\User accounts import export.ps1'
+        UserGroups               = '.\Scripts\User groups import export\User groups import export.ps1'
+        FirewallRules            = '.\Scripts\Firewall rules import export\Firewall rules import export.ps1'
+        CreateFolders            = '.\Scripts\Folders import export\Folders import export.ps1'
+        SmbShares                = '.\Scripts\Smb shares import export\Smb shares import export.ps1'
+        RegionalSettings         = '.\Scripts\Regional settings import export\Regional settings import export.ps1'
+        NetworkCards             = '.\Scripts\Network cards import export\Network cards import export.ps1'
+        NtpTimeServers           = '.\Scripts\NTP time servers import export\NTP time servers import export.ps1'
+        RegistryKeys             = '.\Scripts\Registry keys import export\Registry keys import export.ps1'
+        ScheduledTasks           = '.\Scripts\Scheduled tasks import export\Scheduled tasks import export.ps1'
+        CopyFilesFolders         = '.\Scripts\Copy files folders import export\Copy files folders import export.ps1'
+        Software                 = '.\Scripts\Software import export\Software import export.ps1'
+        StartCustomScriptsBefore = '.\Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
+        StartCustomScriptsAfter  = '.\Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
     },
     [String]$SnapshotsFolder = '.\Snapshots',
     [String]$ReportsFolder = '.\Reports',
@@ -198,19 +198,6 @@ Begin {
 
         Write-Debug "Invoke script '$Path' on data folder '$DataFolder' for '$Type'"
         & $Path -DataFolder $DataFolder -Action $Type
-    }
-    Function Get-FullPathHC {
-        Param (
-            [Parameter(Mandatory)]
-            [String]$Path
-        )
-
-        if ($Path -like '*:*') {
-            $Path
-        }
-        else {
-            Join-Path -Path $PSScriptRoot -ChildPath $Path
-        }
     }
     Function Test-IsStartedElevatedHC {
         <#
@@ -311,8 +298,8 @@ Begin {
                 }
 
                 $joinParams = @{
-                    Path      = $SnapshotsFolderPath
-                    ChildPath = '{0} - {1}' -f 
+                    Path        = $SnapshotsFolderPath
+                    ChildPath   = '{0} - {1}' -f 
                     $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff')
                     ErrorAction = 'Stop'
                 }
@@ -371,7 +358,7 @@ Begin {
             }
 
             $invokeScriptParams = @{
-                Path       = Get-FullPathHC -Path $Script.$($item.Key)
+                Path       = $Script.$($item.Key)
                 DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
             }
     
@@ -464,8 +451,10 @@ Process {
                 NonTerminatingError = $null
             }
 
+            Set-Location $PSScriptRoot
+
             $invokeScriptParams = @{
-                Path       = Get-FullPathHC -Path $Script.$($item.Key)
+                Path       = $Script.$($item.Key)
                 DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
             }
 

@@ -304,34 +304,25 @@ Begin {
             $SnapshotsFolderPath = Convert-Path @params
             #endregion
             
-            #region Create SnapshotsFolder
-            If (-not $SnapshotsFolderPath) {
-                $params = @{
-                    Path        = $SnapshotsFolder 
-                    ItemType    = 'Directory'
-                    ErrorAction = 'Ignore'
-                }
-                $SnapshotsFolderPath = New-Item @params
-            }
-            #endregion
-
-            #region Test SnapshotsFolder
-            If (-not $SnapshotsFolderPath) {
-                throw "Snapshots folder '$SnapshotsFolder' not found"
-            }
-            #endregion
-            
-
             #region Create snapshot folder
             try {
+                If (-not $SnapshotsFolderPath) {
+                    $SnapshotsFolderPath = $SnapshotsFolder
+                }
+
                 $joinParams = @{
-                    Path        = $SnapshotsFolderPath
-                    ChildPath   = '{0} - {1}' -f 
+                    Path      = $SnapshotsFolderPath
+                    ChildPath = '{0} - {1}' -f 
                     $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff')
                     ErrorAction = 'Stop'
                 }
-                $SnapshotFolder = Join-Path @joinParams
-                $null = New-Item -Path $SnapshotFolder -ItemType Directory
+                
+                $params = @{
+                    Path        = Join-Path @joinParams
+                    ItemType    = 'Directory'
+                    ErrorAction = 'Stop'
+                }
+                $SnapshotFolder = (New-Item @params).FullName
             }
             catch {
                 Throw "Failed to create snapshots folder '$SnapshotsFolder': $_"

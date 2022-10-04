@@ -167,8 +167,18 @@ Describe "When action is 'RestoreSnapshot' and 'RestoreSnapshotFolder' is set" {
     It 'restart the computer when using RebootComputerAfterRestoreSnapshot' {
         Should -Invoke Restart-Computer -Exactly -Times 1 -Scope Describe
     }
-    Context 'the RestoreSnapshotFolder can be' {
+    Context "the 'RestoreSnapshotFolder' can be" {
+        BeforeAll {
+            $testRelativeRestoreFolder = "$PSScriptRoot\test"
+            $testScriptFolder = (New-Item "$testRelativeRestoreFolder\Script2" -ItemType Directory).FullName
+            New-Item "$testScriptFolder\Export.csv" -ItemType file
+        }
+        AfterAll {
+            Remove-Item $testRelativeRestoreFolder -Recurse
+        }
         It 'a relative path' {
+            $testNewParams.RestoreSnapshotFolder = '.\test'
+
             .$testScript @testNewParams
     
             Should -Invoke Restart-Computer -Exactly -Times 1

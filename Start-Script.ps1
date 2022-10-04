@@ -307,17 +307,17 @@ Begin {
                 throw "The parameter 'RestoreSnapshotFolder' is mandatory. Please specify the folder containing the snapshot data that needs to be restored on the current computer."
             }
 
-            $RestoreSnapshotFolder = Get-FullPathHC -Path $RestoreSnapshotFolder
+            $params = @{
+                Path        = $RestoreSnapshotFolder
+                ErrorAction = 'Ignore'
+            }
+            $SnapshotFolder = Convert-Path @params
 
             #region Test RestoreSnapshotFolder
-            If (-not 
-                (Test-Path -Path $RestoreSnapshotFolder -PathType Container)
-            ) {
+            If (-not $SnapshotFolder) {
                 throw "Restore snapshot folder '$RestoreSnapshotFolder' not found"
             }
             #endregion
-
-            $SnapshotFolder = $RestoreSnapshotFolder
 
             #region Test snapshot folder
             If (

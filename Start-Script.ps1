@@ -267,7 +267,6 @@ Begin {
 
         Write-Verbose "Start action '$Action'"
 
-        $SnapshotsFolder = Get-FullPathHC -Path $SnapshotsFolder
         $ReportsFolder = Get-FullPathHC -Path $ReportsFolder
 
         #region Create reports folder
@@ -286,10 +285,36 @@ Begin {
                 throw "When using 'Action = CreateSnapshot' the parameter 'RestoreSnapshotFolder' is not supported. Please remove the parameter 'RestoreSnapshotFolder' or change to 'Action = RestoreSnapshot'."
             }
 
+            #region Get path SnapshotsFolder
+            $params = @{
+                Path        = $SnapshotsFolder
+                ErrorAction = 'Ignore'
+            }
+            $SnapshotsFolderPath = Convert-Path @params
+            #endregion
+            
+            #region Create SnapshotsFolder
+            If (-not $SnapshotsFolderPath) {
+                $params = @{
+                    Path        = $SnapshotsFolder 
+                    ItemType    = 'Directory'
+                    ErrorAction = 'Ignore'
+                }
+                $SnapshotsFolderPath = New-Item @params
+            }
+            #endregion
+
+            #region Test SnapshotsFolder
+            If (-not $SnapshotsFolderPath) {
+                throw "Snapshots folder '$SnapshotsFolder' not found"
+            }
+            #endregion
+            
+
             #region Create snapshot folder
             try {
                 $joinParams = @{
-                    Path        = $SnapshotsFolder
+                    Path        = $SnapshotsFolderPath
                     ChildPath   = '{0} - {1}' -f 
                     $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff')
                     ErrorAction = 'Stop'

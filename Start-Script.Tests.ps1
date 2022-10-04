@@ -44,7 +44,7 @@ Describe "Throw a terminating error for action 'CreateSnapshot' when" {
     It 'the snapshots folder cannot be created' {
         $testNewParams.SnapshotsFolder = 'x:/xxx'
         { .$testScript @testNewParams } | 
-        Should -Throw "*Failed to create snapshots folder 'x:/xxx'*"
+        Should -Throw "*Snapshots folder 'x:/xxx' not found*"
     }
     It 'the script does not exist' {
         $testNewParams.Snapshot = [Ordered]@{

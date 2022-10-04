@@ -307,11 +307,13 @@ Begin {
                 throw "The parameter 'RestoreSnapshotFolder' is mandatory. Please specify the folder containing the snapshot data that needs to be restored on the current computer."
             }
 
+            #region Get path RestoreSnapshotFolder
             $params = @{
                 Path        = $RestoreSnapshotFolder
                 ErrorAction = 'Ignore'
             }
             $SnapshotFolder = Convert-Path @params
+            #endregion
 
             #region Test RestoreSnapshotFolder
             If (-not $SnapshotFolder) {

@@ -76,6 +76,28 @@ Describe 'the script fails when' {
             }
         }
     }
+    Context 'parameter ConfigurationFile' {
+        It 'is a non existing file' {
+            $testNewParams.ConfigurationFile = 'TestDrive:/file'
+
+            .$testScript @testNewParams 
+
+            Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+                $Message -eq "Configuration file 'TestDrive:/file' not found"
+            }
+        } 
+        It 'is not a .JSON file' {
+            $testNewParams.Remove('ConfigurationsFolder')
+            $testNewParams.ConfigurationFile = 'TestDrive:/file.txt'
+            '1\' | Out-File -LiteralPath $testNewParams.ConfigurationFile
+
+            .$testScript @testNewParams 
+
+            Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
+                $Message -like "File '*file.txt' is not a valid .JSON configuration file*"
+            }
+        }
+    } -Tag test
 }
 Describe 'when all tests pass' {
     It 'Start-Script.ps1 is called' {
@@ -101,7 +123,7 @@ Describe 'when all tests pass' {
             ($Arguments.Snapshot.ScriptA -eq $true) -and
             ($Arguments.Snapshot.ScriptB -eq $false)
         }
-    } -Tag test
+    }
     It 'ask confirmation before executing Start-Script.ps1' {
         Mock Read-Host { 'y' }
         @{

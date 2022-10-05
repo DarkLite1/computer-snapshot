@@ -131,11 +131,13 @@ Begin {
         ) -ForegroundColor Gray
         #endregion
 
+        #region Get start script path
         $params = @{
             Path        = $StartScript
             ErrorAction = 'Ignore'
         }
         $startScriptPath = Convert-Path @params
+        #endregion
 
         #region Test start script
         If (
@@ -147,9 +149,18 @@ Begin {
         #endregion
 
         if ($ConfigurationFile) {
-            #region Test configuration file
+            #region Get configuration file path
+            $params = @{
+                Path        = $ConfigurationFile
+                ErrorAction = 'Ignore'
+            }
+            $ConfigurationFilePath = Convert-Path @params
+            #endregion
+
+            #region Test start script
             If (
-                -not (Test-Path -LiteralPath $ConfigurationFile -PathType Leaf -ErrorAction Ignore)
+                (-not $ConfigurationFilePath) -or
+                (-not (Test-Path -LiteralPath $ConfigurationFilePath -PathType Leaf))
             ) {
                 throw "Configuration file '$ConfigurationFile' not found"
             }
@@ -195,7 +206,7 @@ Begin {
 
 Process {
     try {
-        if (-not $ConfigurationFile) {
+        if (-not $ConfigurationFilePath) {
             #region Get all pre-configured .JSON files
             $getParams = @{
                 LiteralPath = $ConfigurationsFolderPath
@@ -231,7 +242,7 @@ Process {
             #endregion
         }
         else {
-            $jsonFilePath = $ConfigurationFile
+            $jsonFilePath = $ConfigurationFilePath
         }
 
         #region Import .JSON file
@@ -240,11 +251,11 @@ Process {
             ConvertFrom-Json -ErrorAction Stop
         }
         catch {
-            throw "Parameter file '$jsonFilePath' is invalid: $_"
+            throw "File '$jsonFilePath' is not a valid .JSON configuration file: $_"
         }
         #endregion
    
-        #region Test Start-Script arguments
+        #region Test parameters in .JSON file
         if (-not $jsonFile.StartScript) {
             throw "The parameter 'StartScript' is missing in file '$jsonFilePath'."
         }

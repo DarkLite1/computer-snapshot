@@ -25,6 +25,11 @@
         Folder where the .JSON files are stored. Each file represents a set of
         arguments to be used with 'Start-Script.ps1'.
 
+    .PARAMETER ConfigurationFile
+        A single .JSON file containing the required arguments for StartScript.
+        Combined with NoConfirmQuestion this can be used to launch a 
+        configuration immediately without user interaction.
+
     .PARAMETER NoConfirmQuestion
         When a configuration file is selected a question is asked to make sure
         the user selected the correct file before executing it. When using this

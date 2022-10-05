@@ -297,14 +297,14 @@ _________                               __                                      
         [OutputType()]
         Param (
             [Parameter(Mandatory)]
-            [HashTable]$Menu,
+            [HashTable]$Screens,
             [Parameter(Mandatory)]
             [String]$ScreenName,
             [int]$HighLightRow = 0,
             [Boolean]$Select
         )
         
-        $screen = $Menu[$ScreenName]
+        $screen = $Screens[$ScreenName]
 
         Show-HeaderHC -AddressBarLocation $screen.AddressBarLocation
 
@@ -364,7 +364,7 @@ _________                               __                                      
         
         #region Handle keyboard input
         $params = @{
-            Menu         = $Menu
+            Screens      = $Screens
             ScreenName   = $ScreenName
             HighLightRow = $HighLightRow
             Select       = $false
@@ -448,7 +448,7 @@ Process {
         }
         #endregion
 
-        $menu = @{
+        $screens = @{
             Home = @{
                 AddressBarLocation    = @('Home')
                 AcceptMultipleAnswers = $false
@@ -467,7 +467,7 @@ Process {
             }
         }
         
-        Show-GuiHC -Menu $Menu -ScreenName 'Home'
+        Show-GuiHC -Screens $screens -ScreenName 'Home'
     }
     catch {
         Write-Warning 'Failed to start the script:'

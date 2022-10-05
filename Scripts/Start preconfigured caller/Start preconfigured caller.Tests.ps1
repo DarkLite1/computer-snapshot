@@ -5,7 +5,7 @@ BeforeAll {
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
         StartScript          = (New-Item 'TestDrive:/testStartScript.ps1' -ItemType File).FullName 
-        ConfigurationsFolder = (New-Item 'TestDrive:/testCallers' -ItemType Directory).FullName 
+        ConfigurationsFolder = (New-Item 'TestDrive:/testConfigs' -ItemType Directory).FullName 
         NoConfirmQuestion    = $true
     }
 
@@ -56,17 +56,17 @@ Describe 'the script fails when' {
             $Message -eq "Start script 'TestDrive:/xxx.ps1' not found"
         }
     }
-    Context 'parameter PreconfiguredCallerFilePath not used' {
-        It 'the preconfigured callers folder is not found' {
+    Context 'parameter ConfigurationsFolder' {
+        It 'is folder that does not exist' {
             $testNewParams.ConfigurationsFolder = 'TestDrive:/xxx'
 
             .$testScript @testNewParams 
 
             Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-                $Message -eq "Preconfigured callers folder 'TestDrive:/xxx' not found"
+                $Message -eq "Configurations folder 'TestDrive:/xxx' not found"
             }
         } 
-        It 'the preconfigured callers folder has no .JSON file' {
+        It 'is a folder without .JSON files in it' {
             '1' | Out-File -LiteralPath "$($testParams.ConfigurationsFolder)\file.txt"
 
             .$testScript @testNewParams 

@@ -34,7 +34,7 @@
 Param (
     [String]$StartScript = '.\Start-Script.ps1',
     [String]$ConfigurationsFolder = '.\Configurations',
-    [String]$PreconfiguredCallerFilePath,
+    [String]$ConfigurationFile,
     [Switch]$NoConfirmQuestion
 )
 
@@ -146,12 +146,12 @@ Begin {
         }
         #endregion
 
-        if ($PreconfiguredCallerFilePath) {
+        if ($ConfigurationFile) {
             #region Test folder and file available
             If (
-                -not (Test-Path -LiteralPath $PreconfiguredCallerFilePath -PathType Leaf -ErrorAction Ignore)
+                -not (Test-Path -LiteralPath $ConfigurationFile -PathType Leaf -ErrorAction Ignore)
             ) {
-                throw "Pre-configured caller file '$PreconfiguredCallerFilePath' not found"
+                throw "Pre-configured caller file '$ConfigurationFile' not found"
             }
             #endregion
         }
@@ -164,7 +164,7 @@ Begin {
                 (-not $ConfigurationsFolderPath) -or
                 (-not (Test-Path -LiteralPath $ConfigurationsFolderPath -PathType Container))
             ) {
-                throw "Preconfigured callers folder '$ConfigurationsFolder' not found"
+                throw "Configurations folder '$ConfigurationsFolder' not found"
             }
             If (
                 (Get-ChildItem -Path $ConfigurationsFolderPath -File -Recurse -Filter '*.json' | Measure-Object).Count -eq 0
@@ -195,7 +195,7 @@ Begin {
 
 Process {
     try {
-        if (-not $PreconfiguredCallerFilePath) {
+        if (-not $ConfigurationFile) {
             #region Get all pre-configured .JSON files
             $getParams = @{
                 LiteralPath = $ConfigurationsFolderPath
@@ -231,7 +231,7 @@ Process {
             #endregion
         }
         else {
-            $jsonFilePath = $PreconfiguredCallerFilePath
+            $jsonFilePath = $ConfigurationFile
         }
 
         #region Import .JSON file
@@ -269,7 +269,7 @@ Process {
                 FilePath     = 'powershell.exe'
                 ArgumentList = '-Command "& ''{0}'' -PreconfiguredCaller ''{1}'' -NoConfirmQuestion"' -f 
                 $MyInvocation.MyCommand.Path, 
-                $PreconfiguredCallerFilePath
+                $ConfigurationFile
                 Verb         = 'RunAs'
             }
             Start-Process @startParams

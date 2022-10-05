@@ -17,7 +17,7 @@
 #>
 
 Param (
-    [String]$StartScript = '.\Start-Script.ps1'
+    [String]$StartScript = '..\..\Start-Script.ps1'
 )
 
 Begin {
@@ -37,6 +37,88 @@ Begin {
     
         Write-Debug "Selected '$($keyInfo.Key)'"
         $keyInfo.Key
+    }
+    Function Get-DefaultParameterValuesHC {
+        <#
+        .SYNOPSIS
+            Get the default values for parameters set in a script or function.
+        
+        .DESCRIPTION
+            A hash table is returned containing the name and the default value 
+            of the parameters used in a script or function. When a parameter is 
+            mandatory but still has a default value this value will not be 
+            returned.
+
+            Parameters that have no default value are not returned.
+        
+        .PARAMETER Path
+            Function name or path to the script file
+        
+        .EXAMPLE
+            Function Test-Function {
+                Param (
+                    [Parameter(Mandatory)]
+                    [String]$PrinterName,
+                    [Parameter(Mandatory)]
+                    [String]$PrinterColor,
+                    [String]$ScriptName = 'Get printers',
+                    [String]$PaperSize = 'A4'
+                )
+            }
+            Get-DefaultParameterValuesHC -Path 'Test-Function'
+        
+            Get the default values for parameters that are not mandatory.
+            @{
+                ScriptName = 'Get printers'
+                PaperSize = 'A4'
+            }
+        #>
+    
+        [CmdletBinding()]
+        [OutputType([hashtable])]
+        Param (
+            [Parameter(Mandatory)]
+            [String]$Path
+        )
+        try {
+            $ast = (Get-Command $Path).ScriptBlock.Ast
+    
+            $selectParams = @{
+                Property = @{ 
+                    Name       = 'Name'; 
+                    Expression = { $_.Name.VariablePath.UserPath } 
+                },
+                @{ 
+                    Name       = 'Value'; 
+                    Expression = { $_.DefaultValue.Extent.Text }
+                }
+            }
+    
+            $defaultValueParameters = $ast.FindAll( {
+                    $args[0] -is 
+                    [System.Management.Automation.Language.ParameterAst] 
+                } , $true) | 
+            Where-Object { 
+                ($_.DefaultValue) -and
+                (-not ($_.Attributes | 
+                    Where-Object { $_.TypeName.Name -eq 'Parameter' } | 
+                    ForEach-Object -MemberName NamedArguments | 
+                    Where-Object { $_.ArgumentName -eq 'Mandatory' }))
+            } | 
+            Select-Object @selectParams
+                    
+            $result = @{ }
+    
+            foreach ($d in $defaultValueParameters) {
+                $result[$d.Name] = foreach ($value in $d.Value) {
+                    $ExecutionContext.InvokeCommand.InvokeScript($value, $true)
+                }
+            }
+            $result
+        }
+        catch {
+            throw "Failed retrieving the default parameter values: $_"
+        }
     }
     Function Show-HeaderHC {
         Param (
@@ -319,11 +401,22 @@ _________                               __                                      
         }
         #endregion
 
+        #region Get start script path
         $params = @{
             Path        = $StartScript
             ErrorAction = 'Ignore'
         }
         $startScriptPath = Convert-Path @params
+        #endregion
+
+        #region Test start script
+        If (
+            (-not $startScriptPath) -or
+            (-not (Test-Path -LiteralPath $startScriptPath -PathType Leaf))
+        ) {
+            throw "Start script '$StartScript' not found"
+        }
+        #endregion
     }
     catch {
         Write-Warning 'Failed to run the script:'
@@ -363,22 +456,50 @@ Process {
         }
         #endregion
 
+        #region Get Start-Script.ps1 parameters
+        $defaultValues = Get-DefaultParameterValuesHC -Path $startScriptPath
+        $snapshotItems = $defaultValues.Snapshot.GetEnumerator() | 
+        ForEach-Object {
+            @{
+                option   = $_.Key
+                selected = $_.Value
+            }
+        }
+        
+        #endregion
+
         $screens = @{
-            Home = @{
+            Home            = @{
                 AddressBarLocation    = @('Home')
                 AcceptMultipleAnswers = $false
                 Question              = 'What would you like to do?'
                 Answers               = @(
                     @{
-                        option   = 'Create a new snapshot'
-                        selected = $false
+                        option     = 'Create a new snapshot'
+                        selected   = $false
+                        nextScreen = 'CreateSnapshot'
                     }
                     @{
-                        option   = 'Restore a snapshot'
-                        selected = $false
+                        option     = 'Restore a snapshot'
+                        selected   = $false
+                        nextScreen = 'RestoreSnapshot'
                     }
                 )
                 KeyboardShortcuts     = $keyboardShortcuts.home
+            }
+            CreateSnapshot  = @{
+                AddressBarLocation    = @('Home', 'CreateSnapshot')
+                AcceptMultipleAnswers = $true
+                Question              = 'For what items would you like to take a snapshot?'
+                Answers               = $snapshotItems
+                KeyboardShortcuts     = $keyboardShortcuts.all
+            }
+            RestoreSnapshot = @{
+                AddressBarLocation    = @('Home', 'RestoreSnapshot')
+                AcceptMultipleAnswers = $true
+                Question              = 'Which items would you like to restore?'
+                Answers               = $snapshotItems
+                KeyboardShortcuts     = $keyboardShortcuts.all
             }
         }
         

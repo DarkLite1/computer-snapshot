@@ -13,7 +13,7 @@ BeforeAll {
         Path      = $testParams.ConfigurationsFolder
         ChildPath = 'testCaller.json'
     }
-    $testFile = Join-Path @testJoinParams
+    $testConfigurationFile = Join-Path @testJoinParams
 
     'Param (
         $Action,
@@ -37,11 +37,11 @@ BeforeAll {
             'File name' = 'testCaller'
         }
     }
-    Mock Write-Output
-    Mock Write-Host
-    Mock Write-Warning
     Mock Start-Sleep
     Mock Test-IsStartedElevatedHC { $true }
+    Mock Write-Host
+    Mock Write-Output
+    Mock Write-Warning
 }
 Describe 'the script fails when' {
     BeforeEach {
@@ -97,10 +97,10 @@ Describe 'the script fails when' {
                 $Message -like "File '*file.txt' is not a valid .JSON configuration file*"
             }
         }
-    } -Tag test
+    }
 }
 Describe 'when all tests pass' {
-    It 'Start-Script.ps1 is called' {
+    BeforeAll {
         @{
             StartScript = @{
                 Action                = 'A'
@@ -111,40 +111,68 @@ Describe 'when all tests pass' {
                     ScriptB = $false
                 }
             }
-        } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
+        } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testConfigurationFile
+    }
+    Context 'parameter ConfigurationsFolder' {
+        It 'Start-Script.ps1 is called' {
+            $testNewParams = $testParams.clone()
+            $testNewParams.NoConfirmQuestion = $true
 
-        . $testScript @testParams
+            . $testScript @testNewParams
 
-        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
-            ($Path -eq $testParams.StartScript) -and
-            ($Arguments.Action -eq 'A') -and
-            ($Arguments.RestoreSnapshotFolder -eq 'B') -and
-            ($Arguments.RebootComputer -eq $true) -and
-            ($Arguments.Snapshot.ScriptA -eq $true) -and
-            ($Arguments.Snapshot.ScriptB -eq $false)
+            Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
+                ($Path -eq $testParams.StartScript) -and
+                ($Arguments.Action -eq 'A') -and
+                ($Arguments.RestoreSnapshotFolder -eq 'B') -and
+                ($Arguments.RebootComputer -eq $true) -and
+                ($Arguments.Snapshot.ScriptA -eq $true) -and
+                ($Arguments.Snapshot.ScriptB -eq $false)
+            }
+        }
+        It 'ask confirmation before executing Start-Script.ps1' {
+            Mock Read-Host { 'y' }
+
+            $testNewParams = $testParams.clone()
+            $testNewParams.NoConfirmQuestion = $false
+
+            . $testScript @testNewParams
+
+            Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+            ($Prompt -eq 'Are you sure you want to continue (y/n)') 
+            }
         }
     }
-    It 'ask confirmation before executing Start-Script.ps1' {
-        Mock Read-Host { 'y' }
-        @{
-            StartScript = @{
-                Action                = 'A'
-                RestoreSnapshotFolder = 'B'
-                RebootComputer        = $true
-                Snapshot              = @{
-                    ScriptA = $true
-                    ScriptB = $false
-                }
+    Context 'parameter ConfigurationFile' {
+        BeforeEach {
+            $testNewParams = $testParams.clone()
+            $testNewParams.Remove('ConfigurationsFolder')
+            $testNewParams.ConfigurationFile = $testConfigurationFile
+        }
+        It 'Start-Script.ps1 is called' {
+            $testNewParams.NoConfirmQuestion = $true
+
+            . $testScript @testNewParams
+
+            Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
+                ($Path -eq $testParams.StartScript) -and
+                ($Arguments.Action -eq 'A') -and
+                ($Arguments.RestoreSnapshotFolder -eq 'B') -and
+                ($Arguments.RebootComputer -eq $true) -and
+                ($Arguments.Snapshot.ScriptA -eq $true) -and
+                ($Arguments.Snapshot.ScriptB -eq $false)
             }
-        } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testFile
+        }
+        It 'ask confirmation before executing Start-Script.ps1' {
+            Mock Read-Host { 'y' }
 
-        $testNewParams = $testParams.clone()
-        $testNewParams.NoConfirmQuestion = $false
+            $testNewParams = $testParams.clone()
+            $testNewParams.NoConfirmQuestion = $false
 
-        . $testScript @testNewParams
+            . $testScript @testNewParams
 
-        Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
-            ($Prompt -eq 'Are you sure you want to continue (y/n)') 
+            Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
+                ($Prompt -eq 'Are you sure you want to continue (y/n)') 
+            }
         }
     }
 }

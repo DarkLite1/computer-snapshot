@@ -465,7 +465,6 @@ Process {
                 selected = $_.Value
             }
         }
-        
         #endregion
 
         $screens = @{

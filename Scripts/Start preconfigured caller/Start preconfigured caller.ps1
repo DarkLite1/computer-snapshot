@@ -289,7 +289,9 @@ Process {
         #endregion
 
         #region Display settings
-        Write-Host "Selected file '$($selectedJsonFile.PSObject.Properties.Value)':" -ForegroundColor Gray
+        Write-Host 'Selected file: ' -NoNewline -ForegroundColor Gray
+        Write-Host $selectedJsonFile.PSObject.Properties.Value -ForegroundColor Green
+
         $jsonFile.StartScript | Format-List
         Write-Host "`r`n"
         #endregion

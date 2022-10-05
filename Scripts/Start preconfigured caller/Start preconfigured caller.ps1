@@ -21,7 +21,7 @@
     .PARAMETER StartScript
         Path to the script that will execute the different types of snapshots.
 
-    .PARAMETER PreconfiguredCallersFolder
+    .PARAMETER ConfigurationsFolder
         Folder where the .JSON files are stored. Each file represents a set of
         arguments to be used with 'Start-Script.ps1'.
 
@@ -33,7 +33,7 @@
 
 Param (
     [String]$StartScript = '.\Start-Script.ps1',
-    [String]$PreconfiguredCallersFolder = '.\Configurations',
+    [String]$ConfigurationsFolder = '.\Configurations',
     [String]$PreconfiguredCallerFilePath,
     [Switch]$NoConfirmQuestion
 )
@@ -156,20 +156,20 @@ Begin {
             #endregion
         }
         else {
-            $params.Path = $PreconfiguredCallersFolder
-            $preconfiguredCallersFolderPath = Convert-Path @params
+            $params.Path = $ConfigurationsFolder
+            $ConfigurationsFolderPath = Convert-Path @params
 
             #region Test pre-configured callers folder
             If (
-                (-not $preconfiguredCallersFolderPath) -or
-                (-not (Test-Path -LiteralPath $preconfiguredCallersFolderPath -PathType Container))
+                (-not $ConfigurationsFolderPath) -or
+                (-not (Test-Path -LiteralPath $ConfigurationsFolderPath -PathType Container))
             ) {
-                throw "Preconfigured callers folder '$PreconfiguredCallersFolder' not found"
+                throw "Preconfigured callers folder '$ConfigurationsFolder' not found"
             }
             If (
-                (Get-ChildItem -Path $preconfiguredCallersFolderPath -File -Recurse -Filter '*.json' | Measure-Object).Count -eq 0
+                (Get-ChildItem -Path $ConfigurationsFolderPath -File -Recurse -Filter '*.json' | Measure-Object).Count -eq 0
             ) {
-                throw "No .JSON file found in folder '$preconfiguredCallersFolderPath'. Please create a pre-configuration file first."
+                throw "No .JSON file found in folder '$ConfigurationsFolderPath'. Please create a pre-configuration file first."
             }
             #endregion
         }
@@ -198,14 +198,14 @@ Process {
         if (-not $PreconfiguredCallerFilePath) {
             #region Get all pre-configured .JSON files
             $getParams = @{
-                LiteralPath = $preconfiguredCallersFolderPath
+                LiteralPath = $ConfigurationsFolderPath
                 File        = $true
                 Filter      = '*.json'
             }
             $jsonFiles = Get-ChildItem @getParams
 
             if (-not $jsonFiles) {
-                throw "No pre-configured .JSON caller files found in folder '$preconfiguredCallersFolderPath'"
+                throw "No pre-configured .JSON caller files found in folder '$ConfigurationsFolderPath'"
             }
             #endregion
 

@@ -4,13 +4,13 @@
 BeforeAll {
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
-        StartScript                = (New-Item 'TestDrive:/testStartScript.ps1' -ItemType File).FullName 
-        PreconfiguredCallersFolder = (New-Item 'TestDrive:/testCallers' -ItemType Directory).FullName 
-        NoConfirmQuestion          = $true
+        StartScript          = (New-Item 'TestDrive:/testStartScript.ps1' -ItemType File).FullName 
+        ConfigurationsFolder = (New-Item 'TestDrive:/testCallers' -ItemType Directory).FullName 
+        NoConfirmQuestion    = $true
     }
 
     $testJoinParams = @{
-        Path      = $testParams.PreconfiguredCallersFolder
+        Path      = $testParams.ConfigurationsFolder
         ChildPath = 'testCaller.json'
     }
     $testFile = Join-Path @testJoinParams
@@ -58,7 +58,7 @@ Describe 'the script fails when' {
     }
     Context 'parameter PreconfiguredCallerFilePath not used' {
         It 'the preconfigured callers folder is not found' {
-            $testNewParams.PreconfiguredCallersFolder = 'TestDrive:/xxx'
+            $testNewParams.ConfigurationsFolder = 'TestDrive:/xxx'
 
             .$testScript @testNewParams 
 
@@ -67,12 +67,12 @@ Describe 'the script fails when' {
             }
         } 
         It 'the preconfigured callers folder has no .JSON file' {
-            '1' | Out-File -LiteralPath "$($testParams.PreconfiguredCallersFolder)\file.txt"
+            '1' | Out-File -LiteralPath "$($testParams.ConfigurationsFolder)\file.txt"
 
             .$testScript @testNewParams 
 
             Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-                $Message -eq "No .JSON file found in folder '$($testParams.PreconfiguredCallersFolder)'. Please create a pre-configuration file first."
+                $Message -eq "No .JSON file found in folder '$($testParams.ConfigurationsFolder)'. Please create a pre-configuration file first."
             }
         }
     }
@@ -101,7 +101,7 @@ Describe 'when all tests pass' {
             ($Arguments.Snapshot.ScriptA -eq $true) -and
             ($Arguments.Snapshot.ScriptB -eq $false)
         }
-    } -tag test
+    } -Tag test
     It 'ask confirmation before executing Start-Script.ps1' {
         Mock Read-Host { 'y' }
         @{

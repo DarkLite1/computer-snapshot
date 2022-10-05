@@ -222,7 +222,7 @@ Process {
 
                     #region Test executable file
                     if (-not $executablePath) {
-                        throw "Executable file '$($application.ExecutablePath)' not found"
+                        throw "Executable file '$($application.ExecutablePath)' not found in folder '$PSScriptRoot'"
                     }
 
                     $testPathParams = @{

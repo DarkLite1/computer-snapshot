@@ -147,11 +147,11 @@ Begin {
         #endregion
 
         if ($ConfigurationFile) {
-            #region Test folder and file available
+            #region Test configuration file
             If (
                 -not (Test-Path -LiteralPath $ConfigurationFile -PathType Leaf -ErrorAction Ignore)
             ) {
-                throw "Pre-configured caller file '$ConfigurationFile' not found"
+                throw "Configuration file '$ConfigurationFile' not found"
             }
             #endregion
         }
@@ -159,7 +159,7 @@ Begin {
             $params.Path = $ConfigurationsFolder
             $ConfigurationsFolderPath = Convert-Path @params
 
-            #region Test pre-configured callers folder
+            #region Test configuration folder
             If (
                 (-not $ConfigurationsFolderPath) -or
                 (-not (Test-Path -LiteralPath $ConfigurationsFolderPath -PathType Container))
@@ -169,7 +169,7 @@ Begin {
             If (
                 (Get-ChildItem -Path $ConfigurationsFolderPath -File -Recurse -Filter '*.json' | Measure-Object).Count -eq 0
             ) {
-                throw "No .JSON file found in folder '$ConfigurationsFolderPath'. Please create a pre-configuration file first."
+                throw "No .JSON file found in the configurations folder '$ConfigurationsFolderPath'. Please create a configuration file first."
             }
             #endregion
         }

@@ -72,7 +72,7 @@ Describe 'the script fails when' {
             .$testScript @testNewParams 
 
             Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-                $Message -eq "No .JSON file found in folder '$($testParams.ConfigurationsFolder)'. Please create a pre-configuration file first."
+                $Message -eq "No .JSON file found in the configurations folder '$($testParams.ConfigurationsFolder)'. Please create a configuration file first."
             }
         }
     }

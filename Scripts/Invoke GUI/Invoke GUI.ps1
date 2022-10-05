@@ -44,9 +44,14 @@ Begin {
         $keyInfo.Key
     }
     Function Show-HeaderHC {
+        Param (
+            [Parameter(Mandatory)]
+            [String[]]$AddressBarLocation
+        )
+
         Clear-Host
         Show-AsciArtHC
-        Show-NavigationBarHC -Location $state.addressBarLocation
+        Write-Host (' > ' + ($AddressBarLocation -join ' > ') + "`n") -ForegroundColor Green
     }
     Function Show-FooterHC {
         Write-Host $state.keyboardShortcutsMenu -ForegroundColor DarkGray
@@ -185,14 +190,6 @@ Begin {
     
         $toPrint
     }
-    Function Show-NavigationBarHC {
-        Param(
-            [Parameter(Mandatory)]
-            [String[]]$Location
-        )
-
-        Write-Host (' > ' + ($Location -join ' > ') + "`n") -ForegroundColor Green
-    }
     Function Show-AsciArtHC {
         Write-Host  '
 _________                               __                                                   .__            __   
@@ -222,7 +219,7 @@ _________                               __                                      
             [Boolean]$Select
         )
         
-        Show-HeaderHC
+        Show-HeaderHC -AddressBarLocation $state.AddressBarLocation
 
         Write-Host $Question
     
@@ -296,8 +293,108 @@ _________                               __                                      
     
         Show-OptionsHC @params
     }
+    Function Show-GuiHC {
+        [OutputType()]
+        Param (
+            [Parameter(Mandatory)]
+            [HashTable]$Menu,
+            [Parameter(Mandatory)]
+            [String]$ScreenName,
+            [int]$HighLightRow = 0,
+            [Boolean]$Select
+        )
+        
+        $screen = $Menu[$ScreenName]
+
+        Show-HeaderHC -AddressBarLocation $screen.AddressBarLocation
+
+        Write-Host $screen.Question
+    
+        $options = $screen.Answers
+
+        for ($i = 0; $i -lt $options.Count; $i++) {
+            $o = $options[$i]
+
+            #region Set color
+            $colorParams = @{
+                ForegroundColor = 'White'
+                BackgroundColor = 'Black'
+            }
+
+            if ($i -eq $HighLightRow) { 
+                $colorParams = @{
+                    ForegroundColor = 'Black'
+                    BackgroundColor = 'White'
+                }
+                if (-not $screen.AcceptMultipleAnswers) {
+                    $o.selected = $true
+                }
+                elseif ($Select) {
+                    $o.selected = -not $o.selected
+                }
+            }
+            elseif (-not $screen.AcceptMultipleAnswers) {
+                $o.selected = $false
+            }
+            #endregion
+    
+            #region Set text
+            $message = " {0} {1} " -f 
+            $(
+                if ($screen.AcceptMultipleAnswers) {
+                    if ($o.selected) { '(x)' } else { '( )' }
+                }
+                else {
+                    '>'
+                }
+            ), $o.option
+            #endregion
+    
+            Write-Host $message @colorParams
+        }
+    
+        Show-FooterHC
+        
+        #region Handle keyboard input
+        $keyPressed = Get-KeyPressedHC
+    
+        $params = @{
+            Menu         = $Menu
+            ScreenName   = $ScreenName
+            HighLightRow = $HighLightRow
+            Select       = $false
+        }
+        switch ($keyPressed) {
+            ([ConsoleKey]::DownArrow) { $params.HighLightRow++; break }
+            ([ConsoleKey]::UpArrow) { $params.HighLightRow-- ; break }
+            ([ConsoleKey]::SpaceBar) { $params.Select = $true ; break }
+            ([ConsoleKey]::Enter) { Return $options }
+            ([ConsoleKey]::Escape) { 
+                Write-Warning 'Quit script'
+                Exit
+            }
+            Default { throw "key '$_' not implemented" }
+        }
+        #endregion
+        
+        #region Highlight only visible rows
+        switch ($params.HighLightRow) {
+            { $_ -lt 0 } {
+                $params.HighLightRow = 0
+                break 
+            }
+            { $_ -ge $Options.Count } { 
+                $params.HighLightRow = $Options.Count - 1
+                break 
+            }
+        }
+        #endregion
+
+    
+        Show-GuiHC @params
+    }
     try {
-        #region Test
+        #region Test host
         if ($Host.Name -eq 'Windows PowerShell ISE Host') {
             throw "The host 'Windows PowerShell ISE' is not supported. Please use 'Visual Studio Code' or the PowerShell console to execute this script."
         }
@@ -324,28 +421,46 @@ Process {
             keyboardShortcutsMenu = New-KeyboardShortcutsHC
         }
 
-        $options = @(
-            @{
-                question = 'Option 1'
-                selected = $false
-            }
-            @{
-                question = 'Option 2'
-                selected = $false
-            }
-            @{
-                question = 'Option 3'
-                selected = $false
-            }
-        )
+        <# # $options = @(
+        #     @{
+        #         question = 'Option 1'
+        #         selected = $false
+        #     }
+        #     @{
+        #         question = 'Option 2'
+        #         selected = $false
+        #     }
+        #     @{
+        #         question = 'Option 3'
+        #         selected = $false
+        #     }
+        # )
         
-        $params = @{
-            Options  = $Options
-            Question = 'What would you like restore?'
+        # $params = @{
+        #     Options  = $Options
+        #     Question = 'What would you like restore?'
+        # }
+        # Show-OptionsHC @params #>
+
+        $menu = @{
+            Home = @{
+                AddressBarLocation    = @('Home')
+                AcceptMultipleAnswers = $false
+                Question              = 'What would you like to do?'
+                Answers               = @(
+                    @{
+                        option   = 'Create a new snapshot'
+                        selected = $false
+                    }
+                    @{
+                        option   = 'Restore a snapshot'
+                        selected = $false
+                    }
+                )
+            }
         }
-        Show-OptionsHC @params
         
-        'we done'
+        Show-GuiHC -Menu $Menu -ScreenName 'Home'
     }
     catch {
         Write-Warning 'Failed to start the script:'

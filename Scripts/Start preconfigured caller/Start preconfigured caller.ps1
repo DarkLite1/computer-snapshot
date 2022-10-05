@@ -221,7 +221,7 @@ Process {
             #endregion
 
             #region Display GUI to select the correct .JSON file
-            Write-Host 'Select a pre-configured caller'
+            Write-Host 'Select a configuration file'
             $outParams = @{
                 Title      = 'Select the configuration you want to execute:'
                 OutputMode = 'Single'
@@ -289,8 +289,8 @@ Process {
         #endregion
 
         #region Display settings
-        Write-Host 'Selected file: ' -NoNewline -ForegroundColor Gray
-        Write-Host $selectedJsonFile.PSObject.Properties.Value -ForegroundColor Green
+        Write-Host "`nFile: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($selectedJsonFile.PSObject.Properties.Value).json" -ForegroundColor Green
 
         $jsonFile.StartScript | Format-List
         Write-Host "`r`n"

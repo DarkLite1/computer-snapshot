@@ -24,21 +24,16 @@ Begin {
     Function Get-KeyPressedHC {
         [OutputType([ConsoleKey])]
         Param(
-            [ConsoleKey[]]$Key = @(
-                [ConsoleKey]::UpArrow,
-                [ConsoleKey]::DownArrow,
-                [ConsoleKey]::SpaceBar,
-                [ConsoleKey]::Enter,
-                [ConsoleKey]::Escape
-            )
+            [Parameter(Mandatory)]
+            [ConsoleKey[]]$KeyboardShortcuts
         )
         
         do {
             $keyInfo = [Console]::ReadKey($true)
-            if ($Key -notContains $keyInfo.Key) {
+            if ($KeyboardShortcuts -notContains $keyInfo.Key) {
                 Write-Warning "key '$($keyInfo.Key)' not supported"
             }
-        } until ($Key -contains $keyInfo.Key)
+        } until ($KeyboardShortcuts -contains $keyInfo.Key)
     
         Write-Debug "Selected '$($keyInfo.Key)'"
         $keyInfo.Key
@@ -54,7 +49,12 @@ Begin {
         Write-Host (' > ' + ($AddressBarLocation -join ' > ') + "`n") -ForegroundColor Green
     }
     Function Show-FooterHC {
-        Write-Host $state.keyboardShortcutsMenu -ForegroundColor DarkGray
+        Param (
+            [Parameter(Mandatory)]
+            [String]$KeyboardShortcutsMenu
+        )
+
+        Write-Host $KeyboardShortcutsMenu -ForegroundColor DarkGray
     }
     Function New-KeyboardShortcutsHC {
         <#
@@ -84,7 +84,7 @@ Begin {
             Generate a basic aligned menu and display the results in the console
             
             $params = @{
-                Key             = @(
+                KeyboardShortcuts = @(
                     [ConsoleKey]::UpArrow,
                     [ConsoleKey]::LeftArrow,
                     [ConsoleKey]::SpaceBar,
@@ -103,7 +103,7 @@ Begin {
     
         [OutputType([String])]
         Param(
-            [ConsoleKey[]]$Key = @(
+            [ConsoleKey[]]$KeyboardShortcuts = @(
                 [ConsoleKey]::UpArrow,
                 [ConsoleKey]::LeftArrow,
                 [ConsoleKey]::SpaceBar,
@@ -117,7 +117,7 @@ Begin {
             [String]$Title = "`nKeyboard shortcuts:"
         )
     
-        $navigationKeys = switch ($Key) {
+        $navigationKeys = switch ($KeyboardShortcuts) {
             { $_ -contains [ConsoleKey]::UpArrow } {  
                 '[ARROW_UP] to move up'
             }
@@ -353,11 +353,16 @@ _________                               __                                      
             Write-Host $message @colorParams
         }
     
-        Show-FooterHC
+        Show-FooterHC -KeyboardShortcutsMenu $screen.KeyboardShortcuts.Menu 
+        
+        #region Capture and wait for valid keyboard input
+        $keyParams = @{
+            KeyboardShortcuts = $screen.KeyboardShortcuts.Keys
+        }
+        $keyPressed = Get-KeyPressedHC @keyParams
+        #endregion
         
         #region Handle keyboard input
-        $keyPressed = Get-KeyPressedHC
-    
         $params = @{
             Menu         = $Menu
             ScreenName   = $ScreenName
@@ -390,7 +395,6 @@ _________                               __                                      
         }
         #endregion
 
-    
         Show-GuiHC @params
     }
     try {
@@ -416,31 +420,33 @@ _________                               __                                      
 }
 Process {
     try {
-        $state = @{
-            addressBarLocation    = @('Home')
-            keyboardShortcutsMenu = New-KeyboardShortcutsHC
+        #region Create keyboard shortcuts menu and keys
+        $keyboardShortcuts = @{
+            all  = @{
+                keys = @(
+                    [ConsoleKey]::UpArrow,
+                    [ConsoleKey]::LeftArrow,
+                    [ConsoleKey]::SpaceBar,
+                    [ConsoleKey]::DownArrow,
+                    [ConsoleKey]::RightArrow,
+                    [ConsoleKey]::Enter,
+                    [ConsoleKey]::Escape
+                )
+            }
+            home = @{
+                keys = @(
+                    [ConsoleKey]::UpArrow,
+                    [ConsoleKey]::DownArrow,
+                    [ConsoleKey]::Enter,
+                    [ConsoleKey]::Escape
+                )
+            }
         }
 
-        <# # $options = @(
-        #     @{
-        #         question = 'Option 1'
-        #         selected = $false
-        #     }
-        #     @{
-        #         question = 'Option 2'
-        #         selected = $false
-        #     }
-        #     @{
-        #         question = 'Option 3'
-        #         selected = $false
-        #     }
-        # )
-        
-        # $params = @{
-        #     Options  = $Options
-        #     Question = 'What would you like restore?'
-        # }
-        # Show-OptionsHC @params #>
+        $keyboardShortcuts.GetEnumerator() | ForEach-Object {
+            $_.Value['menu'] = New-KeyboardShortcutsHC -KeyboardShortcuts $_.Value.Keys
+        }
+        #endregion
 
         $menu = @{
             Home = @{
@@ -457,6 +463,7 @@ Process {
                         selected = $false
                     }
                 )
+                KeyboardShortcuts     = $keyboardShortcuts.home
             }
         }
         

@@ -38,88 +38,6 @@ Begin {
         Write-Debug "Selected '$($keyInfo.Key)'"
         $keyInfo.Key
     }
-    Function Get-DefaultParameterValuesHC {
-        <#
-        .SYNOPSIS
-            Get the default values for parameters set in a script or function.
-        
-        .DESCRIPTION
-            A hash table is returned containing the name and the default value 
-            of the parameters used in a script or function. When a parameter is 
-            mandatory but still has a default value this value will not be 
-            returned.
-
-            Parameters that have no default value are not returned.
-        
-        .PARAMETER Path
-            Function name or path to the script file
-        
-        .EXAMPLE
-            Function Test-Function {
-                Param (
-                    [Parameter(Mandatory)]
-                    [String]$PrinterName,
-                    [Parameter(Mandatory)]
-                    [String]$PrinterColor,
-                    [String]$ScriptName = 'Get printers',
-                    [String]$PaperSize = 'A4'
-                )
-            }
-            Get-DefaultParameterValuesHC -Path 'Test-Function'
-        
-            Get the default values for parameters that are not mandatory.
-            @{
-                ScriptName = 'Get printers'
-                PaperSize = 'A4'
-            }
-        #>
-    
-        [CmdletBinding()]
-        [OutputType([hashtable])]
-        Param (
-            [Parameter(Mandatory)]
-            [String]$Path
-        )
-        try {
-            $ast = (Get-Command $Path).ScriptBlock.Ast
-    
-            $selectParams = @{
-                Property = @{ 
-                    Name       = 'Name'; 
-                    Expression = { $_.Name.VariablePath.UserPath } 
-                },
-                @{ 
-                    Name       = 'Value'; 
-                    Expression = { $_.DefaultValue.Extent.Text }
-                }
-            }
-    
-            $defaultValueParameters = $ast.FindAll( {
-                    $args[0] -is 
-                    [System.Management.Automation.Language.ParameterAst] 
-                } , $true) | 
-            Where-Object { 
-                ($_.DefaultValue) -and
-                (-not ($_.Attributes | 
-                    Where-Object { $_.TypeName.Name -eq 'Parameter' } | 
-                    ForEach-Object -MemberName NamedArguments | 
-                    Where-Object { $_.ArgumentName -eq 'Mandatory' }))
-            } | 
-            Select-Object @selectParams
-                    
-            $result = @{ }
-    
-            foreach ($d in $defaultValueParameters) {
-                $result[$d.Name] = foreach ($value in $d.Value) {
-                    $ExecutionContext.InvokeCommand.InvokeScript($value, $true)
-                }
-            }
-            $result
-        }
-        catch {
-            throw "Failed retrieving the default parameter values: $_"
-        }
-    }
     Function Show-HeaderHC {
         Param (
             [Parameter(Mandatory)]
@@ -344,7 +262,15 @@ _________                               __                                      
                 else {
                     '>'
                 }
-            ), $o.option
+            ),
+            $(
+                if ($o.description) {
+                    $o.description
+                }
+                else {
+                    $o.option
+                }
+            )
             #endregion
     
             Write-Host $message @colorParams
@@ -456,16 +382,78 @@ Process {
         }
         #endregion
 
-        #region Get Start-Script.ps1 parameters
-        $defaultValues = Get-DefaultParameterValuesHC -Path $startScriptPath
-        $snapshotItems = $defaultValues.Snapshot.GetEnumerator() | 
-        ForEach-Object {
+        $snapshotItems = @(
             @{
-                option   = $_.Key
-                selected = $_.Value
+                option      = 'StartCustomScriptsBefore'
+                description = 'Start a custom script before the script runs'
+                selected    = $false
             }
-        }
-        #endregion
+            @{
+                option      = 'RegionalSettings'
+                description = 'Regional settings'
+                selected    = $false
+            }
+            @{
+                option      = 'UserAccounts'
+                description = 'User accounts'
+                selected    = $false
+            }
+            @{
+                option      = 'UserGroups'
+                description = 'Security groups'
+                selected    = $false
+            }
+            @{
+                option      = 'FirewallRules'
+                description = 'Firewall rules'
+                selected    = $false
+            }
+            @{
+                option      = 'CreateFolders'
+                description = 'Create folders'
+                selected    = $false
+            }
+            @{
+                option      = 'SmbShares'
+                description = 'SMB shares (folders, permissions, ...)'
+                selected    = $false
+            }
+            @{
+                option      = 'NetworkCards'
+                description = 'Network cards'
+                selected    = $false
+            }
+            @{
+                option      = 'NtpTimeServers'
+                description = 'NTP time servers'
+                selected    = $false
+            }
+            @{
+                option      = 'RegistryKeys'
+                description = 'Registry keys'
+                selected    = $false
+            }
+            @{
+                option      = 'ScheduledTasks'
+                description = 'Scheduled tasks'
+                selected    = $false
+            }
+            @{
+                option      = 'CopyFilesFolders'
+                description = 'Copy files or folders'
+                selected    = $false
+            }
+            @{
+                option      = 'Software'
+                description = 'Software'
+                selected    = $false
+            }
+            @{
+                option      = 'StartCustomScriptsAfter'
+                description = 'Start a custom script after the script ran'
+                selected    = $false
+            }
+        )
 
         $screens = @{
             Home            = @{
@@ -489,14 +477,14 @@ Process {
             CreateSnapshot  = @{
                 AddressBarLocation    = @('Home', 'CreateSnapshot')
                 AcceptMultipleAnswers = $true
-                Question              = 'For what items would you like to take a snapshot?'
+                Question              = 'Select the items for which you would like to take a snapshot?'
                 Answers               = $snapshotItems
                 KeyboardShortcuts     = $keyboardShortcuts.all
             }
             RestoreSnapshot = @{
                 AddressBarLocation    = @('Home', 'RestoreSnapshot')
                 AcceptMultipleAnswers = $true
-                Question              = 'Which items would you like to restore?'
+                Question              = 'Select the items you would like to restore?'
                 Answers               = $snapshotItems
                 KeyboardShortcuts     = $keyboardShortcuts.all
             }

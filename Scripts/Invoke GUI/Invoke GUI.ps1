@@ -21,6 +21,110 @@ Param (
 )
 
 Begin {
+    Function Convert-KeyboardKeysToMenuItemsHC {
+        [OutputType([String[]])]
+        Param(
+            [Parameter(Mandatory)]
+            [ConsoleKey[]]$KeyboardKeys
+        )
+        
+        foreach ($key in $KeyboardKeys) {
+            switch ($key) {
+                ([ConsoleKey]::UpArrow) {  
+                    '[ARROW_UP] to move up'
+                    break
+                }
+                ([ConsoleKey]::Enter) {  
+                    '[ENTER] to confirm'
+                    break
+                }
+                ([ConsoleKey]::SpaceBar) {  
+                    '[SPACE_BAR] to select/unselect'
+                    break
+                }
+                ([ConsoleKey]::DownArrow) {  
+                    '[ARROW_DOWN] to move down'
+                    break
+                }
+                ([ConsoleKey]::LeftArrow) {  
+                    '[ARROW_LEFT] go back'
+                    break
+                }
+                ([ConsoleKey]::RightArrow) {  
+                    '[ARROW_RIGHT] go forward'
+                    break
+                }
+                ([ConsoleKey]::Escape) {  
+                    '[ESC] to quit'
+                    break
+                }
+                Default {
+                    throw "Key '$_' not supported"
+                }
+            }
+        }
+    }
+    Function Convert-StringsToColumnsHC {
+        [OutputType([String])]
+        Param(
+            [Parameter(Mandatory)]    
+            [String[]]$Items,
+            [String]$Title,
+            [Int]$ColumnCount = 3,
+            [String]$ColumnSeparator = '    '
+        )
+    
+        #region Calculate minimal column width
+        $minimalColumnWidth = @{}
+        for ($i = 0; $i -lt $Items.Count; $i = $ColumnCount + $i ) {
+            Write-Verbose "i = $i"
+            foreach ($columnNr in 0..($ColumnCount - 1)) {
+                $index = $columnNr + $i
+    
+                if ($index -ge $Items.Count) {
+                    break
+                }
+    
+                $length = $Items[$index].Length
+    
+                if ($length -ge $minimalColumnWidth[$columnNr]) {
+                    $minimalColumnWidth[$columnNr] = $length
+                }
+            }
+        }
+        #endregion
+    
+        #region Add trailing spaces where needed
+        for ($i = 0; $i -lt $Items.Count; $i = $ColumnCount + $i) {
+            foreach ($columnNr in 0..($ColumnCount - 1)) {
+                $index = $columnNr + $i
+                if ($index -ge $Items.Count) {
+                    break
+                }
+    
+                $Items[$index] = $Items[$index].PadRight($minimalColumnWidth[$columnNr])
+            }
+        }
+        #endregion
+    
+        #region Create rows to display
+        $rows = for ($i = 0; $i -lt $Items.Count; $i = $ColumnCount + $i) {
+            '{0}' -f (
+                $Items[$i..(($ColumnCount + $i) - 1 )] -join $ColumnSeparator
+            )
+        }
+    
+        $toPrint = $rows -join "`n"
+        #endregion
+    
+        #region Add Title
+        if ($Title) {
+            $toPrint = $Title + "`n" + $toPrint
+        }
+        #endregion
+    
+        $toPrint
+    }
     Function Get-KeyPressedHC {
         [OutputType([ConsoleKey])]
         Param(
@@ -99,96 +203,24 @@ Begin {
             $keyboardShortcuts = New-KeyboardShortcutsHC @params
     
             Write-Host $keyboardShortcuts -ForegroundColor DarkGray
-    #>
+        #>
     
         [OutputType([String])]
         Param(
-            [ConsoleKey[]]$KeyboardShortcuts = @(
-                [ConsoleKey]::UpArrow,
-                [ConsoleKey]::LeftArrow,
-                [ConsoleKey]::SpaceBar,
-                [ConsoleKey]::DownArrow,
-                [ConsoleKey]::RightArrow,
-                [ConsoleKey]::Enter,
-                [ConsoleKey]::Escape
-            ),
+            [Parameter(Mandatory)]
+            [ConsoleKey[]]$KeyboardShortcuts,
             [Int]$ColumnCount = 3,
             [String]$ColumnSeparator = '    ',
             [String]$Title = "`nKeyboard shortcuts:"
         )
     
-        $navigationKeys = switch ($KeyboardShortcuts) {
-            { $_ -contains [ConsoleKey]::UpArrow } {  
-                '[ARROW_UP] to move up'
-            }
-            { $_ -contains [ConsoleKey]::Enter } {  
-                '[ENTER] to confirm'
-            }
-            { $_ -contains [ConsoleKey]::SpaceBar } {  
-                '[SPACE_BAR] to select/unselect'
-            }
-            { $_ -contains [ConsoleKey]::DownArrow } {  
-                '[ARROW_DOWN] to move down'
-            }
-            { $_ -contains [ConsoleKey]::LeftArrow } {  
-                '[ARROW_LEFT] go back'
-            }
-            { $_ -contains [ConsoleKey]::RightArrow } {  
-                '[ARROW_RIGHT] go forward'
-            }
-            { $_ -contains [ConsoleKey]::Escape } {  
-                '[ESC] to quit'
-            }
+        $params = @{
+            Items           = Convert-KeyboardKeysToMenuItemsHC -KeyboardKeys $KeyboardShortcuts
+            Title           = $Title
+            ColumnCount     = $ColumnCount
+            ColumnSeparator = $ColumnSeparator
         }
-    
-        #region Calculate minimal column width
-        $minimalColumnWidth = @{}
-        for ($i = 0; $i -lt $navigationKeys.Count; $i = $i + $ColumnCount) {
-            foreach ($columnNr in 0..($ColumnCount - 1)) {
-                $index = $i + $columnNr
-                if ($index -ge $navigationKeys.Count) {
-                    break
-                }
-    
-                $length = $navigationKeys[$index].Length
-    
-                if ($length -ge $minimalColumnWidth[$columnNr]) {
-                    $minimalColumnWidth[$columnNr] = $length
-                }
-            }
-        }
-        #endregion
-    
-        #region Add trailing spaces where needed
-        for ($i = 0; $i -lt $navigationKeys.Count; $i = $i + $ColumnCount) {
-            foreach ($columnNr in 0..($ColumnCount - 1)) {
-                $index = $i + $columnNr
-                if ($index -ge $navigationKeys.Count) {
-                    break
-                }
-    
-                $navigationKeys[$index] = $navigationKeys[$index].PadRight($minimalColumnWidth[$columnNr])
-            }
-        }
-        #endregion
-    
-        #region Create rows to display
-        $rows = for ($i = 0; $i -lt $navigationKeys.Count; $i = $i + 3) {
-            '{0}' -f (
-                $navigationKeys[$i..($i + 2)] -join $ColumnSeparator
-            )
-        }
-    
-        $toPrint = $rows -join "`n"
-        #endregion
-    
-        #region Add Title
-        if ($Title) {
-            $toPrint = $Title + "`n" + $toPrint
-        }
-        #endregion
-    
-        $toPrint
+        Convert-StringsToColumnsHC @params
     }
     Function Show-AsciArtHC {
         Write-Host  '
@@ -243,6 +275,7 @@ _________                               __                                      
                 }
                 if (-not $screen.AcceptMultipleAnswers) {
                     $o.selected = $true
+                    $nextScreen = $o.nextScreen
                 }
                 elseif ($Select) {
                     $o.selected = -not $o.selected
@@ -296,8 +329,25 @@ _________                               __                                      
             ([ConsoleKey]::DownArrow) { $params.HighLightRow++; break }
             ([ConsoleKey]::UpArrow) { $params.HighLightRow-- ; break }
             ([ConsoleKey]::SpaceBar) { $params.Select = $true ; break }
-            ([ConsoleKey]::Enter) { Return $options }
-            ([ConsoleKey]::Escape) { 
+            ([ConsoleKey]::LeftArrow) {
+                $params.ScreenName = $screen.PreviousScreen
+                $params.HighLightRow = 0
+                Show-GuiHC @params
+                break 
+            }
+            ([ConsoleKey]::RightArrow) {
+                $params.ScreenName = $nextScreen
+                Show-GuiHC @params
+                # Return $options
+                break
+            }
+            ([ConsoleKey]::Enter) {
+                $params.ScreenName = $nextScreen
+                Show-GuiHC @params
+                # Return $options
+                break
+            }
+            ([ConsoleKey]::Escape) {
                 Write-Warning 'Quit script'
                 Exit
             }
@@ -456,36 +506,65 @@ Process {
         )
 
         $screens = @{
-            Home            = @{
+            Home                = @{
                 AddressBarLocation    = @('Home')
                 AcceptMultipleAnswers = $false
                 Question              = 'What would you like to do?'
                 Answers               = @(
                     @{
-                        option     = 'Create a new snapshot'
+                        option     = 'Create a backup'
                         selected   = $false
-                        nextScreen = 'CreateSnapshot'
+                        nextScreen = 'CreateBackup'
                     }
                     @{
-                        option     = 'Restore a snapshot'
+                        option     = 'Restore a backup'
                         selected   = $false
-                        nextScreen = 'RestoreSnapshot'
+                        nextScreen = 'RestoreBackup'
                     }
                 )
+                PreviousScreen        = $null
                 KeyboardShortcuts     = $keyboardShortcuts.home
             }
-            CreateSnapshot  = @{
-                AddressBarLocation    = @('Home', 'CreateSnapshot')
+            CreateBackup        = @{
+                AddressBarLocation    = @('Home', 'Create backup')
                 AcceptMultipleAnswers = $true
-                Question              = 'Select the items for which you would like to take a snapshot?'
+                Question              = 'Select what to backup?'
                 Answers               = $snapshotItems
+                Screen                = @{
+                    previous = 'Home'
+                    next     = 'ConfirmCreateBackup'
+                }
+                NextScreen            = 'ConfirmCreateBackup'
                 KeyboardShortcuts     = $keyboardShortcuts.all
             }
-            RestoreSnapshot = @{
-                AddressBarLocation    = @('Home', 'RestoreSnapshot')
+            RestoreBackup       = @{
+                AddressBarLocation    = @('Home', 'Restore backup')
                 AcceptMultipleAnswers = $true
-                Question              = 'Select the items you would like to restore?'
+                Question              = 'Select what to restore:'
                 Answers               = $snapshotItems
+                PreviousScreen        = 'Home'
+                KeyboardShortcuts     = $keyboardShortcuts.all
+            }
+            ConfirmCreateBackup = @{
+                AddressBarLocation    = @(
+                    'Home', 'Restore backup', 'Confirm'
+                )
+                AcceptMultipleAnswers = $true
+                Question              = 'Are you sure you want to take a backup?'
+                Answers               = @(
+                    @{
+                        option     = 'Yes'
+                        selected   = $false
+                        nextScreen = $null
+                        Action     = 'CallStartScript'
+                    }
+                    @{
+                        option     = 'No'
+                        selected   = $false
+                        nextScreen = 'Home'
+                    }
+                )
+                PreviousScreen        = 'RestoreBackup'
                 KeyboardShortcuts     = $keyboardShortcuts.all
             }
         }

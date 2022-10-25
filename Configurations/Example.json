@@ -1,7 +1,7 @@
 {
   "StartScript": {
     "Action": "RestoreSnapshot",
-    "RestoreSnapshotFolder": "Snapshots\\Kiosk PC config for application X",
+    "SnapshotFolder": "Snapshots\\Kiosk PC config for application X",
     "RebootComputerAfterRestoreSnapshot": true,
     "OpenReportInBrowser": true,
     "Snapshot": {

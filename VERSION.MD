@@ -1,3 +1,7 @@
+# Version 1.2
+- Renamed `Start-Script.ps1` arguments:
+    > `RestoreSnapshotFolder` becomes `SnapshotFolder`
+    
 # Version 1.1
 - Add support for relative paths to `Start-Script.ps1`
 

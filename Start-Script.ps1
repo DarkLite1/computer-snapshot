@@ -12,23 +12,14 @@
         (ex. add smb shares, set up local users, grant them NTFS permissions,
         configure firewall rules, ..)
 
-        Step 2: Plug in the USB stick and run this script on the current 
-        computer, which is now configured correctly, to create a snapshot. 
-        Simply set $Action to 'CreateSnapshot' and set the $Snapshot items to 
-        $true for the data you want to collect in the $SnapshotsFolder.
-
-        At this point a snapshot is created and saved on the USB stick in the
-        $SnapshotsFolder.
+        Step 2: Plug in the USB stick and run the script to create a backup in the SnapshotFolder with:
+        - $Action = 'CreateSnapshot'
+        - $SnapshotFolder = 'backup\PC1'
 
         Step 3: To restore the snapshot on another computer plug in the USB 
-        stick and run this script with $Action set to 'RestoreSnapshot' and set 
-        the $Snapshot items to $true for the data you want to restore.
-
-        At this point the snapshot will be used to create or update the current
-        computer to the desired state.
-        
-        In case you want to restore another snapshot than the last one created
-        use the '$RestoreSnapshotFolder'.
+        stick and run this script with:
+        - $Action = 'RestoreSnapshot'
+        - $SnapshotFolder = 'backup\PC1'
 
         TIPS:
         - It is encouraged to modify the exported files to contain only the
@@ -36,16 +27,6 @@
         risks. Use something like Notepad++ or vscode to easily see the file
         structure and remove the unneeded pieces or update others.
         # less is more
-
-        - After making a snapshot it is advised to rename the folder in the 
-        snapshots folder to something more recognizable (ex. 'Image MyApp').
-        Then move it to another folder on the USB drive so you can start the
-        'RestoreBackup' process with the argument 'RestoreSnapshotFolder' set
-        to the new folder (ex. 'X:\Backup restore\Production\Image MyApp').
-        This way you are always certain the correct snapshot is restored.
-        Otherwise, when not using 'RestoreSnapshotFolder', the last created
-        snapshot is restored which might lead to unexpected results.
-        # know what you're doing
 
     .PARAMETER Action
         A snapshot of the current computer is created when set to 
@@ -60,24 +41,15 @@
         Can be a path relative to the Start-Script.ps1 directory like:
         'Snapshots\Snapshot1' or a full path like 'C:\Snapshots\Snapshot1'.
 
-    .PARAMETER RestoreSnapshotFolder
-        By default the last created snapshot is used for restoring data. By
-        using the argument '$RestoreSnapshotFolder' it is possible to restore
-        data from a specific folder. This allows for the creation of named
-        snapshot folders that can be restored on specific computers. 
+    .PARAMETER SnapshotFolder
+        When 'Action = CreateSnapshot' this is the folder where the backup
+        will be saved. The folder will be created if it doesn't exist. When
+        it already exists and there is no content, that's ok too. When there
+        is content in the folder an error will be thrown.
         
-        Simply copy/paste the data you want to restore to a specific folder
-        and add the folder path to '$RestoreSnapshotFolder'.
-
-        Ex: `$RestoreSnapshotFolder = 'Production\Image MyApp'`
-        The folder 'Production' is in the same folder as 'Start-Script.ps1'.
-
-    .PARAMETER SnapshotsFolder
-        The parent folder where all the snapshots will be store by computer name
-        and snapshot date. By default this data is stored on the USB stick.
-
-        Can be a folder name or a folder path. In case it's a folder name the
-        data will be stored in the script root.
+        When 'Action = RestoreSnapshot', this is the folder that
+        contains the data and configuration files that will be used in the 
+        restore process.
 
     .PARAMETER ReportsFolder
         The folder where the reports will be saved. These reports contain the
@@ -96,8 +68,9 @@
     .EXAMPLE
         # on PC1
         $params = @{
-            Action = 'CreateSnapshot'
-            Snapshot = [Ordered]@{
+            Action         = 'CreateSnapshot'
+            SnapshotFolder = 'Snapshots\PC1'
+            Snapshot       = [Ordered]@{
                 UserAccounts  = $true
                 UserGroups    = $true
                 FirewallRules = $false
@@ -108,8 +81,9 @@
 
         # On PC2
         $params = @{
-            Action = 'RestoreSnapshot'
-            Snapshot = [Ordered]@{
+            Action         = 'RestoreSnapshot'
+            SnapshotFolder = 'Snapshots\PC1'
+            Snapshot       = [Ordered]@{
                 UserAccounts  = $true
                 UserGroups    = $true
                 FirewallRules = $false
@@ -119,14 +93,14 @@
         & 'Start-Script.ps1' @params
 
         On PC1 an export is done of all user accounts and smb shares to the 
-        snapshot folder 'Snapshots' on the USB stick.
+        snapshot folder 'Snapshots\PC1' on the USB stick.
         On PC2 this snapshot is restored and the user accounts and smb shares
         that were on PC1 are recreated/updated as needed.
 
     .EXAMPLE
         $params = @{
             Action                = 'RestoreSnapshot'
-            RestoreSnapshotFolder = 'Snapshots\MyCustomSnapshot'
+            SnapshotFolder        = 'Snapshots\MyCustomSnapshot'
             Snapshot              = [Ordered]@{
                 UserAccounts  = $true
                 UserGroups    = $true
@@ -144,7 +118,7 @@
 Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
-    [String]$RestoreSnapshotFolder,
+    [String]$SnapshotFolder,
     [Boolean]$RebootComputerAfterRestoreSnapshot = $true,
     [System.Collections.Specialized.OrderedDictionary]$Snapshot = [Ordered]@{
         StartCustomScriptsBefore = $true
@@ -178,7 +152,6 @@ Param (
         StartCustomScriptsBefore = '.\Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
         StartCustomScriptsAfter  = '.\Scripts\Start custom scripts import export\Start custom scripts import export.ps1'
     },
-    [String]$SnapshotsFolder = '.\Snapshots',
     [String]$ReportsFolder = '.\Reports',
     [Boolean]$OpenReportInBrowser = $true
 )
@@ -278,74 +251,58 @@ Begin {
         }
         #endregion
 
+        #region SnapshotFolder
+
+        #region Test SnapshotFolder mandatory
+        if (-not $SnapshotFolder) {
+            throw "The argument 'SnapshotFolder' is mandatory"
+        }
+        #endregion
+
+        #region Get SnapshotFolder path
+        $params = @{
+            Path        = $SnapshotFolder
+            ErrorAction = 'Ignore'
+        }
+        $SnapshotFolderPath = Convert-Path @params
+        #endregion
+
         If ($Action -eq 'CreateSnapshot') {
-            if ($RestoreSnapshotFolder) {
-                throw "When using 'Action = CreateSnapshot' the parameter 'RestoreSnapshotFolder' is not supported. Please remove the parameter 'RestoreSnapshotFolder' or change to 'Action = RestoreSnapshot'."
-            }
-
-            #region Get path SnapshotsFolder
-            $params = @{
-                Path        = $SnapshotsFolder
-                ErrorAction = 'Ignore'
-            }
-            $SnapshotsFolderPath = Convert-Path @params
-            #endregion
-            
-            #region Create snapshot folder
-            try {
-                If (-not $SnapshotsFolderPath) {
-                    $SnapshotsFolderPath = $SnapshotsFolder
+            If (-not $SnapshotFolderPath) {
+                #region Create snapshot folder
+                try {
+                    $params = @{
+                        Path        = $SnapshotFolder
+                        ItemType    = 'Directory'
+                        ErrorAction = 'Stop'
+                    }
+                    $SnapshotFolderPath = (New-Item @params).FullName
                 }
-
-                $joinParams = @{
-                    Path        = $SnapshotsFolderPath
-                    ChildPath   = '{0} - {1}' -f 
-                    $env:COMPUTERNAME, $Now.ToString('yyyyMMddHHmmssffff')
-                    ErrorAction = 'Stop'
-                }
-                
-                $params = @{
-                    Path        = Join-Path @joinParams
-                    ItemType    = 'Directory'
-                    ErrorAction = 'Stop'
-                }
-                $SnapshotFolder = (New-Item @params).FullName
+                catch {
+                    Throw "Failed to create snapshot folder '$SnapshotFolder': $_"
+                }       
+                #endregion
             }
-            catch {
-                Throw "Failed to create snapshots folder '$SnapshotsFolder': $_"
+            elseif (Test-Path -Path "$SnapshotFolderPath\*") {
+                Throw "The snapshot folder '$SnapshotFolder' needs to be empty before a proper snapshot can be created"
             }
-            #endregion
         }
         else {
-            if (-not $RestoreSnapshotFolder) {
-                throw "The parameter 'RestoreSnapshotFolder' is mandatory. Please specify the folder containing the snapshot data that needs to be restored on the current computer."
-            }
-
-            #region Get path RestoreSnapshotFolder
-            $params = @{
-                Path        = $RestoreSnapshotFolder
-                ErrorAction = 'Ignore'
-            }
-            $SnapshotFolder = Convert-Path @params
-            #endregion
-
-            #region Test RestoreSnapshotFolder
-            If (-not $SnapshotFolder) {
-                throw "Restore snapshot folder '$RestoreSnapshotFolder' not found"
+            #region Test SnapshotFolder exists
+            If (-not $SnapshotFolderPath) {
+                throw "Snapshot folder '$SnapshotFolder' not found"
             }
             #endregion
 
-            #region Test snapshot folder
-            If (
-                (Get-ChildItem -LiteralPath $SnapshotFolder | 
-                Measure-Object).Count -eq 0
-            ) {
+            #region Test SnapshotFolder is empty
+            If (-not (Test-Path -Path "$SnapshotFolderPath\*")) {
                 throw "No data found in snapshot folder '$SnapshotFolder'"
             }
             #endregion
         }
     
-        Write-Verbose "Snapshot folder '$SnapshotFolder'"
+        Write-Verbose "Snapshot folder '$SnapshotFolderPath'"
+        #endregion
 
         #region Test scripts and data folders
         foreach ($item in $Snapshot.GetEnumerator() | 
@@ -359,7 +316,7 @@ Begin {
 
             $invokeScriptParams = @{
                 Path       = $Script.$($item.Key)
-                DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
+                DataFolder = Join-Path -Path $SnapshotFolderPath -ChildPath $item.Key
             }
     
             #region Test execution script
@@ -455,7 +412,7 @@ Process {
 
             $invokeScriptParams = @{
                 Path       = $Script.$($item.Key)
-                DataFolder = Join-Path -Path $SnapshotFolder -ChildPath $item.Key
+                DataFolder = Join-Path -Path $SnapshotFolderPath -ChildPath $item.Key
             }
 
             If ($Action -eq 'CreateSnapshot') {
@@ -591,7 +548,7 @@ End {
         Write-Host ('-' * 80) @writeSeparatorParams
         Write-Host "Action`t`t: $Action" @writeParams
         Write-Host "Total runtime`t: $totalRunTime" @writeParams
-        Write-Host "Snapshot folder`t: $SnapshotFolder" @writeParams
+        Write-Host "Snapshot folder`t: $SnapshotFolderPath" @writeParams
         Write-Host ('-' * 80) @writeSeparatorParams
 
         $html += "
@@ -606,7 +563,7 @@ End {
                 </tr>
                 <tr>
                     <th>Snapshot folder</th>
-                    <td><a href=`"$SnapshotFolder`">$SnapshotFolder</a></td>
+                    <td><a href=`"$SnapshotFolderPath`">$SnapshotFolderPath</a></td>
                 </tr>
             </table>
         "

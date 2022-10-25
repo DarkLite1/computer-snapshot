@@ -13,7 +13,7 @@ BeforeAll {
             Script1 = (New-Item 'TestDrive:/1.ps1' -ItemType File).FullName
             Script2 = (New-Item 'TestDrive:/2.ps1' -ItemType File).FullName
         }
-        SnapshotsFolder     = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
+        SnapshotFolder     = (New-Item 'TestDrive:/A' -ItemType Directory).FullName
         ReportsFolder       = (New-Item 'TestDrive:/R' -ItemType Directory).FullName
         OpenReportInBrowser = $false
     }
@@ -41,10 +41,26 @@ Describe "Throw a terminating error for action 'CreateSnapshot' when" {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'CreateSnapshot'
     }
-    It 'the snapshots folder cannot be created' {
-        $testNewParams.SnapshotsFolder = 'x:/xxx'
-        { .$testScript @testNewParams } | 
-        Should -Throw "*Failed to create snapshots folder 'x:/xxx'*"
+    Context 'the SnapshotFolder' {
+        It 'is blank' {
+            $testNewParams.SnapshotFolder = $null
+            { .$testScript @testNewParams } | 
+            Should -Throw "*The argument 'SnapshotFolder' is mandatory*"
+        }
+        It 'is not empty' {
+            $testNewParams.SnapshotFolder = (New-Item 'TestDrive:/C' -ItemType Directory).FullName
+
+            'a' | 
+            Out-File -FilePath ('{0}\test.txt' -f $testNewParams.SnapshotFolder)
+
+            { .$testScript @testNewParams } | 
+            Should -Throw "*The snapshot folder '$($testNewParams.SnapshotFolder)' needs to be empty before a proper snapshot can be created*"
+        }
+        It 'cannot be created' {
+            $testNewParams.SnapshotFolder = 'x:/xxx'
+            { .$testScript @testNewParams } | 
+            Should -Throw "*Failed to create snapshot folder 'x:/xxx'*"
+        }
     }
     It 'the script does not exist' {
         $testNewParams.Snapshot = [Ordered]@{
@@ -68,23 +84,25 @@ Describe "Throw a terminating error for action 'RestoreSnapshot' when" {
     BeforeEach {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'RestoreSnapshot'
-        $testNewParams.RestoreSnapshotFolder = $testFolder
+        $testNewParams.SnapshotFolder = $testFolder
     }
-    It "The parameter 'RestoreSnapshotFolder' is missing" {
-        $testNewParams.Remove('RestoreSnapshotFolder')
+    Context 'the SnapshotFolder' {
+        It 'is blank' {
+            $testNewParams.SnapshotFolder = $null
+            { .$testScript @testNewParams } | 
+            Should -Throw "*The argument 'SnapshotFolder' is mandatory*"
+        }
+        It 'does not exist' {
+            $testNewParams.SnapshotFolder = 'x:/xxx'
+            { .$testScript @testNewParams } | 
+            Should -Throw "*Snapshot folder 'x:/xxx' not found*"
+        }
+        It 'is empty' {
+            $testNewParams.SnapshotFolder = (New-Item 'TestDrive:/cc' -ItemType Directory).FullName
 
-        { .$testScript @testNewParams } | 
-        Should -Throw "*The parameter 'RestoreSnapshotFolder' is mandatory. Please specify the folder containing the snapshot data that needs to be restored on the current computer*"
-    }
-    It "the 'RestoreSnapshotFolder' is not found'" {
-        $testNewParams.RestoreSnapshotFolder = 'TestDrive:/xxx'
-
-        { .$testScript @testNewParams } | 
-        Should -Throw "*Restore snapshot folder 'TestDrive:/xxx' not found"
-    }
-    It "the 'RestoreSnapshotFolder' is empty" {
-        { .$testScript @testNewParams } | 
-        Should -Throw "*No data found in snapshot folder '$($testNewParams.RestoreSnapshotFolder)'"
+            { .$testScript @testNewParams } | 
+            Should -Throw "*No data found in snapshot folder '$($testNewParams.SnapshotFolder)'*"
+        }
     }
     It "the script restore folder is not found" {
         New-Item "$testFolder/a" -ItemType Directory
@@ -140,11 +158,11 @@ Describe "When action is 'CreateSnapshot'" {
         }
     }
 }
-Describe "When action is 'RestoreSnapshot' and 'RestoreSnapshotFolder' is set" {
+Describe "When action is 'RestoreSnapshot'" {
     BeforeAll {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'RestoreSnapshot'
-        $testNewParams.RestoreSnapshotFolder = $testFolder
+        $testNewParams.SnapshotFolder = $testFolder
         $testNewParams.RebootComputerAfterRestoreSnapshot = $true
         $testNewParams.Snapshot = [Ordered]@{
             Script1 = $false
@@ -167,7 +185,7 @@ Describe "When action is 'RestoreSnapshot' and 'RestoreSnapshotFolder' is set" {
     It 'restart the computer when using RebootComputerAfterRestoreSnapshot' {
         Should -Invoke Restart-Computer -Exactly -Times 1 -Scope Describe
     }
-    Context "the 'RestoreSnapshotFolder' can be" {
+    Context "the 'SnapshotFolder' can be" {
         BeforeAll {
             $testRelativeRestoreFolder = "$PSScriptRoot\test"
             $testScriptFolder = (New-Item "$testRelativeRestoreFolder\Script2" -ItemType Directory).FullName
@@ -177,14 +195,14 @@ Describe "When action is 'RestoreSnapshot' and 'RestoreSnapshotFolder' is set" {
             Remove-Item $testRelativeRestoreFolder -Recurse
         }
         It 'a relative path' {
-            $testNewParams.RestoreSnapshotFolder = '.\test'
+            $testNewParams.SnapshotFolder = '.\test'
 
             .$testScript @testNewParams
     
             Should -Invoke Restart-Computer -Exactly -Times 1
         }
     }
-} -Tag test
+}
 Describe 'Other scripts are still executed when' {
     BeforeAll {
         Get-ChildItem -Path 'TestDrive:/' -Filter '*.ps1' |
@@ -208,6 +226,8 @@ Describe 'Other scripts are still executed when' {
             Write-Error 'Script2 non terminating error'
         } -ParameterFilter { $Path -eq $testNewParams.Script.Script2 }
 
+        $testNewParams.SnapshotFolder = (New-Item 'TestDrive:/bb' -ItemType Directory).FullName
+
         .$testScript @testNewParams -ErrorAction SilentlyContinue
 
         Should -Invoke Invoke-ScriptHC -Times 3 -Exactly
@@ -225,6 +245,8 @@ Describe 'Other scripts are still executed when' {
         Mock Invoke-ScriptHC {
             throw 'Script2 terminating error'
         } -ParameterFilter { $Path -eq $testNewParams.Script.Script2 }
+
+        $testNewParams.SnapshotFolder = (New-Item 'TestDrive:/ss' -ItemType Directory).FullName
 
         .$testScript @testNewParams
 

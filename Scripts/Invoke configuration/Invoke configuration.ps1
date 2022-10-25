@@ -162,7 +162,7 @@ Begin {
             $ConfigurationFilePath = Convert-Path @params
             #endregion
 
-            #region Test start script
+            #region Test configuration file
             If (
                 (-not $ConfigurationFilePath) -or
                 (-not (Test-Path -LiteralPath $ConfigurationFilePath -PathType Leaf))

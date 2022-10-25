@@ -1,7 +1,9 @@
 # Version 1.2
-- Renamed `Start-Script.ps1` arguments:
-    > `RestoreSnapshotFolder` becomes `SnapshotFolder`
-    
+- Changes in `Start-Script.ps1`:
+    > rename `RestoreSnapshotFolder` to `SnapshotFolder`
+    > rename `RebootComputerAfterRestoreSnapshot` to `RebootComputer`
+    > `SnapshotFolder` is now mandatory in all cases
+
 # Version 1.1
 - Add support for relative paths to `Start-Script.ps1`
 

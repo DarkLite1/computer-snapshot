@@ -62,8 +62,8 @@
         Once the script is done an HTML report will be opened in the browser for
         further inspection.
 
-    .PARAMETER RebootComputerAfterRestoreSnapshot
-        Reboot the current machine once the action 'RestoreSnapshot' is finished
+    .PARAMETER RebootComputer
+        Reboot the current machine after the script is finished
 
     .EXAMPLE
         # on PC1
@@ -119,7 +119,7 @@ Param (
     [ValidateSet('CreateSnapshot' , 'RestoreSnapshot')]
     [String]$Action = 'CreateSnapshot',
     [String]$SnapshotFolder,
-    [Boolean]$RebootComputerAfterRestoreSnapshot = $true,
+    [Boolean]$RebootComputer = $false,
     [System.Collections.Specialized.OrderedDictionary]$Snapshot = [Ordered]@{
         StartCustomScriptsBefore = $true
         RegionalSettings         = $true
@@ -514,10 +514,7 @@ End {
         <body>
         "
 
-        if (
-            ($Action -eq 'RestoreSnapshot') -and 
-            ($RebootComputerAfterRestoreSnapshot)
-        ) {
+        if ($RebootComputer) {
             $html += "
             <div class=`"rebootHeader`">
                 REBOOT IMMINENT
@@ -647,10 +644,7 @@ End {
             }
         }
 
-        if (
-            ($Action -eq 'RestoreSnapshot') -and 
-            ($RebootComputerAfterRestoreSnapshot)
-        ) {
+        if ($RebootComputer) {
             Write-Host 'Restart computer' @writeParams
             Restart-Computer
         }

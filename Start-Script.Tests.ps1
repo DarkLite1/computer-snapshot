@@ -163,7 +163,7 @@ Describe "When action is 'RestoreSnapshot'" {
         $testNewParams = $testParams.clone()
         $testNewParams.Action = 'RestoreSnapshot'
         $testNewParams.SnapshotFolder = $testFolder
-        $testNewParams.RebootComputerAfterRestoreSnapshot = $true
+        $testNewParams.RebootComputer = $true
         $testNewParams.Snapshot = [Ordered]@{
             Script1 = $false
             Script2 = $true
@@ -182,7 +182,7 @@ Describe "When action is 'RestoreSnapshot'" {
             ($Type -eq 'Import')
         }
     } 
-    It 'restart the computer when using RebootComputerAfterRestoreSnapshot' {
+    It 'restart the computer when using RebootComputer' {
         Should -Invoke Restart-Computer -Exactly -Times 1 -Scope Describe
     }
     Context "the 'SnapshotFolder' can be" {

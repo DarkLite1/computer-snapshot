@@ -9,7 +9,7 @@
         display a list of pre-configured arguments to use for calling 
         'Start-Script.ps1'.
         
-        Each .JSON file in the folder 'Preconfigured callers' represents a set
+        Each .JSON file in the folder 'ConfigurationsFolder' represents a set
         of pre-configured arguments to call 'Start-Script.ps1'. Many different
         .JSON files can be created for many different occasions of restoring
         snapshots.
@@ -283,7 +283,7 @@ Process {
       
             $startParams = @{
                 FilePath     = 'powershell.exe'
-                ArgumentList = '-Command "& ''{0}'' -PreconfiguredCaller ''{1}'' -NoConfirmQuestion"' -f 
+                ArgumentList = '-Command "& ''{0}'' -ConfigurationFile ''{1}'' -NoConfirmQuestion"' -f 
                 $MyInvocation.MyCommand.Path, 
                 $ConfigurationFile
                 Verb         = 'RunAs'

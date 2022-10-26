@@ -57,7 +57,7 @@ Describe 'the script fails when' {
         }
     }
     Context 'parameter ConfigurationsFolder' {
-        It 'is folder that does not exist' {
+        It 'is a folder that does not exist' {
             $testNewParams.ConfigurationsFolder = 'TestDrive:/xxx'
 
             .$testScript @testNewParams 
@@ -78,6 +78,7 @@ Describe 'the script fails when' {
     }
     Context 'parameter ConfigurationFile' {
         It 'is a non existing file' {
+            $testNewParams.Remove('ConfigurationsFolder')
             $testNewParams.ConfigurationFile = 'TestDrive:/file'
 
             .$testScript @testNewParams 

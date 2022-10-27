@@ -178,8 +178,8 @@ Begin {
             Check if the script is started in elevated mode
         
         .DESCRIPTION
-            Some PowerShell scripts required to be run as adminstrator 
-            and in elavated mode to functino propertly.
+            Some PowerShell scripts required to be run as administrator 
+            and in elevated mode to function properly.
         #>
         
         Try {

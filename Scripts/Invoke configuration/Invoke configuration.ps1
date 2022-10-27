@@ -283,7 +283,7 @@ Process {
       
             $startParams = @{
                 FilePath     = 'powershell.exe'
-                ArgumentList = '-Command "& ''{0}'' -ConfigurationFile ''{1}'' -NoConfirmQuestion"' -f 
+                ArgumentList = '-ExecutionPolicy Bypass -NoProfile -Command "& ''{0}'' -ConfigurationFile ''{1}'' -NoConfirmQuestion"' -f 
                 $MyInvocation.MyCommand.Path, 
                 $ConfigurationFile
                 Verb         = 'RunAs'

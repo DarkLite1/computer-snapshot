@@ -152,7 +152,7 @@ Param (
         StartCustomScriptsBefore = '..\Start custom scripts import export\Start custom scripts import export.ps1'
         StartCustomScriptsAfter  = '..\Start custom scripts import export\Start custom scripts import export.ps1'
     },
-    [String]$ReportsFolder = '.\Reports',
+    [String]$ReportsFolder = '..\..\Log',
     [Boolean]$OpenReportInBrowser = $true
 )
 

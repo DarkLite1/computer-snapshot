@@ -3,7 +3,7 @@
     "Remove": [],
     "Install": [
       {
-        "ExecutablePath": "..\\..\\..\\Software\\App hello world1.exe",
+        "ExecutablePath": "..\\..\\..\\Software\\App hello world 1.exe",
         "Arguments": null,
         "ArgumentsExampleSilentSwitch": "/S"
       },

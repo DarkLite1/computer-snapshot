@@ -44,18 +44,18 @@ This is the **preferred way** to restore or backup a computer.
 
 The shortcut launcher `Start wizard` starts a GUI that will guide you through the process. It will ask questions like: Would you like to create or restore a backup? What would you like to backup or restore? Where do we need to store the backup files? ..
 
-The wizard comes preconfigured with default settings and best practices. It creates the required .JSON file that is used to execute the main script `Scripts\Invoke scripts\Invoke scripts.ps1` with the correct arguments. No manual file editing is required when using this method.
+The wizard comes preconfigured with default settings and best practices. It creates the required .JSON file that is used to execute the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) with the correct arguments. No manual file editing is required when using this method.
 
 ## Use manual input files
 
 This method is only available for **experienced users**.
 
-The required configuration files can also be created manually. These files are used to send the correct arguments to the main script `Scripts\Invoke scripts\Invoke scripts.ps1` for execution.
+The required configuration files can also be created manually. These files are used to send the correct arguments to the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) for execution.
 
 ### Step 1: Create your custom configuration file
 By preference it's a good idea to copy the example .JSON file that can be found in the folder `Configurations` and save it with a new name.
 
-Edit the file to your liking. All accepted arguments can be found in the main script `Scripts\Invoke scripts\Invoke scripts.ps1`.
+Edit the file to your liking. All accepted arguments can be found in the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1).
 
 ### Step 2: Execute your custom configuration file
 Click on the shortcut launcher `Select configuration` and select the custom .JSON file. The main script will not be executed with the arguments provided in the .JSON file.

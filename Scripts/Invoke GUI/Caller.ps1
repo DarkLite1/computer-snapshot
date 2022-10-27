@@ -15,7 +15,7 @@ $startParams = @{
     FilePath     = 'powershell.exe'
     ArgumentList = '-ExecutionPolicy Bypass -NoProfile -Command "& ''{0}'' -StartScript ''{1}'' -InvokeConfigurationScript ''{2}''"' -f 
     '.\Invoke GUI.ps1', 
-    '..\Start script\Start-Script.ps1',
+    '..\Invoke scripts\Invoke scripts.ps1',
     '..\Invoke configuration\Invoke configuration.ps1'
     WindowStyle  = 'Hidden'
 }

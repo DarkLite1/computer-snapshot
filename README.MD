@@ -3,7 +3,25 @@ A PowerShell script designed to create and restore snapshots on Windows computer
 
 This script is intended to run from a USB stick and is portable. The intent is to create a snapshot on one computer and restore the snapshot on another computer. Snapshots are by default stored on the USB stick in easily editable .JSON files.
 
-# What is a snapshot folder?
+# Snapshots
+
+### What can be backed up or restored?
+Find a full list of supported snapshot items in the argument `Snapshot` of the main script `Scripts\Invoke scripts\Invoke scripts.ps1`. Summary of the most used snapshot items:
+
+- Files or folders to copy
+- Folders to create
+- Regional settings
+- Registry keys
+- SMB shares and their SMB share and NTFS permissions
+- User accounts
+- User groups
+- Windows firewall rules
+- Windows scheduled tasks to create
+- Network card renaming and network profile
+- Custom PowerShell scripts to run before or after execution
+- ...
+
+### What is a snapshot folder?
 A snapshot is a single folder (`SnapshotFolder`) that contains the state of a machine at the time a backup was made. This folder contains multiple child folders for each selected snapshot item during the backup. Each of these child folders contain the saved configuration files that can be edited.
 
 Example:

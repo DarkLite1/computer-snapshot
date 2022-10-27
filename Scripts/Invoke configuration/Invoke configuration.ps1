@@ -37,8 +37,8 @@
 #>
 
 Param (
-    [String]$StartScript = '.\Start-Script.ps1',
-    [String]$ConfigurationsFolder = '.\Configurations',
+    [String]$StartScript = '..\Invoke scripts\Invoke scripts.ps1',
+    [String]$ConfigurationsFolder = '..\..\Configurations',
     [String]$ConfigurationFile,
     [Switch]$NoConfirmQuestion
 )
@@ -135,6 +135,8 @@ Begin {
             [System.Net.Dns]::GetHostEntry([string]$env:computername).HostName
         ) -ForegroundColor Gray
         #endregion
+
+        Set-Location $PSScriptRoot
 
         #region Get start script path
         $params = @{

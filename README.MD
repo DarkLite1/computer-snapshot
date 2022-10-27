@@ -20,30 +20,34 @@ A snapshot can contain different things:
 
 # How to use this script
 
-## Step 1: Configure the current computer to the desired state
-Create local users, create local user groups and add users, create smb shares and set smb share permissions and NTFS permissions, configure firewall rules, ...
+## Use the graphical user interface
 
-## Step 2: Create a snapshot
-Plug in the USB stick that contains all the script files and run the script `Start-Script.ps1` with `$Action = 'CreateSnapshot'` and set the `$Snapshot` items to `$true` for the data you want to collect.
+This is the **preferred way** to restore or backup a computer.
 
-At this point a snapshot is created and saved on the USB stick in the `$SnapshotsFolder`.
+The shortcut launcher `Start wizard` starts a GUI that will guide you through the process. It will ask questions like: Would you like to create or restore a backup? What would you like to backup or restore? Where do we need to store the backup files? ..
 
-## Step 3: Restore the snapshot on another computer
-Plug in the same USB stick that contains all the script files and the collected snapshot data and run the script `Start-Script.ps1` with `$Action = 'RestoreSnapshot'` and set the `$Snapshot` items to `$true` for the data you want to restore.
+The wizard comes preconfigured with default settings and best practices. It creates the required .JSON file that is used to execute the main script `Scripts\Invoke scripts\Invoke scripts.ps1` with the correct arguments. No manual file editing is required when using this method.
 
-At this point the data of the latest snapshot will be used to update the current computer to the desired state. In case you want to restore another snapshot than the last one created use the `$RestoreSnapshotFolder`.
+## Use manual input files
 
-# Quick and easy execution
-The folder `Configurations` holds .JSON files that represent the arguments used in `Start-Script.ps1`. This can be convenient when you have multiple snapshots on the USB stick but you only want to apply a specific one.
+This method is only available for **experienced users**.
 
-Click on `Quick launcher.lnk` to open a new window. In the new window all files in the folder `Configurations` are displayed. Select a single file to apply that configuration on the current machine.
+The required configuration files can also be created manually. These files are used to send the correct arguments to the main script `Scripts\Invoke scripts\Invoke scripts.ps1` for execution.
+
+### Step 1: Create your custom configuration file
+By preference it's a good idea to copy the example .JSON file that can be found in the folder `Configurations` and save it with a new name.
+
+Edit the file to your liking. All accepted arguments can be found in the main script `Scripts\Invoke scripts\Invoke scripts.ps1`.
+
+### Step 2: Execute your custom configuration file
+Click on the shortcut launcher `Select configuration` and select the custom .JSON file. The main script will not be executed with the arguments provided in the .JSON file.
 
  # Tips
-- It is encouraged to modify the exported files to contain only the data you really need. This will speed up the process and reduces the risks. Use a text file editor like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. You can then use the updated files with `$action = 'RestoreSnapshot'` and `$RestoreSnapshotFolder` . **_Less is more_**
+- It is encouraged to modify the exported files in the folder `Snapshots` to contain only the data you really need. This will speed up the process and reduces the risks. Use a text file editor like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. **_Less is more_**
 
-- After making a snapshot it is advised to rename the newly created snapshot in the `Snapshots` folder to something more recognizable (ex. 'Kiosk PC config for application X'). This allows you to select the correct image when executing `$Action = 'RestoreSnapshot'` by using `$RestoreSnapshotFolder = 'Snapshots\Kiosk PC config for application X'`). If you don't use the `$RestoreSnapshotFolder` the last created snapshot is restored which might lead to unexpected results. **_Know what you're doing_**
+- When creating a snapshot it is advised to use a descriptive name to identify the correct image folder within the `SnapshotFolder` (ex. 'Kiosk PC config for application X'). This allows you to easily recognize the correct backup folder months later when a restore is needed. **_Know what you're doing_**
 
-- Exporting all data on a computer would take a very long time. So some snapshot items like `CreateFolders` and `RegistryKeys` only create example files on `$Action = 'CreateSnapshot'`. These files should always be edited before running `$Action = 'RestoreSnapshot'`.
+- Exporting all data on a computer would take a long time. So some snapshot items like `CreateFolders` and `RegistryKeys` only create example files that need to be edited before starting the restore backup process.
 
 [Notepad++]: https://notepad-plus-plus.org/
 [VS Code]: https://code.visualstudio.com/

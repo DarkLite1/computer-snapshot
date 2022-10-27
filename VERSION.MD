@@ -1,4 +1,7 @@
 # Version 1.2
+- Add `Start wizard` and GUI script
+
+# Version 1.2
 - Changes in `Start-Script.ps1`:
     > rename `Start-Script.ps1` to `Invoke scripts.ps1`
     > moved to its own folder `Scripts\Invoke scripts\Invoke scripts.ps1`

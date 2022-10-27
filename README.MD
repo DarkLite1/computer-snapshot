@@ -7,24 +7,17 @@ This script is intended to run from a USB stick and is portable. The intent is t
 A snapshot is a single folder (`SnapshotFolder`) that contains the state of a machine at the time a backup was made. This folder contains multiple child folders for each selected snapshot item during the backup. Each of these child folders contain the saved configuration files that can be edited.
 
 Example:
-| - Snapshots
-| - Snapshots\Kiosk PC app X (`SnapshotFolder`)
-| - Snapshots\Kiosk PC app X > CopyFilesFolders
-| - Snapshots\Kiosk PC app X > CreateFolders
-| - Snapshots\Kiosk PC app X > FirewallRules
-| - Snapshots\Kiosk PC app X > NetworkCards
-| - Snapshots\Kiosk PC app X > NtpTimeServers
-| - Snapshots\Kiosk PC app X > RegionalSettings
-| - Snapshots\Kiosk PC app X > RegistryKeys
-| - Snapshots\Kiosk PC app X > ScheduledTasks
-| - Snapshots\Kiosk PC app X > SMBshares
-| - Snapshots\Kiosk PC app X > Software
-| - Snapshots\Kiosk PC app X > StartCustomScriptsAfter
-| - Snapshots\Kiosk PC app X > StartCustomScriptsBefore
-| - Snapshots\Kiosk PC app X > UserAccounts
-| - Snapshots\Kiosk PC app X > UserGroups
-| - Snapshots\Kiosk PC app X > ...
-
+```bash
+├── Snapshots
+│   ├── Kiosk PC app X (`SnapshotFolder`)
+│   │   ├── CopyFilesFolders
+│   │   ├── FirewallRules
+│   │   ├── SMBshares
+│   ├── Kiosk PC app Y (`SnapshotFolder`)
+│   │   ├── NtpTimeServers
+│   │   ├── RegionalSettings
+│   │   ├── RegistryKeys
+```
 # How to use this script
 
 ## Use the graphical user interface

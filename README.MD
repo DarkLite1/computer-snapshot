@@ -6,7 +6,7 @@ This script is intended to run from a USB stick and is portable. The intent is t
 # Snapshots
 
 ### What can be backed up or restored?
-Find a full list of supported snapshot items in the argument `Snapshot` of the main script `Scripts\Invoke scripts\Invoke scripts.ps1`. Summary of the most used snapshot items:
+Find a full list of supported snapshot items in the argument `Snapshot` of the [main script](Scripts/Invoke scripts/Invoke scripts.ps1). Summary of the most used snapshot items:
 
 - Files or folders to copy
 - Folders to create

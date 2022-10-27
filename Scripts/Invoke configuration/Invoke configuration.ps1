@@ -136,8 +136,6 @@ Begin {
         ) -ForegroundColor Gray
         #endregion
 
-        Set-Location $PSScriptRoot
-
         #region Get start script path
         $params = @{
             Path        = $StartScript

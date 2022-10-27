@@ -1,0 +1,17 @@
+{
+  "SoftwarePackages": {
+    "Remove": [],
+    "Install": [
+      {
+        "ExecutablePath": "..\\..\\..\\Software\\App hello world1.exe",
+        "Arguments": null,
+        "ArgumentsExampleSilentSwitch": "/S"
+      },
+      {
+        "ExecutablePath": ".\\Packages\\App hello world 2.exe",
+        "Arguments": null,
+        "ArgumentsExampleSilentSwitch": "/S"
+      }
+    ]
+  }
+}

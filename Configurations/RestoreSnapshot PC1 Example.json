@@ -1,0 +1,25 @@
+{
+  "StartScript": {
+    "Action": "RestoreSnapshot",
+    "SnapshotFolder": "..\\..\\Snapshots\\RestoreSnapshot PC1 Example",
+    "RebootComputer": false,
+    "OpenReportInBrowser": true,
+    "Snapshot": {
+      "StartCustomScriptsBefore": false,
+      "RegionalSettings": false,
+      "UserAccounts": false,
+      "UserGroups": false,
+      "FirewallRules": false,
+      "CreateFolders": false,
+      "SmbShares": false,
+      "NetworkCards": false,
+      "NtpTimeServers": false,
+      "RegistryKeys": false,
+      "ScheduledTasks": false,
+      "CopyFilesFolders": false,
+      "Software": true,
+      "StartCustomScriptsAfter": false
+    }
+  },
+  "RunInElevatedPowerShellSession": false
+}

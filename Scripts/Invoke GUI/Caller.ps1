@@ -13,10 +13,11 @@ Set-Location $PSScriptRoot
 
 $startParams = @{
     FilePath     = 'powershell.exe'
-    ArgumentList = '-ExecutionPolicy Bypass -NoProfile -Command "& ''{0}'' -StartScript ''{1}'' -InvokeConfigurationScript ''{2}''"' -f 
+    ArgumentList = '-ExecutionPolicy Bypass -NoProfile -Command "& ''{0}'' -StartScript ''{1}'' -InvokeConfigurationScript ''{2}'' -SnapshotFolder ''{3}''"' -f 
     '.\Invoke GUI.ps1', 
     '..\Invoke scripts\Invoke scripts.ps1',
-    '..\Invoke configuration\Invoke configuration.ps1'
+    '..\Invoke configuration\Invoke configuration.ps1',
+    '..\..\Snapshots'
     WindowStyle  = 'Hidden'
 }
 Start-Process @startParams

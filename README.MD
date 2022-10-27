@@ -3,20 +3,27 @@ A PowerShell script designed to create and restore snapshots on Windows computer
 
 This script is intended to run from a USB stick and is portable. The intent is to create a snapshot on one computer and restore the snapshot on another computer. Snapshots are by default stored on the USB stick in easily editable .JSON files.
 
-# What can be restored?
-A snapshot can contain different things:
-- local user accounts
-- local user groups
-- smb shares and their SMB share and NTFS permissions
-- Windows firewall rules
-- regional settings
-- registry keys
-- folders to create
-- files or folders to copy
-- scheduled tasks to create
-- network card renaming and network profile
-- custom PowerShell scripts to run
-- ...
+# What is a snapshot folder?
+A snapshot is a single folder (`SnapshotFolder`) that contains the state of a machine at the time a backup was made. This folder contains multiple child folders for each selected snapshot item during the backup. Each of these child folders contain the saved configuration files that can be edited.
+
+Example:
+| - Snapshots
+| - Snapshots\Kiosk PC app X (`SnapshotFolder`)
+| - Snapshots\Kiosk PC app X > CopyFilesFolders
+| - Snapshots\Kiosk PC app X > CreateFolders
+| - Snapshots\Kiosk PC app X > FirewallRules
+| - Snapshots\Kiosk PC app X > NetworkCards
+| - Snapshots\Kiosk PC app X > NtpTimeServers
+| - Snapshots\Kiosk PC app X > RegionalSettings
+| - Snapshots\Kiosk PC app X > RegistryKeys
+| - Snapshots\Kiosk PC app X > ScheduledTasks
+| - Snapshots\Kiosk PC app X > SMBshares
+| - Snapshots\Kiosk PC app X > Software
+| - Snapshots\Kiosk PC app X > StartCustomScriptsAfter
+| - Snapshots\Kiosk PC app X > StartCustomScriptsBefore
+| - Snapshots\Kiosk PC app X > UserAccounts
+| - Snapshots\Kiosk PC app X > UserGroups
+| - Snapshots\Kiosk PC app X > ...
 
 # How to use this script
 

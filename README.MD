@@ -22,7 +22,7 @@ Find a full list of supported snapshot items in the argument `Snapshot` of the [
 - ...
 
 ### What is a snapshot folder?
-A snapshot is a single folder ([SnapshotFolder](.\Snapshots\RestoreSnapshot%20PC1%20Example)) that contains the state of a machine at the time a backup was made. This folder can contain multiple child folders, one for each selected snapshot item during the backup. Each of these child folders contain the saved configuration files that can be edited.
+A snapshot is a single folder ([SnapshotFolder](./Snapshots/RestoreSnapshot%20PC1%20Example)) that contains the state of a machine at the time a backup was made. This folder can contain multiple child folders, one for each selected snapshot item during the backup. Each of these child folders contain the saved configuration files that can be edited.
 
 Example:
 ```bash
@@ -61,11 +61,11 @@ Edit the file to your liking. All accepted arguments can be found in the [main s
 Click on the shortcut launcher `Select configuration` and select the custom .JSON file in the window that pops up. The [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) will now be executed with the arguments provided in the .JSON file.
 
  # Tips
-- It is encouraged to modify the exported files in the child folders of the [SnapshotFolder](.\Snapshots\RestoreSnapshot%20PC1%20Example) to contain only the data you really need. This will speed up the process and reduces the risks. Use a text file editor like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. **_Less is more_**
+- It is encouraged to modify the exported files in the child folders of the [SnapshotFolder](./Snapshots/RestoreSnapshot%20PC1%20Example) to contain only the data you really need. This will speed up the process and reduces the risks. Use a text file editor like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. **_Less is more_**
 
-- When creating a snapshot it is advised to use a descriptive name to identify the correct image folder within the [SnapshotFolder](.\Snapshots) (ex. 'Kiosk PC config for application X'). This allows you to easily recognize the correct backup folder months later when a restore is needed. **_Know what you're doing_**
+- When creating a snapshot it is advised to use a descriptive name to identify the correct image folder within the [SnapshotFolder](./Snapshots) (ex. 'Kiosk PC config for application X'). This allows you to easily recognize the correct backup folder months later when a restore is needed. **_Know what you're doing_**
 
-- Exporting all data on a computer would take a long time. So some snapshot items like `CreateFolders`, `RegistryKeys`, [Software](.\Snapshots\RestoreSnapshot%20PC1%20Example\Software) only create example files that need to be edited before starting the restore backup process.
+- Exporting all data on a computer would take a long time. So some snapshot items like `CreateFolders`, `RegistryKeys`, [Software](./Snapshots/RestoreSnapshot%20PC1%20Example/Software) only create example files that need to be edited before starting the restore backup process.
 
 [Notepad++]: https://notepad-plus-plus.org/
 [VS Code]: https://code.visualstudio.com/

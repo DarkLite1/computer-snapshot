@@ -1,4 +1,4 @@
-# Version 1.2
+# Version 1.3
 - Add `Start wizard` and GUI script
 
 # Version 1.2

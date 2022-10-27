@@ -55,10 +55,10 @@ The required configuration files can also be created manually. These files are u
 ### Step 1: Create your custom configuration file
 By preference it's a good idea to copy the example .JSON file that can be found in the folder `Configurations` and save it with a new name.
 
-Edit the file to your liking. All accepted arguments can be found in the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1).
+Edit the file to your liking. All accepted arguments can be found in the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) under argument `Script`.
 
 ### Step 2: Execute your custom configuration file
-Click on the shortcut launcher `Select configuration` and select the custom .JSON file. The main script will not be executed with the arguments provided in the .JSON file.
+Click on the shortcut launcher `Select configuration` and select the custom .JSON file in the window that pops up. The [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) will now be executed with the arguments provided in the .JSON file.
 
  # Tips
 - It is encouraged to modify the exported files in the folder `Snapshots` to contain only the data you really need. This will speed up the process and reduces the risks. Use a text file editor like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. **_Less is more_**

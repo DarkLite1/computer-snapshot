@@ -1,7 +1,7 @@
 # Description
 A PowerShell script designed to create and restore snapshots on Windows computers.
 
-This script is intended to run from a USB stick and is portable. The intent is to create a snapshot on one computer and restore the snapshot on another computer. Snapshots are by default stored on the USB stick in easily editable .JSON files.
+This script is intended to run from a USB stick and is portable. The intent is to create a snapshot on one computer and restore the snapshot on another computer with the `Start wizard.lnk` shortcut. Snapshot data is stored by default on the USB stick in the folder [Snapshots](./Snapshots). Preconfigured configuration files, for fast and easy execution with the `Select configuration.lnk` shortcut, are stored in the folder [Configurations](./Configurations).
 
 # Snapshots
 
@@ -22,19 +22,21 @@ Find a full list of supported snapshot items in the argument `Snapshot` of the [
 - ...
 
 ### What is a snapshot folder?
-A snapshot is a single folder ([SnapshotFolder](./Snapshots/RestoreSnapshot%20PC1%20Example)) that contains the state of a machine at the time a backup was made. This folder can contain multiple child folders, one for each selected snapshot item during the backup. Each of these child folders contain the saved configuration files that can be edited.
+A [SnapshotFolder](./Snapshots/RestoreSnapshot%20PC1%20Example) is a single folder within the folder [Snapshots](./Snapshots) that contains the state of a machine at the time a backup was made. This folder can contain multiple child folders, one for each selected snapshot item during the backup. Each of these child folders contain configuration files that can be edited.
 
 Example:
 ```bash
 ├── Snapshots
 │   ├── Kiosk PC app X (`SnapshotFolder`)
-│   │   ├── CopyFilesFolders
-│   │   ├── FirewallRules
-│   │   ├── SMBshares
+│   │   ├── Software
+│   │       ├── Software.json (`file to edit`)
 │   ├── Kiosk PC app Y (`SnapshotFolder`)
 │   │   ├── NtpTimeServers
+│   │       ├── ntpServers.json (`file to edit`)
 │   │   ├── RegionalSettings
-│   │   ├── RegistryKeys
+│   │       ├── regionalSettings.json (`file to edit`)
+│   │   ├── RegistryKeys 
+│   │       ├── registryKeys.json (`file to edit`)
 ```
 # How to use this script
 
@@ -42,9 +44,9 @@ Example:
 
 This is the **preferred way** to restore or backup a computer.
 
-The shortcut launcher `Start wizard` starts a GUI that will guide you through the process. It will ask questions like: Would you like to create or restore a backup? What would you like to backup or restore? Where do we need to store the backup files? ..
+The shortcut `Start wizard.lnk`, in the root folder of the script, starts a GUI that will guide you through the process. It will ask questions like: Would you like to create or restore a backup? What would you like to backup or restore? Where do we need to store the backup files? ..
 
-The wizard comes preconfigured with default settings and best practices. It creates the required .JSON file that is used to execute the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) with the correct arguments. No manual file editing is required when using this method.
+The wizard comes preconfigured with default settings and best practices. It creates the required .JSON file that is used to execute the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) with the correct arguments. No manual file editing is required when using this method, except for the backup/restore files within the [SnapshotFolder](./Snapshots/RestoreSnapshot%20PC1%20Example).
 
 ## Use manual input files
 
@@ -53,12 +55,10 @@ This method is only available for **experienced users**.
 The required configuration files can also be created manually. These files are used to send the correct arguments to the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) for execution.
 
 ### Step 1: Create your custom configuration file
-By preference it's a good idea to copy the example .JSON file that can be found in the folder [Configurations](./Configurations) and save it with a new name.
-
-Edit the file to your liking. All accepted arguments can be found in the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1).
+By preference it's a good idea to copy and edit the example .JSON file in the folder [Configurations](./Configurations) and save it with a new name. All accepted arguments can be found in the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1).
 
 ### Step 2: Execute your custom configuration file
-Click on the shortcut launcher `Select configuration` and select the custom .JSON file in the window that pops up. The [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) will now be executed with the arguments provided in the .JSON file.
+Click on the shortcut `Select configuration.lnk`, in the root folder, and select the custom .JSON file in the window that pops-up. The [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) will now be executed with the arguments provided in the selected .JSON custom configuration file.
 
  # Tips
 - It is encouraged to modify the exported files in the child folders of the [SnapshotFolder](./Snapshots/RestoreSnapshot%20PC1%20Example) to contain only the data you really need. This will speed up the process and reduces the risks. Use a text file editor like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. **_Less is more_**

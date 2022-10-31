@@ -61,10 +61,10 @@ There are 2 ways to create a custom configuration file for use with the `Select 
 - Create a backup with the `Start wizard.lnk` and copy the generated .JSON file to the folder [Configurations](./Configurations)
 - Copy the example .JSON file in the folder [Configurations](./Configurations) and save it with a new name
 
-In case you are creating a restore configuration file make sure that `Action` is set to `RestoreBackup` and only the required `Snapshot` items are set to `true`.
+Edit the custom configuration file. In case you are creating a restore configuration file make sure that `Action` is set to `RestoreBackup` and only the required `Snapshot` items are set to `true`.
 
 ### Step 2: Update the data in the snapshot folder
-If you want to do a restore verify that all data in the [SnapshotFolder](#what-is-a-snapshot-folder) is correct. 
+If you want to restore a backup, verify that all data in the [SnapshotFolder](#what-is-a-snapshot-folder) is correct. 
 
 ### Step 2: Execute the custom configuration file
 Click on the shortcut `Select configuration.lnk`, in the root folder, and select the custom .JSON file in the window that pops-up. The [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) will now be executed with the arguments provided in the selected .JSON custom configuration file.

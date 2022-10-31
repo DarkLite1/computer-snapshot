@@ -1,34 +1,37 @@
 <#
     .SYNOPSIS
-        Execute 'Start-Script.ps1' with the correct arguments.
+        Execute the main script with the correct arguments.
 
     .DESCRIPTION
         This script serves as a launcher script for ease of use. 
 
-        Once the shortcut in the parent folder is clicked this script will
-        display a list of pre-configured arguments to use for calling 
-        'Start-Script.ps1'.
-        
-        Each .JSON file in the folder 'ConfigurationsFolder' represents a set
-        of pre-configured arguments to call 'Start-Script.ps1'. Many different
-        .JSON files can be created for many different occasions of restoring
-        snapshots.
+        Once the shortcut 'Select configuration.lnk' in the parent folder is 
+        clicked, this script will display all the .JSON files in the folder 
+        'Configurations'. Each .JSON file represents a set of arguments that 
+        can be used to call the main script.
 
         This allows the user to leave with a USB stick full of ready to use
         configurations to go on site and restore a specific snapshot on a 
         machine.
+
+        The shortcut 'Start wizard.lnk' opens a GUI to ask questions to the
+        user. When all questions are answered and the user proceeds to start 
+        the restore/backup process a custom configuration file is created by
+        the 'Invoke GUI' script. Then this script is called with the argument
+        'ConfigurationFile' to call the main script with the correct arguments. 
 
     .PARAMETER StartScript
         Path to the script that will execute the different types of snapshots.
 
     .PARAMETER ConfigurationsFolder
         Folder where the .JSON files are stored. Each file represents a set of
-        arguments to be used with 'Start-Script.ps1'.
+        arguments to be used with 'StartScript'.
 
     .PARAMETER ConfigurationFile
-        A single .JSON file containing the required arguments for StartScript.
-        Combined with Confirm this can be used to launch a 
-        configuration immediately without user interaction.
+        A single .JSON file containing the required arguments for the main 
+        script. The argument 'ConfigurationFile' combined with 'Confirm' can be 
+        used to launch a configuration used by the main script without user 
+        interaction.
 
     .PARAMETER Confirm
         When a configuration file is selected a question is asked to make sure

@@ -48,7 +48,7 @@ This is the **preferred way** to restore or backup a computer.
 
 The shortcut `Start wizard.lnk`, in the root folder of the script, starts a GUI that will guide you through the process. It will ask questions like: Would you like to create or restore a backup? What would you like to backup or restore? Where do we need to store the backup files? ..
 
-The wizard comes preconfigured with default settings and best practices. It creates the required .JSON file that is used to execute the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) with the correct arguments. No manual file editing is required when using this method, except for the backup/restore files within the [SnapshotFolder](./Snapshots/RestoreSnapshot%20PC1%20Example).
+The wizard comes preconfigured with default settings and best practices. It creates the required .JSON file that is used to execute the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) with the correct arguments. No manual file editing is required when using this method, except for the backup/restore files within the [SnapshotFolder](#what-is-a-snapshot-folder).
 
 ## Use manual input files
 

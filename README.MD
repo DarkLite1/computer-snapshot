@@ -1,7 +1,9 @@
 # Description
 A PowerShell script designed to create and restore snapshots on Windows computers.
 
-This script is intended to run from a USB stick and is portable. The intent is to create a snapshot on one computer and restore the snapshot on another computer with the `Start wizard.lnk` shortcut. Snapshot data is stored by default on the USB stick in the folder [Snapshots](./Snapshots). Preconfigured configuration files, for fast and easy execution with the `Select configuration.lnk` shortcut, are stored in the folder [Configurations](./Configurations).
+This script is intended to run from a USB stick and is portable. The intent is to create a snapshot on one computer and restore the snapshot on another computer with the `Start wizard.lnk` shortcut. 
+
+Snapshot data is stored by default on the USB stick in the folder [Snapshots](./Snapshots). Preconfigured configuration files, for fast and easy execution with the `Select configuration.lnk` shortcut, are stored in the folder [Configurations](./Configurations).
 
 # Snapshots
 

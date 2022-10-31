@@ -58,7 +58,7 @@ The folder [Configurations](./Configurations) contains preconfigured .JSON files
 
 ### Step 1: Create a custom configuration file
 There are 2 ways to create a custom configuration file for use with the `Select configuration.lnk` launcher:
-- Use the `Start wizard.lnk` launcher to create a backup and copy the generated .JSON file to the folder [Configurations](./Configurations)
+- Create a backup with the `Start wizard.lnk` and copy the generated .JSON file to the folder [Configurations](./Configurations)
 - Copy the example .JSON file in the folder [Configurations](./Configurations) and save it with a new name
 
 In case you are creating a restore configuration file make sure that `Action` is set to `RestoreBackup` and only the required `Snapshot` items are set to `true`.
@@ -70,9 +70,9 @@ If you want to do a restore verify that all data in the [SnapshotFolder](#what-i
 Click on the shortcut `Select configuration.lnk`, in the root folder, and select the custom .JSON file in the window that pops-up. The [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) will now be executed with the arguments provided in the selected .JSON custom configuration file.
 
  # Tips
-- It is encouraged to modify the exported files in the child folders of the [SnapshotFolder](./Snapshots/RestoreSnapshot%20PC1%20Example) to contain only the data you really need. This will speed up the process and reduces the risks. Use a text file editor like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. **_Less is more_**
+- It is encouraged to modify the exported files in the [SnapshotFolder](#what-is-a-snapshot-folder) to contain only the data you really need. This will speed up the process and reduces the risks. Use a text file editor like [Notepad++] or [VS Code] to edit the exported files. Simply remove the data you don't need or update data to your liking. **_Less is more_**
 
-- When creating a snapshot it is advised to use a descriptive name to identify the correct image folder within the [SnapshotFolder](./Snapshots) (ex. 'Kiosk PC config for application X'). This allows you to easily recognize the correct backup folder months later when a restore is needed. **_Know what you're doing_**
+- When creating a snapshot it is advised to use a descriptive name to identify the correct [SnapshotFolder](#what-is-a-snapshot-folder) (ex. 'Kiosk PC config for application X'). This allows you to easily recognize the correct backup folder months later when a restore is needed. **_Know what you're doing_**
 
 - Exporting all data on a computer would take a long time. So some snapshot items like `CreateFolders`, `RegistryKeys`, [Software](./Snapshots/RestoreSnapshot%20PC1%20Example/Software) only create example files that need to be edited before starting the restore backup process.
 

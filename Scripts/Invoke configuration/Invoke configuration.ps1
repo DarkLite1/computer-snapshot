@@ -117,6 +117,8 @@ Begin {
     }
 
     try {
+        Set-Location $PSScriptRoot
+
         #region ASCI art
         Write-Host  '
         ________        .__        __     .__                             .__                  
@@ -295,7 +297,7 @@ Process {
 
         #region Display settings
         Write-Host "`nFile: " -NoNewline -ForegroundColor Gray
-        Write-Host "$($selectedJsonFile.PSObject.Properties.Value).json" -ForegroundColor Green
+        Write-Host (Split-Path $jsonFilePath -Leaf) -ForegroundColor Green
 
         $jsonFile.StartScript | Format-List
         Write-Host "`r`n"

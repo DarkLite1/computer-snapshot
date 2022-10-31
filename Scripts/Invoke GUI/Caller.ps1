@@ -15,9 +15,9 @@ $startParams = @{
     FilePath     = 'powershell.exe'
     ArgumentList = '-ExecutionPolicy Bypass -NoProfile -Command "& ''{0}'' -StartScript ''{1}'' -InvokeConfigurationScript ''{2}'' -SnapshotFolder ''{3}''"' -f 
     '.\Invoke GUI.ps1', 
-    '..\Invoke scripts\Invoke scripts.ps1',
-    '..\Invoke configuration\Invoke configuration.ps1',
-    '..\..\Snapshots'
+    (Convert-Path -Path '..\Invoke scripts\Invoke scripts.ps1'),
+    (Convert-Path -Path '..\Invoke configuration\Invoke configuration.ps1'),
+    (Convert-Path -Path '..\..\Snapshots')
     WindowStyle  = 'Hidden'
 }
 Start-Process @startParams

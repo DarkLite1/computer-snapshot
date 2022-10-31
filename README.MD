@@ -54,12 +54,19 @@ The wizard comes preconfigured with default settings and best practices. It crea
 
 This method is only available for **experienced users**.
 
-The required configuration files can also be created manually. These files are used to send the correct arguments to the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) for execution.
+The folder [Configurations](./Configurations) contains preconfigured .JSON files that contain the required arguments to execute the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1). These files are only used by the shortcut `Select configuration.lnk`, which avoids all the extra questions asked by the `Start wizard.lnk` launcher. 
 
-### Step 1: Create your custom configuration file
-By preference it's a good idea to copy and edit the example .JSON file in the folder [Configurations](./Configurations) and save it with a new name. All accepted arguments can be found in the [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1).
+### Step 1: Create a custom configuration file
+There are 2 ways to create a custom configuration file for use with the `Select configuration.lnk` launcher:
+- Use the `Start wizard.lnk` launcher to create a backup and copy the generated .JSON file to the folder [Configurations](./Configurations)
+- Copy the example .JSON file in the folder [Configurations](./Configurations) and save it with a new name
 
-### Step 2: Execute your custom configuration file
+In case you are creating a restore configuration file make sure that `Action` is set to `RestoreBackup` and only the required `Snapshot` items are set to `true`.
+
+### Step 2: Update the data in the snapshot folder
+If you want to do a restore verify that all data in the [SnapshotFolder](#what-is-a-snapshot-folder) is correct. 
+
+### Step 2: Execute the custom configuration file
 Click on the shortcut `Select configuration.lnk`, in the root folder, and select the custom .JSON file in the window that pops-up. The [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) will now be executed with the arguments provided in the selected .JSON custom configuration file.
 
  # Tips

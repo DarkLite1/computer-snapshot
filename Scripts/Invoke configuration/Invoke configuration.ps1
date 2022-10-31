@@ -44,6 +44,68 @@ Param (
 )
 
 Begin {
+    Function Convert-StringsToColumnsHC {
+        [OutputType([String])]
+        Param(
+            [Parameter(Mandatory)]    
+            [String[]]$Items,
+            [String]$Title,
+            [Int]$ColumnCount = 5,
+            [String]$ColumnSeparator = '    '
+        )
+    
+        #region Calculate minimal column width
+        $minimalColumnWidth = @{}
+        for ($i = 0; $i -lt $Items.Count; $i = $ColumnCount + $i ) {
+            Write-Verbose "i = $i"
+            foreach ($columnNr in 0..($ColumnCount - 1)) {
+                $index = $columnNr + $i
+    
+                if ($index -ge $Items.Count) {
+                    break
+                }
+    
+                $length = $Items[$index].Length
+    
+                if ($length -ge $minimalColumnWidth[$columnNr]) {
+                    $minimalColumnWidth[$columnNr] = $length
+                }
+            }
+        }
+        #endregion
+    
+        #region Add trailing spaces where needed
+        for ($i = 0; $i -lt $Items.Count; $i = $ColumnCount + $i) {
+            foreach ($columnNr in 0..($ColumnCount - 1)) {
+                $index = $columnNr + $i
+                if ($index -ge $Items.Count) {
+                    break
+                }
+    
+                $Items[$index] = $Items[$index].PadRight($minimalColumnWidth[$columnNr])
+            }
+        }
+        #endregion
+    
+        #region Create rows to display
+        $rows = for ($i = 0; $i -lt $Items.Count; $i = $ColumnCount + $i) {
+            '{0}' -f (
+                $Items[$i..(($ColumnCount + $i) - 1 )] -join $ColumnSeparator
+            )
+        }
+    
+        $toPrint = $rows -join "`n"
+        #endregion
+    
+        #region Add Title
+        if ($Title) {
+            $toPrint = $Title + "`n" + $toPrint
+        }
+        #endregion
+    
+        $toPrint
+    }
+    
     Function ConvertTo-HashtableHC {
         <#
         .SYNOPSIS
@@ -120,18 +182,17 @@ Begin {
         Set-Location $PSScriptRoot
 
         #region ASCI art
-        Write-Host  '
-        ________        .__        __     .__                             .__                  
-        \_____  \  __ __|__| ____ |  | __ |  | _____   __ __  ____   ____ |  |__   ___________ 
-         /  / \  \|  |  \  |/ ___\|  |/ / |  | \__  \ |  |  \/    \_/ ___\|  |  \_/ __ \_  __ \
-        /   \_/.  \  |  /  \  \___|    <  |  |__/ __ \|  |  /   |  \  \___|   Y  \  ___/|  | \/
-        \_____\ \_/____/|__|\___  >__|_ \ |____(____  /____/|___|  /\___  >___|  /\___  >__|   
-               \__>             \/     \/           \/           \/     \/     \/     \/       
+        Write-Host '  
+         _________ __                 __                         _____.__        
+        /   _____//  |______ ________/  |_    ____  ____   _____/ ____\__| ____  
+        \_____  \\   __\__  \\_  __ \   __\ _/ ___\/  _ \ /    \   __\|  |/ ___\ 
+        /        \|  |  / __ \|  | \/|  |   \  \__(  <_> )   |  \  |  |  / /_/  >
+       /_______  /|__| (____  /__|   |__|    \___  >____/|___|  /__|  |__\___  / 
+               \/           \/                   \/           \/        /_____/ 
         ' -ForegroundColor Cyan
         
-        
         Write-Host (
-            "{0} - {1} - {2}`r`n" -f
+            '{0} - {1} - {2}' -f
             (Get-Date).ToString('dddd dd/MM/yyyy HH:mm'),
             $env:USERNAME, 
             [System.Net.Dns]::GetHostEntry([string]$env:computername).HostName
@@ -295,11 +356,66 @@ Process {
         }
         #endregion
 
+        $startScriptArguments = ConvertTo-HashtableHC $jsonFile.StartScript
+        
         #region Display settings
-        Write-Host "`nFile: " -NoNewline -ForegroundColor Gray
-        Write-Host (Split-Path $jsonFilePath -Leaf) -ForegroundColor Green
+        $length = (
+            $startScriptArguments.Keys | 
+            Measure-Object -Maximum -Property Length
+        ).Maximum
 
-        $jsonFile.StartScript | Format-List
+        $params = @{
+            Object          = "`n$('File'.PadRight($length)) : "
+            ForegroundColor = 'Gray'
+        }
+        Write-Host @params -NoNewline
+
+        $params = @{
+            Object          = Split-Path $jsonFilePath -Leaf
+            ForegroundColor = 'Green'
+        }
+        Write-Host @params
+
+        $startScriptArguments.GetEnumerator().where({ $_.Key -ne 'Snapshot' }).foreach(
+            {
+                Write-Host "$($_.Key.PadRight($length)) : " -NoNewline
+                Write-Host $_.Value
+            }
+        )
+
+        $items = @{
+            enabled  = $startScriptArguments.Snapshot.GetEnumerator().where(
+                { $_.Value }
+            )
+            disabled = $startScriptArguments.Snapshot.GetEnumerator().where(
+                { -not $_.Value }
+            )
+        }
+        
+        if ($items.enabled) {
+            Write-Host "`nSelected snapshot items: " -ForegroundColor Gray
+
+            $params = @{
+                Object          = Convert-StringsToColumnsHC $items.enabled.Name
+                ForegroundColor = 'Cyan'
+            }
+            Write-Host @params
+        }
+        else {
+            throw "No snapshot items found there are set to 'true'"
+        }
+        if ($items.disabled) {
+            Write-Host "`nDisabled snapshot items: " -ForegroundColor Gray
+
+            $params = @{
+                Object          = Convert-StringsToColumnsHC $items.disabled.Name
+                ForegroundColor = 'Magenta'
+                # ForegroundColor = 'Gray'
+            }
+            Write-Host @params
+        }
+
+        
         Write-Host "`r`n"
         #endregion
 
@@ -321,7 +437,7 @@ Process {
         #region Execute script
         $invokeParams = @{
             Path      = $startScriptPath
-            Arguments = ConvertTo-HashtableHC $jsonFile.StartScript
+            Arguments = $startScriptArguments
         }
         Invoke-ScriptHC @invokeParams
         #endregion

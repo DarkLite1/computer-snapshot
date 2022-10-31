@@ -27,10 +27,10 @@
 
     .PARAMETER ConfigurationFile
         A single .JSON file containing the required arguments for StartScript.
-        Combined with NoConfirmQuestion this can be used to launch a 
+        Combined with Confirm this can be used to launch a 
         configuration immediately without user interaction.
 
-    .PARAMETER NoConfirmQuestion
+    .PARAMETER Confirm
         When a configuration file is selected a question is asked to make sure
         the user selected the correct file before executing it. When using this
         switch no question is asked.
@@ -40,7 +40,7 @@ Param (
     [String]$StartScript = '..\Invoke scripts\Invoke scripts.ps1',
     [String]$ConfigurationsFolder = '..\..\Configurations',
     [String]$ConfigurationFile,
-    [Switch]$NoConfirmQuestion
+    [Switch]$Confirm
 )
 
 Begin {
@@ -283,7 +283,7 @@ Process {
       
             $startParams = @{
                 FilePath     = 'powershell.exe'
-                ArgumentList = '-ExecutionPolicy Bypass -NoProfile -Command "& ''{0}'' -ConfigurationFile ''{1}'' -NoConfirmQuestion"' -f 
+                ArgumentList = '-ExecutionPolicy Bypass -NoProfile -Command "& ''{0}'' -ConfigurationFile ''{1}'' -Confirm"' -f 
                 $MyInvocation.MyCommand.Path, 
                 $ConfigurationFile
                 Verb         = 'RunAs'
@@ -302,7 +302,7 @@ Process {
         #endregion
 
         #region Confirm selection before executing
-        if (-not $NoConfirmQuestion) {
+        if (-not $Confirm) {
             $answer = $null
 
             while ($answer -notMatch '^y$|^n$') {

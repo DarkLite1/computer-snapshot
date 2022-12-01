@@ -117,9 +117,8 @@ Describe 'when all tests pass' {
     Context 'parameter ConfigurationsFolder' {
         It 'Start-Script.ps1 is called' {
             $testNewParams = $testParams.clone()
-            $testNewParams.NoConfirmQuestion = $true
 
-            . $testScript @testNewParams
+            . $testScript @testNewParams -Confirm
 
             Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
                 ($Path -eq $testParams.StartScript) -and
@@ -129,12 +128,11 @@ Describe 'when all tests pass' {
                 ($Arguments.Snapshot.ScriptA -eq $true) -and
                 ($Arguments.Snapshot.ScriptB -eq $false)
             }
-        }
+        } -tag test
         It 'ask confirmation before executing Start-Script.ps1' {
             Mock Read-Host { 'y' }
 
             $testNewParams = $testParams.clone()
-            $testNewParams.NoConfirmQuestion = $false
 
             . $testScript @testNewParams
 
@@ -150,9 +148,7 @@ Describe 'when all tests pass' {
             $testNewParams.ConfigurationFile = $testConfigurationFile
         }
         It 'Start-Script.ps1 is called' {
-            $testNewParams.NoConfirmQuestion = $true
-
-            . $testScript @testNewParams
+            . $testScript @testNewParams -Confirm
 
             Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
                 ($Path -eq $testParams.StartScript) -and

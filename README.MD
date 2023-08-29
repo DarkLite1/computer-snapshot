@@ -66,7 +66,7 @@ Edit the custom configuration file. In case you are creating a restore configura
 ### Step 2: Update the data in the snapshot folder
 If you want to restore a backup, verify that all data in the [SnapshotFolder](#what-is-a-snapshot-folder) is correct. 
 
-### Step 2: Execute the custom configuration file
+### Step 3: Execute the custom configuration file
 Click on the shortcut `Select configuration.lnk`, in the root folder, and select the custom .JSON file in the window that pops-up. The [main script](./Scripts/Invoke%20scripts/Invoke%20scripts.ps1) will now be executed with the arguments provided in the selected .JSON custom configuration file.
 
  # Tips

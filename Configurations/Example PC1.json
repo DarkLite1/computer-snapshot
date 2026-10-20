@@ -1,0 +1,32 @@
+{
+  "$schema": "../Scripts/config.schema.json",
+  "SchemaVersion": 2,
+  "Description": "Example PC1: bundled hello-world applications and a reusable user section",
+  "Settings": {
+    "RebootComputer": false,
+    "OpenReportInBrowser": true,
+    "RunElevated": false
+  },
+  "Items": {
+    "StartCustomScriptsBefore": [],
+    "RegionalSettings": {},
+    "UserAccounts": "Shared\\UserAccounts kiosk.json",
+    "UserGroups": [],
+    "FirewallRules": [],
+    "CreateFolders": {},
+    "SmbShares": {},
+    "NetworkCards": [],
+    "NtpTimeServers": {},
+    "RegistryKeys": {},
+    "ScheduledTasks": [],
+    "CopyFilesFolders": [],
+    "Software": {
+      "Remove": [],
+      "Install": [
+        { "ExecutablePath": "Software\\App hello world 1.exe", "Arguments": null },
+        { "ExecutablePath": "Software\\App hello world 2.exe", "Arguments": null }
+      ]
+    },
+    "StartCustomScriptsAfter": []
+  }
+}

@@ -33,6 +33,28 @@ Describe 'Schema contract' {
         $problems = @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Software = @{ Instal = @() } } } $TestDrive)
         $problems -join ';' | Should -Match 'Software.Instal: unknown property'
     }
+    It 'validates every shipped configuration and its shared references' {
+        $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+        foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root 'Configurations') -Filter '*.json' -File | Where-Object { $_.Name -notlike '*.v1.json' }) {
+            $loaded = Read-ConfigurationHC $file.FullName $root
+            $problems = @(Test-ConfigurationHC $loaded $root)
+            $problems.Count | Should -Be 0 -Because ($problems -join '; ')
+        }
+    }
+    It 'checks shipped configurations and Shared sections with Test-Json' -Skip:($PSVersionTable.PSVersion.Major -lt 7) {
+        $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+        foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root 'Configurations') -Filter '*.json' -File | Where-Object { $_.Name -notlike '*.v1.json' }) {
+            Get-Content -LiteralPath $file.FullName -Raw | Test-Json -SchemaFile $schemaPath -ErrorAction Stop | Should -BeTrue
+        }
+        foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root 'Shared') -Filter '*.json' -File -Recurse) {
+            $data = Read-SectionExampleHC $file.FullName
+            $matches = @($schema.'$defs'.PSObject.Properties.Name | Where-Object {
+                $document = @{ SchemaVersion = 2; Items = @{ $_ = $data } }
+                $document | ConvertTo-Json -Depth 20 | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue
+            })
+            $matches.Count | Should -BeGreaterThan 0 -Because "Shared file '$($file.Name)' must match a section shape"
+        }
+    }
     It 'gives descriptions to every declared property' {
         function Test-DescriptionsHC($node) {
             if ($node -is [pscustomobject] -and $node.properties -is [pscustomobject]) {

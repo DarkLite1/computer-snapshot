@@ -113,8 +113,7 @@ $exportData = [ordered]@{
             Name = $share.Name
             Owner = $acl.Owner
             AreAccessRulesProtected = $acl.AreAccessRulesProtected
-            Access = @($acl.Access | Where-Object { -not $_.IsInherited } | Select-Object
-                @{Name='IdentityReference';Expression={[string]$_.IdentityReference}},
+            Access = @($acl.Access | Where-Object { -not $_.IsInherited } | Select-Object @{Name='IdentityReference';Expression={[string]$_.IdentityReference}},
                 @{Name='AccessControlType';Expression={[string]$_.AccessControlType}},
                 @{Name='FileSystemRights';Expression={[string]$_.FileSystemRights}},
                 @{Name='InheritanceFlags';Expression={[string]$_.InheritanceFlags}},

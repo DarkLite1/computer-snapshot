@@ -1,0 +1,23 @@
+{
+  "$schema": "../Scripts/config.schema.json",
+  "SchemaVersion": 2,
+  "Description": "Converted from RestoreSnapshot PC1 Example.json",
+  "Settings": { "RebootComputer": false, "OpenReportInBrowser": true, "RunElevated": false },
+  "Items": {
+    "Software": {
+      "Remove": [],
+      "Install": [
+        {
+          "ExecutablePath": "Software\\App hello world 1.exe",
+          "Arguments": null,
+          "Comment": "to install the software silently use the silent switches required by the application (ex. Arguments: /S)"
+        },
+        {
+          "ExecutablePath": "Software\\App hello world 2.exe",
+          "Arguments": null,
+          "Comment": "to install the software silently use the silent switches required by the application (ex. Arguments: /S)"
+        }
+      ]
+    }
+  }
+}

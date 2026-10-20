@@ -33,6 +33,15 @@ Describe 'Schema contract' {
         $problems = @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Software = @{ Instal = @() } } } $TestDrive)
         $problems -join ';' | Should -Match 'Software.Instal: unknown property'
     }
+    It 'rejects empty array entries but permits empty sections' {
+        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @(@{}) } } $TestDrive) -join ';' | Should -Match 'Name: required'
+        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ CreateFolders = @{}; ScheduledTasks = @() } } $TestDrive).Count | Should -Be 0
+    }
+    It 'requires schema property casing and string comments' {
+        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Software = @{ install = @() } } } $TestDrive) -join ';' | Should -Match 'install: unknown'
+        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ software = @{} } } $TestDrive) -join ';' | Should -Match 'software: unknown'
+        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Comment = 5; Software = @{} } } $TestDrive) -join ';' | Should -Match 'Comment: expected a string'
+    }
     It 'validates every shipped configuration and its shared references' {
         $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
         foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root 'Configurations') -Filter '*.json' -File | Where-Object { $_.Name -notlike '*.v1.json' }) {

@@ -19,7 +19,8 @@ Import-Module "$PSScriptRoot\..\Common\Configuration.psm1" -Force
 
 function Convert-CommentsHC {
     param($Value)
-    if ($Value -is [pscustomobject]) {
+    if ($Value -is [array]) { foreach ($entry in $Value) { Convert-CommentsHC $entry } }
+    elseif ($null -ne $Value -and $Value.GetType() -eq [System.Management.Automation.PSCustomObject]) {
         if ($Value.PSObject.Properties['?']) {
             $comment = [string]$Value.'?'
             $Value.PSObject.Properties.Remove('?')
@@ -27,7 +28,6 @@ function Convert-CommentsHC {
         }
         foreach ($property in $Value.PSObject.Properties) { Convert-CommentsHC $property.Value }
     }
-    elseif ($Value -is [array]) { foreach ($entry in $Value) { Convert-CommentsHC $entry } }
 }
 
 function Get-RootRelativePathHC {
@@ -111,7 +111,7 @@ foreach ($name in $order) {
                 $enabled = if ($null -ne $task.Settings.Enabled) { [bool]$task.Settings.Enabled } else { $task.State -ne 'Disabled' }
                 [pscustomobject]@{
                     TaskName = $task.TaskName; TaskPath = $task.TaskPath; Enabled = $enabled
-                    Xml = Get-Content -LiteralPath (Join-Path $folder ($file.BaseName + ' - Definition.xml')) -Raw -ErrorAction Stop
+                    Xml = [IO.File]::ReadAllText((Join-Path $folder ($file.BaseName + ' - Definition.xml')))
                 }
             })
         }

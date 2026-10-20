@@ -40,10 +40,10 @@ function Test-ShapeHC {
         $names = @(Get-PropertiesHC $Value)
         if ($null -ne $Schema.maxProperties -and $names.Count -gt $Schema.maxProperties) { "${Location}: too many properties" }
         foreach ($required in $Schema.required) {
-            if ($names -notcontains $required) { "${Location}.${required}: required property is missing" }
+            if ($names -cnotcontains $required) { "${Location}.${required}: required property is missing" }
         }
         foreach ($name in $names) {
-            if ((Get-PropertiesHC $Schema.properties) -contains $name) {
+            if ((Get-PropertiesHC $Schema.properties) -ccontains $name) {
                 Test-ShapeHC $Value.$name $Schema.properties.$name $Definitions "${Location}.${name}"
             }
             else {

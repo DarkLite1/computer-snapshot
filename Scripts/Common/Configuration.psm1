@@ -47,7 +47,7 @@ function ConvertTo-LoadedConfigurationHC {
         return $result
     }
     foreach ($property in Get-PropertiesHC $Configuration) {
-        if ($property -notin @('$schema', 'SchemaVersion', 'Description', 'Settings', 'Items')) {
+        if ($property -cnotin @('$schema', 'SchemaVersion', 'Description', 'Settings', 'Items')) {
             $problems.Add("$Source > ${property}: unknown property")
         }
     }
@@ -65,10 +65,10 @@ function ConvertTo-LoadedConfigurationHC {
         }
         else {
             foreach ($property in Get-PropertiesHC $Configuration.Settings) {
-                if ($property -eq 'Comment') {
+                if ($property -ceq 'Comment') {
                     if ($Configuration.Settings.Comment -isnot [string]) { $problems.Add("$Source > Settings.Comment: expected a string") }
                 }
-                elseif ($property -notin @('RebootComputer', 'OpenReportInBrowser', 'RunElevated')) {
+                elseif ($property -cnotin @('RebootComputer', 'OpenReportInBrowser', 'RunElevated')) {
                     $problems.Add("$Source > Settings.${property}: unknown property")
                 }
                 elseif ($Configuration.Settings.$property -isnot [bool]) {
@@ -83,7 +83,10 @@ function ConvertTo-LoadedConfigurationHC {
         return $result
     }
     foreach ($name in Get-PropertiesHC $Configuration.Items) {
-        if ($name -notin $script:ItemOrder -and $name -ne 'Comment') {
+        if ($name -ceq 'Comment') {
+            if ($Configuration.Items.Comment -isnot [string]) { $problems.Add("$Source > Items.Comment: expected a string") }
+        }
+        elseif ($name -cnotin $script:ItemOrder) {
             $problems.Add("$Source > Items.${name}: unknown item")
         }
     }

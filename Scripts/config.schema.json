@@ -1,0 +1,1577 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Computer snapshot configuration",
+  "description": "Version 2 single-file Windows computer configuration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "SchemaVersion",
+    "Items"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Schema location for editor completion and validation."
+    },
+    "SchemaVersion": {
+      "description": "Configuration format version. Must be 2.",
+      "type": "integer",
+      "const": 2
+    },
+    "Description": {
+      "type": "string",
+      "description": "Description shown to technicians in the configuration picker."
+    },
+    "Settings": {
+      "type": "object",
+      "description": "Optional runtime settings; defaults apply when omitted.",
+      "additionalProperties": false,
+      "properties": {
+        "RebootComputer": {
+          "description": "Restart after a successful restore.",
+          "default": false,
+          "type": "boolean"
+        },
+        "OpenReportInBrowser": {
+          "description": "Open the HTML report after execution.",
+          "default": true,
+          "type": "boolean"
+        },
+        "RunElevated": {
+          "description": "Ask the launcher to run the restore as administrator.",
+          "default": false,
+          "type": "boolean"
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    },
+    "Items": {
+      "type": "object",
+      "description": "Present items are restored in fixed execution order. Missing items are skipped.",
+      "additionalProperties": false,
+      "properties": {
+        "StartCustomScriptsBefore": {
+          "description": "Inline StartCustomScriptsBefore data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline StartCustomScriptsBefore data.",
+              "$ref": "#/$defs/StartCustomScriptsBefore"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "RegionalSettings": {
+          "description": "Inline RegionalSettings data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline RegionalSettings data.",
+              "$ref": "#/$defs/RegionalSettings"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "UserAccounts": {
+          "description": "Inline UserAccounts data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline UserAccounts data.",
+              "$ref": "#/$defs/UserAccounts"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "UserGroups": {
+          "description": "Inline UserGroups data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline UserGroups data.",
+              "$ref": "#/$defs/UserGroups"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "FirewallRules": {
+          "description": "Inline FirewallRules data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline FirewallRules data.",
+              "$ref": "#/$defs/FirewallRules"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "CreateFolders": {
+          "description": "Inline CreateFolders data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline CreateFolders data.",
+              "$ref": "#/$defs/CreateFolders"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "SmbShares": {
+          "description": "Inline SmbShares data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline SmbShares data.",
+              "$ref": "#/$defs/SmbShares"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "NetworkCards": {
+          "description": "Inline NetworkCards data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline NetworkCards data.",
+              "$ref": "#/$defs/NetworkCards"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "NtpTimeServers": {
+          "description": "Inline NtpTimeServers data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline NtpTimeServers data.",
+              "$ref": "#/$defs/NtpTimeServers"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "RegistryKeys": {
+          "description": "Inline RegistryKeys data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline RegistryKeys data.",
+              "$ref": "#/$defs/RegistryKeys"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "ScheduledTasks": {
+          "description": "Inline ScheduledTasks data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline ScheduledTasks data.",
+              "$ref": "#/$defs/ScheduledTasks"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "CopyFilesFolders": {
+          "description": "Inline CopyFilesFolders data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline CopyFilesFolders data.",
+              "$ref": "#/$defs/CopyFilesFolders"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "Software": {
+          "description": "Inline Software data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline Software data.",
+              "$ref": "#/$defs/Software"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "StartCustomScriptsAfter": {
+          "description": "Inline StartCustomScriptsAfter data, or a root-relative path to a Shared JSON section.",
+          "oneOf": [
+            {
+              "description": "Inline StartCustomScriptsAfter data.",
+              "$ref": "#/$defs/StartCustomScriptsAfter"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            }
+          ]
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "StartCustomScriptsBefore"
+          ]
+        },
+        {
+          "required": [
+            "RegionalSettings"
+          ]
+        },
+        {
+          "required": [
+            "UserAccounts"
+          ]
+        },
+        {
+          "required": [
+            "UserGroups"
+          ]
+        },
+        {
+          "required": [
+            "FirewallRules"
+          ]
+        },
+        {
+          "required": [
+            "CreateFolders"
+          ]
+        },
+        {
+          "required": [
+            "SmbShares"
+          ]
+        },
+        {
+          "required": [
+            "NetworkCards"
+          ]
+        },
+        {
+          "required": [
+            "NtpTimeServers"
+          ]
+        },
+        {
+          "required": [
+            "RegistryKeys"
+          ]
+        },
+        {
+          "required": [
+            "ScheduledTasks"
+          ]
+        },
+        {
+          "required": [
+            "CopyFilesFolders"
+          ]
+        },
+        {
+          "required": [
+            "Software"
+          ]
+        },
+        {
+          "required": [
+            "StartCustomScriptsAfter"
+          ]
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "StartCustomScriptsBefore": {
+      "type": "array",
+      "description": "Custom scripts executed first, in array order.",
+      "items": {
+        "type": "object",
+        "description": "A reviewed custom PowerShell script to execute.",
+        "additionalProperties": false,
+        "properties": {
+          "Path": {
+            "type": "string",
+            "description": "PowerShell script path, relative to the USB root or absolute."
+          },
+          "Arguments": {
+            "type": "object",
+            "description": "Named PowerShell parameters passed to a custom script.",
+            "additionalProperties": false,
+            "properties": {
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "patternProperties": {
+              "^(?!Comment$).+$": {
+                "description": "Named script parameter value."
+              }
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "anyOf": [
+          {
+            "maxProperties": 0
+          },
+          {
+            "required": [
+              "Path"
+            ]
+          },
+          {
+            "maxProperties": 1,
+            "required": [
+              "Comment"
+            ]
+          }
+        ]
+      }
+    },
+    "StartCustomScriptsAfter": {
+      "type": "array",
+      "description": "Custom scripts executed last, in array order.",
+      "items": {
+        "type": "object",
+        "description": "A reviewed custom PowerShell script to execute.",
+        "additionalProperties": false,
+        "properties": {
+          "Path": {
+            "type": "string",
+            "description": "PowerShell script path, relative to the USB root or absolute."
+          },
+          "Arguments": {
+            "type": "object",
+            "description": "Named PowerShell parameters passed to a custom script.",
+            "additionalProperties": false,
+            "properties": {
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "patternProperties": {
+              "^(?!Comment$).+$": {
+                "description": "Named script parameter value."
+              }
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "anyOf": [
+          {
+            "maxProperties": 0
+          },
+          {
+            "required": [
+              "Path"
+            ]
+          },
+          {
+            "maxProperties": 1,
+            "required": [
+              "Comment"
+            ]
+          }
+        ]
+      }
+    },
+    "RegionalSettings": {
+      "type": "object",
+      "description": "Regional settings for the computer and current user.",
+      "additionalProperties": false,
+      "properties": {
+        "WinSystemLocaleName": {
+          "type": "string",
+          "description": "Windows system locale name, for example en-US."
+        },
+        "TimeZoneId": {
+          "type": "string",
+          "description": "Windows time-zone identifier."
+        },
+        "WinHomeLocationGeoId": {
+          "type": "integer",
+          "description": "Windows geographic location identifier."
+        },
+        "CultureName": {
+          "type": "string",
+          "description": "Current user culture name."
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "anyOf": [
+        {
+          "maxProperties": 0
+        },
+        {
+          "required": [
+            "WinSystemLocaleName",
+            "TimeZoneId",
+            "WinHomeLocationGeoId",
+            "CultureName"
+          ]
+        },
+        {
+          "maxProperties": 1,
+          "required": [
+            "Comment"
+          ]
+        }
+      ]
+    },
+    "UserAccounts": {
+      "type": "array",
+      "description": "Local user accounts.",
+      "items": {
+        "type": "object",
+        "description": "A local account. Keep sensitive sections in protected Shared files.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "Local account name."
+          },
+          "FullName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Display name."
+          },
+          "Description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Account description."
+          },
+          "Enabled": {
+            "type": "boolean",
+            "description": "Whether the account is enabled."
+          },
+          "PasswordExpires": {
+            "type": [
+              "string",
+              "null",
+              "boolean"
+            ],
+            "description": "Existing password expiry value; null means no expiry."
+          },
+          "AccountExpires": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional account expiry date."
+          },
+          "UserMayChangePassword": {
+            "type": "boolean",
+            "description": "Whether the user may change their password."
+          },
+          "Password": {
+            "type": "string",
+            "description": "Plain-text password, unchanged from the previous format. Empty prompts interactively."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "anyOf": [
+          {
+            "maxProperties": 0
+          },
+          {
+            "required": [
+              "Name"
+            ]
+          },
+          {
+            "maxProperties": 1,
+            "required": [
+              "Comment"
+            ]
+          }
+        ]
+      }
+    },
+    "UserGroups": {
+      "type": "array",
+      "description": "Local groups.",
+      "items": {
+        "type": "object",
+        "description": "Local group and its members.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "Local group name."
+          },
+          "Description": {
+            "type": "string",
+            "description": "Local group description."
+          },
+          "Members": {
+            "type": "array",
+            "description": "Members to add to this group.",
+            "items": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Account name in local or domain notation."
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "anyOf": [
+          {
+            "maxProperties": 0
+          },
+          {
+            "required": [
+              "Name"
+            ]
+          },
+          {
+            "maxProperties": 1,
+            "required": [
+              "Comment"
+            ]
+          }
+        ]
+      }
+    },
+    "FirewallRules": {
+      "type": "array",
+      "description": "Windows firewall rules.",
+      "items": {
+        "type": "object",
+        "description": "A complete Windows firewall rule.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Name setting, as captured by the firewall export."
+          },
+          "DisplayName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall DisplayName setting, as captured by the firewall export."
+          },
+          "Description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Description setting, as captured by the firewall export."
+          },
+          "Action": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Action setting, as captured by the firewall export."
+          },
+          "Direction": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Direction setting, as captured by the firewall export."
+          },
+          "Profile": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Profile setting, as captured by the firewall export."
+          },
+          "Protocol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Protocol setting, as captured by the firewall export."
+          },
+          "LocalPort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall LocalPort setting, as captured by the firewall export."
+          },
+          "RemotePort": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall RemotePort setting, as captured by the firewall export."
+          },
+          "IcmpType": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall IcmpType setting, as captured by the firewall export."
+          },
+          "DynamicTarget": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall DynamicTarget setting, as captured by the firewall export."
+          },
+          "Group": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Group setting, as captured by the firewall export."
+          },
+          "Platform": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Platform setting, as captured by the firewall export."
+          },
+          "EdgeTraversalPolicy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall EdgeTraversalPolicy setting, as captured by the firewall export."
+          },
+          "Owner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Owner setting, as captured by the firewall export."
+          },
+          "LocalAddress": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall LocalAddress setting, as captured by the firewall export."
+          },
+          "RemoteAddress": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall RemoteAddress setting, as captured by the firewall export."
+          },
+          "Program": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Program setting, as captured by the firewall export."
+          },
+          "Package": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Package setting, as captured by the firewall export."
+          },
+          "Service": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Service setting, as captured by the firewall export."
+          },
+          "InterfaceAlias": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall InterfaceAlias setting, as captured by the firewall export."
+          },
+          "InterfaceType": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall InterfaceType setting, as captured by the firewall export."
+          },
+          "LocalUser": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall LocalUser setting, as captured by the firewall export."
+          },
+          "RemoteUser": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall RemoteUser setting, as captured by the firewall export."
+          },
+          "RemoteMachine": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall RemoteMachine setting, as captured by the firewall export."
+          },
+          "Authentication": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Authentication setting, as captured by the firewall export."
+          },
+          "Encryption": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Windows firewall Encryption setting, as captured by the firewall export."
+          },
+          "Enabled": {
+            "type": "boolean",
+            "description": "Windows firewall Enabled flag."
+          },
+          "LooseSourceMapping": {
+            "type": "boolean",
+            "description": "Windows firewall LooseSourceMapping flag."
+          },
+          "LocalOnlyMapping": {
+            "type": "boolean",
+            "description": "Windows firewall LocalOnlyMapping flag."
+          },
+          "OverrideBlockRules": {
+            "type": "boolean",
+            "description": "Windows firewall OverrideBlockRules flag."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "anyOf": [
+          {
+            "maxProperties": 0
+          },
+          {
+            "required": [
+              "Name",
+              "DisplayName"
+            ]
+          },
+          {
+            "maxProperties": 1,
+            "required": [
+              "Comment"
+            ]
+          }
+        ]
+      }
+    },
+    "CreateFolders": {
+      "type": "object",
+      "description": "Folders to create.",
+      "additionalProperties": false,
+      "properties": {
+        "FolderPaths": {
+          "type": "array",
+          "description": "Folders to create; existing folders are left intact.",
+          "items": {
+            "type": "string",
+            "description": "Absolute folder path to create."
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "anyOf": [
+        {
+          "maxProperties": 0
+        },
+        {
+          "required": [
+            "FolderPaths"
+          ]
+        },
+        {
+          "maxProperties": 1,
+          "required": [
+            "Comment"
+          ]
+        }
+      ]
+    },
+    "SmbShares": {
+      "type": "object",
+      "description": "Combined SMB shares, share access and NTFS permissions.",
+      "additionalProperties": false,
+      "properties": {
+        "Shares": {
+          "type": "array",
+          "description": "Shares to create or update.",
+          "items": {
+            "type": "object",
+            "description": "SMB share settings.",
+            "additionalProperties": false,
+            "properties": {
+              "Name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB share Name setting."
+              },
+              "Description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB share Description setting."
+              },
+              "Path": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB share Path setting."
+              },
+              "ScopeName": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB share ScopeName setting."
+              },
+              "CachingMode": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB share CachingMode setting."
+              },
+              "SmbInstance": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB share SmbInstance setting."
+              },
+              "FolderEnumerationMode": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB share FolderEnumerationMode setting."
+              },
+              "CATimeout": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "SMB share CATimeout value."
+              },
+              "ThrottleLimit": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "SMB share ThrottleLimit value."
+              },
+              "ConcurrentUserLimit": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "SMB share ConcurrentUserLimit value."
+              },
+              "EncryptData": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "SMB share EncryptData flag."
+              },
+              "ContinuouslyAvailable": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "SMB share ContinuouslyAvailable flag."
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "anyOf": [
+              {
+                "maxProperties": 0
+              },
+              {
+                "required": [
+                  "Name",
+                  "Path"
+                ]
+              },
+              {
+                "maxProperties": 1,
+                "required": [
+                  "Comment"
+                ]
+              }
+            ]
+          }
+        },
+        "Access": {
+          "type": "array",
+          "description": "SMB access permissions.",
+          "items": {
+            "type": "object",
+            "description": "SMB share access entry.",
+            "additionalProperties": false,
+            "properties": {
+              "Name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB access Name value."
+              },
+              "ScopeName": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB access ScopeName value."
+              },
+              "AccountName": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB access AccountName value."
+              },
+              "AccessControlType": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB access AccessControlType value."
+              },
+              "AccessRight": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SMB access AccessRight value."
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "anyOf": [
+              {
+                "maxProperties": 0
+              },
+              {
+                "required": [
+                  "Name",
+                  "AccountName",
+                  "AccessRight"
+                ]
+              },
+              {
+                "maxProperties": 1,
+                "required": [
+                  "Comment"
+                ]
+              }
+            ]
+          }
+        },
+        "Ntfs": {
+          "type": "array",
+          "description": "Optional NTFS permissions by share name.",
+          "items": {
+            "type": "object",
+            "description": "Captured NTFS permissions.",
+            "additionalProperties": false,
+            "properties": {
+              "Name": {
+                "type": "string",
+                "description": "Name of the share whose folder receives these permissions."
+              },
+              "Owner": {
+                "type": "string",
+                "description": "Owner account name."
+              },
+              "AreAccessRulesProtected": {
+                "type": "boolean",
+                "description": "Whether inherited access rules are disabled."
+              },
+              "Access": {
+                "type": "array",
+                "description": "Non-inherited NTFS access rules.",
+                "items": {
+                  "type": "object",
+                  "description": "Explicit NTFS permission.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "IdentityReference": {
+                      "type": "string",
+                      "description": "NTFS access-rule IdentityReference value."
+                    },
+                    "AccessControlType": {
+                      "type": "string",
+                      "description": "NTFS access-rule AccessControlType value."
+                    },
+                    "FileSystemRights": {
+                      "type": "string",
+                      "description": "NTFS access-rule FileSystemRights value."
+                    },
+                    "InheritanceFlags": {
+                      "type": "string",
+                      "description": "NTFS access-rule InheritanceFlags value."
+                    },
+                    "PropagationFlags": {
+                      "type": "string",
+                      "description": "NTFS access-rule PropagationFlags value."
+                    },
+                    "Comment": {
+                      "type": "string",
+                      "description": "Technician notes; ignored when applying the configuration."
+                    }
+                  }
+                }
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "anyOf": [
+              {
+                "maxProperties": 0
+              },
+              {
+                "required": [
+                  "Name",
+                  "Owner",
+                  "AreAccessRulesProtected",
+                  "Access"
+                ]
+              },
+              {
+                "maxProperties": 1,
+                "required": [
+                  "Comment"
+                ]
+              }
+            ]
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "anyOf": [
+        {
+          "maxProperties": 0
+        },
+        {
+          "required": [
+            "Shares",
+            "Access"
+          ]
+        },
+        {
+          "maxProperties": 1,
+          "required": [
+            "Comment"
+          ]
+        }
+      ]
+    },
+    "NetworkCards": {
+      "type": "array",
+      "description": "Network adapters.",
+      "items": {
+        "type": "object",
+        "description": "Network adapter settings.",
+        "additionalProperties": false,
+        "properties": {
+          "NetworkCardName": {
+            "type": "string",
+            "description": "Desired adapter name; empty leaves the name unchanged."
+          },
+          "NetworkCardDescription": {
+            "type": "string",
+            "description": "Adapter description to match."
+          },
+          "NetworkCategory": {
+            "type": "string",
+            "description": "Desired connection profile; empty leaves it unchanged."
+          },
+          "NetworkCardDnsSuffix": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Connection-specific DNS suffix."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "anyOf": [
+          {
+            "maxProperties": 0
+          },
+          {
+            "required": [
+              "NetworkCardName",
+              "NetworkCardDescription",
+              "NetworkCategory"
+            ]
+          },
+          {
+            "maxProperties": 1,
+            "required": [
+              "Comment"
+            ]
+          }
+        ]
+      }
+    },
+    "NtpTimeServers": {
+      "type": "object",
+      "description": "Windows time synchronization.",
+      "additionalProperties": false,
+      "properties": {
+        "SyncTimeWithDomain": {
+          "type": "boolean",
+          "description": "Use domain time synchronization instead of custom servers."
+        },
+        "TimeServerNames": {
+          "type": "array",
+          "description": "Custom NTP servers, ignored when domain synchronization is enabled.",
+          "items": {
+            "type": "string",
+            "description": "NTP server hostname."
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "anyOf": [
+        {
+          "maxProperties": 0
+        },
+        {
+          "required": [
+            "SyncTimeWithDomain",
+            "TimeServerNames"
+          ]
+        },
+        {
+          "maxProperties": 1,
+          "required": [
+            "Comment"
+          ]
+        }
+      ]
+    },
+    "RegistryKeys": {
+      "type": "object",
+      "description": "Registry changes. Protect files containing alternate-user credentials.",
+      "additionalProperties": false,
+      "properties": {
+        "RunAsCurrentUser": {
+          "type": "object",
+          "description": "Current-user registry changes.",
+          "additionalProperties": false,
+          "properties": {
+            "RegistryKeys": {
+              "type": "array",
+              "description": "Values applied in the current user context.",
+              "items": {
+                "type": "object",
+                "description": "Registry value to create or update.",
+                "additionalProperties": false,
+                "properties": {
+                  "Path": {
+                    "type": "string",
+                    "description": "Registry provider path, for example HKLM:\\SOFTWARE\\Example."
+                  },
+                  "Name": {
+                    "type": "string",
+                    "description": "Registry value name."
+                  },
+                  "Value": {
+                    "type": "string",
+                    "description": "Registry value data."
+                  },
+                  "Type": {
+                    "type": "string",
+                    "description": "Registry value type, such as DWORD or STRING."
+                  },
+                  "Comment": {
+                    "type": "string",
+                    "description": "Technician notes; ignored when applying the configuration."
+                  }
+                },
+                "anyOf": [
+                  {
+                    "maxProperties": 0
+                  },
+                  {
+                    "required": [
+                      "Path",
+                      "Name",
+                      "Value",
+                      "Type"
+                    ]
+                  },
+                  {
+                    "maxProperties": 1,
+                    "required": [
+                      "Comment"
+                    ]
+                  }
+                ]
+              }
+            },
+            "Comment": {
+              "type": "string",
+              "description": "Technician notes; ignored when applying the configuration."
+            }
+          }
+        },
+        "RunAsOtherUser": {
+          "type": "array",
+          "description": "Other local users to configure.",
+          "items": {
+            "type": "object",
+            "description": "Alternate-user registry changes.",
+            "additionalProperties": false,
+            "properties": {
+              "UserName": {
+                "type": "string",
+                "description": "Local user whose registry hive will be loaded."
+              },
+              "UserPassword": {
+                "type": "string",
+                "description": "Plain-text password used to initialize a missing profile."
+              },
+              "RegistryKeys": {
+                "type": "array",
+                "description": "Values applied to this user registry hive.",
+                "items": {
+                  "type": "object",
+                  "description": "Registry value to create or update.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "Path": {
+                      "type": "string",
+                      "description": "Registry provider path, for example HKLM:\\SOFTWARE\\Example."
+                    },
+                    "Name": {
+                      "type": "string",
+                      "description": "Registry value name."
+                    },
+                    "Value": {
+                      "type": "string",
+                      "description": "Registry value data."
+                    },
+                    "Type": {
+                      "type": "string",
+                      "description": "Registry value type, such as DWORD or STRING."
+                    },
+                    "Comment": {
+                      "type": "string",
+                      "description": "Technician notes; ignored when applying the configuration."
+                    }
+                  },
+                  "anyOf": [
+                    {
+                      "maxProperties": 0
+                    },
+                    {
+                      "required": [
+                        "Path",
+                        "Name",
+                        "Value",
+                        "Type"
+                      ]
+                    },
+                    {
+                      "maxProperties": 1,
+                      "required": [
+                        "Comment"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "anyOf": [
+              {
+                "maxProperties": 0
+              },
+              {
+                "required": [
+                  "UserName",
+                  "RegistryKeys"
+                ]
+              },
+              {
+                "maxProperties": 1,
+                "required": [
+                  "Comment"
+                ]
+              }
+            ]
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    },
+    "ScheduledTasks": {
+      "type": "array",
+      "description": "Scheduled tasks with inline XML.",
+      "items": {
+        "type": "object",
+        "description": "Task definition and enabled state.",
+        "additionalProperties": false,
+        "properties": {
+          "TaskName": {
+            "type": "string",
+            "description": "Task Scheduler task name."
+          },
+          "TaskPath": {
+            "type": "string",
+            "description": "Task Scheduler folder, for example \\HC\\."
+          },
+          "Enabled": {
+            "type": "boolean",
+            "description": "Whether the registered task is enabled."
+          },
+          "Xml": {
+            "type": "string",
+            "description": "Complete XML returned by Export-ScheduledTask."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "anyOf": [
+          {
+            "maxProperties": 0
+          },
+          {
+            "required": [
+              "TaskName",
+              "TaskPath",
+              "Enabled",
+              "Xml"
+            ]
+          },
+          {
+            "maxProperties": 1,
+            "required": [
+              "Comment"
+            ]
+          }
+        ]
+      }
+    },
+    "CopyFilesFolders": {
+      "type": "array",
+      "description": "Files and folders to copy.",
+      "items": {
+        "type": "object",
+        "description": "One copy operation.",
+        "additionalProperties": false,
+        "properties": {
+          "From": {
+            "type": "string",
+            "description": "Source file or folder, relative to the USB root or absolute."
+          },
+          "To": {
+            "type": "string",
+            "description": "Absolute destination file or folder path."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "anyOf": [
+          {
+            "maxProperties": 0
+          },
+          {
+            "required": [
+              "From",
+              "To"
+            ]
+          },
+          {
+            "maxProperties": 1,
+            "required": [
+              "Comment"
+            ]
+          }
+        ]
+      }
+    },
+    "Software": {
+      "type": "object",
+      "description": "Software uninstall and install operations.",
+      "additionalProperties": false,
+      "properties": {
+        "Remove": {
+          "type": "array",
+          "description": "Applications to remove first.",
+          "items": {
+            "type": "string",
+            "description": "Installed application display name to uninstall."
+          }
+        },
+        "Install": {
+          "type": "array",
+          "description": "Installers to execute in array order.",
+          "items": {
+            "type": "object",
+            "description": "Installer to execute and wait for.",
+            "additionalProperties": false,
+            "properties": {
+              "ExecutablePath": {
+                "type": "string",
+                "description": "Installer path, relative to the USB root or absolute."
+              },
+              "Arguments": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Command-line arguments passed to the installer."
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "anyOf": [
+              {
+                "maxProperties": 0
+              },
+              {
+                "required": [
+                  "ExecutablePath"
+                ]
+              },
+              {
+                "maxProperties": 1,
+                "required": [
+                  "Comment"
+                ]
+              }
+            ]
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    }
+  }
+}

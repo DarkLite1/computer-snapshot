@@ -2,6 +2,14 @@ param([string]$ScriptPath, [string]$Name)
 
 Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $Name }) {
     BeforeAll {
+        Import-Module "$PSScriptRoot\Configuration.psm1" -Force
+        $itemNames = @{
+            Folders = 'CreateFolders'; 'Copy files folders' = 'CopyFilesFolders'; 'NTP time servers' = 'NtpTimeServers'
+            'Network cards' = 'NetworkCards'; 'Regional settings' = 'RegionalSettings'; Software = 'Software'
+            'User accounts' = 'UserAccounts'; 'User groups' = 'UserGroups'; 'Registry keys' = 'RegistryKeys'
+            'Firewall rules' = 'FirewallRules'; 'Scheduled tasks' = 'ScheduledTasks'; 'Smb shares' = 'SmbShares'
+            'Start custom scripts' = 'StartCustomScriptsBefore'
+        }
         function Get-TimeServerHC {}
         function Set-SynchronizeTimeWithServerHC { param($ComputerName) }
         function Set-SynchronizeTimeWithDomainHC {}
@@ -91,6 +99,8 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         $result[0].PSObject.Properties.Name | Should -Contain 'Data'
         $result[0].Data | Should -Not -BeNullOrEmpty
         $result[0].Messages.GetType() | Should -Be ([string[]])
+        $problems = @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ $itemNames[$Name] = $result[0].Data } } $TestDrive)
+        @($problems | Where-Object { $_ -notmatch "file '.+' not found" }).Count | Should -Be 0 -Because ($problems -join '; ')
         @(Get-ChildItem -LiteralPath $TestDrive -Recurse).FullName | Should -Be $before
         Should -Invoke New-Item -Times 0 -Exactly
         Should -Invoke Copy-Item -Times 0 -Exactly

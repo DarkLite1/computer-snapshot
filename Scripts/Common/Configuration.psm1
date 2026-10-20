@@ -4,6 +4,7 @@
     Read, validate and write version-2 computer configurations on PowerShell 5.1.
 #>
 . "$PSScriptRoot\Section.ps1"
+. "$PSScriptRoot\Schema.ps1"
 $script:ItemOrder = @('StartCustomScriptsBefore', 'RegionalSettings', 'UserAccounts', 'UserGroups',
     'FirewallRules', 'CreateFolders', 'SmbShares', 'NetworkCards', 'NtpTimeServers', 'RegistryKeys',
     'ScheduledTasks', 'CopyFilesFolders', 'Software', 'StartCustomScriptsAfter')
@@ -13,7 +14,7 @@ $script:ArrayItems = @('StartCustomScriptsBefore', 'UserAccounts', 'UserGroups',
 function Get-PropertiesHC {
     param($Value)
     if ($Value -is [System.Collections.IDictionary]) { return @($Value.Keys) }
-    if ($Value -is [pscustomobject]) { return @($Value.PSObject.Properties.Name) }
+    if ($Value -is [pscustomobject]) { return @($Value.PSObject.Properties | ForEach-Object { $_.Name }) }
     return @()
 }
 
@@ -124,6 +125,7 @@ function Test-ConfigurationHC {
     $problems = New-Object 'System.Collections.Generic.List[string]'
     foreach ($problem in $Configuration.Problems) { $problems.Add($problem) }
     $source = $Configuration.Source
+    $schema = Get-Content -LiteralPath "$PSScriptRoot\..\config.schema.json" -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($name in $Configuration.Items.Keys) {
         $data = $Configuration.Items[$name]
         $location = "$source > Items.$name"
@@ -134,6 +136,9 @@ function Test-ConfigurationHC {
             }
         }
         elseif (-not (Test-ObjectHC $data)) { $problems.Add("${location}: expected an object"); continue }
+        $shapeProblems = @(Test-ShapeHC $data $schema.'$defs'.$name $schema.'$defs' $location)
+        foreach ($problem in $shapeProblems) { $problems.Add($problem) }
+        if ($shapeProblems.Count) { continue }
         if (Test-EmptySectionHC $data) { continue }
         $assets = @()
         switch ($name) {

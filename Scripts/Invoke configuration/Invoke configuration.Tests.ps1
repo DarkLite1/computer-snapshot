@@ -1,175 +1,47 @@
-#Requires -Modules Pester
 #Requires -Version 5.1
-
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 BeforeAll {
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
-    $testParams = @{
-        StartScript          = (New-Item 'TestDrive:/testStartScript.ps1' -ItemType File).FullName 
-        ConfigurationsFolder = (New-Item 'TestDrive:/testConfigs' -ItemType Directory).FullName 
-        NoConfirmQuestion    = $true
-    }
-
-    $testJoinParams = @{
-        Path      = $testParams.ConfigurationsFolder
-        ChildPath = 'testCaller.json'
-    }
-    $testConfigurationFile = Join-Path @testJoinParams
-
-    'Param (
-        $Action,
-        $RestoreSnapshotFolder,
-        $RebootComputer,
-        $Snapshot
-    )' | Out-File -FilePath $testParams.StartScript
-    
-    Function Test-IsStartedElevatedHC {}
-    Function Invoke-ScriptHC {
-        Param (
-            [Parameter(Mandatory)]
-            [String]$Path,
-            [Parameter(Mandatory)]
-            [HashTable]$Arguments
-        )
-    }
-    Mock Invoke-ScriptHC
-    Mock Out-GridView {
-        [PSCustomObject]@{
-            'File name' = 'testCaller'
-        }
-    }
-    Mock Start-Sleep
-    Mock Test-IsStartedElevatedHC { $true }
-    Mock Write-Host
-    Mock Write-Output
-    Mock Write-Warning
+    function Invoke-ScriptHC { param($Path, $Arguments) }
+    function Test-IsStartedElevatedHC {}
 }
-Describe 'the script fails when' {
+Describe 'Configuration launcher' {
     BeforeEach {
-        $testNewParams = $testParams.clone()
+        $testConfigurationFile = Join-Path $TestDrive 'Example.json'
+        $document = @{ SchemaVersion = 2; Description = 'Example computer'; Settings = @{ RunElevated = $false }; Items = @{ UserAccounts = @() } }
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        Mock Invoke-ScriptHC
+        Mock Start-Process
+        Mock Test-IsStartedElevatedHC { $false }
+        Mock Read-Host { 'y' }
+        Mock Out-GridView { [pscustomobject]@{ Path = $testConfigurationFile } }
     }
-    It 'the start script is not found' {
-        $testNewParams.StartScript = 'TestDrive:/xxx.ps1'
-
-        .$testScript @testNewParams 
-
-        Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-            $Message -eq "Start script 'TestDrive:/xxx.ps1' not found"
-        }
+    It 'passes only the action and file path to the main script' {
+        . $testScript -ConfigurationFile $testConfigurationFile -Confirm
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { $Arguments.Action -eq 'RestoreSnapshot' -and $Arguments.ConfigurationFile -eq $testConfigurationFile -and $Arguments.Count -eq 2 }
     }
-    Context 'parameter ConfigurationsFolder' {
-        It 'is a folder that does not exist' {
-            $testNewParams.ConfigurationsFolder = 'TestDrive:/xxx'
-
-            .$testScript @testNewParams 
-
-            Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-                $Message -eq "Configurations folder 'TestDrive:/xxx' not found"
-            }
-        } 
-        It 'is a folder without .JSON files in it' {
-            '1' | Out-File -LiteralPath "$($testParams.ConfigurationsFolder)\file.txt"
-
-            .$testScript @testNewParams 
-
-            Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-                $Message -eq "No .JSON file found in the configurations folder '$($testParams.ConfigurationsFolder)'. Please create a configuration file first."
-            }
-        }
+    It 'selects a configuration from the picker' {
+        . $testScript -ConfigurationsFolder $TestDrive -Confirm
+        Should -Invoke Out-GridView -Times 1 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly
     }
-    Context 'parameter ConfigurationFile' {
-        It 'is a non existing file' {
-            $testNewParams.Remove('ConfigurationsFolder')
-            $testNewParams.ConfigurationFile = 'TestDrive:/file'
-
-            .$testScript @testNewParams 
-
-            Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-                $Message -eq "Configuration file 'TestDrive:/file' not found"
-            }
-        } 
-        It 'is not a .JSON file' {
-            $testNewParams.Remove('ConfigurationsFolder')
-            $testNewParams.ConfigurationFile = 'TestDrive:/file.txt'
-            '1\' | Out-File -LiteralPath $testNewParams.ConfigurationFile
-
-            .$testScript @testNewParams 
-
-            Should -Invoke Write-Warning -Times 1 -Exactly -ParameterFilter {
-                $Message -like "File '*file.txt' is not a valid .JSON configuration file*"
-            }
-        }
+    It 'does nothing when confirmation is declined' {
+        Mock Read-Host { 'n' }
+        . $testScript -ConfigurationFile $testConfigurationFile
+        Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
     }
-}
-Describe 'when all tests pass' {
-    BeforeAll {
-        @{
-            StartScript = @{
-                Action                = 'A'
-                RestoreSnapshotFolder = 'B'
-                RebootComputer        = $true
-                Snapshot              = @{
-                    ScriptA = $true
-                    ScriptB = $false
-                }
-            }
-        } | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $testConfigurationFile
+    It 'relaunches the selected file with an encoded command when elevation is requested' {
+        $document.Settings.RunElevated = $true
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        . $testScript -ConfigurationsFolder $TestDrive -Confirm
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $Verb -eq 'RunAs' -and [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1])).Contains($testConfigurationFile)
+        }
+        Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
     }
-    Context 'parameter ConfigurationsFolder' {
-        It 'Start-Script.ps1 is called' {
-            $testNewParams = $testParams.clone()
-
-            . $testScript @testNewParams -Confirm
-
-            Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
-                ($Path -eq $testParams.StartScript) -and
-                ($Arguments.Action -eq 'A') -and
-                ($Arguments.RestoreSnapshotFolder -eq 'B') -and
-                ($Arguments.RebootComputer -eq $true) -and
-                ($Arguments.Snapshot.ScriptA -eq $true) -and
-                ($Arguments.Snapshot.ScriptB -eq $false)
-            }
-        } -tag test
-        It 'ask confirmation before executing Start-Script.ps1' {
-            Mock Read-Host { 'y' }
-
-            $testNewParams = $testParams.clone()
-
-            . $testScript @testNewParams
-
-            Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
-            ($Prompt -eq 'Are you sure you want to continue (y/n)') 
-            }
-        }
-    }
-    Context 'parameter ConfigurationFile' {
-        BeforeEach {
-            $testNewParams = $testParams.clone()
-            $testNewParams.Remove('ConfigurationsFolder')
-            $testNewParams.ConfigurationFile = $testConfigurationFile
-        }
-        It 'Start-Script.ps1 is called' {
-            . $testScript @testNewParams -Confirm
-
-            Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
-                ($Path -eq $testParams.StartScript) -and
-                ($Arguments.Action -eq 'A') -and
-                ($Arguments.RestoreSnapshotFolder -eq 'B') -and
-                ($Arguments.RebootComputer -eq $true) -and
-                ($Arguments.Snapshot.ScriptA -eq $true) -and
-                ($Arguments.Snapshot.ScriptB -eq $false)
-            }
-        }
-        It 'ask confirmation before executing Start-Script.ps1' {
-            Mock Read-Host { 'y' }
-
-            $testNewParams = $testParams.clone()
-            $testNewParams.NoConfirmQuestion = $false
-
-            . $testScript @testNewParams
-
-            Should -Invoke Read-Host -Times 1 -Exactly -ParameterFilter {
-                ($Prompt -eq 'Are you sure you want to continue (y/n)') 
-            }
-        }
+    It 'rejects version 1 files without running any child scripts' {
+        '{"StartScript":{}}' | Set-Content -LiteralPath $testConfigurationFile
+        { . $testScript -ConfigurationFile $testConfigurationFile -Confirm } | Should -Throw '*converter*'
+        Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
     }
 }

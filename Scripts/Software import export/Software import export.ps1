@@ -1,46 +1,26 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Install or remove software packages
-
-    .DESCRIPTION
-        The .JSON file contains a list of software packages to install or 
-        remove. When a package is requested to be installed and removed, it 
-        will first be uninstalled and then installed again.
-        
-    .PARAMETER Action
-        When action is 'Export' a template file is created that can be edited 
-        by the user.
-        When action is 'Import' the import file is read and the packages in the 
-        file will be installed.
-
-    .PARAMETER DataFolder
-        Folder containing the import file and the software packages.
-
-    .PARAMETER ImportFileName
-        File containing the registry keys.
+.SYNOPSIS
+    Export or import Software as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$ImportFileName = 'Software.json'
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
-
-Begin {    
-    Function Get-InstalledApplicationsHC {
-        <#
-        .SYNOPSIS
-            Get all applications installed
-
-        .DESCRIPTION
-            Query the registry to find all installed applications. The following code
-            does not always return all installed applications:
-            Get-WmiObject -Class Win32_Product
-        #>
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
+Function Get-InstalledApplicationsHC {
+        
         Try {
             $R1 = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* |
             Where-Object { $_.DisplayName } | 
@@ -62,7 +42,7 @@ Begin {
             throw "Failed retrieving installed software: $_"
         }
     }
-    Function Remove-ApplicationHC {
+Function Remove-ApplicationHC {
         Param (
             [Parameter(Mandatory)]
             [String]$ApplicationName,
@@ -77,73 +57,29 @@ Begin {
         # suppress error messages
         cmd /C $UninstallString 2> $null
     }
-
-    Try {
-        $ImportFilePath = Join-Path -Path $DataFolder -ChildPath $ImportFileName
-        $packagesFolder = Join-Path -Path $DataFolder -ChildPath 'Packages'
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $ImportFilePath -PathType Leaf)) {
-                throw "Input file '$ImportFilePath' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        $errorMessage = $_; $Error.RemoveAt(0)
-        throw "$Action software packages failed: $errorMessage"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            #region Create example config file
-            Write-Verbose "Create example file '$ImportFilePath'"
-            $params = @{
-                LiteralPath = Join-Path $PSScriptRoot 'Example.json'
-                Destination = $ImportFilePath
-            }
-            Copy-Item @params
-            Write-Output "Created example file '$ImportFilePath'"
-            #endregion
+if ($Action -eq 'Export') {
+    #region Capture section
+$exportData = Read-SectionExampleHC "$PSScriptRoot\Example.json"
+    #endregion
+    $messages = @('Exported Software')
+}
+else {
+    #region Apply section
+    $messages = @(& {
+try {
+$workPath = Get-Location
+Set-Location -LiteralPath $RootFolder
 
-            #region Create empty packages folder
-            $null = New-Item -Path $packagesFolder -ItemType Directory
-            #endregion
-        }
-        else {
-            $workPath = Get-Location
-            Set-Location $DataFolder
 
-            #region Import .JSON file
-            Write-Verbose "Import from file '$ImportFilePath'"
-            $getParams = @{
-                LiteralPath = $ImportFilePath
-                Encoding    = 'UTF8'
-                Raw         = $true
-            }
-            $import = Get-Content @getParams | 
-            ConvertFrom-Json -EA Stop
-            #endregion
-     
-            #region Remove packages
-            foreach ($applicationName in $import.SoftwarePackages.Remove) {
+$import = $Data
+foreach ($applicationName in $import.Remove) {
                 if (
                     $installedApplication = Get-InstalledApplicationsHC |
                     Where-Object { $_.DisplayName -eq $applicationName }
@@ -201,10 +137,7 @@ Process {
                     Write-Verbose $M; Write-Output $M
                 }
             }
-            #endregion
-
-            #region Install packages
-            foreach ($application in $import.SoftwarePackages.Install) {
+foreach ($application in $import.Install) {
                 try {
                     #region Test executable file
                     if (-not $application.ExecutablePath) {
@@ -214,7 +147,7 @@ Process {
 
                     #region Get executable path from software folder
                     $params = @{
-                        Path        = $application.ExecutablePath
+                        Path        = Resolve-RootPathHC -Path $application.ExecutablePath -RootFolder $RootFolder
                         ErrorAction = 'Ignore'
                     }
                     $executablePath = Convert-Path @params
@@ -262,16 +195,8 @@ Process {
                     Write-Error "Failed to install executable '$($application.ExecutablePath)' with arguments '$($application.Arguments)': $errorMessage"
                 } 
             }
-            #endregion
-        }
-    }
-    Catch {
-        $errorMessage = $_; $Error.RemoveAt(0)
-        throw "$Action software packages failed: $errorMessage"
-    }
-    Finally {
-        If ($Action -eq 'Import') {
-            Set-Location $workPath
-        }
-    }
+} finally { Set-Location -LiteralPath $workPath.Path }
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

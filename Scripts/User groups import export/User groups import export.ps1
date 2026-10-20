@@ -1,91 +1,26 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Export or import local groups
-
-    .DESCRIPTION
-        This script should be run with action 'Export' on a computer that has 
-        already the required local groups already created. Then on another 
-        computer run this script with action 'Import' to recreate the exported 
-        local groups.
-
-        Only local group creation is supported. Azure AD groups or not supported
-        for creation. 
-        
-        This script only adds or updates local groups and group members and 
-        will never remove a group or remove a group member.
-        
-        TIP:
-        It's encouraged to clean up the export file before running the script 
-        with action 'Import'. Remove non relevant groups, update group details,
-        , ...
-
-    .PARAMETER Action
-        When action is 'Export' the data will be saved in the $DataFolder, when 
-        action is 'Import' the data in the $DataFolder will be restored.
-
-    .PARAMETER DataFolder
-        Folder where the export or import file can be found
-
-    .PARAMETER FileName
-        Name of the file that contains all local groups
-
-    .EXAMPLE
-        $exportParams = @{
-            Action     = 'Export'
-            DataFolder = 'C:\Groups'
-            FileName   = 'Groups.json'
-        }
-        & 'C:\Groups.ps1' @exportParams
-
-        Export all groups on the current computer to the folder 
-        'C:\Groups'
-
-    .EXAMPLE
-        $importParams = @{
-            Action         = 'Import'
-            DataFolder     = 'C:\Groups'
-            FileName = 'Groups.json'
-        }
-        & 'C:\Groups.ps1' @importParams
-
-        Restore all groups in the folder 'C:\Groups' on the 
-        current computer
+.SYNOPSIS
+    Export or import User groups as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
-[CmdLetBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$FileName = 'Groups.json'
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
-
-Begin {
-    Function Convert-AccountNameHC {
-        <#
-            .SYNOPSIS
-                Convert an account name coming from another computer to 
-                an account name usable on the current computer.
-    
-            .EXAMPLE
-                Convert-AccountNameHC -Name 'PC1\mike'
-                Returns 'PC2\mike' when the computer name of the current
-                computer is 'PC2'
-    
-            .EXAMPLE
-                Convert-AccountNameHC -Name 'BUILTIN\Administrators'
-                Returns 'BUILTIN\Administrators'
-    
-            .EXAMPLE
-                Convert-AccountNameHC -Name 'CONTOSO\bob'
-                Returns 'CONTOSO\bob'
-    
-            .EXAMPLE
-                Convert-AccountNameHC -Name 'Everyone'
-                Returns 'Everyone'
-        #>
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
+Function Convert-AccountNameHC {
+        
         Param (
             [Parameter(Mandatory)]
             [String]$Name
@@ -110,7 +45,7 @@ Begin {
             throw "Failed to convert the account name of '$Name': $_"
         }
     }
-    Function Set-LocalGroupHC {
+Function Set-LocalGroupHC {
         # not supported by standard CmdLet
         # Set-LocalGroup -Description ''
         # Set-LocalGroup -Description $null
@@ -131,43 +66,17 @@ Begin {
             $Group.SetInfo()
         }
     }
-    
-    Try {
-        $GroupsFile = Join-Path -Path $DataFolder -ChildPath $FileName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $GroupsFile -PathType Leaf)) {
-                throw "groups file '$GroupsFile' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        throw "$Action groups failed: $_"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            $groups = Get-LocalGroup
-
-            $groupsToExport = foreach ($group in $groups) {
+if ($Action -eq 'Export') {
+    #region Capture section
+$groups = Get-LocalGroup
+$groupsToExport = foreach ($group in $groups) {
                 Write-Verbose "Group '$($group.Name)'"
                 try {
                     $groupMembers = Get-LocalGroupMember -Name $group.Name -EA Stop
@@ -184,21 +93,17 @@ Process {
                     Members     = @($groupMembers.Name)
                 }
             }
-            
-            Write-Verbose "Export groups to file '$GroupsFile'"
-            $groupsToExport | ConvertTo-Json -Depth 5 | 
-            Out-File -FilePath $GroupsFile -Encoding UTF8
+$exportData = @($groupsToExport)
+    #endregion
+    $messages = @('Exported User groups')
+}
+else {
+    #region Apply section
+    $messages = @(& {
 
-            Write-Output "Exported $($groups.count) groups"
-        }
-        else {
-            Write-Verbose "Import groups from file '$GroupsFile'"
-            $importedGroups = Get-Content -LiteralPath $GroupsFile -Raw | 
-            ConvertFrom-Json -EA Stop
-
-            $knownComputerGroups = Get-LocalGroup
-
-            foreach ($group in $importedGroups) {
+$importedGroups = $Data
+$knownComputerGroups = Get-LocalGroup
+foreach ($group in $importedGroups) {
                 try {                    
                     Write-Verbose "Group '$($group.Name)'"
                     
@@ -264,9 +169,7 @@ Process {
                     $Error.RemoveAt(1)
                 }
             }
-        }
-    }
-    Catch {
-        throw "$Action groups failed: $_"
-    }
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

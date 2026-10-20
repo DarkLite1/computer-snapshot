@@ -1,0 +1,13 @@
+[
+  {
+    "Name": "Example",
+    "DisplayName": "Example",
+    "Direction": "Inbound",
+    "Action": "Allow",
+    "Enabled": false,
+    "Profile": "Private",
+    "Protocol": "TCP",
+    "LocalPort": "443",
+    "Comment": "Export existing rules for complete settings. Enable only required rules."
+  }
+]

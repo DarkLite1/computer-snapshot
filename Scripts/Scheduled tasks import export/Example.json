@@ -1,0 +1,9 @@
+[
+  {
+    "Comment": "Replace Xml with the complete XML returned by Export-ScheduledTask.",
+    "TaskName": "Example",
+    "TaskPath": "\\HC\\",
+    "Enabled": true,
+    "Xml": "<Task xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\" version=\"1.2\"><Triggers/><Principals><Principal id=\"Author\"><UserId>S-1-5-18</UserId><RunLevel>LeastPrivilege</RunLevel></Principal></Principals><Settings><Enabled>true</Enabled></Settings><Actions Context=\"Author\"><Exec><Command>cmd.exe</Command><Arguments>/c exit 0</Arguments></Exec></Actions></Task>"
+  }
+]

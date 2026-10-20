@@ -1,130 +1,26 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Export or import user accounts
-
-    .DESCRIPTION
-        This script should be run with action 'Export' on a computer that has 
-        all the required users already created. Then on another computer this
-        script can be run with action 'Import' to recreate the exported user 
-        accounts.
-
-        Disabled and Enabled user accounts will be recreated with their 
-        respective status. 
-
-        This script only adds or updates user accounts and will never remove a
-        user account.
-        
-        TIP:
-        It's encouraged to clean up the export file before running the script 
-        with action 'Import'. Remove disabled user accounts, remove non 
-        relevant user accounts, update user account details as desired, ...
-
-    .PARAMETER Action
-        When action is 'Export' the data will be saved in the $DataFolder, when 
-        action is 'Import' the data in the $DataFolder will be restored.
-
-    .PARAMETER DataFolder
-        Folder where the export or import file can be found
-
-    .PARAMETER UserAccountsFileName
-        Name of the file that contains all local user accounts
-
-    .PARAMETER AllowBlankPassword
-        Allow the creation of user accounts with a blank password. When set to 
-        true a blank password is accepted. This can be done by simply pressing
-        the ENTER key when asked for a new password for the user account. 
-        By default, blank passwords are not accepted.
-
-    .EXAMPLE
-        $exportParams = @{
-            Action               = 'Export'
-            DataFolder           = 'C:\UserAccounts'
-            UserAccountsFileName = 'UserAccounts.json'
-        }
-        & 'C:\UserAccounts.ps1' @exportParams
-
-        Export all user accounts on the current computer to the folder 
-        'C:\UserAccounts'
-
-    .EXAMPLE
-        $importParams = @{
-            Action               = 'Import'
-            DataFolder           = 'C:\UserAccounts'
-            UserAccountsFileName = 'UserAccounts.json'
-        }
-        & 'C:\UserAccounts.ps1' @importParams
-
-        Restore all user accounts in the folder 'C:\UserAccounts' on the 
-        current computer
-
-    .EXAMPLE
-        $exportParams = @{
-            Action               = 'Export'
-            DataFolder           = 'C:\UserAccounts'
-            UserAccountsFileName = 'UserAccounts.json'
-        }
-        & 'C:\UserAccounts.ps1' @exportParams
-
-        $joinParams = @{
-            Path      = $exportParams.DataFolder 
-            ChildPath = $exportParams.UserAccountsFileName
-        }
-        $exportFile = Join-Path @joinParams
-
-        $ExportedUsers = (Get-Content -Path $exportFile -Raw) | ConvertFrom-Json
-        $ExportedUsers | Foreach-Object {$_.Enabled = $true}
-        ($ExportedUsers[0..1]) | ConvertTo-Json | 
-        Out-File -Path $exportFile -Encoding UTF8
-
-        $exportParams.Action = 'Import'
-        & 'C:\UserAccounts.ps1' @exportParams
-
-        The first command exports all user accounts. The second command
-        sets the status Enabled to $true for all exported user accounts and
-        overwrites the exported file with the first 2 user accounts only.
-        The last command creates all users in the exported file, being two
-        users with status Enabled set to $true.
+.SYNOPSIS
+    Export or import User accounts as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$UserAccountsFileName = 'UserAccounts.json',
-    [Boolean]$AllowBlankPassword = $true
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
-
-Begin {
-    Function Compare-EncryptedPasswordsEqualHC {
-        <#
-            .SYNOPSIS
-                Compare two encrypted passwords to see if they match
-    
-            .DESCRIPTION
-                Users must enter a password twice to make sure they 
-                didn't miss type
-    
-            .EXAMPLE
-                $compareParams = @{
-                    Password1 = ConvertTo-SecureString -String '1' -AsPlainText -Force
-                    Password2 = ConvertTo-SecureString -String '1' -AsPlainText -Force
-                }
-                Compare-EncryptedPasswordsEqualHC @compareParams
-    
-                Both passwords match, so true is returned
-    
-            .EXAMPLE
-                $compareParams = @{
-                    Password1 = ConvertTo-SecureString -String '1' -AsPlainText -Force
-                    Password2 = ConvertTo-SecureString -String '2' -AsPlainText -Force
-                }
-                Compare-EncryptedPasswordsEqualHC @compareParams
-    
-                Both passwords do not match, so false is returned
-        #>
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
+Function Compare-EncryptedPasswordsEqualHC {
+        
         Param (
             [Parameter(Mandatory)]
             [System.Security.SecureString]$Password1, 
@@ -139,16 +35,8 @@ Begin {
             $true
         }
     }
-    Function Request-PasswordHC {
-        <#
-            .SYNOPSIS
-                Ask the user to type a password in the console
-
-            .DESCRIPTION
-                The password typed will be checked by asking the users to type
-                it twice and confirming it's a match. In case it's not matching
-                we'll ask again.
-        #>
+Function Request-PasswordHC {
+        
 
         [OutputType([System.Security.SecureString])]
         Param (
@@ -176,34 +64,9 @@ Begin {
         until ($passwordsMatching)
     
         $compareParams.Password1
-    }    
-    Function Set-NewPasswordHC {
-        <#
-            .SYNOPSIS
-                Create a new user account or update an existing user account
-                with the provided plain string password
-
-            .PARAMETER UserName
-                Name of the user account
-
-            .PARAMETER UserPassword
-                Plain string containing the user account password
-
-            .PARAMETER NewUser
-                If used a new user is created with the requested password
-                otherwise an existing user is updated with the requested
-                password
-
-            .EXAMPLE
-                Set-NewPasswordHC -UserName 'bob' -UserPassword 'P@s/-%*D!'
-
-                Updates the existing user 'bob' with the new password
-
-            .EXAMPLE
-                Set-NewPasswordHC -UserName 'mike' -UserPassword 'P@s/-%*D!' -NewUser
-
-                Creates the new user 'mike' and set his password
-        #>
+    }
+Function Set-NewPasswordHC {
+        
         Param (
             [Parameter(Mandatory)]
             [String]$UserName,
@@ -249,70 +112,28 @@ Begin {
         }
         while (-not $isPasswordAccepted)
     }
-
-    Try {
-        $UserAccountsFile = Join-Path -Path $DataFolder -ChildPath $UserAccountsFileName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $UserAccountsFile -PathType Leaf)) {
-                throw "User accounts file '$UserAccountsFile' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        throw "$Action user accounts failed: $_"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
+$AllowBlankPassword = $true
+if ($Action -eq 'Export') {
+    #region Capture section
+$users = @(Get-LocalUser)
+$exportData = @($users | Select-Object Name, FullName, Description, Enabled, PasswordExpires,
+    UserMayChangePassword, @{ Name = 'Password'; Expression = { '' } })
+    #endregion
+    $messages = @('Exported User accounts')
+}
+else {
+    #region Apply section
+    $messages = @(& {
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            Write-Verbose "Export user accounts to file '$UserAccountsFile'"
-            If ($users = Get-LocalUser) {
-                $users | ForEach-Object {
-                    Write-Verbose "User account '$($_.Name)' description '$($_.description)'"
-                }
-                Write-Verbose "Export users to file '$UserAccountsFile'"
-                (
-                    $users | Select-Object -Property Name, FullName,
-                    Description, Enabled, PasswordExpires, 
-                    UserMayChangePassword, 
-                    @{Name = 'Password'; Expression = { '' } } 
-                ) | 
-                ConvertTo-Json | 
-                Out-File -FilePath $UserAccountsFile -Encoding UTF8
-
-                Write-Output "Exported $($users.count) user accounts"
-            }
-            else {
-                throw 'No enabled local user accounts found'
-            }
-        }
-        else {
-            Write-Verbose "Import user accounts from file '$UserAccountsFile'"
-            $importedUsers = (
-                Get-Content -LiteralPath $UserAccountsFile -Raw
-            ) | ConvertFrom-Json -EA Stop
-
-            $knownComputerUsers = Get-LocalUser
-
-            foreach ($user in $importedUsers) {
+$importedUsers = $Data
+$knownComputerUsers = Get-LocalUser
+foreach ($user in $importedUsers) {
                 try {                    
                     Write-Verbose "User '$($user.Name)'"
                     $passwordParams = @{
@@ -385,9 +206,7 @@ Process {
                     $Error.RemoveAt(1)
                 }
             }
-        }
-    }
-    Catch {
-        throw "$Action user accounts failed: $_"
-    }
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

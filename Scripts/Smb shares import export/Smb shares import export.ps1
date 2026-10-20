@@ -1,78 +1,26 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Export or import smb shares.
-
-    .DESCRIPTION
-        This script should be run on a computer that has the correct smb shares 
-        configured with action Export. This will create export files containing 
-        all the data needed to do a restore. Then on another computer run the 
-        script again with action Import and it will restore all smb shares in
-        the data folder.
-        
-        This script will never delete an smb share or folder. SMB share folders
-        that do not exist will be created.
-        
-    .PARAMETER Action
-        When action is 'Export' the data will be saved in the $DataFolder, when 
-        action is 'Import' the data in the $DataFolder will be restored.
-
-    .PARAMETER DataFolder
-        Folder where the export or import file can be found
-
-    .EXAMPLE
-        $exportParams = @{
-            Action     = 'Export'
-            DataFolder = 'C:\SmbShares'
-        }
-        & 'C:\ImportExportSmbShares.ps1' @exportParams
-
-        Export all smb shares on the current computer to the folder 'SmbShares'
-
-    .EXAMPLE
-        $importParams = @{
-            Action     = 'Import'
-            DataFolder = 'C:\SmbShares'
-        }
-        & 'C:\ImportExportSmbShares.ps1' @importParams
-
-        Import all smb shares in the folder 'SmbShares'
+.SYNOPSIS
+    Export or import Smb shares as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$smbSharesFileName = 'SmbShares.json',
-    [String]$smbSharesAccessFileName = 'SmbSharesAccess.json'
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
-
-Begin {    
-    Function Convert-AccountNameHC {
-        <#
-            .SYNOPSIS
-                Convert an account name coming from another computer to 
-                an account name usable on the current computer.
-    
-            .EXAMPLE
-                Convert-AccountNameHC -Name 'PC1\mike'
-                Returns 'PC2\mike' when the computer name of the current
-                computer is 'PC2'
-    
-            .EXAMPLE
-                Convert-AccountNameHC -Name 'BUILTIN\Administrators'
-                Returns 'BUILTIN\Administrators'
-    
-            .EXAMPLE
-                Convert-AccountNameHC -Name 'CONTOSO\bob'
-                Returns 'CONTOSO\bob'
-    
-            .EXAMPLE
-                Convert-AccountNameHC -Name 'Everyone'
-                Returns 'Everyone'
-        #>
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
+Function Convert-AccountNameHC {
+        
         Param (
             [Parameter(Mandatory)]
             [String]$Name
@@ -97,28 +45,8 @@ Begin {
             throw "Failed to convert the account name of '$Name': $_"
         }
     }
-    Function Test-AccountExistsHC {
-        <#
-            .SYNOPSIS
-                Test if an account exists
-    
-            .DESCRIPTION
-                Test if an account exists and can be used to set NTFS permissions. Returns true if valid and false when not valid.
-    
-            .EXAMPLE
-                Returns true for all existing accounts:
-                Test-AccountExistsHC -Name "$env:USERDOMAIN\$env:USERNAME"
-                Test-AccountExistsHC -Name 'NT AUTHORITY\Everyone'
-                Test-AccountExistsHC -Name 'Everyone'
-                Test-AccountExistsHC -Name "$env:COMPUTERNAME\ExistingLocalAccount"
-                Test-AccountExistsHC -Name 'ExistingLocalAccount'
-                Test-AccountExistsHC -Name 'BUILTIN\Administrators'
-    
-                Returns false for all accounts that do not exist:
-                Test-AccountExistsHC -Name "$env:USERDOMAIN\NonExisting"
-                Test-AccountExistsHC -Name 'BUILTIN\Everyone'
-                Test-AccountExistsHC -Name 'NonExisting'
-        #>
+Function Test-AccountExistsHC {
+        
         
         Param (
             [Parameter(Mandatory)]
@@ -160,159 +88,52 @@ Begin {
             $tmpFile | Remove-Item
         }
     }
-
-    Try {
-        $smbSharesFile = Join-Path -Path $DataFolder -ChildPath $smbSharesFileName
-        $smbSharesAccessFile = Join-Path -Path $DataFolder -ChildPath $smbSharesAccessFileName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $smbSharesFile -PathType Leaf)) {
-                throw "Smb shares file '$smbSharesFile' not found"
-            }
-            If (-not (Test-Path -LiteralPath $smbSharesAccessFile -PathType Leaf)) {
-                throw "Smb shares access file '$smbSharesAccessFile' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        throw "$Action smb shares failed: $_"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            If ($smbShares = @(Get-SmbShare)) {
-                Write-Verbose "Smb shares '$($smbShares.Name -join "', '")'"
-                Write-Verbose "Export smb shares to file '$smbSharesFile'"
-                (
-                    $smbShares | Select-Object -Property Name, Description, Path, 
-                    ScopeName, 
-                    @{
-                        Name       = 'CachingMode';
-                        Expression = { [String]$_.CachingMode } 
-                    }, 
-                    @{
-                        Name       = 'SmbInstance'; 
-                        Expression = { [String]$_.SmbInstance } 
-                    }, 
-                    @{
-                        Name       = 'FolderEnumerationMode'; 
-                        Expression = { [String]$_.FolderEnumerationMode } 
-                    }, 
-                    CATimeout, EncryptData, ThrottleLimit, ConcurrentUserLimit, 
-                    ContinuouslyAvailable
-                ) | 
-                ConvertTo-Json | 
-                Out-File -LiteralPath $smbSharesFile -Encoding utf8
-
-                Write-Output "Exported $($smbShares.Count) smb shares"
-
-                $smbSharesAccess = $smbShares | Get-SmbShareAccess
-                Write-Verbose "Export smb share access permissions to file '$smbSharesAccessFile'"
-                (
-                    $smbSharesAccess | Select-Object -Property Name, 
-                    ScopeName, AccountName, 
-                    @{
-                        Name       = 'AccessControlType'; 
-                        Expression = { [String]$_.AccessControlType } 
-                    },
-                    @{
-                        Name       = 'AccessRight'; 
-                        Expression = { [String]$_.AccessRight } 
-                    }
-                ) | 
-                ConvertTo-Json | 
-                Out-File -LiteralPath $smbSharesAccessFile -Encoding utf8
-                    
-                Write-Output "Exported $($smbSharesAccess.Count) smb share accesses"
-
-                $ntfsFolder = New-Item -Path (Join-Path $DataFolder 'NTFS') -ItemType Directory
-
-                Foreach ($share in $smbShares | 
-                    Where-Object { 
-                        ($_.Path) -and
-                        (Test-Path -LiteralPath $_.Path -PathType Container -EA Ignore)
-                    }
-                ) {
-                    $ntfsFile = Join-Path -Path $ntfsFolder -ChildPath "$($share.Name).json"
-                    $acl = Get-Acl -Path $share.Path
-                    Write-Verbose "Smb share '$($share.Name)' export NTFS permissions to file '$ntfsFile'"
-
-                    (
-                        [Ordered]@{
-                            Owner                   = $acl.Owner
-                            AreAccessRulesProtected = $acl.AreAccessRulesProtected
-                            Access                  = @(
-                                $acl.Access | 
-                                Where-Object { -not $_.IsInherited } | 
-                                Select-Object -Property @{
-                                    Name       = 'IdentityReference'; 
-                                    Expression = { [String]$_.IdentityReference } 
-                                },
-                                @{
-                                    Name       = 'AccessControlType'; 
-                                    Expression = { [String]$_.AccessControlType } 
-                                },
-                                @{
-                                    Name       = 'FileSystemRights'; 
-                                    Expression = { [String]$_.FileSystemRights } 
-                                },
-                                @{
-                                    Name       = 'InheritanceFlags'; 
-                                    Expression = { [String]$_.InheritanceFlags } 
-                                },
-                                @{
-                                    Name       = 'PropagationFlags'; 
-                                    Expression = { [String]$_.PropagationFlags } 
-                                } 
-                            )
-                        }
-                    ) | 
-                    ConvertTo-Json | 
-                    Out-File -LiteralPath $ntfsFile -Encoding utf8
-                }
-
-                if ($ntfsFile) {
-                    Write-Output 'Exported NTFS permissions'
-                }
-            }
-            else {
-                throw "No Smb shares found on '$env:COMPUTERNAME'"
-            }
+if ($Action -eq 'Export') {
+    #region Capture section
+$shares = @(Get-SmbShare)
+$exportData = [ordered]@{
+    Shares = @($shares | Select-Object Name, Description, Path, ScopeName,
+        @{Name='CachingMode';Expression={[string]$_.CachingMode}},
+        @{Name='SmbInstance';Expression={[string]$_.SmbInstance}},
+        @{Name='FolderEnumerationMode';Expression={[string]$_.FolderEnumerationMode}},
+        CATimeout, EncryptData, ThrottleLimit, ConcurrentUserLimit, ContinuouslyAvailable)
+    Access = @($shares | Get-SmbShareAccess | Select-Object Name, ScopeName, AccountName,
+        @{Name='AccessControlType';Expression={[string]$_.AccessControlType}},
+        @{Name='AccessRight';Expression={[string]$_.AccessRight}})
+    Ntfs = @(foreach ($share in $shares | Where-Object { $_.Path -and (Test-Path -LiteralPath $_.Path -PathType Container -ErrorAction Ignore) }) {
+        $acl = Get-Acl -Path $share.Path
+        [ordered]@{
+            Name = $share.Name
+            Owner = $acl.Owner
+            AreAccessRulesProtected = $acl.AreAccessRulesProtected
+            Access = @($acl.Access | Where-Object { -not $_.IsInherited } | Select-Object
+                @{Name='IdentityReference';Expression={[string]$_.IdentityReference}},
+                @{Name='AccessControlType';Expression={[string]$_.AccessControlType}},
+                @{Name='FileSystemRights';Expression={[string]$_.FileSystemRights}},
+                @{Name='InheritanceFlags';Expression={[string]$_.InheritanceFlags}},
+                @{Name='PropagationFlags';Expression={[string]$_.PropagationFlags}})
         }
-        else {
-            $accountsValid = @{}
+    })
+}
+    #endregion
+    $messages = @('Exported Smb shares')
+}
+else {
+    #region Apply section
+    $messages = @(& {
+$accountsValid = @{}
 
-            Write-Verbose "Import smb shares from file '$smbSharesFile'"
-            $smbShares = (
-                Get-Content -LiteralPath $smbSharesFile -Encoding UTF8 -Raw
-            ) | 
-            ConvertFrom-Json -EA Stop
-        
-            Write-Verbose "Import smb shares access from file '$smbSharesAccessFile'"
-            $smbSharesAccesses = (
-                Get-Content -LiteralPath $smbSharesAccessFile -Encoding UTF8 -Raw
-            ) | 
-            ConvertFrom-Json -EA Stop
-        
-            foreach ($share in $smbShares) {
+$smbShares = $Data.Shares
+
+$smbSharesAccesses = $Data.Access
+foreach ($share in $smbShares) {
                 Try {
                     Write-Verbose "Smb share '$($share.Name)' path '$($share.Path)'"
           
@@ -382,12 +203,9 @@ Process {
                     #endregion
         
                     #region Add NTFS permissions
-                    $ntfsFile = Join-Path -Path $DataFolder -ChildPath "NTFS\$($share.Name).json"
-                    If (Test-Path -Path $ntfsFile -PathType Leaf) {
-                        $aclImport = (
-                            Get-Content -LiteralPath $ntfsFile -Encoding UTF8
-                        ) | 
-                        ConvertFrom-Json -EA Stop
+
+                    If ($Data.Ntfs | Where-Object { $_.Name -eq $share.Name }) {
+                        $aclImport = $Data.Ntfs | Where-Object { $_.Name -eq $share.Name }
                     
                         #region Create ACE's
                         $aceList = ForEach ($ace in $aclImport.Access) {
@@ -467,9 +285,7 @@ Process {
                     $Error.RemoveAt(1)
                 }
             }
-        }
-    }
-    Catch {
-        throw "$Action smb shares failed: $_"
-    }
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

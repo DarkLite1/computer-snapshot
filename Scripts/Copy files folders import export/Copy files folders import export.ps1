@@ -1,147 +1,43 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Copy files from one location to another.
-
-    .DESCRIPTION
-        When action is 'Export' the script will create an example file that can 
-        be used with action set to 'Import'.
-
-        When action is 'Import' the import file is read and all files and 
-        folders in the file will be copied. 
-        
-        The import file needs to be explicit and contain the destination file 
-        name or folder name:
-
-        [
-            {
-                "From" = "C:\\Finance\\Reports",
-                "To" = "T:\\Backup\\Reports"
-            },
-            {
-                "From" = "C:\\Fruit\\Banana.txt",
-                "To" = "T:\\Basket\\Banana.txt"
-            }
-        ]
-
-        Files or folders with the same name will be overwritten in the 
-        destination, extra files or folders will not be removed.
-
-    .PARAMETER Action
-        When action is 'Export' the data will be saved in the $DataFolder, when 
-        action is 'Import' the data in the $DataFolder will be restored.
-
-    .PARAMETER FileName
-        The file containing the paths to the files or folders to copy, with the 
-        from and to fields.
-
-    .PARAMETER DataFolder
-        Folder where the export or import file can be found.
-
-    .EXAMPLE
-        $params = @{
-            Action     = 'Export'
-            DataFolder = 'C:\copy'
-            FileName   = 'copy.json'
-        }
-        & 'C:\script.ps1' @params
-
-        Create the example file 'C:\copy\copy.json' that can be used later on 
-        with action 'Import'.
-
-    .EXAMPLE
-        $params = @{
-            Action     = 'Import'
-            DataFolder = 'C:\copy'
-            FileName   = 'copy.json'
-        }
-        & 'C:\script.ps1' @params
-
-        Read the file 'C:\copy\copy.json' and execute all copy actions defined 
-        in the file.
+.SYNOPSIS
+    Export or import Copy files folders as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$FileName = 'CopyFilesFolders.json'
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
 
-Begin {
-    Function Get-FullPathHC {
-        Param (
-            [Parameter(Mandatory)]
-            [String]$Path
-        )
-
-        if ($Path -like '*:*') {
-            $Path
-        }
-        else {
-            Join-Path -Path $DataFolder -ChildPath $Path
-        }
-    }
-
-    Try {
-        $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
-                throw "Import file '$ExportFile' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        throw "$Action failed: $_"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            #region Create example config file
-            Write-Verbose "Create example config file '$ExportFile'"
-            $params = @{
-                LiteralPath = Join-Path $PSScriptRoot 'Examples\CopyFilesFolders.json'
-                Destination = $ExportFile
-            }
-            Copy-Item @params
-            Write-Output "Created example config file '$ExportFile'"
-            #endregion
-
-            #region Create example copy file
-            Write-Verbose 'Create example copy file'
-            $params = @{
-                LiteralPath = Join-Path $PSScriptRoot 'Examples\Monitor SSD.ps1'
-                Destination = Join-Path $DataFolder 'Monitor SSD.ps1'
-            }
-            Copy-Item @params
-            Write-Output "Created example copy file '$($params.Destination)'"
-            #endregion
-        }
-        else {
-            $itemsToCopy = Get-Content -Path $ExportFile -Raw | ConvertFrom-Json
-
-            foreach ($i in $itemsToCopy) {
+if ($Action -eq 'Export') {
+    #region Capture section
+$exportData = Read-SectionExampleHC "$PSScriptRoot\Example.json"
+    #endregion
+    $messages = @('Exported Copy files folders')
+}
+else {
+    #region Apply section
+    $messages = @(& {
+$itemsToCopy = $Data
+foreach ($i in $itemsToCopy) {
                 try {
                     if (-not ($from = $i.From)) {
                         throw "The field 'From' is required"
@@ -149,7 +45,7 @@ Process {
                     if (-not ($to = $i.To)) {
                         throw "The field 'To' is required"
                     }
-                    $from = Get-FullPathHC -Path $from
+                    $from = Resolve-RootPathHC -Path $from -RootFolder $RootFolder
                     if (-not 
                         ($fromItem = Get-Item -LiteralPath $from -EA Ignore)
                     ) {
@@ -188,9 +84,7 @@ Process {
                     Write-Error "Failed to copy from '$($i.From)' to '$($i.To)': $_"
                 }
             }
-        }
-    }
-    Catch {
-        throw "$Action failed: $_"
-    }
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

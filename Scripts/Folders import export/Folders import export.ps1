@@ -1,96 +1,43 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Create folders.
-
-    .DESCRIPTION
-        Read the folder paths from an input file and create the required 
-        folders. This script will never delete a folder.
-        
-    .PARAMETER Action
-        When action is 'Import' the required folders will be created from 
-        the import file. When action is 'Export' a template file is exported
-        that can be edited by the user.
-
-    .PARAMETER DataFolder
-        Folder where the file can be found that contains the folder paths.
-
-    .PARAMETER FoldersFileName
-        File containing strings representing the full path of the folders
-        that need to be created.
+.SYNOPSIS
+    Export or import Folders as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$FoldersFileName = 'CreateFolders.json'
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
 
-Begin {    
-    Try {
-        $foldersFile = Join-Path -Path $DataFolder -ChildPath $FoldersFileName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $foldersFile -PathType Leaf)) {
-                throw "Folders file '$foldersFile' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        throw "$Action folders failed: $_"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            #region Create example file
-            Write-Verbose "Create example file '$foldersFile'"
-            $params = @{
-                LiteralPath = Join-Path $PSScriptRoot 'Example.json'
-                Destination = $foldersFile
-            }
-            Copy-Item @params
-            Write-Output "Created example file '$foldersFile'"
-            #endregion
-        }
-        else {
-            #region Import .JSON file
-            Write-Verbose "Import folders from file '$foldersFile'"
-            $getParams = @{
-                LiteralPath = $foldersFile 
-                Encoding    = 'UTF8'
-                Raw         = $true
-            }
-            $folders = Get-Content @getParams | ConvertFrom-Json -EA Stop
-            #endregion
-
-            #region Test .JSON file
-            if (-not $folders.FolderPaths) {
-                throw "Property 'FolderPaths' is empty, no folder to create. Please update the input file '$foldersFile'"
-            }
-            #endregion
-
-            foreach ($path in $folders.FolderPaths) {
+if ($Action -eq 'Export') {
+    #region Capture section
+$exportData = Read-SectionExampleHC "$PSScriptRoot\Example.json"
+    #endregion
+    $messages = @('Exported Folders')
+}
+else {
+    #region Apply section
+    $messages = @(& {
+$folders = $Data
+foreach ($path in $folders.FolderPaths) {
                 Try {
                     Write-Verbose "Folder '$path'"
           
@@ -113,9 +60,7 @@ Process {
                     $Error.RemoveAt(1)
                 }
             }
-        }
-    }
-    Catch {
-        throw "$Action Folders failed: $_"
-    }
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

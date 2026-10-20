@@ -1,139 +1,35 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Configure network cards: rename, connection profile, ...
-
-    .DESCRIPTION
-        When action is 'Export' the script will create an example file that can 
-        be used with action set to 'Import'.
-
-        When action is 'Import' the import file is read and the network cards 
-        will be renamed and or given the correct connection profile (Public, 
-        Private, ...).
-        
-        Identifying the correct network card to rename is done by using the 
-        NetworkCardDescription field. Identifying the correct network card to 
-        change the category is done by using the NetworkCardName. 
-
-        Renaming a card is done first, so if you need to rename and change the
-        category only the NetworkCardDescription is used to identify the 
-        correct network card. 
-
-        The field NetworkCardDescription usually contains the name of the 
-        manufacturer. When querying we use wildcards so the complete 
-        description is not required.
-
-        [
-            {
-                "NetworkCardName"        = "LAN FACTORY",
-                "NetworkCardDescription" = "Broadcom",
-                "NetworkCategory"        = null
-            },
-            {
-                "NetworkCardName"        = "LAN OFFICE",
-                "NetworkCardDescription" = "Intel",
-                "NetworkCategory"        = "Private"
-            }
-        ]
-
-        When a field contains the value NULL or is empty it will be ignored. 
-
-    .PARAMETER Action
-        When action is 'Export' the data will be saved in the $DataFolder, when 
-        action is 'Import' the data in the $DataFolder will be restored.
-
-    .PARAMETER FileName
-        The file containing the network card's configuration
-
-    .PARAMETER DataFolder
-        Folder where the export or import file can be found.
-
-    .EXAMPLE
-        $params = @{
-            Action     = 'Export'
-            DataFolder = 'C:\folder'
-            FileName   = 'NetworkCards.json'
-        }
-        & 'C:\script.ps1' @params
-
-        Create the example file 'C:\folder\NetworkCards.json' that can be used 
-        later on with action 'Import'.
-
-    .EXAMPLE
-        $params = @{
-            Action     = 'Import'
-            DataFolder = 'C:\folder'
-            FileName   = 'NetworkCards.json'
-        }
-        & 'C:\script.ps1' @params
-
-        Read the file 'C:\folder\NetworkCards.json' and rename the network cards
-        matching the description and set the connection profile.
+.SYNOPSIS
+    Export or import Network cards as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$FileName = 'NetworkCards.json'
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
 
-Begin {
-    Function Get-FullPathHC {
-        Param (
-            [Parameter(Mandatory)]
-            [String]$Path
-        )
-
-        if ($Path -like '*:*') {
-            $Path
-        }
-        else {
-            Join-Path -Path $DataFolder -ChildPath $Path
-        }
-    }
-
-    Try {
-        $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
-                throw "Import file '$ExportFile' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        throw "$Action failed: $_"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
-
-Process {
-    Try {
-        $netAdapters = Get-NetAdapter
-        $netConnectionProfiles = Get-NetConnectionProfile
-        $dnsClients = Get-DnsClient
-
-        If ($Action -eq 'Export') {
-            #region Export example config file
-            $cardsToExport = foreach ($adapter in $netAdapters) {
+$netAdapters = Get-NetAdapter; $netConnectionProfiles = Get-NetConnectionProfile; $dnsClients = Get-DnsClient
+if ($Action -eq 'Export') {
+    #region Capture section
+$cardsToExport = foreach ($adapter in $netAdapters) {
                 $NetworkCategory = ($netConnectionProfiles | Where-Object { 
                         $_.InterfaceAlias -eq $adapter.name
                     }).NetworkCategory
@@ -146,8 +42,7 @@ Process {
                         }).ConnectionSpecificSuffix
                 }
             }
-  
-            if (-not $cardsToExport) {
+if (-not $cardsToExport) {
                 #region Create example config file
                 Write-Verbose 'No network cards found, create template'
                 $getParams = @{
@@ -160,30 +55,21 @@ Process {
                 #endregion
             } 
             else {
-                Write-Output "Found $($cardsToExport.Count) network cards:"
+                Write-Verbose "Found $($cardsToExport.Count) network cards:"
                 $cardsToExport | ForEach-Object {
                     $M = "Name '$($_.NetworkCardName)' description '$($_.NetworkCardDescription)' network profile '$($_.NetworkCategory)'"
-                    Write-Verbose $M; Write-Output $M
+                    Write-Verbose $M; Write-Verbose $M
                 }
             }
-            
-            Write-Verbose "Create example config file '$ExportFile'"
-
-            $outParams = @{
-                LiteralPath = $ExportFile 
-                Encoding    = 'UTF8'
-            }
-            $cardsToExport | ConvertTo-Json | Out-File @outParams
- 
-            Write-Output "Created example config file '$ExportFile'"
-            #endregion
-        }
-        else {
-            $NetworkCards = (Get-Content -Path $ExportFile -Raw) | 
-            ConvertFrom-Json
-            
-            #region Test required fields
-            $NetworkCards | ForEach-Object {
+$exportData = @($cardsToExport)
+    #endregion
+    $messages = @('Exported Network cards')
+}
+else {
+    #region Apply section
+    $messages = @(& {
+$NetworkCards = $Data
+$NetworkCards | ForEach-Object {
                 if ($_.PSobject.Properties.Name -notContains "NetworkCardName") {
                     throw "The field 'NetworkCardName' is required"
                 }
@@ -195,9 +81,7 @@ Process {
                     throw "The field 'NetworkCategory' is required"
                 }
             }
-            #endregion
-
-            foreach ($card in $NetworkCards) {
+foreach ($card in $NetworkCards) {
                 foreach (
                     $adapter in 
                     $netAdapters | Where-Object { 
@@ -258,9 +142,7 @@ Process {
                 }
                 #endregion
             }
-        }
-    }
-    Catch {
-        throw "$Action failed: $_"
-    }
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

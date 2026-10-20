@@ -1,0 +1,7 @@
+[
+  {
+    "Comment": "Place the source in Files and set the absolute destination path.",
+    "From": "Files\\Monitor SSD.ps1",
+    "To": "C:\\HC\\Monitor SSD.ps1"
+  }
+]

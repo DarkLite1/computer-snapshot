@@ -1,121 +1,59 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Execute custom PowerShell scripts.
-
-    .DESCRIPTION
-        This script will execute custom PowerShell scripts that are found in the import folder.
-
-    .PARAMETER Action
-        When action is 'Export' example .ps1 files will be saved in the data 
-        folder. When action is 'Import' the .ps1 scripts in the data folder 
-        are simply executed.
-
-    .PARAMETER DataFolder
-        Folder where the PowerShell scripts can be found.
-
-    .EXAMPLE
-        $params = @{
-            Action     = 'Export'
-            DataFolder = 'C:\scripts'
-        }
-        & 'C:\script.ps1' @params
-
-        Add .ps1 example files in the folder 'C:\scripts'.
-
-    .EXAMPLE
-        $params = @{
-            Action     = 'Import'
-            DataFolder = 'C:\scripts'
-        }
-        & 'C:\script.ps1' @params
-
-        The .ps1 files found in the folder 'C:\scripts' will be executed.
+.SYNOPSIS
+    Export or import Start custom scripts as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
-
-Begin {
-    Function Invoke-ScriptHC {
-        [CmdLetBinding()]
-        Param (
-            [Parameter(Mandatory)]
-            [String]$Path
-        )
-
-        & $Path
-    }
-
-    Try {
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If (
-                (Get-ChildItem -Path $DataFolder -Filter '*.ps1' | 
-                Measure-Object).Count -eq 0
-            ) {
-                throw "Import folder '$DataFolder' empty: No PowerShell files found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        $errorMessage = $_
-        $Error.RemoveAt(0)
-        throw "$Action failed: $errorMessage"
-    }
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
+function Invoke-CustomScriptHC {
+    param([string]$Path, [hashtable]$Arguments)
+    & $Path @Arguments
+}
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            #region Create example files
-            Write-Verbose 'Create example copy file'
-            $params = @{
-                Path        = Join-Path $PSScriptRoot 'Examples\*'
-                Destination = $DataFolder
-                Recurse     = $true
-                Force       = $true
-            }
-            Copy-Item @params
-            Write-Output 'Created example script files in folder '$DataFolder'. Please update them as required or create new ones.'
-            #endregion
-        }
-        else {
-            $scriptsToExecute = Get-ChildItem -Path $DataFolder -Filter '*.ps1' 
-
-            foreach ($script in $scriptsToExecute) {
-                try {
-                    Write-Output "---------------- Script '$($script.Name)' ----------------"
-                    Invoke-ScriptHC -Path $script.FullName
-                }
-                catch {
-                    $errorMessage = $_
-                    $Error.RemoveAt(0)
-                    Write-Error "Failed to execute script '$($script.Name)': $errorMessage"
-                }
-            }
-        }
-    }
-    Catch {
-        $errorMessage = $_
-        $Error.RemoveAt(0)
-        throw "$Action failed: $errorMessage"
-    }
+if ($Action -eq 'Export') {
+    #region Capture section
+$exportData = Read-SectionExampleHC "$PSScriptRoot\Example.json"
+    #endregion
+    $messages = @('Exported Start custom scripts')
 }
+else {
+    #region Apply section
+    $messages = @(& {
+foreach ($script in $Data) {
+    $path = Resolve-RootPathHC -Path $script.Path -RootFolder $RootFolder
+    $arguments = @{}
+    if ($script.Arguments) {
+        foreach ($property in $script.Arguments.PSObject.Properties) {
+            if ($property.Name -ne 'Comment') { $arguments[$property.Name] = $property.Value }
+        }
+    }
+    try {
+        Write-Output "Execute script '$path'"
+        Invoke-CustomScriptHC -Path $path -Arguments $arguments | ForEach-Object { [string]$_ }
+    }
+    catch { Write-Error "Failed to execute script '$path': $_" }
+}
+    })
+    #endregion
+}
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

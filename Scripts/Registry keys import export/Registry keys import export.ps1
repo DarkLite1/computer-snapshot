@@ -1,36 +1,32 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Create registry keys.
-
-    .DESCRIPTION
-        Read the registry keys from an input file on one machine and set the 
-        registry keys from the same file on another machine.
-        
-    .PARAMETER Action
-        When action is 'Export' a template file is created that can be edited 
-        by the user to contain the required registry keys. 
-        When action is 'Import' the registry keys in the import file will be 
-        created or updated on the current machine. 
-
-    .PARAMETER DataFolder
-        Folder where the file can be found that contains the registry keys.
-
-    .PARAMETER RegistryKeysFileName
-        File containing the registry keys.
+.SYNOPSIS
+    Export or import Registry keys as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$RegistryKeysFileName = 'registryKeys.json'
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
 
-Begin {
-    $scriptBlock = {
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
+}
+$scriptBlock = {
         Param (
             [Parameter(Mandatory)]
             [String]$Path,
@@ -92,63 +88,21 @@ Begin {
             $Error.RemoveAt(1)
         }
     }
-
-    Try {
-        $RegistryKeysFile = Join-Path -Path $DataFolder -ChildPath $RegistryKeysFileName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $RegistryKeysFile -PathType Leaf)) {
-                throw "Registry keys file '$RegistryKeysFile' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        throw "$Action registry keys failed: $_"
-    }
+if ($Action -eq 'Export') {
+    #region Capture section
+$exportData = Read-SectionExampleHC "$PSScriptRoot\Example.json"
+    #endregion
+    $messages = @('Exported Registry keys')
 }
+else {
+    #region Apply section
+    $messages = @(& {
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            #region Create example config file
-            Write-Verbose "Create example file '$RegistryKeysFile'"
-            $params = @{
-                LiteralPath = Join-Path $PSScriptRoot 'Example.json'
-                Destination = $RegistryKeysFile
-            }
-            Copy-Item @params
-            Write-Output "Created example registry keys file '$RegistryKeysFile'"
-            #endregion
-        }
-        else {            
-            Write-Verbose "Import registry keys from file '$RegistryKeysFile'"
-            $registryKeys = Get-Content -LiteralPath $RegistryKeysFile -Encoding UTF8 -Raw | 
-            ConvertFrom-Json -EA Stop
-     
-            #region Run registry keys for current user
-            foreach ($key in $registryKeys.RunAsCurrentUser.RegistryKeys) {
+$registryKeys = $Data
+foreach ($key in $registryKeys.RunAsCurrentUser.RegistryKeys) {
                 & $scriptBlock -Path $key.Path -Name $key.Name -Value $key.Value -Type $key.Type
             }
-            #endregion
-
-            #region Run registry keys for another user
-            foreach ($user in $registryKeys.RunAsOtherUser) {
+foreach ($user in $registryKeys.RunAsOtherUser) {
                 if (-not $user.UserName) {
                     Throw "Property 'UserName' is mandatory in 'RunAsOtherUser'"
                 }
@@ -255,10 +209,7 @@ Process {
                 }
                 #endregion
             }
-            #endregion
-        }
-    }
-    Catch {
-        throw "$Action registry keys failed: $_"
-    }
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

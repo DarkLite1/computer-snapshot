@@ -1,59 +1,25 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Create a backup of the regional settings and or restore them.
-
-    .DESCRIPTION
-        When action is 'Export' the regional settings of the computer are 
-        exported. When action is 'Import' the regional settings found in the 
-        input file are restored.
-
-    .PARAMETER Action
-        When action is 'Export' the data will be saved in the $DataFolder, when 
-        action is 'Import' the data in the $DataFolder will be restored.
-
-    .PARAMETER FileName
-        The file containing the regional settings that will be exported or need
-        to be restored.
-
-    .PARAMETER DataFolder
-        Folder where the export or import file can be found.
-
-    .EXAMPLE
-        $params = @{
-            Action     = 'Export'
-            DataFolder = 'C:\folder'
-            FileName   = 'RegionalSettings.json'
-        }
-        & 'C:\script.ps1' @params
-
-        Export the regional settings on the current computer to the file 
-        'C:\folder\RegionalSettings.json'.
-
-    .EXAMPLE
-        $params = @{
-            Action     = 'Import'
-            DataFolder = 'C:\folder'
-            FileName   = 'RegionalSettings.json'
-        }
-        & 'C:\script.ps1' @params
-
-        Restore the regional settings found in the file 
-        'C:\folder\RegionalSettings.json' on the current computer.
+.SYNOPSIS
+    Export or import Regional settings as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$FileName = 'RegionalSettings.json',
-    [String]$NewAccountsScriptName = 'Regional settings new accounts.ps1'
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
-
-Begin {
-    Function Start-ScriptHC {
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
+Function Start-ScriptHC {
         Param (
             [Parameter(Mandatory)]
             [ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })]
@@ -66,67 +32,29 @@ Begin {
             throw "Failed to execute script '$Path': $_"
         }
     }
-
-    Try {
-        $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
-        $NewAccountsScript = Join-Path $PSScriptRoot $NewAccountsScriptName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
-                throw "Import file '$ExportFile' not found"
-            }
-        }
-        #endregion
-
-        #region Test NewAccountsScript
-        If (-not (Test-Path -LiteralPath $NewAccountsScript -PathType Leaf)) {
-            throw "Script file '$NewAccountsScript' not found"
-        }
-        #endregion
-    }
-    Catch {
-        $errorMessage = $_
-        $Error.RemoveAt(0)
-        throw "$Action failed: $errorMessage"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
-
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            Write-Verbose "Export regional settings to file '$ExportFile'"
-            (
-                @{
-                    WinSystemLocaleName  = (Get-WinSystemLocale).Name
-                    TimeZoneId           = (Get-TimeZone).Id
-                    WinHomeLocationGeoId = (Get-WinHomeLocation).GeoId
-                    CultureName          = (Get-Culture).Name
-                }
-            ) | 
-            ConvertTo-Json | 
-            Out-File -LiteralPath $ExportFile -Encoding utf8
-        }
-        else {
-            $importFile = Get-Content -Path $ExportFile -Raw | 
-            ConvertFrom-Json
-
-            #region Test required fields
-            try {
+$NewAccountsScript = Join-Path $PSScriptRoot 'Regional settings new accounts.ps1'
+if ($Action -eq 'Export') {
+    #region Capture section
+$exportData = [ordered]@{
+    WinSystemLocaleName = (Get-WinSystemLocale).Name
+    TimeZoneId = (Get-TimeZone).Id
+    WinHomeLocationGeoId = (Get-WinHomeLocation).GeoId
+    CultureName = (Get-Culture).Name
+}
+    #endregion
+    $messages = @('Exported Regional settings')
+}
+else {
+    #region Apply section
+    $messages = @(& {
+$importFile = $Data
+try {
                 if (-not $importFile.WinSystemLocaleName) {
                     throw "The field 'WinSystemLocaleName' is required"
                 }
@@ -145,14 +73,10 @@ Process {
                 $Error.RemoveAt(0)
                 throw "The following fields are required 'WinSystemLocaleName', 'TimeZoneId', 'CultureName' and 'WinHomeLocationGeoId': $errorMessage"
             }
-            #endregion
-
-            $rebootRequired = $false
-
-            #region Set WinSystemLocale
-            $oldWinSystemLocaleName = (Get-WinSystemLocale).Name
-            $newWinSystemLocaleName = $importFile.WinSystemLocaleName
-            if ($oldWinSystemLocaleName -ne $newWinSystemLocaleName) {
+$rebootRequired = $false
+$oldWinSystemLocaleName = (Get-WinSystemLocale).Name
+$newWinSystemLocaleName = $importFile.WinSystemLocaleName
+if ($oldWinSystemLocaleName -ne $newWinSystemLocaleName) {
                 Set-WinSystemLocale -SystemLocale $newWinSystemLocaleName
                 Write-Output "Changed regional format from '$oldWinSystemLocaleName' to '$newWinSystemLocaleName'"
                 $rebootRequired = $true
@@ -160,12 +84,9 @@ Process {
             else {
                 Write-Output "Regional format '$oldWinSystemLocaleName' is already correct"
             }
-            #endregion
-
-            #region Set TimeZone
-            $oldTimeZoneId = (Get-TimeZone).Id
-            $newTimeZoneId = $importFile.TimeZoneId
-            if ($oldTimeZoneId -ne $newTimeZoneId) {
+$oldTimeZoneId = (Get-TimeZone).Id
+$newTimeZoneId = $importFile.TimeZoneId
+if ($oldTimeZoneId -ne $newTimeZoneId) {
                 Set-TimeZone -Id $newTimeZoneId
                 Write-Output "Changed time zone from '$oldTimeZoneId' to '$newTimeZoneId'"
                 $rebootRequired = $true
@@ -173,12 +94,9 @@ Process {
             else {
                 Write-Output "Time zone '$oldTimeZoneId' is already correct"
             }
-            #endregion
-
-            #region Set WinHomeLocation
-            $oldWinHomeLocation = Get-WinHomeLocation
-            $newWinHomeLocationGeoId = $importFile.WinHomeLocationGeoId
-            if ($oldWinHomeLocation.GeoId -ne $newWinHomeLocationGeoId) {
+$oldWinHomeLocation = Get-WinHomeLocation
+$newWinHomeLocationGeoId = $importFile.WinHomeLocationGeoId
+if ($oldWinHomeLocation.GeoId -ne $newWinHomeLocationGeoId) {
                 Set-WinHomeLocation -GeoId $newWinHomeLocationGeoId
                 Write-Output "Changed country/region from '$($oldWinHomeLocation.GeoId) - $($oldWinHomeLocation.HomeLocation)' to '$newWinHomeLocationGeoId'"
                 $rebootRequired = $true
@@ -186,12 +104,9 @@ Process {
             else {
                 Write-Output "Country/region '$($oldWinHomeLocation.GeoId) - $($oldWinHomeLocation.HomeLocation)' is already correct"
             }
-            #endregion
-
-            #region Set Culture
-            $oldCultureName = (Get-Culture).Name
-            $newCultureName = $importFile.CultureName
-            if ($oldCultureName -ne $newCultureName) {
+$oldCultureName = (Get-Culture).Name
+$newCultureName = $importFile.CultureName
+if ($oldCultureName -ne $newCultureName) {
                 Set-Culture -CultureInfo $newCultureName
                 Write-Output "Changed region format from '$oldCultureName' to '$newCultureName'"
                 $rebootRequired = $true
@@ -199,18 +114,11 @@ Process {
             else {
                 Write-Output "Region format '$oldCultureName' is already correct"
             }
-            #endregion
-
-            if ($rebootRequired) {
+if ($rebootRequired) {
                 Write-Output 'Changes take effect after the computer is restarted'
             }
-
-            Start-ScriptHC -Path $NewAccountsScript
-        }
-    }
-    Catch {
-        $errorMessage = $_
-        $Error.RemoveAt(0)
-        throw "$Action failed: $errorMessage"
-    }
+Start-ScriptHC -Path $NewAccountsScript
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

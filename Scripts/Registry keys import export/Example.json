@@ -25,14 +25,14 @@
           "Name": "EnableAutoTray",
           "Value": "00000001",
           "Type": "DWORD",
-          "?": "Hide task bar"
+          "Comment": "Hide task bar"
         },
         {
           "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
           "Name": "DisableTaskMgr",
           "Value": "00000001",
           "Type": "DWORD",
-          "?": "Disable Ctrl+Alt+Del"
+          "Comment": "Disable Ctrl+Alt+Del"
         }
       ]
     }

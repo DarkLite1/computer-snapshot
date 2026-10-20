@@ -1,4 +1,7 @@
 {
   "SyncTimeWithDomain": true,
-  "TimeServerNames": ["SERVER1.CONTOSO.NET", "SERVER2.CONTOSO.NET"]
+  "TimeServerNames": [
+    "SERVER1.CONTOSO.NET",
+    "SERVER2.CONTOSO.NET"
+  ]
 }

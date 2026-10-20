@@ -1,31 +1,32 @@
 {
-  "SoftwarePackages": {
-    "Remove": ["Notepad++ (64-bit x64)"],
-    "Install": [
-      {
-        "ExecutablePath": ".\\Packages\\npp.8.3.3.Installer.x64.exe",
-        "Arguments": "/S"
-      },
-      {
-        "ExecutablePath": ".\\Packages\\MicrosoftEdgeSetup.exe",
-        "Arguments": null
-      },
-      {
-        "ExecutablePath": ".\\Packages\\Remote Access-windows64-offline.exe",
-        "Arguments": null
-      },
-      {
-        "ExecutablePath": ".\\Packages\\Remote Access-windows64-offline.exe",
-        "Arguments": "/S /NAME=AUTODETECT \"/HOST=http://5.5.5.5:10555\""
-      },
-      {
-        "ExecutablePath": ".\\Packages\\Firebird-2.1.3.18185_0_x64.exe",
-        "Arguments": "/Silent"
-      },
-      {
-        "ExecutablePath": "C:\\WINDOWS\\SysWOW64\\cscript.exe",
-        "Arguments": "DELL_COMMANDUPDATE_4.2.1_EN_X86_R02417\\_Install_Silent.vbs"
-      }
-    ]
-  }
+  "Remove": [
+    "Notepad++ (64-bit x64)"
+  ],
+  "Install": [
+    {
+      "ExecutablePath": "Software\\npp.8.3.3.Installer.x64.exe",
+      "Arguments": "/S"
+    },
+    {
+      "ExecutablePath": "Software\\MicrosoftEdgeSetup.exe",
+      "Arguments": null
+    },
+    {
+      "ExecutablePath": "Software\\Remote Access-windows64-offline.exe",
+      "Arguments": null
+    },
+    {
+      "ExecutablePath": "Software\\Remote Access-windows64-offline.exe",
+      "Arguments": "/S /NAME=AUTODETECT \"/HOST=http://5.5.5.5:10555\""
+    },
+    {
+      "ExecutablePath": "Software\\Firebird-2.1.3.18185_0_x64.exe",
+      "Arguments": "/Silent"
+    },
+    {
+      "ExecutablePath": "Software\\cscript.exe",
+      "Arguments": "DELL_COMMANDUPDATE_4.2.1_EN_X86_R02417\\_Install_Silent.vbs"
+    }
+  ],
+  "Comment": "Place installers in Software. Review uninstall names and installation arguments."
 }

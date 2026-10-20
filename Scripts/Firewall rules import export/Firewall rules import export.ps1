@@ -1,90 +1,27 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Export or import firewall rules.
-
-    .DESCRIPTION
-        This script should be run on a computer that has its firewall rules 
-        correctly configured with the action 'Export'. This will save the 
-        current firewall rules in the DataFolder. On another computer run this 
-        script to restore the firewall rules in the data folder.
-
-        On action Import, when a firewall rule with the same name already exits 
-        it will be removed and created again. Other rules will never be touched.
-
-    .PARAMETER Action
-        When action is 'Export' the data will be saved in the $DataFolder, when 
-        action is 'Import' the data in the $DataFolder will be restored.
-
-    .PARAMETER DataFolder
-        Folder where the export or import file can be found
-
-    .EXAMPLE
-        $exportParams = @{
-            Action     = 'Export'
-            DataFolder = 'C:\FirewallRules'
-        }
-        & 'C:\ImportExportFirewallRules.ps1' @exportParams
-
-        Export all firewall rules on the current computer to the folder 
-        'FirewallRules'
-
-    .EXAMPLE
-        $importParams = @{
-            Action     = 'Import'
-            DataFolder = 'C:\FirewallRules'
-        }
-        & 'C:\ImportExportFirewallRules.ps1' @importParams
-
-        Restore all firewall rules in the folder 'FirewallRules' to the local 
-        computer
+.SYNOPSIS
+    Export or import Firewall rules as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$FileName = 'FirewallRules.json'
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
-
-Begin {
-    Function Export-FirewallRulesHC {
-        <#
-            .SYNOPSIS
-                Exports firewall rules to a '.json' file
-    
-            .DESCRIPTION
-                Export local and policy based firewall rules to a '.json' file.
-                All rules are exported by default, you can filter with parameter 
-                -Name, -Inbound, -Outbound, -Enabled, -Disabled, -Allow and -Block
-    
-            .PARAMETER Name
-                Display name of the rules to be processed. Wildcard character * is 
-                allowed
-    
-            .PARAMETER PolicyStore
-                Store from which the rules are retrieved (default: ActiveStore).
-                Allowed values are PersistentStore, ActiveStore (the resultant rule 
-                set of all sources), localhost, a computer name, <domain.fqdn.
-                com>\<GPO_Friendly_Name>, RSOP and others depending on the 
-                environment.
-            
-            .EXAMPLE
-                Export-FirewallRulesHC -ExportFile 'C:\rules.json'
-    
-                Exports all firewall rules to the file 'C:\rules.json'
-    
-            .EXAMPLE
-                Export-FirewallRulesHC -ExportFile 'C:\rules.json' -Inbound -Allow
-    
-                Exports all inbound and firewall 'Allow' rules to the file 
-                'C:\rules.json'
-            #>
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
+Function Export-FirewallRulesHC {
+        
         Param(
-            [Parameter(Mandatory)]
-            [String]$ExportFile, 
             [String]$Name = '*', 
             [String]$PolicyStore = 'ActiveStore', 
             [Switch]$Inbound, 
@@ -141,11 +78,7 @@ Begin {
             #endregion
         
             #region Get firewall rules
-            $firewallRules = Get-NetFirewallRule -DisplayName $Name -PolicyStore $PolicyStore | Where-Object { 
-                $_.Direction -like $Direction -and 
-                $_.Enabled -like $RuleState -And 
-                $_.Action -like $Action 
-            }
+            $firewallRules = Get-NetFirewallRule -DisplayName $Name -PolicyStore $PolicyStore | Where-Object { $_.Direction -like $Direction -and $_.Enabled -like $RuleState -and $_.Action -like $Action }
             #endregion
                 
             #region Create firewall rule details for export
@@ -196,71 +129,18 @@ Begin {
             }
             #endregion
         
-            $outParams = @{
-                LiteralPath = $ExportFile 
-                Encoding    = 'UTF8'
-            }
-            $firewallRuleSet | ConvertTo-Json | Out-File @outParams
-            Write-Output "Exported $($firewallRuleSet.Count) firewall rules"
+            return @($firewallRuleSet)
         }
         Catch {
             throw "Failed to export the firewall rules: $_"
         }
     }
-    Function Import-FirewallRulesHC {
-        <#
-            .SYNOPSIS
-                Imports firewall rules from a '.json' file
-    
-            .DESCRIPTION
-                Imports firewall rules from a '.json' file. Existing rules with same 
-                display name will be overwritten.
-    
-            .PARAMETER PolicyStore
-                Store to which the rules are written (default: PersistentStore).
-                Allowed values are PersistentStore, ActiveStore (the resultant rule 
-                set of all sources), localhost, a computer name, 
-                <domain.fqdn.com>\<GPO_Friendly_Name> and others depending on the 
-                environment.
-    
-            .EXAMPLE
-                Import-FirewallRulesHC -ImportFile 'C:\rules.json'
-                    
-                Import all firewall rules in the file 'C:\rules.json'
-    
-            .EXAMPLE
-                Export-FirewallRulesHC -ExportFile '.\rules.json' -Verbose
-    
-                $getParams = @{
-                    Path     = '.\rules.json'
-                    Raw      = $true
-                    Encoding = 'utf8'
-                }
-                $exportedRules = (Get-Content @getParams) | ConvertFrom-Json
-    
-                $rulesToImport = $exportedRules | Where-Object {
-                    ($_.DisplayName -eq 'Logica') -or
-                    ($_.DisplayName -eq 'CA Communication Beckhoff PLC') -or
-                    ($_.DisplayName -eq 'Firebird DB Server') -or
-                    ($_.DisplayName -eq 'SMB')
-                }
-    
-                $outParams = @{
-                    FilePath = '.\rules.json'
-                    Encoding  = 'utf8'
-                }
-                $rulesToImport | ConvertTo-Json | Out-File @outParams
-    
-                Import-FirewallRulesHC -ImportFile $outParams.FilePath
-    
-                The first command exports the current firewall rules, then they 
-                only the rules that need to be restored are selected and the file
-                is updated. Om import only those selected rules will be restored.
-            #>
+Function Import-FirewallRulesHC {
+        
         
         Param(
             [Parameter(Mandatory)]
-            [String]$ImportFile, 
+            $Data, 
             [String]$PolicyStore = 'PersistentStore'
         )
         
@@ -294,13 +174,8 @@ Begin {
         }
         
         Try {
-            $getParams = @{
-                LiteralPath = $ImportFile 
-                Encoding    = 'UTF8'
-                Raw         = $true
-            }
-            $firewallRules = (Get-Content @getParams) | 
-            ConvertFrom-Json -EA Stop
+            
+            $firewallRules = $Data
         
             ForEach ($rule In $firewallRules) {
                 $newRuleParams = @{
@@ -373,49 +248,24 @@ Begin {
             throw "Failed to import the firewall rules: $_"
         }
     }
-
-    Try {
-        $ExportFile = Join-Path -Path $DataFolder -ChildPath $FileName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $ExportFile -PathType Leaf)) {
-                throw "Firewall rules file '$ExportFile' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        throw "$Action firewall rules failed: $_"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            Write-Verbose "Export firewall rules to file '$ExportFile'"
-            Export-FirewallRulesHC -ExportFile $ExportFile
-        }
-        else {
-            Write-Verbose "Import firewall rules from file '$ExportFile'"
-            Import-FirewallRulesHC -ImportFile $ExportFile
-        }
-    }
-    Catch {
-        throw "$Action firewall rules failed: $_"
-    }
+if ($Action -eq 'Export') {
+    #region Capture section
+$exportData = @(Export-FirewallRulesHC)
+    #endregion
+    $messages = @('Exported Firewall rules')
 }
+else {
+    #region Apply section
+    $messages = @(& {
+Import-FirewallRulesHC -Data $Data
+    })
+    #endregion
+}
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

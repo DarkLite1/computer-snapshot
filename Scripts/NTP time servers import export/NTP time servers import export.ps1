@@ -1,51 +1,26 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Configure the time synchronization system (NTP).
-
-    .DESCRIPTION
-        Export the NTP configuration to a file on one machine and apply the 
-        NTP configuration from the same file on another machine.
-        
-    .PARAMETER Action
-        When action is 'Import' the NTP server will be read from the import 
-        file and it will be set on the current machine. When action is 'Export' 
-        a template file is exported that can be edited by the user.
-
-    .PARAMETER DataFolder
-        Folder where the file can be found that contains the NTP server name.
-
-    .PARAMETER NtpFileName
-        File containing the information to configure NTP.
+.SYNOPSIS
+    Export or import NTP time servers as a configuration section.
+.PARAMETER Action
+    Export captures data in memory. Import applies Data to Windows.
+.PARAMETER Data
+    Resolved section data. An empty section performs no operations.
+.PARAMETER RootFolder
+    Absolute USB root for asset paths. No configuration files are written here.
+.OUTPUTS
+    Exactly one object: Data (export only) and a string array of Messages.
 #>
-
 [CmdletBinding()]
-Param(
-    [ValidateSet('Export', 'Import')]
-    [Parameter(Mandatory)]
-    [String]$Action,
-    [Parameter(Mandatory)]
-    [String]$DataFolder,
-    [String]$NtpFileName = 'ntpServers.json'
+param(
+    [Parameter(Mandatory)][ValidateSet('Export', 'Import')][string]$Action,
+    $Data,
+    [Parameter(Mandatory)][string]$RootFolder
 )
-
-Begin {
-    Function Get-TimeServerHC {
-        <#
-        .SYNOPSIS
-            Get the time server used on a specific computer
-    
-        .DESCRIPTION
-            Get the time server used on a specific computer.
-            The default is current computer.
-    
-        .EXAMPLE
-            Get-TimeServerHC
-            Get the time server on the current computer
-            
-        .EXAMPLE
-            Get-TimeServerHC -ComputerName 'PC1', 'PC2'
-            Get the time servers for PC1 and PC2
-        #>
+. "$PSScriptRoot\..\Common\Section.ps1"
+#region Windows helpers
+Function Get-TimeServerHC {
+        
         [CmdletBinding()]
         Param (
             [String[]]$ComputerName = $env:COMPUTERNAME
@@ -86,7 +61,7 @@ Begin {
             }
         }
     }
-    Function Set-SynchronizeTimeWithServerHC {
+Function Set-SynchronizeTimeWithServerHC {
         Param (
             [Parameter(Mandatory)]
             [String[]]$ComputerName
@@ -97,61 +72,32 @@ Begin {
         $null = w32tm /config /manualpeerlist:"$manualpeerlist" /syncfromflags:manual /reliable:YES /update
         $null = w32tm /config /update
     }
-    Function Set-SynchronizeTimeWithDomainHC {
+Function Set-SynchronizeTimeWithDomainHC {
         $null = w32tm /config /syncfromflags:domhier /reliable:NO /update
     }
-
-    Try {
-        $ntpFile = Join-Path -Path $DataFolder -ChildPath $NtpFileName
-
-        #region Test DataFolder
-        If ($Action -eq 'Export') {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Export folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -ne 0) {
-                throw "Export folder '$DataFolder' not empty"
-            }
-        }
-        else {
-            If (-not (Test-Path -LiteralPath $DataFolder -PathType Container)) {
-                throw "Import folder '$DataFolder' not found"
-            }
-            If ((Get-ChildItem -Path $DataFolder | Measure-Object).Count -eq 0) {
-                throw "Import folder '$DataFolder' empty"
-            }
-            If (-not (Test-Path -LiteralPath $ntpFile -PathType Leaf)) {
-                throw "NTP file '$ntpFile' not found"
-            }
-        }
-        #endregion
-    }
-    Catch {
-        throw "$Action NTP servers failed: $_"
-    }
+#endregion
+$exportData = $null
+$messages = @()
+if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
 }
 
-Process {
-    Try {
-        If ($Action -eq 'Export') {
-            $timeServers = Get-TimeServerHC
-            @{
-                SyncTimeWithDomain = $timeServers.Type -eq 'NT5DS'
-                TimeServerNames    = @(
-                    $timeServers.TimeServer -split ' ' | Where-Object { $_ } |
-                    ForEach-Object { $_.trim() }
-                )
-            } | 
-            ConvertTo-Json | Out-File -LiteralPath $ntpFile -Encoding utf8
+if ($Action -eq 'Export') {
+    #region Capture section
+$timeServers = Get-TimeServerHC
+$exportData = [ordered]@{
+    SyncTimeWithDomain = $timeServers.Type -eq 'NT5DS'
+    TimeServerNames = @($timeServers.TimeServer -split ' ' | Where-Object { $_ } | ForEach-Object { $_.Trim() })
+}
+    #endregion
+    $messages = @('Exported NTP time servers')
+}
+else {
+    #region Apply section
+    $messages = @(& {
 
-            Write-Output 'Exported NTP config'
-        }
-        else {            
-            Write-Verbose "Import NTP config from file '$ntpFile'"
-            $ntp = Get-Content -LiteralPath $ntpFile -Encoding UTF8 -Raw | 
-            ConvertFrom-Json -EA Stop
-            
-            if ($ntp.SyncTimeWithDomain) {
+$ntp = $Data
+if ($ntp.SyncTimeWithDomain) {
                 Write-Verbose 'Sync time with the domain'
                 Set-SynchronizeTimeWithDomainHC
                 Write-Output 'Time synchronized with the domain'
@@ -177,13 +123,10 @@ Process {
                 else {
                     throw 'No time server names found in the import file'
                 }
-            }    
-           
-            Restart-Service w32time
-            w32tm /resync
-        }
-    }
-    Catch {
-        throw "$Action NTP servers failed: $_"
-    }
+            }
+Restart-Service w32time
+$null = w32tm /resync
+    })
+    #endregion
 }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }

@@ -34,8 +34,8 @@ Describe 'Inline NTFS permissions' {
 		Mock New-SmbShare
 		Mock Test-AccountExistsHC { $true }
 		$exportResult = . $testScript -Action Export -RootFolder $TestDrive
-		$exportResult.Data.Ntfs[0].Access.Count | Should -Be 1
-		$exportResult.Data.Ntfs[0].Access[0].IdentityReference | Should -Be 'Everyone'
+		$exportResult.Data.NTFS[0].Access.Count | Should -Be 1
+		$exportResult.Data.NTFS[0].Access[0].IdentityReference | Should -Be 'Everyone'
 		@(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ SmbShares = $exportResult.Data } } $TestDrive).Count | Should -Be 0
 		$importResult = . $testScript -Action Import -Data $exportResult.Data -RootFolder $TestDrive -ErrorAction Stop
 		$importResult.Data | Should -BeNullOrEmpty

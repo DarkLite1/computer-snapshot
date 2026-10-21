@@ -42,7 +42,7 @@ Written JSON uses two-space indentation, with `Comment` first wherever present. 
 
 If an item fails, successful sections are still exported and failed items are listed in the console and report. If every item fails, no configuration is written. Post-export validation warnings commonly indicate example assets that have not been placed yet. Review the report before restoring.
 
-`CreateFolders`, `RegistryKeys`, `Software`, `CopyFilesFolders` and custom scripts export templates, not a complete capture of those parts of the computer. Scheduled-task capture retains the existing `\HC\*` selection. Task XML and enabled state are stored inline. SMB shares include `Shares`, `Access` and optional `Ntfs` permissions.
+`CreateFolders`, `RegistryKeys`, `Software`, `CopyFilesFolders` and custom scripts export templates, not a complete capture of those parts of the computer. Scheduled-task capture retains the existing `\HC\*` selection. Task XML and enabled state are stored inline. SMB shares include `Shares`, `Access` and optional `NTFS` permissions.
 
 ## Configuration Format
 

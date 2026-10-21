@@ -121,10 +121,10 @@ foreach ($name in $order) {
             $data = [pscustomobject]@{
                 Shares = @($shareData)
                 Access = @($accessData)
-                Ntfs = @()
+                NTFS = @()
             }
             if (Test-Path -LiteralPath (Join-Path $folder 'NTFS')) {
-                $data.Ntfs = @(foreach ($file in Get-ChildItem -LiteralPath (Join-Path $folder 'NTFS') -Filter '*.json' -File) {
+                $data.NTFS = @(foreach ($file in Get-ChildItem -LiteralPath (Join-Path $folder 'NTFS') -Filter '*.json' -File) {
                     $permissions = Read-SectionExampleHC $file.FullName
                     $permissions | Add-Member -NotePropertyName Name -NotePropertyValue $file.BaseName -Force
                     $permissions

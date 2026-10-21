@@ -180,7 +180,7 @@ function Test-ConfigurationHC {
                 }
             }
             'SmbShares' {
-                foreach ($property in @('Shares', 'Access', 'Ntfs')) {
+                foreach ($property in @('Shares', 'Access', 'NTFS')) {
                     if ((Get-PropertiesHC $data) -contains $property -and $data.$property -isnot [array]) { $problems.Add("${location}.${property}: expected an array") }
                 }
             }

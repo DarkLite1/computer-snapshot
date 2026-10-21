@@ -130,7 +130,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
             'Start custom scripts' { $data = @([pscustomobject]@{ Path = 'Files\example.ps1'; Arguments = [pscustomobject]@{ Value = 'Example' } }); $command = 'Invoke-CustomScriptHC' }
             'Scheduled tasks' { $data = @([pscustomobject]@{ TaskName = 'Example'; TaskPath = '\HC\'; Enabled = $false; Xml = '<Task/>' }); $command = 'Disable-ScheduledTask' }
             'Firewall rules' { $data = @([pscustomobject]@{ Name = 'Example'; DisplayName = 'Example'; Enabled = $true; Direction = 'Inbound'; Action = 'Allow'; Protocol = 'TCP'; Profile = 'Any'; DynamicTarget = 'Any'; EdgeTraversalPolicy = 'Block'; InterfaceType = 'Any'; Authentication = 'NotRequired'; Encryption = 'NotRequired' }); $command = 'New-NetFirewallRule' }
-            'Smb shares' { $data = [pscustomobject]@{ Shares = @([pscustomobject]@{ Name = 'Example'; Path = 'C:\Example' }); Access = @(); Ntfs = @() }; $command = 'Set-SmbShare' }
+            'Smb shares' { $data = [pscustomobject]@{ Shares = @([pscustomobject]@{ Name = 'Example'; Path = 'C:\Example' }); Access = @(); NTFS = @() }; $command = 'Set-SmbShare' }
         }
         $result = @(. $ScriptPath -Action Import -Data $data -RootFolder $TestDrive -ErrorAction Stop)
         $result.Count | Should -Be 1

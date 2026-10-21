@@ -973,7 +973,7 @@
             ]
           }
         },
-        "Ntfs": {
+        "NTFS": {
           "type": "array",
           "description": "Optional NTFS permissions by share name.",
           "items": {

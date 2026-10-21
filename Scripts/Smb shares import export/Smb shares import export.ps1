@@ -107,7 +107,7 @@ $exportData = [ordered]@{
     Access = @($shares | Get-SmbShareAccess | Select-Object Name, ScopeName, AccountName,
         @{Name='AccessControlType';Expression={[string]$_.AccessControlType}},
         @{Name='AccessRight';Expression={[string]$_.AccessRight}})
-    Ntfs = @(foreach ($share in $shares | Where-Object { $_.Path -and (Test-Path -LiteralPath $_.Path -PathType Container -ErrorAction Ignore) }) {
+    NTFS = @(foreach ($share in $shares | Where-Object { $_.Path -and (Test-Path -LiteralPath $_.Path -PathType Container -ErrorAction Ignore) }) {
         $acl = Get-Acl -Path $share.Path
         [ordered]@{
             Name = $share.Name
@@ -203,8 +203,8 @@ foreach ($share in $smbShares) {
         
                     #region Add NTFS permissions
 
-                    If ($Data.Ntfs | Where-Object { $_.Name -eq $share.Name }) {
-                        $aclImport = $Data.Ntfs | Where-Object { $_.Name -eq $share.Name }
+                    If ($Data.NTFS | Where-Object { $_.Name -eq $share.Name }) {
+                        $aclImport = $Data.NTFS | Where-Object { $_.Name -eq $share.Name }
                     
                         #region Create ACE's
                         $aceList = ForEach ($ace in $aclImport.Access) {

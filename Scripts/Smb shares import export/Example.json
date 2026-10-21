@@ -1,6 +1,6 @@
 {
   "Shares": [],
   "Access": [],
-  "Ntfs": [],
+  "NTFS": [],
   "Comment": "Export an existing share to capture its SMB and NTFS permissions."
 }

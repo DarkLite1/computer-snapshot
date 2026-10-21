@@ -1,130 +1,47 @@
-# Computer Snapshot
+# 🖥️ Computer Snapshot
 
-Create and restore Windows computer configurations from a USB stick. Each configuration is one JSON file. Runtime requires **64-bit Windows PowerShell 5.1 or later** and the Windows features used by the selected items. No modules need to be installed on the target computer.
+Computer Snapshot is a portable tool that lets you easily backup (export) and set up (restore) Windows computers directly from a USB stick. 
 
-## Layout
+The best part? **No installation is required** on the computers you are managing. As long as the PC is running 64-bit Windows (PowerShell 5.1 or newer), you are good to go. Every computer's configuration is neatly saved as a single, easy-to-read text file.
 
-```text
-USB root/
-	Configurations/  one JSON file per computer configuration
-	Shared/          optional reusable JSON sections
-	Software/        installers
-	Files/           files to copy and reviewed custom scripts
-	Log/             HTML execution reports
-	Scripts/         production scripts and config.schema.json
-		Common/      shared runtime modules and helpers
-	Examples/        named JSON templates and example scripts
-	Tests/           Pester test suites
-		Common/      shared test helpers
-		Fixtures/    test-only data
-```
+## 🚀 Quick Start: Using the Wizard
 
-## Use the Wizard
+The easiest way to use Computer Snapshot is through the built-in graphical wizard. 
 
-Open **Start wizard.lnk**. Restore selects a configuration by name and description. Export selects items and an output name. The wizard calls the main script directly; it does not create an intermediate configuration or working folder.
+1. Plug in your USB stick.
+2. Double-click **`Start wizard.lnk`**.
+3. **To set up a PC (Restore):** Click **Restore** and select a saved configuration from your list to apply it to the current computer.
+4. **To save a PC's setup (Export):** Click **Export**, choose which settings you want to copy (like users, folders, or network settings), and give your file a name. *Tip: The wizard will suggest a handy default name like `KIOSK01 2026-10-21 142536.json`*.
 
-The suggested export name is `COMPUTERNAME yyyy-MM-dd HHmmss` (for example, `KIOSK01 2026-10-21 142536.json`). You can edit it; explicitly supplied command-line filenames are unchanged.
+Once you run a task, you can check the `Log` folder for an easy-to-read HTML report showing exactly what succeeded and what failed.
 
-The two example shortcuts use [Configurations/Example PC1.json](Configurations/Example%20PC1.json). That example runs the bundled hello-world executables; review any executable before running it.
+## 📂 Know Your Folders
 
-## Command Line
+Your USB stick has a specific layout to keep everything organized. Here are the main folders you will use:
 
-From the USB root:
+*   **`Configurations/`**: This is where your saved PC setups live (one file per computer).
+*   **`Software/`**: Place any app installers (like `.exe` files) in here.
+*   **`Files/`**: Put any standard files or custom scripts you want copied to the new PC here.
+*   **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers.
+*   **`Log/`**: Check here for your execution reports.
 
+## ✍️ Customizing Your Setups
+
+All configurations are saved as standard JSON files. You can open and edit them in any code editor, like Visual Studio Code. 
+
+*   **Smart Automation:** You don't need to worry about the order of operations. The script automatically handles things in a safe sequence (for example, creating user accounts before trying to copy files into their folders).
+*   **Skipping Items:** If an item or section is missing from your file, the script simply skips it and moves on. 
+*   **Safety First:** If a specific setting fails to apply, the tool won't crash. It will continue setting up the rest of the computer and log the error for you to review later. 
+
+> **🔒 Important Security Warning:** 
+> When you save settings that include passwords (like user accounts or certain registry keys), **they are saved in plain text**. Please keep your USB stick physically secure, and never upload files containing sensitive passwords to public spaces. 
+
+## 🔄 Upgrading from an Older Version?
+
+If you have old configuration files from a previous version of this tool, they won't work right away. But don't worry—there's an automatic converter!
+
+Just open PowerShell from your USB stick and run:
 ```powershell
-& '.\Scripts\Invoke scripts.ps1' `
-		-Action CreateSnapshot `
-		-ConfigurationFile 'Configurations\My PC.json' `
-		-Items UserAccounts, UserGroups, RegionalSettings
-
-& '.\Scripts\Invoke configuration.ps1' `
-		-ConfigurationFile 'Configurations\My PC.json'
+& '.\Scripts\Convert configuration.ps1' -OldConfigurationFile 'Configurations\Old PC.json' -RootFolder $PWD.Path
 ```
-
-Export refuses to overwrite an existing file unless `-Force` is supplied. It captures all selected sections in memory and writes one JSON file, plus its HTML report under `Log`. No temporary folders, per-item files, or copied assets are created. The `Configurations` directory must already exist.
-
-Written JSON uses two-space indentation, with `Comment` first wherever present. Short arrays stay inline; arrays exceeding an 80-column target expand across lines. Individual strings, including task XML, remain intact and can exceed 80 columns. Formatting requires no external tools.
-
-If an item fails, successful sections are still exported and failed items are listed in the console and report. If every item fails, no configuration is written. Post-export validation warnings commonly indicate example assets that have not been placed yet. Review the report before restoring.
-
-`CreateFolders`, `RegistryKeys`, `Software`, `CopyFilesFolders` and custom scripts export templates, not a complete capture of those parts of the computer. Scheduled-task capture retains the existing `\HC\*` selection. Task XML and enabled state are stored inline. SMB shares include `Shares`, `Access` and optional `NTFS` permissions.
-
-NTP export captures every configured manual peer in order. `TimeServerNames` contains server names, without the Windows per-peer flag suffixes.
-Time-service command failures include the native exit code and diagnostics in the item failure; synchronization is reported as successful only after configuration, service restart and resynchronization succeed. NTP does not require a successful ICMP ping; the time service determines whether synchronization succeeds.
-
-Network profiles are matched to adapters by interface index, so category changes still apply when restoring a different adapter name. Set `NetworkCardDnsSuffix` to `""` to clear a suffix; omit it or use `null` to leave the existing suffix unchanged.
-
-Applying regional settings to new accounts uses unique temporary files and a unique registry hive mount. Cleanup runs even when applying settings fails. An unload or file-cleanup failure is reported alongside the original error, including the remaining resource's path.
-
-## Configuration Format
-
-```json
-{
-	"$schema": "../Scripts/config.schema.json",
-	"SchemaVersion": 2,
-	"Description": "Kiosk PC for application X",
-	"Settings": {
-		"RebootComputer": false,
-		"OpenReportInBrowser": true,
-		"RunElevated": false
-	},
-	"Items": {
-		"UserAccounts": "Shared\\UserAccounts kiosk.json",
-		"CreateFolders": {
-			"Comment": "Folders required by the kiosk application.",
-			"FolderPaths": ["C:\\Kiosk"]
-		},
-		"CopyFilesFolders": [
-			{ "From": "Files\\Monitor SSD.ps1", "To": "C:\\Kiosk\\Monitor SSD.ps1" }
-		],
-		"Software": {
-			"Remove": [],
-			"Install": [
-				{ "ExecutablePath": "Software\\App hello world 1.exe", "Arguments": null }
-			]
-		}
-	}
-}
-```
-
-- A present section is restored; a missing section is skipped. Empty objects and arrays are reported as "Nothing to do". There are no enable switches and no stored action.
-- Execution order is fixed: custom scripts before, regional settings, users, groups, firewall, folders, shares, network cards, NTP, registry, tasks, copies, software, custom scripts after. JSON key order does not change execution order.
-- A section is inline data or a JSON file path. The referenced file contains only that section, not a complete configuration. References cannot point to another reference.
-- References, installer paths, copy sources and custom-script paths resolve against the USB root, never the current directory or the configuration file's folder. Absolute paths stay absolute. Environment variables such as `%SystemRoot%` are expanded before use. Destination and registry paths retain their Windows meaning.
-- `Comment` is optional on section objects and is ignored when applying data. JSON comments and the old `?` property are not supported. Unknown properties are validation errors.
-- Settings default to `RebootComputer: false`, `OpenReportInBrowser: true`, `RunElevated: false`. Elevation is handled by the launcher. Direct main-script invocation uses the current session's privileges.
-- All input is validated before the first component runs. Validation problems are shown together in the console and HTML report. Runtime failures are reported per item; other items continue. Failed operations never trigger an automatic reboot.
-
-## Shared Sections and Editing
-
-For example, [Shared/UserAccounts kiosk.json](Shared/UserAccounts%20kiosk.json) contains a JSON array and is referenced by `Items.UserAccounts`. Its initial empty array deliberately makes no account changes. The same file can be referenced by several configurations.
-
-Open a configuration in VS Code as **JSON**, leaving its `$schema` property in place. The bundled [Scripts/config.schema.json](Scripts/config.schema.json) supplies completion, hover descriptions and misspelled-key validation without an extension. Named templates such as [Examples/Software.json](Examples/Software.json) show each inline shape. Keep `Examples` on the USB stick: several export scripts read their templates there. A shared section is validated when its containing configuration is loaded.
-
-Passwords remain plain text in `UserAccounts` and `RegistryKeys`, as before. Keep sensitive sections in access-controlled `Shared` files on encrypted media; a shared reference does not encrypt them. Never commit production credentials. Custom scripts and installers execute code with the session's privileges; use trusted assets only.
-
-## Convert an Old Configuration
-
-The main script never accepts the old format. Run the separate one-time converter:
-
-```powershell
-& '.\Scripts\Convert configuration.ps1' `
-		-OldConfigurationFile 'Configurations\Old PC.json' `
-		-RootFolder $PWD.Path
-```
-
-It writes `Configurations\Old PC.json`, renames the original to `Old PC.v1.json`, converts `?` notes to `Comment`, embeds scheduled-task XML, combines share permissions, and copies required assets to `Software` or `Files`. Old snapshot folders are never deleted. Existing asset files with different contents and existing migration backups are never overwritten. Validation results are printed at the end. Archive the `.v1.json` backup after reviewing the result; pickers exclude these backups.
-
-## Tests
-
-Development tests require **Pester 6**; production runtime does not require Pester. Run:
-
-```powershell
-Invoke-Pester .\Tests
-```
-
-Production entry scripts are directly under `Scripts`, and test suites directly under `Tests`, without a folder per script. Shared test helpers and fixtures are grouped under `Tests/Common` and `Tests/Fixtures`. The entire `Tests` folder is development-only and can be omitted from the target computer or USB stick.
-
-The ordered item-to-script catalogue is defined once by `Get-SnapshotScriptsHC` in `Scripts/Common/Section.ps1`. The configuration loader, executor, wizard and converter all use it; tests check that it matches the schema and existing component scripts.
-
-Windows-changing operations are mocked, including local accounts, groups, shares and registry writes. Tests do not require administrator rights. Run the suite in Windows PowerShell 5.1 and PowerShell 7. Only the independent `Test-Json -SchemaFile` tests are skipped on 5.1; the dependency-free runtime validator is tested on both.
+This will automatically update your old file to the new format and safely back up your original setup as a `.v1.json` file just in case.

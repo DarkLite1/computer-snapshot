@@ -16,6 +16,16 @@ Describe 'Single-file wizard commands' {
             $command -like '*-Action CreateSnapshot*' -and $command -like '*Configurations\Kiosk example.json*' -and $command -like '*-Items*UserAccounts*Software*'
         }
     }
+    It 'includes HHmmss in the suggested export filename' {
+        Mock Get-Date { '2026-10-21 142536' } -ParameterFilter { $Format -eq 'yyyy-MM-dd HHmmss' }
+        $name = Get-DefaultConfigurationNameHC
+        $name | Should -BeExactly "$env:COMPUTERNAME 2026-10-21 142536"
+        Start-ConfigurationJobHC -Action CreateSnapshot -RootFolder $TestDrive -Name $name -Items UserAccounts
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
+            $command -like '* 2026-10-21 142536.json*'
+        }
+    }
     It 'rejects directory traversal in a configuration name' {
         { Start-ConfigurationJobHC -Action CreateSnapshot -RootFolder $TestDrive -Name '..\outside' -Items UserAccounts } | Should -Throw '*file name*'
         Should -Invoke Start-Process -Times 0 -Exactly

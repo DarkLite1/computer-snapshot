@@ -14,6 +14,10 @@ param(
 )
 
 #region Command construction
+function Get-DefaultConfigurationNameHC {
+    return $env:COMPUTERNAME + ' ' + (Get-Date -Format 'yyyy-MM-dd HHmmss')
+}
+
 function Get-ConfigurationEntriesHC {
     param([string]$RootFolder)
     foreach ($file in Get-ChildItem -LiteralPath (Join-Path $RootFolder 'Configurations') -Filter '*.json' -File -ErrorAction Stop | Where-Object { $_.Name -notlike '*.v1.json' }) {
@@ -143,7 +147,7 @@ $nameLabel.Text = 'Configuration name'
 $nameLabel.Dock = 'Fill'
 $nameBox = New-Object Windows.Forms.TextBox
 $nameBox.Dock = 'Fill'
-$nameBox.Text = $env:COMPUTERNAME + ' ' + (Get-Date -Format 'yyyy-MM-dd')
+$nameBox.Text = Get-DefaultConfigurationNameHC
 $itemList = New-Object Windows.Forms.CheckedListBox
 $itemList.Dock = 'Fill'
 $itemList.CheckOnClick = $true

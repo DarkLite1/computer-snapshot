@@ -200,6 +200,34 @@ function Test-ConfigurationHC {
     return $problems.ToArray()
 }
 
+function Format-ConfigurationJsonHC {
+    param($Value, [int]$Depth = 0, [int]$PrefixLength = 0)
+    if ($null -eq $Value) { return 'null' }
+    $indent = '  ' * $Depth
+    $childIndent = '  ' * ($Depth + 1)
+    $newline = [Environment]::NewLine
+    if ($Value -is [System.Collections.IDictionary] -or
+        ($null -ne $Value -and $Value.GetType() -eq [System.Management.Automation.PSCustomObject])) {
+        $names = @(Get-PropertiesHC $Value)
+        if (-not $names.Count) { return '{}' }
+        $names = @($names | Where-Object { $_ -ceq 'Comment' }) + @($names | Where-Object { $_ -cne 'Comment' })
+        $lines = foreach ($name in $names) {
+            $key = ConvertTo-Json -InputObject ([string]$name) -Compress
+            $formatted = Format-ConfigurationJsonHC -Value $Value.$name -Depth ($Depth + 1) -PrefixLength ($key.Length + 2)
+            $childIndent + $key + ': ' + $formatted
+        }
+        return '{' + $newline + ($lines -join (',' + $newline)) + $newline + $indent + '}'
+    }
+    if ($Value -is [array]) {
+        if (-not $Value.Count) { return '[]' }
+        $entries = @(foreach ($entry in $Value) { Format-ConfigurationJsonHC -Value $entry -Depth ($Depth + 1) })
+        $inline = '[' + ($entries -join ', ') + ']'
+        if (-not $inline.Contains($newline) -and ($indent.Length + $PrefixLength + $inline.Length) -le 80) { return $inline }
+        return '[' + $newline + $childIndent + ($entries -join (',' + $newline + $childIndent)) + $newline + $indent + ']'
+    }
+    return ConvertTo-Json -InputObject $Value -Depth 20 -Compress
+}
+
 function Write-ConfigurationHC {
     [CmdletBinding()]
     param([Parameter(Mandatory)]$Configuration, [Parameter(Mandatory)][string]$Path)
@@ -210,7 +238,7 @@ function Write-ConfigurationHC {
     if ($null -ne $Configuration.Description) { $document.Description = $Configuration.Description }
     if ($null -ne $Configuration.Settings) { $document.Settings = $Configuration.Settings }
     $document.Items = $Configuration.Items
-    $json = ConvertTo-Json -InputObject $document -Depth 20
+    $json = Format-ConfigurationJsonHC $document
     [IO.File]::WriteAllText($Path, $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false))
 }
 

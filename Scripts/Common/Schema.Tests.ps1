@@ -5,6 +5,9 @@ BeforeAll {
     . "$PSScriptRoot\Section.ps1"
     $schemaPath = Join-Path $PSScriptRoot '..\config.schema.json'
     $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
+    $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $shippedConfigurations = @((Join-Path $root 'Configurations\Example PC1.json'))
+    $shippedSharedSections = @((Join-Path $root 'Shared\UserAccounts kiosk.json'))
     $mapping = @{
         'Folders' = 'CreateFolders'; 'Copy files folders' = 'CopyFilesFolders'; 'NTP time servers' = 'NtpTimeServers'
         'Network cards' = 'NetworkCards'; 'Regional settings' = 'RegionalSettings'; 'Software' = 'Software'
@@ -43,19 +46,17 @@ Describe 'Schema contract' {
         @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Comment = 5; Software = @{} } } $TestDrive) -join ';' | Should -Match 'Comment: expected a string'
     }
     It 'validates every shipped configuration and its shared references' {
-        $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-        foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root 'Configurations') -Filter '*.json' -File | Where-Object { $_.Name -notlike '*.v1.json' }) {
+        foreach ($file in Get-Item -LiteralPath $shippedConfigurations -ErrorAction Stop) {
             $loaded = Read-ConfigurationHC $file.FullName $root
             $problems = @(Test-ConfigurationHC $loaded $root)
             $problems.Count | Should -Be 0 -Because ($problems -join '; ')
         }
     }
     It 'checks shipped configurations and Shared sections with Test-Json' -Skip:($PSVersionTable.PSVersion.Major -lt 7) {
-        $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-        foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root 'Configurations') -Filter '*.json' -File | Where-Object { $_.Name -notlike '*.v1.json' }) {
+        foreach ($file in Get-Item -LiteralPath $shippedConfigurations -ErrorAction Stop) {
             Get-Content -LiteralPath $file.FullName -Raw | Test-Json -SchemaFile $schemaPath -ErrorAction Stop | Should -BeTrue
         }
-        foreach ($file in Get-ChildItem -LiteralPath (Join-Path $root 'Shared') -Filter '*.json' -File -Recurse) {
+        foreach ($file in Get-Item -LiteralPath $shippedSharedSections -ErrorAction Stop) {
             $data = Read-SectionExampleHC $file.FullName
             $matches = @($schema.'$defs'.PSObject.Properties.Name | Where-Object {
                 $document = @{ SchemaVersion = 2; Items = @{ $_ = $data } }

@@ -18,6 +18,8 @@ USB root/
 
 Open **Start wizard.lnk**. Restore selects a configuration by name and description. Export selects items and an output name. The wizard calls the main script directly; it does not create an intermediate configuration or working folder.
 
+The suggested export name is `COMPUTERNAME yyyy-MM-dd HHmmss` (for example, `KIOSK01 2026-10-21 142536.json`). You can edit it; explicitly supplied command-line filenames are unchanged.
+
 **Select configuration.lnk** opens the restore picker. The two example shortcuts use [Configurations/Example PC1.json](Configurations/Example%20PC1.json). That example runs the bundled hello-world executables; review any executable before running it.
 
 ## Command Line
@@ -35,6 +37,8 @@ From the USB root:
 ```
 
 Export refuses to overwrite an existing file unless `-Force` is supplied. It captures all selected sections in memory and writes one JSON file, plus its HTML report under `Log`. No temporary folders, per-item files, or copied assets are created. The `Configurations` directory must already exist.
+
+Written JSON uses two-space indentation, with `Comment` first wherever present. Short arrays stay inline; arrays exceeding an 80-column target expand across lines. Individual strings, including task XML, remain intact and can exceed 80 columns. Formatting requires no external tools.
 
 If an item fails, successful sections are still exported and failed items are listed in the console and report. If every item fails, no configuration is written. Post-export validation warnings commonly indicate example assets that have not been placed yet. Review the report before restoring.
 

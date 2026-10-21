@@ -8,14 +8,14 @@
       "Remove": [],
       "Install": [
         {
+          "Comment": "to install the software silently use the silent switches required by the application (ex. Arguments: /S)",
           "ExecutablePath": "Software\\App hello world 1.exe",
-          "Arguments": null,
-          "Comment": "to install the software silently use the silent switches required by the application (ex. Arguments: /S)"
+          "Arguments": null
         },
         {
+          "Comment": "to install the software silently use the silent switches required by the application (ex. Arguments: /S)",
           "ExecutablePath": "Software\\App hello world 2.exe",
-          "Arguments": null,
-          "Comment": "to install the software silently use the silent switches required by the application (ex. Arguments: /S)"
+          "Arguments": null
         }
       ]
     }

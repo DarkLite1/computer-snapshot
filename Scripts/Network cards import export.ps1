@@ -97,7 +97,7 @@ foreach ($card in $NetworkCards) {
                             Name    = $adapter.Name 
                             NewName = $card.NetworkCardName
                         }
-                        Rename-NetAdapter @renameParams
+                        Rename-NetAdapter @renameParams -ErrorAction Stop
 
                         Write-Output "Renamed network card with description '$($adapter.InterfaceDescription)' from '$($adapter.Name)' to '$($card.NetworkCardName)'"
                     }
@@ -120,14 +120,13 @@ foreach ($card in $NetworkCards) {
                         Write-Output "Changed DNS suffix for network card with id '$($adapter.InterfaceIndex)' and description '$($adapter.InterfaceDescription)' from '$($dnsClient.ConnectionSpecificSuffix)' to '$($card.NetworkCardDnsSuffix)'"
                     }
                     #endregion
-                }
-            
+
                 #region Set network category
                 foreach (
                     $profile in 
                     $netConnectionProfiles | Where-Object {
                         ($card.NetworkCategory) -and
-                        ($_.InterfaceAlias -eq $card.NetworkCardName) -and
+                        ($_.InterfaceIndex -eq $adapter.InterfaceIndex) -and
                         ($_.NetworkCategory -ne $card.NetworkCategory) 
                     }
                 ) {
@@ -135,12 +134,13 @@ foreach ($card in $NetworkCards) {
                         InterfaceIndex  = $profile.InterfaceIndex 
                         NetworkCategory = $card.NetworkCategory
                     }
-                    Set-NetConnectionProfile @setNetConnectionParams
+                    Set-NetConnectionProfile @setNetConnectionParams -ErrorAction Stop
 
                     $M = "Changed network category on card '$($card.NetworkCardName)' from '$($profile.NetworkCategory)' to '$($card.NetworkCategory)'"
                     Write-Verbose $M; Write-Output $M
                 }
                 #endregion
+                }
             }
     })
     #endregion

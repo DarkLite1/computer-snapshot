@@ -41,7 +41,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         Mock Add-LocalGroupMember
         Mock Get-NetAdapter { [pscustomobject]@{ Name = 'Old'; InterfaceDescription = 'Example'; InterfaceIndex = 1 } }
         Mock Get-DnsClient { [pscustomobject]@{ InterfaceIndex = 1; ConnectionSpecificSuffix = 'old' } }
-        Mock Get-NetConnectionProfile { [pscustomobject]@{ InterfaceAlias = 'New'; InterfaceIndex = 1; NetworkCategory = 'Public' } }
+        Mock Get-NetConnectionProfile { [pscustomobject]@{ InterfaceAlias = 'Old'; InterfaceIndex = 1; NetworkCategory = 'Public' } }
         Mock Rename-NetAdapter
         Mock Set-DnsClient
         Mock Set-NetConnectionProfile

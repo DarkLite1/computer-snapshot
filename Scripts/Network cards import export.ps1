@@ -108,14 +108,14 @@ foreach ($card in $NetworkCards) {
                         $_.InterfaceIndex -eq $adapter.InterfaceIndex
                     }
                     if (
-                        ($card.NetworkCardDnsSuffix) -and
+                        ($null -ne $card.NetworkCardDnsSuffix) -and
                         ($dnsClient.ConnectionSpecificSuffix -ne $card.NetworkCardDnsSuffix)
                     ) {
                         $setDnsParams = @{
                             InterfaceIndex           = $adapter.InterfaceIndex
                             ConnectionSpecificSuffix = $card.NetworkCardDnsSuffix
                         }
-                        Set-DnsClient @setDnsParams
+                        Set-DnsClient @setDnsParams -ErrorAction Stop
 
                         Write-Output "Changed DNS suffix for network card with id '$($adapter.InterfaceIndex)' and description '$($adapter.InterfaceDescription)' from '$($dnsClient.ConnectionSpecificSuffix)' to '$($card.NetworkCardDnsSuffix)'"
                     }

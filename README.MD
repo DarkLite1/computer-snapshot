@@ -52,7 +52,7 @@ If an item fails, successful sections are still exported and failed items are li
 NTP export captures every configured manual peer in order. `TimeServerNames` contains server names, without the Windows per-peer flag suffixes.
 Time-service command failures include the native exit code and diagnostics in the item failure; synchronization is reported as successful only after configuration, service restart and resynchronization succeed.
 
-Network profiles are matched to adapters by interface index, so category changes still apply when restoring a different adapter name.
+Network profiles are matched to adapters by interface index, so category changes still apply when restoring a different adapter name. Set `NetworkCardDnsSuffix` to `""` to clear a suffix; omit it or use `null` to leave the existing suffix unchanged.
 
 ## Configuration Format
 

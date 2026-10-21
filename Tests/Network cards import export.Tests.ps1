@@ -47,4 +47,38 @@ Describe 'Network profile restoration' {
         Mock Set-NetConnectionProfile { Write-Error 'Profile update failed' }
         { . $scriptPath -Action Import -Data $data -RootFolder $TestDrive } | Should -Throw '*Profile update failed*'
     }
+    It 'clears an existing suffix when an empty string is explicitly supplied' {
+        Mock Get-DnsClient { [pscustomobject]@{ InterfaceIndex = 1; ConnectionSpecificSuffix = 'old.example' } }
+        $data[0] | Add-Member -NotePropertyName NetworkCardDnsSuffix -NotePropertyValue ''
+        $null = . $scriptPath -Action Import -Data $data -RootFolder $TestDrive
+        Should -Invoke Set-DnsClient -Times 1 -Exactly -ParameterFilter {
+            $InterfaceIndex -eq 1 -and $ConnectionSpecificSuffix -ceq '' -and $ErrorAction -eq 'Stop'
+        }
+    }
+    It 'leaves an omitted suffix unchanged' {
+        Mock Get-DnsClient { [pscustomobject]@{ InterfaceIndex = 1; ConnectionSpecificSuffix = 'old.example' } }
+        $null = . $scriptPath -Action Import -Data $data -RootFolder $TestDrive
+        Should -Invoke Set-DnsClient -Times 0 -Exactly
+    }
+    It 'leaves a null suffix unchanged' {
+        Mock Get-DnsClient { [pscustomobject]@{ InterfaceIndex = 1; ConnectionSpecificSuffix = 'old.example' } }
+        $data[0] | Add-Member -NotePropertyName NetworkCardDnsSuffix -NotePropertyValue $null
+        $null = . $scriptPath -Action Import -Data $data -RootFolder $TestDrive
+        Should -Invoke Set-DnsClient -Times 0 -Exactly
+    }
+    It 'does not reapply an already empty suffix' {
+        $data[0] | Add-Member -NotePropertyName NetworkCardDnsSuffix -NotePropertyValue ''
+        $null = . $scriptPath -Action Import -Data $data -RootFolder $TestDrive
+        Should -Invoke Set-DnsClient -Times 0 -Exactly
+    }
+    It 'applies a nonempty suffix to the matched interface' {
+        $data[0] | Add-Member -NotePropertyName NetworkCardDnsSuffix -NotePropertyValue 'new.example'
+        $null = . $scriptPath -Action Import -Data $data -RootFolder $TestDrive
+        Should -Invoke Set-DnsClient -Times 1 -Exactly -ParameterFilter { $InterfaceIndex -eq 1 -and $ConnectionSpecificSuffix -eq 'new.example' }
+    }
+    It 'surfaces a failed suffix update' {
+        $data[0] | Add-Member -NotePropertyName NetworkCardDnsSuffix -NotePropertyValue 'new.example'
+        Mock Set-DnsClient { Write-Error 'DNS suffix update failed' }
+        { . $scriptPath -Action Import -Data $data -RootFolder $TestDrive } | Should -Throw '*DNS suffix update failed*'
+    }
 }

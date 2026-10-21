@@ -1089,7 +1089,7 @@
               "string",
               "null"
             ],
-            "description": "Connection-specific DNS suffix."
+            "description": "Connection-specific DNS suffix. An empty string clears it; null or omission leaves it unchanged."
           },
           "Comment": {
             "type": "string",

@@ -54,6 +54,8 @@ Time-service command failures include the native exit code and diagnostics in th
 
 Network profiles are matched to adapters by interface index, so category changes still apply when restoring a different adapter name. Set `NetworkCardDnsSuffix` to `""` to clear a suffix; omit it or use `null` to leave the existing suffix unchanged.
 
+Applying regional settings to new accounts uses unique temporary files and a unique registry hive mount. Cleanup runs even when applying settings fails. An unload or file-cleanup failure is reported alongside the original error, including the remaining resource's path.
+
 ## Configuration Format
 
 ```json

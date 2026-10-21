@@ -1,123 +1,94 @@
+#Requires -Version 5.1
 <#
-    .SYNOPSIS
-        Apply the regional settings of the current user account to accounts 
-        that will be created after this script runs.
-
-    .DESCRIPTION
-        Only accounts that are created after this script runs will receive the 
-        same regional settings as the current account.
+.SYNOPSIS
+    Apply the current user's regional settings to accounts created later.
+.DESCRIPTION
+    Uses isolated temporary files and a temporary mount of the default user hive.
+    Files and the mounted hive are cleaned up on both success and failure.
 #>
-Param (
-    [String[]]$RegistryKeys = @(
+[CmdletBinding()]
+param(
+    [string[]]$RegistryKeys = @(
         'HKEY_CURRENT_USER\Control Panel\International',
         'HKEY_CURRENT_USER\Control Panel\Input Method',
         'HKEY_CURRENT_USER\Keyboard Layout'
     )
 )
 
-$tempFileComplete = New-TemporaryFile
-
-$encoding = @{
-    Encoding = 'unicode'
-}
-
-#region Export registry keys
-$firstRun = $true
-
-foreach ($key in $RegistryKeys) {
-    Write-Verbose "Export registry key '$key'"
-
-    $tempFile = New-TemporaryFile
-
-    $startParams = @{
-        FilePath     = 'regedit.exe' 
-        ArgumentList = "/e `"$($tempFile.FullName)`" `"$key`"" 
-        Wait         = $true
-        PassThru     = $true
-    }
-    $process = Start-Process @startParams
-
-    if ($process.ExitCode) {
-        throw "Failed to export registry key '$key': exit code $($process.ExitCode)"
+$id = [guid]::NewGuid().ToString('N')
+$tempFolder = Join-Path $env:TEMP "ComputerSnapshot-RegionalSettings-$id"
+$tempKey = "HKEY_USERS\ComputerSnapshot_$id"
+$temporaryFiles = New-Object 'System.Collections.Generic.List[string]'
+$failures = New-Object 'System.Collections.Generic.List[string]'
+$folderCreated = $false
+$hiveLoaded = $false
+try {
+    $null = New-Item -Path $tempFolder -ItemType Directory -ErrorAction Stop
+    $folderCreated = $true
+    $registryLines = New-Object 'System.Collections.Generic.List[string]'
+    for ($index = 0; $index -lt $RegistryKeys.Count; $index++) {
+        $key = $RegistryKeys[$index]
+        $path = Join-Path $tempFolder "export-$index.reg"
+        $temporaryFiles.Add($path)
+        $process = Start-Process -FilePath 'regedit.exe' -ArgumentList "/e `"$path`" `"$key`"" -Wait -PassThru -ErrorAction Stop
+        if ($process.ExitCode -ne 0) {
+            throw "Failed to export registry key '$key': exit code $($process.ExitCode)"
+        }
+        $lines = @(Get-Content -LiteralPath $path -Encoding Unicode -ErrorAction Stop)
+        if ($index -gt 0) { $lines = @($lines | Select-Object -Skip 1) }
+        foreach ($line in $lines) { $registryLines.Add($line) }
     }
 
-    if ($firstRun) {
-        $tempFile | Get-Content @encoding | 
-        Out-File @encoding -FilePath $tempFileComplete.FullName
+    $targets = @('HKEY_USERS\.DEFAULT', $tempKey, 'HKEY_USERS\S-1-5-20', 'HKEY_USERS\S-1-5-19')
+    $importFiles = @(for ($index = 0; $index -lt $targets.Count; $index++) {
+        $path = Join-Path $tempFolder "target-$index.reg"
+        $temporaryFiles.Add($path)
+        $registryLines | ForEach-Object { $_.Replace('HKEY_CURRENT_USER', $targets[$index]) } |
+            Out-File -LiteralPath $path -Encoding Unicode -ErrorAction Stop
+        $path
+    })
+
+    $process = Start-Process -FilePath 'reg.exe' -ArgumentList "load `"$tempKey`" `"C:\Users\Default\NTUSER.DAT`"" -Wait -PassThru -ErrorAction Stop
+    if ($process.ExitCode -ne 0) {
+        throw "Failed to load the temporary profile '$tempKey': exit code $($process.ExitCode)"
     }
-    else {
-        $tempFile | Get-Content @encoding | Select-Object -Skip 1 | 
-        Out-File @encoding -FilePath $tempFileComplete.FullName -Append 
-    }
-
-    $firstRun = $false
-}
-#endregion
-
-#region Create profile registry keys
-$exportedRegistryFiles = @(
-    'HKEY_USERS\.DEFAULT',
-    'HKEY_USERS\TEMP', 
-    'HKEY_USERS\S-1-5-20',
-    'HKEY_USERS\S-1-5-19'
-) | ForEach-Object {
-    $outParams = @{
-        FilePath = "$($ENV:Temp)\RegionalSettings_{0}.reg" -f ($_.Split('\')[1])
-        Encoding = 'utf8'
-    }
-    Write-Verbose "Create registry key file '$($outParams.FilePath)'"
-
-    $fileContent = $tempFileComplete | Get-Content @encoding
-    $fileContent.Replace('HKEY_CURRENT_USER', $_) |
-    Out-File @outParams
-
-    $outParams.FilePath
-}
-#endregion
-
-#region Set default settings for new accounts
-$TempKey = 'HKEY_USERS\TEMP'
-$DefaultRegPath = 'C:\Users\Default\NTUSER.DAT'
-
-$startParams = @{
-    FilePath     = 'reg.exe'
-    ArgumentList = "load `"$TempKey`" `"$DefaultRegPath`"" 
-    Wait         = $true
-    PassThru     = $true
-}
-$process = Start-Process @startParams
-
-if ($process.ExitCode) {
-    throw "Failed to load the temporary profile: exit code $($process.ExitCode)"
-}
-
-$exportedRegistryFiles | ForEach-Object {
-    Write-Verbose "Import registry key file '$_'"
-
-    $startParams = @{
-        FilePath     = 'regedit.exe'
-        ArgumentList = "/s `"$_`""
-        Wait         = $true
-        PassThru     = $true
-    }
-    $process = Start-Process @startParams
-
-    if ($process.ExitCode) {
-        throw "Failed to import registry key '$_': exit code $($process.ExitCode)"
+    $hiveLoaded = $true
+    foreach ($path in $importFiles) {
+        $process = Start-Process -FilePath 'regedit.exe' -ArgumentList "/s `"$path`"" -Wait -PassThru -ErrorAction Stop
+        if ($process.ExitCode -ne 0) {
+            throw "Failed to import registry key file '$path': exit code $($process.ExitCode)"
+        }
     }
 }
-
-$startParams = @{
-    FilePath     = 'reg.exe'
-    ArgumentList = "unload `"$TempKey`""
-    Wait         = $true
-    PassThru     = $true
+catch {
+    $failures.Add($_.Exception.Message)
 }
-$process = Start-Process @startParams
-
-if ($process.ExitCode) {
-    throw "Failed to unload the temporary profile: exit code $($process.ExitCode)"
+finally {
+    if ($hiveLoaded) {
+        try {
+            $process = Start-Process -FilePath 'reg.exe' -ArgumentList "unload `"$tempKey`"" -Wait -PassThru -ErrorAction Stop
+            if ($process.ExitCode -ne 0) {
+                throw "Failed to unload the temporary profile '$tempKey': exit code $($process.ExitCode)"
+            }
+        }
+        catch { $failures.Add($_.Exception.Message) }
+    }
+    $filesRemoved = $true
+    foreach ($path in $temporaryFiles) {
+        try {
+            if (Test-Path -LiteralPath $path -ErrorAction Stop) {
+                Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+            }
+        }
+        catch {
+            $filesRemoved = $false
+            $failures.Add("Failed to remove temporary file '${path}': $($_.Exception.Message)")
+        }
+    }
+    if ($folderCreated -and $filesRemoved) {
+        try { Remove-Item -LiteralPath $tempFolder -Force -ErrorAction Stop }
+        catch { $failures.Add("Failed to remove temporary folder '${tempFolder}': $($_.Exception.Message)") }
+    }
 }
-#endregion
-
-'Set regional settings to be applied the newly created accounts too'
+if ($failures.Count) { throw ($failures -join [Environment]::NewLine) }
+'Set regional settings to be applied to newly created accounts too'

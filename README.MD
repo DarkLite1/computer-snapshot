@@ -11,7 +11,12 @@ USB root/
 	Software/        installers
 	Files/           files to copy and reviewed custom scripts
 	Log/             HTML execution reports
-	Scripts/         scripts, tests and config.schema.json
+	Scripts/         production scripts and config.schema.json
+		Common/      shared runtime modules and helpers
+	Examples/        named JSON templates and example scripts
+	Tests/           Pester test suites
+		Common/      shared test helpers
+		Fixtures/    test-only data
 ```
 
 ## Use the Wizard
@@ -27,12 +32,12 @@ The suggested export name is `COMPUTERNAME yyyy-MM-dd HHmmss` (for example, `KIO
 From the USB root:
 
 ```powershell
-& '.\Scripts\Invoke scripts\Invoke scripts.ps1' `
+& '.\Scripts\Invoke scripts.ps1' `
 		-Action CreateSnapshot `
 		-ConfigurationFile 'Configurations\My PC.json' `
 		-Items UserAccounts, UserGroups, RegionalSettings
 
-& '.\Scripts\Invoke configuration\Invoke configuration.ps1' `
+& '.\Scripts\Invoke configuration.ps1' `
 		-ConfigurationFile 'Configurations\My PC.json'
 ```
 
@@ -87,7 +92,7 @@ If an item fails, successful sections are still exported and failed items are li
 
 For example, [Shared/UserAccounts kiosk.json](Shared/UserAccounts%20kiosk.json) contains a JSON array and is referenced by `Items.UserAccounts`. Its initial empty array deliberately makes no account changes. The same file can be referenced by several configurations.
 
-Open a configuration in VS Code as **JSON**, leaving its `$schema` property in place. The bundled [Scripts/config.schema.json](Scripts/config.schema.json) supplies completion, hover descriptions and misspelled-key validation without an extension. The component `Example.json` files show each inline shape. A shared section is validated when its containing configuration is loaded.
+Open a configuration in VS Code as **JSON**, leaving its `$schema` property in place. The bundled [Scripts/config.schema.json](Scripts/config.schema.json) supplies completion, hover descriptions and misspelled-key validation without an extension. Named templates such as [Examples/Software.json](Examples/Software.json) show each inline shape. Keep `Examples` on the USB stick: several export scripts read their templates there. A shared section is validated when its containing configuration is loaded.
 
 Passwords remain plain text in `UserAccounts` and `RegistryKeys`, as before. Keep sensitive sections in access-controlled `Shared` files on encrypted media; a shared reference does not encrypt them. Never commit production credentials. Custom scripts and installers execute code with the session's privileges; use trusted assets only.
 
@@ -96,7 +101,7 @@ Passwords remain plain text in `UserAccounts` and `RegistryKeys`, as before. Kee
 The main script never accepts the old format. Run the separate one-time converter:
 
 ```powershell
-& '.\Scripts\Convert configuration\Convert configuration.ps1' `
+& '.\Scripts\Convert configuration.ps1' `
 		-OldConfigurationFile 'Configurations\Old PC.json' `
 		-RootFolder $PWD.Path
 ```
@@ -108,7 +113,9 @@ It writes `Configurations\Old PC.json`, renames the original to `Old PC.v1.json`
 Development tests require **Pester 6**; production runtime does not require Pester. Run:
 
 ```powershell
-Invoke-Pester .\Scripts
+Invoke-Pester .\Tests
 ```
+
+Production entry scripts are directly under `Scripts`, and test suites directly under `Tests`, without a folder per script. Shared test helpers and fixtures are grouped under `Tests/Common` and `Tests/Fixtures`. The entire `Tests` folder is development-only and can be omitted from the target computer or USB stick.
 
 Windows-changing operations are mocked, including local accounts, groups, shares and registry writes. Tests do not require administrator rights. Run the suite in Windows PowerShell 5.1 and PowerShell 7. Only the independent `Test-Json -SchemaFile` tests are skipped on 5.1; the dependency-free runtime validator is tested on both.

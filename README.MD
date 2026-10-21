@@ -14,8 +14,6 @@ USB root/
 	Scripts/         scripts, tests and config.schema.json
 ```
 
-The runtime does not use the old `Snapshots` layout. Existing legacy data is left untouched for migration.
-
 ## Use the Wizard
 
 Open **Start wizard.lnk**. Restore selects a configuration by name and description. Export selects items and an output name. The wizard calls the main script directly; it does not create an intermediate configuration or working folder.

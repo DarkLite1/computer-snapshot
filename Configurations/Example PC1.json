@@ -23,8 +23,14 @@
     "Software": {
       "Remove": [],
       "Install": [
-        { "ExecutablePath": "Software\\App hello world 1.exe", "Arguments": null },
-        { "ExecutablePath": "Software\\App hello world 2.exe", "Arguments": null }
+        {
+          "ExecutablePath": "Software\\App hello world 1.exe",
+          "Arguments": null
+        },
+        {
+          "ExecutablePath": "Software\\App hello world 2.exe",
+          "Arguments": null
+        }
       ]
     },
     "StartCustomScriptsAfter": []

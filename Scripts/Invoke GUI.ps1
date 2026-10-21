@@ -13,6 +13,8 @@ param(
     [switch]$NoShow
 )
 
+. "$PSScriptRoot\Common\Section.ps1"
+
 #region Command construction
 function Get-DefaultConfigurationNameHC {
     return $env:COMPUTERNAME + ' ' + (Get-Date -Format 'yyyy-MM-dd HHmmss')
@@ -151,7 +153,7 @@ $nameBox.Text = Get-DefaultConfigurationNameHC
 $itemList = New-Object Windows.Forms.CheckedListBox
 $itemList.Dock = 'Fill'
 $itemList.CheckOnClick = $true
-foreach ($name in @('StartCustomScriptsBefore','RegionalSettings','UserAccounts','UserGroups','FirewallRules','CreateFolders','SmbShares','NetworkCards','NtpTimeServers','RegistryKeys','ScheduledTasks','CopyFilesFolders','Software','StartCustomScriptsAfter')) { $null = $itemList.Items.Add($name, $true) }
+foreach ($name in (Get-SnapshotScriptsHC).Keys) { $null = $itemList.Items.Add($name, $true) }
 $options = New-Object Windows.Forms.FlowLayoutPanel
 $options.Dock = 'Fill'
 $openReport = New-Object Windows.Forms.CheckBox

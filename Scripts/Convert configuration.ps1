@@ -72,7 +72,7 @@ $itemFiles = @{
     FirewallRules = 'FirewallRules.json'; CreateFolders = 'CreateFolders.json'; NetworkCards = 'NetworkCards.json'
     NtpTimeServers = 'ntpServers.json'; RegistryKeys = 'registryKeys.json'; CopyFilesFolders = 'CopyFilesFolders.json'; Software = 'Software.json'
 }
-$order = @('StartCustomScriptsBefore','RegionalSettings','UserAccounts','UserGroups','FirewallRules','CreateFolders','SmbShares','NetworkCards','NtpTimeServers','RegistryKeys','ScheduledTasks','CopyFilesFolders','Software','StartCustomScriptsAfter')
+$order = @((Get-SnapshotScriptsHC).Keys)
 foreach ($property in $old.StartScript.Snapshot.PSObject.Properties) {
     if ($property.Value -and $property.Name -notin $order) { throw "Unknown old snapshot item '$($property.Name)'" }
 }

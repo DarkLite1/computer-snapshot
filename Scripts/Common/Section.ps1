@@ -3,6 +3,25 @@
 .SYNOPSIS
     Shared section helpers for standalone snapshot components.
 #>
+function Get-SnapshotScriptsHC {
+    return [ordered]@{
+        StartCustomScriptsBefore = 'Start custom scripts import export.ps1'
+        RegionalSettings = 'Regional settings import export.ps1'
+        UserAccounts = 'User accounts import export.ps1'
+        UserGroups = 'User groups import export.ps1'
+        FirewallRules = 'Firewall rules import export.ps1'
+        CreateFolders = 'Folders import export.ps1'
+        SmbShares = 'Smb shares import export.ps1'
+        NetworkCards = 'Network cards import export.ps1'
+        NtpTimeServers = 'NTP time servers import export.ps1'
+        RegistryKeys = 'Registry keys import export.ps1'
+        ScheduledTasks = 'Scheduled tasks import export.ps1'
+        CopyFilesFolders = 'Copy files folders import export.ps1'
+        Software = 'Software import export.ps1'
+        StartCustomScriptsAfter = 'Start custom scripts import export.ps1'
+    }
+}
+
 function Resolve-RootPathHC {
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$RootFolder)
     $expandedPath = [Environment]::ExpandEnvironmentVariables($Path)

@@ -28,24 +28,11 @@ param(
     [bool]$RebootComputer = $false,
     [bool]$OpenReportInBrowser = $true,
     [switch]$Force,
-    [System.Collections.IDictionary]$Script = [ordered]@{
-        StartCustomScriptsBefore = 'Start custom scripts import export.ps1'
-        RegionalSettings = 'Regional settings import export.ps1'
-        UserAccounts = 'User accounts import export.ps1'
-        UserGroups = 'User groups import export.ps1'
-        FirewallRules = 'Firewall rules import export.ps1'
-        CreateFolders = 'Folders import export.ps1'
-        SmbShares = 'Smb shares import export.ps1'
-        NetworkCards = 'Network cards import export.ps1'
-        NtpTimeServers = 'NTP time servers import export.ps1'
-        RegistryKeys = 'Registry keys import export.ps1'
-        ScheduledTasks = 'Scheduled tasks import export.ps1'
-        CopyFilesFolders = 'Copy files folders import export.ps1'
-        Software = 'Software import export.ps1'
-        StartCustomScriptsAfter = 'Start custom scripts import export.ps1'
-    }
+    [System.Collections.IDictionary]$Script
 )
 Import-Module "$PSScriptRoot\Common\Execution.psm1" -Force
+. "$PSScriptRoot\Common\Section.ps1"
+if (-not $PSBoundParameters.ContainsKey('Script')) { $Script = Get-SnapshotScriptsHC }
 $rootFolder = Split-Path $PSScriptRoot -Parent
 $resolvedScripts = [ordered]@{}
 foreach ($name in $Script.Keys) {

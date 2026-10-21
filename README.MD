@@ -125,4 +125,6 @@ Invoke-Pester .\Tests
 
 Production entry scripts are directly under `Scripts`, and test suites directly under `Tests`, without a folder per script. Shared test helpers and fixtures are grouped under `Tests/Common` and `Tests/Fixtures`. The entire `Tests` folder is development-only and can be omitted from the target computer or USB stick.
 
+The ordered item-to-script catalogue is defined once by `Get-SnapshotScriptsHC` in `Scripts/Common/Section.ps1`. The configuration loader, executor, wizard and converter all use it; tests check that it matches the schema and existing component scripts.
+
 Windows-changing operations are mocked, including local accounts, groups, shares and registry writes. Tests do not require administrator rights. Run the suite in Windows PowerShell 5.1 and PowerShell 7. Only the independent `Test-Json -SchemaFile` tests are skipped on 5.1; the dependency-free runtime validator is tested on both.

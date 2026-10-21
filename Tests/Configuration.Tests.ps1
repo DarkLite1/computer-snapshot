@@ -2,6 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 BeforeAll {
     Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
+    . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
 }
 Describe 'Version 2 configuration' {
     BeforeEach {
@@ -111,5 +112,41 @@ Describe 'Version 2 configuration' {
         @(Test-ConfigurationHC $configuration $TestDrive).Count | Should -Be 0
         $configuration.Items.Software.Install[0].ExecutablePath = 'missing.exe'
         @(Test-ConfigurationHC $configuration $TestDrive) | Should -Match 'Items.Software.Install\[0\].ExecutablePath.*not found'
+    }
+}
+
+Describe 'Shared snapshot catalogue' {
+    It 'preserves the established order and maps every item to an existing script' {
+        $scripts = Get-SnapshotScriptsHC
+        @($scripts.Keys) | Should -Be @(
+            'StartCustomScriptsBefore', 'RegionalSettings', 'UserAccounts', 'UserGroups',
+            'FirewallRules', 'CreateFolders', 'SmbShares', 'NetworkCards', 'NtpTimeServers',
+            'RegistryKeys', 'ScheduledTasks', 'CopyFilesFolders', 'Software', 'StartCustomScriptsAfter'
+        )
+        foreach ($script in $scripts.Values) {
+            Join-Path "$PSScriptRoot\..\Scripts" $script | Should -Exist
+        }
+    }
+    It 'returns an independent map so caller overrides cannot change the catalogue' {
+        $scripts = Get-SnapshotScriptsHC
+        $scripts.UserAccounts = 'custom.ps1'
+        (Get-SnapshotScriptsHC).UserAccounts | Should -Be 'User accounts import export.ps1'
+    }
+    It 'matches the items supported by the JSON schema' {
+        $schema = Get-Content -LiteralPath "$PSScriptRoot\..\Scripts\config.schema.json" -Raw | ConvertFrom-Json
+        $names = @($schema.properties.Items.properties.PSObject.Properties.Name | Where-Object { $_ -ne 'Comment' } | Sort-Object)
+        @((Get-SnapshotScriptsHC).Keys | Sort-Object) | Should -Be $names
+    }
+    It 'loads all empty sections in catalogue order regardless of JSON order' {
+        $schema = Get-Content -LiteralPath "$PSScriptRoot\..\Scripts\config.schema.json" -Raw | ConvertFrom-Json
+        $items = [ordered]@{}
+        foreach ($name in (Get-SnapshotScriptsHC).Keys | Sort-Object -Descending) {
+            $items[$name] = if ($schema.'$defs'.$name.type -eq 'array') { ,@() } else { @{} }
+        }
+        $path = Join-Path $TestDrive 'all-items.json'
+        Write-ConfigurationHC @{ SchemaVersion = 2; Items = $items } $path
+        $loaded = Read-ConfigurationHC $path $TestDrive
+        @($loaded.Items.Keys) | Should -Be @((Get-SnapshotScriptsHC).Keys)
+        @(Test-ConfigurationHC $loaded $TestDrive).Count | Should -Be 0
     }
 }

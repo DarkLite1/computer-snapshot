@@ -5,9 +5,7 @@
 #>
 . "$PSScriptRoot\Section.ps1"
 . "$PSScriptRoot\Schema.ps1"
-$script:ItemOrder = @('StartCustomScriptsBefore', 'RegionalSettings', 'UserAccounts', 'UserGroups',
-    'FirewallRules', 'CreateFolders', 'SmbShares', 'NetworkCards', 'NtpTimeServers', 'RegistryKeys',
-    'ScheduledTasks', 'CopyFilesFolders', 'Software', 'StartCustomScriptsAfter')
+$script:ItemOrder = @((Get-SnapshotScriptsHC).Keys)
 $script:ArrayItems = @('StartCustomScriptsBefore', 'UserAccounts', 'UserGroups', 'FirewallRules',
     'NetworkCards', 'ScheduledTasks', 'CopyFilesFolders', 'StartCustomScriptsAfter')
 

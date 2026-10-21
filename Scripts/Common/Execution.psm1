@@ -85,10 +85,7 @@ function Invoke-ComputerSnapshotHC {
     }
     if (-not (Test-ElevatedHC)) { Write-Warning 'Not running as administrator; some Windows operations may be unavailable.' }
     #endregion
-    $order = @('StartCustomScriptsBefore', 'RegionalSettings', 'UserAccounts', 'UserGroups', 'FirewallRules',
-        'CreateFolders', 'SmbShares', 'NetworkCards', 'NtpTimeServers', 'RegistryKeys', 'ScheduledTasks',
-        'CopyFilesFolders', 'Software', 'StartCustomScriptsAfter')
-    $selected = @($order | Where-Object { $_ -in $Items })
+    $selected = @((Get-SnapshotScriptsHC).Keys | Where-Object { $_ -in $Items })
     $exportItems = [ordered]@{}
     $step = 0
     foreach ($name in $selected) {

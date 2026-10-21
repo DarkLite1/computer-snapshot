@@ -87,4 +87,11 @@ Describe 'NTP command failures' {
             Should -Invoke w32tm -Times 1 -Exactly -ParameterFilter { $Arguments -contains '/resync' }
             Should -Invoke w32tm -Times 2 -Exactly
         }
+        It 'does not require ICMP reachability to configure and synchronize NTP' {
+            Mock Test-Connection { $false }
+            $result = . $scriptPath -Action Import -Data $manualData -RootFolder $TestDrive -ErrorAction Stop
+            $result.Messages | Should -Contain "Time synchronized with custom time servers 'server1 server2'"
+            Should -Invoke Test-Connection -Times 0 -Exactly
+            Should -Invoke w32tm -Times 1 -Exactly -ParameterFilter { $Arguments -contains '/resync' }
+        }
     }

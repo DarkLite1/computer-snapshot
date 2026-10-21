@@ -20,47 +20,18 @@ param(
 . "$PSScriptRoot\Common\Section.ps1"
 #region Windows helpers
 Function Get-TimeServerHC {
-        
-        [CmdletBinding()]
-        Param (
-            [String[]]$ComputerName = $env:COMPUTERNAME
-        )
-        
-        process {
-            $HKLM = 2147483650
-        
-            foreach ($Computer in $ComputerName) {
-                try {
-                    $Output = [PSCustomObject]@{
-                        ComputerName = $Computer
-                        TimeServer   = $null
-                        Type         = $null
-                        Description  = $null
-                    }
-                    $reg = [wmiClass]"\\$Computer\root\default:StdRegprov"
-                    $key = 'SYSTEM\CurrentControlSet\Services\W32Time\Parameters'
-                        
-                    $type = $reg.GetStringValue($HKLM, $key, 'Type')
-                    $Output.Type = $Type.sValue
-    
-                    if ($Output.Type -eq 'NTP') {
-                        $Output.Description = 'Get time from configured NTP source'
-                        $server = $reg.GetStringValue($HKLM, $key, 'NtpServer')
-                        $Output.TimeServer = ($server.sValue -split ',')[0]
-                    }
-                    else {
-                        $Output.Description = 'Get time from the domain hierarchy'
-                        $Output.TimeServer = w32tm /query /source
-                    }
-                    
-                    $Output
-                }
-                catch {
-                    Write-Error "Failed to get NTP server from computer '$Computer': $_"
-                }
-            }
-        }
+    [CmdletBinding()]
+    param()
+
+    $parameters = Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Parameters' -ErrorAction Stop
+    $servers = if ($parameters.Type -eq 'NTP') {
+        $parameters.NtpServer -split '\s+' | Where-Object { $_ } | ForEach-Object { ($_ -split ',', 2)[0] }
     }
+    else {
+        w32tm /query /source
+    }
+    [pscustomobject]@{ Type = $parameters.Type; TimeServer = @($servers) }
+}
 Function Set-SynchronizeTimeWithServerHC {
         Param (
             [Parameter(Mandatory)]
@@ -87,7 +58,7 @@ if ($Action -eq 'Export') {
 $timeServers = Get-TimeServerHC
 $exportData = [ordered]@{
     SyncTimeWithDomain = $timeServers.Type -eq 'NT5DS'
-    TimeServerNames = @($timeServers.TimeServer -split ' ' | Where-Object { $_ } | ForEach-Object { $_.Trim() })
+    TimeServerNames = @($timeServers.TimeServer | Where-Object { $_ } | ForEach-Object { $_.Trim() })
 }
     #endregion
     $messages = @('Exported NTP time servers')

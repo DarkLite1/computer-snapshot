@@ -7,6 +7,7 @@ Describe 'NTP peer capture' {
     BeforeAll {
         $scriptPath = "$PSScriptRoot\..\Scripts\NTP time servers import export.ps1"
     }
+
     BeforeEach {
         Mock Get-ItemProperty { [pscustomobject]@{ Type = 'NTP'; NtpServer = "  server1,0x9`tserver2,0x8   server3  " } }
         Mock w32tm { throw 'Manual peers must not query the current source' }
@@ -31,3 +32,59 @@ Describe 'NTP peer capture' {
         { . $scriptPath -Action Export -RootFolder $TestDrive } | Should -Throw '*Registry unavailable*'
     }
 }
+
+Describe 'NTP command failures' {
+        BeforeAll {
+            $scriptPath = "$PSScriptRoot\..\Scripts\NTP time servers import export.ps1"
+            function w32tm {
+                param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
+                throw 'An unmocked time-service command must never run in tests'
+            }
+        }
+        BeforeEach {
+            $savedExitCode = $global:LASTEXITCODE
+            Mock w32tm { $global:LASTEXITCODE = 0 }
+            Mock Restart-Service
+            Mock Test-Connection { $true }
+            Mock Get-ItemProperty { [pscustomobject]@{ Type = 'NT5DS' } }
+            $domainData = [pscustomobject]@{ SyncTimeWithDomain = $true }
+            $manualData = [pscustomobject]@{ SyncTimeWithDomain = $false; TimeServerNames = @('server1', 'server2') }
+        }
+        AfterEach {
+            $global:LASTEXITCODE = $savedExitCode
+        }
+        It 'reports source-query exit codes and diagnostics on export' {
+            Mock w32tm { $global:LASTEXITCODE = 5; 'Access denied' }
+            { . $scriptPath -Action Export -RootFolder $TestDrive } | Should -Throw '*exit code 5*Access denied*'
+        }
+        It 'stops a domain import when configuration fails' {
+            Mock w32tm { $global:LASTEXITCODE = 5; 'Access denied' } -ParameterFilter { $Arguments -contains '/config' }
+            { . $scriptPath -Action Import -Data $domainData -RootFolder $TestDrive } | Should -Throw '*exit code 5*'
+            Should -Invoke Restart-Service -Times 0 -Exactly
+            Should -Invoke w32tm -Times 0 -Exactly -ParameterFilter { $Arguments -contains '/resync' }
+        }
+        It 'stops a manual import when configuration fails' {
+            Mock w32tm { $global:LASTEXITCODE = 87; 'Invalid parameter' } -ParameterFilter { $Arguments -contains '/config' }
+            { . $scriptPath -Action Import -Data $manualData -RootFolder $TestDrive } | Should -Throw '*exit code 87*Invalid parameter*'
+            Should -Invoke Restart-Service -Times 0 -Exactly
+        }
+        It 'reports resynchronization failures rather than returning a success result' {
+            Mock w32tm { $global:LASTEXITCODE = 1; 'No time data available' } -ParameterFilter { $Arguments -contains '/resync' }
+            { . $scriptPath -Action Import -Data $domainData -RootFolder $TestDrive } | Should -Throw '*exit code 1*No time data available*'
+        }
+        It 'stops before resynchronization if restarting the service fails' {
+            Mock Restart-Service { Write-Error 'Service restart failed' }
+            { . $scriptPath -Action Import -Data $domainData -RootFolder $TestDrive } | Should -Throw '*Service restart failed*'
+            Should -Invoke w32tm -Times 0 -Exactly -ParameterFilter { $Arguments -contains '/resync' }
+        }
+        It 'configures all manual peers in one argument and resynchronizes once' {
+            $result = . $scriptPath -Action Import -Data $manualData -RootFolder $TestDrive
+            $result.Messages | Should -Contain "Time synchronized with custom time servers 'server1 server2'"
+            Should -Invoke w32tm -Times 1 -Exactly -ParameterFilter {
+                $Arguments -contains '/config' -and $Arguments -contains '/manualpeerlist:server1 server2' -and $Arguments -contains '/update'
+            }
+            Should -Invoke Restart-Service -Times 1 -Exactly -ParameterFilter { $ErrorAction -eq 'Stop' }
+            Should -Invoke w32tm -Times 1 -Exactly -ParameterFilter { $Arguments -contains '/resync' }
+            Should -Invoke w32tm -Times 2 -Exactly
+        }
+    }

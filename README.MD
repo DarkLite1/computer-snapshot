@@ -50,6 +50,7 @@ If an item fails, successful sections are still exported and failed items are li
 `CreateFolders`, `RegistryKeys`, `Software`, `CopyFilesFolders` and custom scripts export templates, not a complete capture of those parts of the computer. Scheduled-task capture retains the existing `\HC\*` selection. Task XML and enabled state are stored inline. SMB shares include `Shares`, `Access` and optional `NTFS` permissions.
 
 NTP export captures every configured manual peer in order. `TimeServerNames` contains server names, without the Windows per-peer flag suffixes.
+Time-service command failures include the native exit code and diagnostics in the item failure; synchronization is reported as successful only after configuration, service restart and resynchronization succeed.
 
 ## Configuration Format
 

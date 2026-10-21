@@ -77,4 +77,20 @@ Describe 'Single-file execution' {
         $result.Results[0].Status | Should -Be 'Skipped'
         Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
     }
+    It 'reports a failed time-service operation and never reboots after it' {
+        Write-ConfigurationHC @{
+            SchemaVersion = 2
+            Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }
+            Items = @{ NtpTimeServers = @{ SyncTimeWithDomain = $true; TimeServerNames = @() } }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Script = [ordered]@{ NtpTimeServers = Join-Path $PSScriptRoot '..\..\Scripts\NTP time servers import export.ps1' }
+        Mock Invoke-ChildScriptHC -ModuleName Execution { throw 'w32tm /resync failed with exit code 1: No time data available' }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeFalse
+        $result.Results[0].Status | Should -Be 'Failed'
+        $result.Results[0].Messages[0] | Should -Match 'exit code 1'
+        Should -Invoke Restart-Computer -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly
+    }
 }

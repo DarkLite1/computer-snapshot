@@ -19,6 +19,16 @@ param(
 )
 . "$PSScriptRoot\Common\Section.ps1"
 #region Windows helpers
+function Invoke-TimeServiceHC {
+    param([Parameter(Mandatory)][string[]]$Arguments)
+    $output = & w32tm @Arguments 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "w32tm $($Arguments -join ' ') failed with exit code ${exitCode}: $($output -join [Environment]::NewLine)"
+    }
+    $output
+}
+
 Function Get-TimeServerHC {
     [CmdletBinding()]
     param()
@@ -28,7 +38,7 @@ Function Get-TimeServerHC {
         $parameters.NtpServer -split '\s+' | Where-Object { $_ } | ForEach-Object { ($_ -split ',', 2)[0] }
     }
     else {
-        w32tm /query /source
+        Invoke-TimeServiceHC -Arguments '/query', '/source'
     }
     [pscustomobject]@{ Type = $parameters.Type; TimeServer = @($servers) }
 }
@@ -40,11 +50,10 @@ Function Set-SynchronizeTimeWithServerHC {
 
         $manualpeerlist = $ComputerName -join ' '
 
-        $null = w32tm /config /manualpeerlist:"$manualpeerlist" /syncfromflags:manual /reliable:YES /update
-        $null = w32tm /config /update
+        $null = Invoke-TimeServiceHC -Arguments '/config', "/manualpeerlist:$manualpeerlist", '/syncfromflags:manual', '/reliable:YES', '/update'
     }
 Function Set-SynchronizeTimeWithDomainHC {
-        $null = w32tm /config /syncfromflags:domhier /reliable:NO /update
+        $null = Invoke-TimeServiceHC -Arguments '/config', '/syncfromflags:domhier', '/reliable:NO', '/update'
     }
 #endregion
 $exportData = $null
@@ -71,8 +80,6 @@ $ntp = $Data
 if ($ntp.SyncTimeWithDomain) {
                 Write-Verbose 'Sync time with the domain'
                 Set-SynchronizeTimeWithDomainHC
-                Write-Output 'Time synchronized with the domain'
-                Write-Output 'Custom time server names are disregarded'
             } 
             else {
                 $timeServerNames = $ntp.TimeServerNames | Where-Object { $_ } | 
@@ -89,14 +96,20 @@ if ($ntp.SyncTimeWithDomain) {
                     Write-Verbose "Sync time with servers '$timeServerNames'"
                     Set-SynchronizeTimeWithServerHC -ComputerName $timeServerNames
                     
-                    Write-Output "Time synchronized with custom time servers '$timeServerNames'"
                 }
                 else {
                     throw 'No time server names found in the import file'
                 }
             }
-Restart-Service w32time
-$null = w32tm /resync
+Restart-Service w32time -ErrorAction Stop
+$null = Invoke-TimeServiceHC -Arguments '/resync'
+if ($ntp.SyncTimeWithDomain) {
+    Write-Output 'Time synchronized with the domain'
+    Write-Output 'Custom time server names are disregarded'
+}
+else {
+    Write-Output "Time synchronized with custom time servers '$timeServerNames'"
+}
     })
     #endregion
 }

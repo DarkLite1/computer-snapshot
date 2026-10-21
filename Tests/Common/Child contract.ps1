@@ -49,7 +49,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         Mock Set-SynchronizeTimeWithServerHC
         Mock Set-SynchronizeTimeWithDomainHC
         Mock Restart-Service
-        Mock w32tm
+        Mock w32tm { $global:LASTEXITCODE = 0 }
         Mock Get-WinSystemLocale { [pscustomobject]@{ Name = 'en-US' } }
         Mock Get-TimeZone { [pscustomobject]@{ Id = 'UTC' } }
         Mock Get-WinHomeLocation { [pscustomobject]@{ GeoId = 21 } }

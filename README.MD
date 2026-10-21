@@ -25,7 +25,7 @@ Open **Start wizard.lnk**. Restore selects a configuration by name and descripti
 
 The suggested export name is `COMPUTERNAME yyyy-MM-dd HHmmss` (for example, `KIOSK01 2026-10-21 142536.json`). You can edit it; explicitly supplied command-line filenames are unchanged.
 
-**Select configuration.lnk** opens the restore picker. The two example shortcuts use [Configurations/Example PC1.json](Configurations/Example%20PC1.json). That example runs the bundled hello-world executables; review any executable before running it.
+The two example shortcuts use [Configurations/Example PC1.json](Configurations/Example%20PC1.json). That example runs the bundled hello-world executables; review any executable before running it.
 
 ## Command Line
 

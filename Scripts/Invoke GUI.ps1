@@ -289,6 +289,21 @@ function New-RestoreSelectionFormHC {
         $owner = $this.FindForm()
         $owner.Controls.Find('RestoreSelected', $true)[0].Enabled = $this.CheckedItems.Count -gt 0
     })
+    $dialog.Add_Shown({
+        $this.PerformLayout()
+        $itemList = $this.Controls.Find('SnapshotItems', $true)[0]
+        if (-not $itemList.Items.Count) { return }
+        $rowHeight = $itemList.Items[0].Bounds.Height
+        $headerHeight = $itemList.Items[0].Bounds.Top
+        $borderHeight = $itemList.Height - $itemList.ClientSize.Height
+        $surroundingHeight = $this.Height - $itemList.Height
+        $workingArea = [Windows.Forms.Screen]::FromControl($this).WorkingArea
+        $minimumHeight = $surroundingHeight + $headerHeight + $borderHeight + $rowHeight * [Math]::Min(3, $itemList.Items.Count) + 2
+        $this.MinimumSize = New-Object Drawing.Size $this.MinimumSize.Width, ([Math]::Min($minimumHeight, $workingArea.Height))
+        $contentHeight = $surroundingHeight + $headerHeight + $borderHeight + $rowHeight * $itemList.Items.Count + 2
+        $this.Height = [Math]::Min($contentHeight, $workingArea.Height)
+        $this.Top = [Math]::Max($workingArea.Top, [Math]::Min($this.Top, $workingArea.Bottom - $this.Height))
+    })
     return ,$dialog
 }
 

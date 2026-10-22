@@ -170,6 +170,41 @@ Describe 'Restore selection controls' {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
     }
+    It 'fits the initial window height to the rendered checklist without spare rows' {
+        foreach ($entries in @(@(Get-SnapshotItemEntriesHC -Items UserAccounts, Software), @(Get-SnapshotItemEntriesHC))) {
+            $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Fit checklist' -Entries $entries
+            try {
+                $dialog.Show()
+                [Windows.Forms.Application]::DoEvents()
+                $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
+                $lastRow = $list.Items[$list.Items.Count - 1]
+                $remaining = $list.ClientSize.Height - $lastRow.Bounds.Bottom
+                $remaining | Should -BeGreaterOrEqual 0
+                $remaining | Should -BeLessOrEqual 4
+                $report = $dialog.Controls.Find('OpenReportInBrowser', $true)[0]
+                $list.Bottom | Should -BeLessOrEqual $report.Parent.Top
+                $dialog.Height | Should -BeLessOrEqual ([Windows.Forms.Screen]::FromControl($dialog).WorkingArea.Height)
+            }
+            finally { $dialog.Dispose() }
+        }
+    }
+    It 'caps tall checklists at the available screen height and leaves them scrollable' {
+        $entries = @(1..100 | ForEach-Object { Get-SnapshotItemEntriesHC -Items UserAccounts })
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Tall checklist' -Entries $entries
+        try {
+            $dialog.Show()
+            [Windows.Forms.Application]::DoEvents()
+            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
+            $workingArea = [Windows.Forms.Screen]::FromControl($dialog).WorkingArea
+            $dialog.Height | Should -BeLessOrEqual $workingArea.Height
+            $dialog.Top | Should -BeGreaterOrEqual $workingArea.Top
+            $dialog.Bottom | Should -BeLessOrEqual $workingArea.Bottom
+            $list.Items[99].Bounds.Bottom | Should -BeGreaterThan $list.ClientSize.Height
+            $list.EnsureVisible(99)
+            $list.Items[99].Bounds.Bottom | Should -BeLessOrEqual $list.ClientSize.Height
+        }
+        finally { $dialog.Dispose() }
+    }
     It 'shows the selected configuration description separately from restore guidance' {
         $path = "$PSScriptRoot\..\Configurations\Example PC1.json"
         $expected = (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).Description
@@ -356,6 +391,8 @@ Describe 'Restore selection controls' {
         try {
             $dialog.Size = $dialog.MinimumSize
             $dialog.Show()
+            [Windows.Forms.Application]::DoEvents()
+            $dialog.Size = $dialog.MinimumSize
             $dialog.PerformLayout()
             $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
             $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]

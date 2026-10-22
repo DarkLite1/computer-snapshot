@@ -251,6 +251,8 @@ Describe 'Restore selection controls' {
             $description.Text | Should -BeExactly $expected
             $description.Bottom | Should -BeLessThan $guidance.Top
             $guidance.Text | Should -BeLike 'Choose the sections to apply*'
+            $guidance.Font.Size | Should -BeLessThan $description.Font.Size
+            $guidance.Font.Size | Should -Be 9
         }
         finally { $dialog.Dispose() }
     }

@@ -255,6 +255,7 @@ function New-RestoreSelectionFormHC {
     $description = New-Object Windows.Forms.Label
     $description.Name = 'RestoreGuidance'
     $description.Text = 'Choose the sections to apply to this computer. Uncheck anything you want to leave unchanged.'
+    $description.Font = New-Object Drawing.Font $dialog.Font.FontFamily, 9
     $description.AutoSize = $true
     $description.Dock = 'Fill'
     $description.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
@@ -424,6 +425,7 @@ $null = $restoreLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Window
 $restoreTab.Controls.Add($restoreLayout)
 $restoreDescription = New-Object Windows.Forms.Label
 $restoreDescription.Text = 'Apply a saved configuration to this computer. Select a configuration and click Restore to review and choose which sections to apply.'
+$restoreDescription.Font = New-Object Drawing.Font $form.Font.FontFamily, 9
 $restoreDescription.AutoSize = $true
 $restoreDescription.Dock = 'Fill'
 $restoreDescription.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
@@ -495,6 +497,7 @@ foreach ($height in @(40, 48)) { $null = $exportLayout.RowStyles.Add((New-Object
 $exportTab.Controls.Add($exportLayout)
 $exportDescription = New-Object Windows.Forms.Label
 $exportDescription.Text = 'Save selected sections to a JSON file in Configurations. Some sections export editable templates rather than current settings; review the file before restoring it.'
+$exportDescription.Font = New-Object Drawing.Font $form.Font.FontFamily, 9
 $exportDescription.AutoSize = $true
 $exportDescription.Dock = 'Fill'
 $exportDescription.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12

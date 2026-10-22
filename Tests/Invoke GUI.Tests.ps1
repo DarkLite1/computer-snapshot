@@ -139,6 +139,20 @@ Describe 'Optional wizard elevation' {
         Mock Start-Process { throw (New-Object System.ComponentModel.Win32Exception 2) }
         { Restart-WizardElevatedHC -RootFolder $TestDrive -WizardScript 'C:\Wizard.ps1' } | Should -Throw
     }
+    It 'distinguishes administrator restart with a shield and accessible accent color' {
+        $panel = New-WizardElevationPanelHC -RootFolder $TestDrive -WizardScript 'C:\Wizard.ps1'
+        try {
+            $button = $panel.Controls.Find('RestartAsAdministrator', $true)[0]
+            $button.Image | Should -Not -BeNullOrEmpty
+            $button.Image.Width | Should -Be 16
+            $button.TextImageRelation | Should -Be ([Windows.Forms.TextImageRelation]::ImageBeforeText)
+            if (-not [Windows.Forms.SystemInformation]::HighContrast) {
+                $button.BackColor | Should -Be ([Drawing.Color]::FromArgb(245, 199, 92))
+                $button.ForeColor | Should -Be ([Drawing.Color]::FromArgb(40, 35, 20))
+            }
+        }
+        finally { $panel.Dispose() }
+    }
     It 'omits the button when already elevated' {
         Mock Test-WizardElevatedHC { $true }
         New-WizardElevationPanelHC -RootFolder $TestDrive -WizardScript 'C:\Wizard.ps1' | Should -BeNullOrEmpty

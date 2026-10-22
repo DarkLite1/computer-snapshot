@@ -56,6 +56,20 @@ function New-WizardElevationPanelHC {
     $button.Name = 'RestartAsAdministrator'
     $button.Text = 'Restart as administrator'
     $button.Size = New-Object Drawing.Size 230, 34
+    if (-not [Windows.Forms.SystemInformation]::HighContrast) {
+        $button.UseVisualStyleBackColor = $false
+        $button.BackColor = [Drawing.Color]::FromArgb(245, 199, 92)
+        $button.ForeColor = [Drawing.Color]::FromArgb(40, 35, 20)
+        $button.FlatStyle = 'Flat'
+        $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(164, 119, 26)
+        $button.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(255, 218, 133)
+        $button.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(225, 173, 58)
+    }
+    $shield = New-Object Drawing.Icon ([Drawing.SystemIcons]::Shield), 16, 16
+    try { $button.Image = $shield.ToBitmap() }
+    finally { $shield.Dispose() }
+    $button.TextImageRelation = 'ImageBeforeText'
+    $button.Add_Disposed({ if ($this.Image) { $this.Image.Dispose() } })
     $button.Tag = @{ RootFolder = $RootFolder; WizardScript = $WizardScript }
     $button.Add_Click({
         $owner = $this.FindForm()

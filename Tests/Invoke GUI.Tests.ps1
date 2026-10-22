@@ -3,6 +3,51 @@
 BeforeAll {
     . "$PSScriptRoot\..\Scripts\Invoke GUI.ps1" -NoShow
 }
+Describe 'Wizard console welcome' {
+    BeforeEach {
+        Mock Clear-Host
+        Mock Write-Host
+        Mock Test-WizardElevatedHC { $false }
+        $console = [pscustomobject]@{ BackgroundColor = [ConsoleColor]::DarkBlue; ForegroundColor = [ConsoleColor]::Yellow; WindowTitle = 'PowerShell' }
+    }
+    It 'sets a black console and shows ASCII art with launch details' {
+        Show-WizardConsoleHC -ConsoleUI $console -ComputerName 'TEST-PC' -UserName 'DOMAIN\Example' -StartedAt ([datetime]'2026-10-22T08:42:04')
+        $console.BackgroundColor | Should -Be ([ConsoleColor]::Black)
+        $console.ForegroundColor | Should -Be ([ConsoleColor]::Gray)
+        $console.WindowTitle | Should -Be 'Computer Snapshot | TEST-PC'
+        Should -Invoke Clear-Host -Times 1 -Exactly
+        Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter {
+            $Object -like '*COMPUTER SNAPSHOT*' -and $Object -like '*[[] SNAPSHOT ]*' -and
+            $Object -notmatch '[^\x00-\x7F]' -and $BackgroundColor -eq 'Black'
+        }
+        Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter {
+            $Object -like '*Hostname   : TEST-PC*' -and $Object -like '*2026-10-22 08:42:04*' -and
+            $Object -like '*User       : DOMAIN\Example*' -and $Object -like '*PowerShell :*' -and
+            $Object -like '*Standard (not elevated)*' -and $BackgroundColor -eq 'Black'
+        }
+    }
+    It 'identifies an elevated session' {
+        Mock Test-WizardElevatedHC { $true }
+        Show-WizardConsoleHC -ConsoleUI $console
+        Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter { $Object -like '*Access     : Administrator*' }
+    }
+    It 'continues when console customization is unavailable' {
+        Mock Clear-Host { throw 'Unsupported console operation' }
+        { Show-WizardConsoleHC -ConsoleUI $console } | Should -Not -Throw
+        Should -Invoke Write-Host -Times 3 -Exactly
+    }
+    It 'supports hosts without a raw console' {
+        { Show-WizardConsoleHC -ConsoleUI $null } | Should -Not -Throw
+        Should -Invoke Clear-Host -Times 0 -Exactly
+        Should -Invoke Write-Host -Times 3 -Exactly
+    }
+    It 'does not clear or print a welcome when loading with NoShow' {
+        . "$PSScriptRoot\..\Scripts\Invoke GUI.ps1" -NoShow
+        Should -Invoke Clear-Host -Times 0 -Exactly
+        Should -Invoke Write-Host -Times 0 -Exactly
+    }
+}
+
 Describe 'Single-file wizard commands' {
     BeforeEach {
         Mock Start-Process

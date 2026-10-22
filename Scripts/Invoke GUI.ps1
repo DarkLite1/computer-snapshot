@@ -25,6 +25,46 @@ function Test-WizardElevatedHC {
     finally { $identity.Dispose() }
 }
 
+function Show-WizardConsoleHC {
+    param(
+        $ConsoleUI = $Host.UI.RawUI,
+        [string]$ComputerName = [Environment]::MachineName,
+        [string]$UserName = ('{0}\{1}' -f [Environment]::UserDomainName, [Environment]::UserName),
+        [datetime]$StartedAt = (Get-Date)
+    )
+    if ($null -ne $ConsoleUI) {
+        try {
+            $ConsoleUI.BackgroundColor = [ConsoleColor]::Black
+            $ConsoleUI.ForegroundColor = [ConsoleColor]::Gray
+            $ConsoleUI.WindowTitle = "Computer Snapshot | $ComputerName"
+            Clear-Host
+        }
+        catch { Write-Verbose 'Console appearance could not be changed in this host.' }
+    }
+    $art = @'
+
+    .----------------------.   COMPUTER SNAPSHOT
+    |  >_                  |   -----------------
+    |     [ SNAPSHOT ]     |   Export . Restore
+    |                      |
+    '----------+-----------'
+              _|_
+             |___|
+
+'@
+    Write-Host $art -ForegroundColor Cyan -BackgroundColor Black
+    $access = if (Test-WizardElevatedHC) { 'Administrator' } else { 'Standard (not elevated)' }
+    $details = @(
+        "    Hostname   : $ComputerName"
+        "    Started    : $($StartedAt.ToString('yyyy-MM-dd HH:mm:ss'))"
+        "    User       : $UserName"
+        "    PowerShell : $($PSVersionTable.PSVersion)"
+        "    Access     : $access"
+    )
+    Write-Host ($details -join [Environment]::NewLine) -ForegroundColor White -BackgroundColor Black
+    Write-Host "`n    The wizard is open in a separate window.`n" -ForegroundColor DarkGray -BackgroundColor Black
+}
+
 function Restart-WizardElevatedHC {
     param([string]$RootFolder, [string]$WizardScript)
     $command = "& '{0}' -RootFolder '{1}'" -f $WizardScript.Replace("'", "''"), $RootFolder.Replace("'", "''")
@@ -384,6 +424,7 @@ function Start-ConfigurationJobHC {
 }
 #endregion
 if ($NoShow) { return }
+Show-WizardConsoleHC
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()

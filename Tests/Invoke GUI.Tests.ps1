@@ -62,14 +62,17 @@ Describe 'Single-file wizard commands' {
         foreach ($entry in $entries) {
             $entry.Name | Should -Not -BeNullOrEmpty
             $entry.Description | Should -Not -BeNullOrEmpty
+            $entry.Available | Should -BeTrue
         }
         ($entries | Where-Object Key -eq 'CopyFilesFolders').Name | Should -Be 'Copy files and folders'
     }
-    It 'lists only sections in the selected configuration without resolving references' {
+    It 'lists all sections but only marks configured sections available without resolving references' {
         $testFile = Join-Path $TestDrive 'Example.json'
         '{"SchemaVersion":2,"Items":{"Software":{},"UserAccounts":"missing.json","Comment":"Example"}}' | Set-Content -LiteralPath $testFile
         $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile)
-        @($entries.Key) | Should -Be @('UserAccounts', 'Software')
+        @($entries.Key) | Should -Be @((Get-SnapshotScriptsHC).Keys)
+        @($entries | Where-Object Available | ForEach-Object Key) | Should -Be @('UserAccounts', 'Software')
+        @($entries | Where-Object { -not $_.Available }).Count | Should -Be ($entries.Count - 2)
     }
     It 'rejects legacy or empty configurations in the restore overview' {
         $testFile = Join-Path $TestDrive 'Example.json'
@@ -137,6 +140,34 @@ Describe 'Restore selection controls' {
     BeforeAll {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
+    }
+    It 'grays out missing sections and blocks checking them individually or with Select all' {
+        $testFile = Join-Path $TestDrive 'Partial.json'
+        '{"SchemaVersion":2,"Items":{"UserAccounts":[],"Software":{}}}' | Set-Content -LiteralPath $testFile
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Partial' -Entries @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile)
+        try {
+            $dialog.Show()
+            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
+            $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
+            $list.Items.Count | Should -Be (Get-SnapshotScriptsHC).Count
+            @($list.CheckedItems | ForEach-Object Tag) | Should -Be @('UserAccounts', 'Software')
+            $missing = @($list.Items | Where-Object { $_.Tag -notin @('UserAccounts', 'Software') })
+            foreach ($item in $missing) {
+                $item.ForeColor | Should -Be ([Drawing.SystemColors]::GrayText)
+                $item.ToolTipText | Should -Be 'Not included in this configuration.'
+                $item.Checked = $true
+                $item.Checked | Should -BeFalse
+            }
+            ($confirm.Parent.Controls | Where-Object Text -eq 'Clear all').PerformClick()
+            $confirm.Enabled | Should -BeFalse
+            $missing[0].Checked = $true
+            $confirm.Enabled | Should -BeFalse
+            ($confirm.Parent.Controls | Where-Object Text -eq 'Select all').PerformClick()
+            @($list.CheckedItems | ForEach-Object Tag) | Should -Be @('UserAccounts', 'Software')
+            $confirm.PerformClick()
+            @($dialog.Tag) | Should -Be @('UserAccounts', 'Software')
+        }
+        finally { $dialog.Dispose() }
     }
     It 'shows checked names and descriptions and returns only checked keys' {
         $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Example' -Entries @(Get-SnapshotItemEntriesHC -Items UserAccounts, Software)

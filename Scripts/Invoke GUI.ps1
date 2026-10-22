@@ -102,7 +102,7 @@ function Get-SnapshotItemEntriesHC {
     }
     foreach ($name in (Get-SnapshotScriptsHC).Keys) {
         if ($null -ne $Items -and $name -notin $Items) { continue }
-        [pscustomobject]@{ Key = $name; Name = $labels[$name][0]; Description = $labels[$name][1] }
+        [pscustomobject]@{ Key = $name; Name = $labels[$name][0]; Description = $labels[$name][1]; Available = $true }
     }
 }
 
@@ -116,7 +116,10 @@ function Get-RestoreItemEntriesHC {
     foreach ($name in $names) {
         if ($name -cnotin (Get-SnapshotScriptsHC).Keys) { throw "Unknown configuration item '$name'." }
     }
-    Get-SnapshotItemEntriesHC -Items $names
+    foreach ($entry in Get-SnapshotItemEntriesHC) {
+        $entry.Available = $entry.Key -in $names
+        $entry
+    }
 }
 
 function New-SnapshotItemListHC {
@@ -129,6 +132,7 @@ function New-SnapshotItemListHC {
     $list.FullRowSelect = $true
     $list.HideSelection = $false
     $list.ShowItemToolTips = $true
+    $list.Tag = @($Entries | Where-Object { $_.Available -eq $false } | ForEach-Object { $_.Key })
     $null = $list.Columns.Add('Item', 250)
     $null = $list.Columns.Add('Description', 450)
     foreach ($entry in $Entries) {
@@ -136,9 +140,19 @@ function New-SnapshotItemListHC {
         $null = $item.SubItems.Add($entry.Description)
         $item.Tag = $entry.Key
         $item.ToolTipText = $entry.Description
-        $item.Checked = $true
+        $item.Checked = $entry.Available -ne $false
+        if ($entry.Available -eq $false) {
+            $item.ForeColor = [Drawing.SystemColors]::GrayText
+            $item.ToolTipText = 'Not included in this configuration.'
+        }
         $null = $list.Items.Add($item)
     }
+    $list.Add_ItemCheck({
+        param($sender, $eventArgs)
+        if ($sender.Items[$eventArgs.Index].Tag -in $sender.Tag) {
+            $eventArgs.NewValue = [Windows.Forms.CheckState]::Unchecked
+        }
+    })
     return ,$list
 }
 
@@ -196,7 +210,12 @@ function New-RestoreSelectionFormHC {
     $all = New-Object Windows.Forms.Button
     $all.Text = 'Select all'
     $all.Size = New-Object Drawing.Size 100, 34
-    $all.Add_Click({ foreach ($entry in $this.FindForm().Controls.Find('SnapshotItems', $true)[0].Items) { $entry.Checked = $true } })
+    $all.Add_Click({
+        $availableList = $this.FindForm().Controls.Find('SnapshotItems', $true)[0]
+        foreach ($entry in $availableList.Items) {
+            if ($entry.Tag -notin $availableList.Tag) { $entry.Checked = $true }
+        }
+    })
     $buttons.Controls.AddRange(@($confirm, $cancel, $clear, $all))
     $layout.Controls.Add($buttons, 0, 2)
     $list.Add_ItemChecked({

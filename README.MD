@@ -10,8 +10,12 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
 
 1. Plug in your USB stick.
 2. Double-click **`Start wizard.lnk`**.
-3. **To set up a PC (Restore):** Click **Restore** and select a saved configuration from your list to apply it to the current computer.
-4. **To save a PC's setup (Export):** Click **Export**, choose which settings you want to copy (like users, folders, or network settings), and give your file a name. *Tip: The wizard will suggest a handy default name like `KIOSK01 2026-10-21 142536.json`*.
+3. **To set up a PC (Restore):** Select a saved configuration and click **Restore**. Review the section names and descriptions, uncheck anything you do not want to apply, then click **Restore selected**. **Select all** and **Clear all** help with larger selections; **Cancel** leaves the computer unchanged. The saved configuration file is not modified.
+4. **To save a PC's setup (Export):** Click **Export**, review the item names and descriptions, choose which sections you want to save (like users, folders, or network settings), and give your file a name. Some sections export editable templates rather than current settings, so review the file before restoring it. *Tip: The wizard will suggest a handy default name like `KIOSK01 2026-10-21 142536.json`*.
+
+When the wizard is not elevated, an optional **Restart as administrator** button appears above the tabs. Windows handles any administrator credentials or consent prompt according to its UAC policy; the wizard never collects passwords. Cancelling the prompt keeps the current window open. You can also ignore the button and continue without elevation, although some Windows operations require administrator rights. Restarting opens a fresh wizard with the same configuration folder.
+
+Restore selections apply to whole sections, not individual users, applications, or rules within them. Only selected sections are resolved, validated, and executed; configuration-level options such as automatic restart still apply. Command-line restores keep their existing all-sections behavior unless you pass `-Items`, for example `-Items UserAccounts,Software` to `Scripts\Invoke configuration.ps1`.
 
 Once you run a task, you can check the `Log` folder for an easy-to-read HTML report showing exactly what succeeded and what failed.
 

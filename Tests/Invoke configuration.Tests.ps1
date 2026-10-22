@@ -45,4 +45,20 @@ Describe 'Configuration launcher' {
         { . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm } | Should -Throw '*converter*'
         Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
     }
+    It 'forwards the selected sections to the main script' {
+        $document.Items.Software = @{ Install = @(@{ ExecutablePath = 'missing.exe' }) }
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm -Items UserAccounts
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { $Arguments.Items.Count -eq 1 -and $Arguments.Items[0] -eq 'UserAccounts' }
+    }
+    It 'preserves selection when relaunching elevated' {
+        $document.Settings.RunElevated = $true
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm -Items UserAccounts
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
+            $Verb -eq 'RunAs' -and $command.Contains("-Items @('UserAccounts')")
+        }
+        Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
+    }
 }

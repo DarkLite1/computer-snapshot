@@ -7,7 +7,7 @@
 .PARAMETER ConfigurationFile
     JSON file to read or write. Relative paths are resolved from the USB root.
 .PARAMETER Items
-    Items to capture on export. Defaults to all supported items.
+    Sections to export or restore. Defaults to all supported export items or all sections in the restore configuration.
 .PARAMETER ReportsFolder
     Report folder, relative to this script when not absolute.
 .PARAMETER Force

@@ -59,7 +59,7 @@ function Invoke-ComputerSnapshotHC {
     #region Preflight
     if ($Action -eq 'RestoreSnapshot') {
         try {
-            $configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $RootFolder
+            $configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $RootFolder -Items $Items
             $problems = @(Test-ConfigurationHC -Configuration $configuration -RootFolder $RootFolder)
             $RebootComputer = $configuration.Settings.RebootComputer
             $OpenReportInBrowser = $configuration.Settings.OpenReportInBrowser

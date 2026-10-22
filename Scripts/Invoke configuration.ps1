@@ -10,13 +10,16 @@
     Main execution script. Defaults to the bundled Invoke scripts script.
 .PARAMETER Confirm
     Skip the interactive confirmation question.
+.PARAMETER Items
+    Restore only these sections. Omit to restore all sections in the configuration.
 #>
 [CmdletBinding()]
 param(
     [string]$ConfigurationFile,
     [string]$ConfigurationsFolder,
     [string]$StartScript = "$PSScriptRoot\Invoke scripts.ps1",
-    [switch]$Confirm
+    [switch]$Confirm,
+    [string[]]$Items
 )
 Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
 . "$PSScriptRoot\Common\Section.ps1"
@@ -44,14 +47,20 @@ if (-not $ConfigurationFile) {
     $ConfigurationFile = $selected.Path
 }
 $configurationPath = Resolve-RootPathHC $ConfigurationFile $rootFolder
-$configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $rootFolder
+$configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $rootFolder -Items $Items
 $problems = @(Test-ConfigurationHC $configuration $rootFolder)
 if ($problems.Count) { throw ($problems -join [Environment]::NewLine) }
 if (-not $Confirm -and (Read-Host "Restore '$configurationPath'? (y/n)") -ne 'y') { return }
 if ($configuration.Settings.RunElevated -and -not (Test-IsStartedElevatedHC)) {
     $command = "& '{0}' -ConfigurationFile '{1}' -StartScript '{2}' -Confirm" -f $PSCommandPath.Replace("'", "''"), $configurationPath.Replace("'", "''"), $StartScript.Replace("'", "''")
+    if ($null -ne $Items) {
+        $itemArguments = ($Items | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
+        $command += " -Items @($itemArguments)"
+    }
     $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
     Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encodedCommand
     return
 }
-Invoke-ScriptHC -Path $StartScript -Arguments @{ Action = 'RestoreSnapshot'; ConfigurationFile = $configurationPath }
+$arguments = @{ Action = 'RestoreSnapshot'; ConfigurationFile = $configurationPath }
+if ($null -ne $Items) { $arguments.Items = $Items }
+Invoke-ScriptHC -Path $StartScript -Arguments $arguments

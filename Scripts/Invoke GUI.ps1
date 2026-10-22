@@ -16,6 +16,59 @@ param(
 . "$PSScriptRoot\Common\Section.ps1"
 
 #region Command construction
+function Test-WizardElevatedHC {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    try {
+        $principal = New-Object Security.Principal.WindowsPrincipal $identity
+        return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    }
+    finally { $identity.Dispose() }
+}
+
+function Restart-WizardElevatedHC {
+    param([string]$RootFolder, [string]$WizardScript)
+    $command = "& '{0}' -RootFolder '{1}'" -f $WizardScript.Replace("'", "''"), $RootFolder.Replace("'", "''")
+    $parameters = @{
+        FilePath = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
+        Verb = 'RunAs'
+        WorkingDirectory = $env:WINDIR
+        ArgumentList = @('-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command)))
+        ErrorAction = 'Stop'
+    }
+    try { Start-Process @parameters }
+    catch [System.ComponentModel.Win32Exception] {
+        if ($_.Exception.NativeErrorCode -eq 1223) { return $false }
+        throw
+    }
+    return $true
+}
+
+function New-WizardElevationPanelHC {
+    param([string]$RootFolder, [string]$WizardScript)
+    if (Test-WizardElevatedHC) { return }
+    $panel = New-Object Windows.Forms.FlowLayoutPanel
+    $panel.Name = 'WizardElevation'
+    $panel.Dock = 'Fill'
+    $panel.AutoSize = $true
+    $panel.FlowDirection = 'RightToLeft'
+    $panel.Padding = New-Object Windows.Forms.Padding 6
+    $button = New-Object Windows.Forms.Button
+    $button.Name = 'RestartAsAdministrator'
+    $button.Text = 'Restart as administrator'
+    $button.Size = New-Object Drawing.Size 230, 34
+    $button.Tag = @{ RootFolder = $RootFolder; WizardScript = $WizardScript }
+    $button.Add_Click({
+        $owner = $this.FindForm()
+        $arguments = $this.Tag
+        try {
+            if (Restart-WizardElevatedHC @arguments) { $owner.Close() }
+        }
+        catch { $null = [Windows.Forms.MessageBox]::Show($owner, [string]$_, 'Administrator restart', 'OK', 'Error') }
+    })
+    $panel.Controls.Add($button)
+    return ,$panel
+}
+
 function Get-DefaultConfigurationNameHC {
     return $env:COMPUTERNAME + ' ' + (Get-Date -Format 'yyyy-MM-dd HHmmss')
 }
@@ -27,6 +80,130 @@ function Get-ConfigurationEntriesHC {
         catch { $document = @{ Description = 'Invalid JSON' } }
         [pscustomobject]@{ Name = $file.BaseName; Description = $document.Description; Path = $file.FullName }
     }
+}
+
+function Get-SnapshotItemEntriesHC {
+    param([string[]]$Items)
+    $labels = @{
+        StartCustomScriptsBefore = @('Custom scripts (before restore)', 'Run custom scripts before the other sections.')
+        RegionalSettings = @('Regional settings', 'Language, culture, home location and time zone.')
+        UserAccounts = @('User accounts', 'Local user accounts and their settings.')
+        UserGroups = @('User groups', 'Local groups and group membership.')
+        FirewallRules = @('Firewall rules', 'Windows Firewall rules and their settings.')
+        CreateFolders = @('Create folders', 'Folder paths to create on the computer.')
+        SmbShares = @('Shared folders (SMB)', 'Network shares, share access and NTFS permissions.')
+        NetworkCards = @('Network adapters', 'Network adapter, IP address and DNS settings.')
+        NtpTimeServers = @('Time synchronization', 'Domain time synchronization or NTP time servers.')
+        RegistryKeys = @('Registry keys', 'Registry keys and values to apply.')
+        ScheduledTasks = @('Scheduled tasks', 'Task definitions and enabled states.')
+        CopyFilesFolders = @('Copy files and folders', 'Source and destination paths for file copies.')
+        Software = @('Software', 'Applications to install or remove.')
+        StartCustomScriptsAfter = @('Custom scripts (after restore)', 'Run custom scripts after the other sections.')
+    }
+    foreach ($name in (Get-SnapshotScriptsHC).Keys) {
+        if ($null -ne $Items -and $name -notin $Items) { continue }
+        [pscustomobject]@{ Key = $name; Name = $labels[$name][0]; Description = $labels[$name][1] }
+    }
+}
+
+function Get-RestoreItemEntriesHC {
+    param([string]$ConfigurationFile)
+    $document = Get-Content -LiteralPath $ConfigurationFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    if ($document.SchemaVersion -ne 2 -or $document.SchemaVersion -is [string]) { throw 'Select a version-2 configuration; convert older configurations first.' }
+    if ($document.Items -isnot [pscustomobject]) { throw 'The configuration must contain an Items object.' }
+    $names = @($document.Items.PSObject.Properties | Where-Object { $_.Name -cne 'Comment' } | ForEach-Object { $_.Name })
+    if (-not $names.Count) { throw 'The configuration contains no items to restore.' }
+    foreach ($name in $names) {
+        if ($name -cnotin (Get-SnapshotScriptsHC).Keys) { throw "Unknown configuration item '$name'." }
+    }
+    Get-SnapshotItemEntriesHC -Items $names
+}
+
+function New-SnapshotItemListHC {
+    param([object[]]$Entries)
+    $list = New-Object Windows.Forms.ListView
+    $list.Name = 'SnapshotItems'
+    $list.Dock = 'Fill'
+    $list.View = 'Details'
+    $list.CheckBoxes = $true
+    $list.FullRowSelect = $true
+    $list.HideSelection = $false
+    $list.ShowItemToolTips = $true
+    $null = $list.Columns.Add('Item', 250)
+    $null = $list.Columns.Add('Description', 450)
+    foreach ($entry in $Entries) {
+        $item = New-Object Windows.Forms.ListViewItem $entry.Name
+        $null = $item.SubItems.Add($entry.Description)
+        $item.Tag = $entry.Key
+        $item.ToolTipText = $entry.Description
+        $item.Checked = $true
+        $null = $list.Items.Add($item)
+    }
+    return ,$list
+}
+
+function New-RestoreSelectionFormHC {
+    param([string]$ConfigurationName, [object[]]$Entries)
+    $dialog = New-Object Windows.Forms.Form
+    $dialog.Text = "Restore - $ConfigurationName"
+    $dialog.ClientSize = New-Object Drawing.Size 800, 500
+    $dialog.MinimumSize = New-Object Drawing.Size 650, 400
+    $dialog.StartPosition = 'CenterParent'
+    $dialog.Font = New-Object Drawing.Font 'Segoe UI', 10
+    $dialog.ShowInTaskbar = $false
+    $layout = New-Object Windows.Forms.TableLayoutPanel
+    $layout.Dock = 'Fill'
+    $layout.Padding = New-Object Windows.Forms.Padding 12
+    $layout.ColumnCount = 1
+    $null = $layout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Percent), 100))
+    $layout.RowCount = 3
+    $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
+    $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Percent), 100))
+    $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), 48))
+    $dialog.Controls.Add($layout)
+    $description = New-Object Windows.Forms.Label
+    $description.Text = 'Choose the sections to apply to this computer. Uncheck anything you want to leave unchanged. Configuration options, including any automatic restart, still apply.'
+    $description.AutoSize = $true
+    $description.Dock = 'Fill'
+    $description.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
+    $layout.Controls.Add($description, 0, 0)
+    $list = New-SnapshotItemListHC -Entries $Entries
+    $layout.Controls.Add($list, 0, 1)
+    $buttons = New-Object Windows.Forms.FlowLayoutPanel
+    $buttons.Dock = 'Fill'
+    $buttons.FlowDirection = 'RightToLeft'
+    $confirm = New-Object Windows.Forms.Button
+    $confirm.Name = 'RestoreSelected'
+    $confirm.Text = 'Restore selected'
+    $confirm.Size = New-Object Drawing.Size 150, 34
+    $confirm.Enabled = $list.CheckedItems.Count -gt 0
+    $confirm.Add_Click({
+        $owner = $this.FindForm()
+        $checked = @($owner.Controls.Find('SnapshotItems', $true)[0].CheckedItems | ForEach-Object { [string]$_.Tag })
+        if (-not $checked.Count) { return }
+        $owner.Tag = $checked
+        $owner.DialogResult = [Windows.Forms.DialogResult]::OK
+    })
+    $cancel = New-Object Windows.Forms.Button
+    $cancel.Text = 'Cancel'
+    $cancel.Size = New-Object Drawing.Size 100, 34
+    $cancel.DialogResult = 'Cancel'
+    $dialog.CancelButton = $cancel
+    $clear = New-Object Windows.Forms.Button
+    $clear.Text = 'Clear all'
+    $clear.Size = New-Object Drawing.Size 100, 34
+    $clear.Add_Click({ foreach ($entry in $this.FindForm().Controls.Find('SnapshotItems', $true)[0].Items) { $entry.Checked = $false } })
+    $all = New-Object Windows.Forms.Button
+    $all.Text = 'Select all'
+    $all.Size = New-Object Drawing.Size 100, 34
+    $all.Add_Click({ foreach ($entry in $this.FindForm().Controls.Find('SnapshotItems', $true)[0].Items) { $entry.Checked = $true } })
+    $buttons.Controls.AddRange(@($confirm, $cancel, $clear, $all))
+    $layout.Controls.Add($buttons, 0, 2)
+    $list.Add_ItemChecked({
+        $owner = $this.FindForm()
+        $owner.Controls.Find('RestoreSelected', $true)[0].Enabled = $this.CheckedItems.Count -gt 0
+    })
+    return ,$dialog
 }
 
 function Start-ConfigurationJobHC {
@@ -57,6 +234,11 @@ function Start-ConfigurationJobHC {
         if (-not (Test-Path -LiteralPath $ConfigurationFile -PathType Leaf)) { throw 'Select an existing configuration file.' }
         $script = Join-Path $RootFolder 'Scripts\Invoke configuration.ps1'
         $command = "& '{0}' -ConfigurationFile '{1}' -Confirm" -f $script.Replace("'", "''"), $ConfigurationFile.Replace("'", "''")
+        if ($PSBoundParameters.ContainsKey('Items')) {
+            if (-not $Items.Count) { throw 'Select at least one item.' }
+            $itemArguments = ($Items | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
+            $command += " -Items @($itemArguments)"
+        }
     }
     $parameters = @{
         FilePath = 'powershell.exe'
@@ -74,7 +256,7 @@ Add-Type -AssemblyName System.Drawing
 #region Native Windows interface
 $form = New-Object Windows.Forms.Form
 $form.Text = 'Computer Snapshot'
-$form.ClientSize = New-Object Drawing.Size 760, 540
+$form.ClientSize = New-Object Drawing.Size 820, 580
 $form.MinimumSize = New-Object Drawing.Size 650, 480
 $form.StartPosition = 'CenterScreen'
 $form.Font = New-Object Drawing.Font 'Segoe UI', 10
@@ -84,16 +266,34 @@ $tabs.Dock = 'Fill'
 $restoreTab = New-Object Windows.Forms.TabPage 'Restore'
 $exportTab = New-Object Windows.Forms.TabPage 'Export'
 $tabs.TabPages.AddRange(@($restoreTab, $exportTab))
-$form.Controls.Add($tabs)
+$wizardLayout = New-Object Windows.Forms.TableLayoutPanel
+$wizardLayout.Dock = 'Fill'
+$wizardLayout.ColumnCount = 1
+$null = $wizardLayout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Percent), 100))
+$wizardLayout.RowCount = 2
+$null = $wizardLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
+$null = $wizardLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Percent), 100))
+$form.Controls.Add($wizardLayout)
+$elevationPanel = New-WizardElevationPanelHC -RootFolder $RootFolder -WizardScript $PSCommandPath
+if ($elevationPanel) { $wizardLayout.Controls.Add($elevationPanel, 0, 0) }
+$wizardLayout.Controls.Add($tabs, 0, 1)
 
 $restoreLayout = New-Object Windows.Forms.TableLayoutPanel
 $restoreLayout.Dock = 'Fill'
 $restoreLayout.Padding = New-Object Windows.Forms.Padding 12
 $restoreLayout.ColumnCount = 1
-$restoreLayout.RowCount = 2
+$null = $restoreLayout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Percent), 100))
+$restoreLayout.RowCount = 3
+$null = $restoreLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
 $null = $restoreLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Percent), 100))
 $null = $restoreLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), 48))
 $restoreTab.Controls.Add($restoreLayout)
+$restoreDescription = New-Object Windows.Forms.Label
+$restoreDescription.Text = 'Apply a saved configuration to this computer. Select a configuration and click Restore to review and choose which sections to apply.'
+$restoreDescription.AutoSize = $true
+$restoreDescription.Dock = 'Fill'
+$restoreDescription.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
+$restoreLayout.Controls.Add($restoreDescription, 0, 0)
 $configurations = New-Object Windows.Forms.ListView
 $configurations.Dock = 'Fill'
 $configurations.View = 'Details'
@@ -102,7 +302,7 @@ $configurations.MultiSelect = $false
 $configurations.HideSelection = $false
 $null = $configurations.Columns.Add('Configuration', 240)
 $null = $configurations.Columns.Add('Description', 420)
-$restoreLayout.Controls.Add($configurations, 0, 0)
+$restoreLayout.Controls.Add($configurations, 0, 1)
 $restoreButtons = New-Object Windows.Forms.FlowLayoutPanel
 $restoreButtons.Dock = 'Fill'
 $restoreButtons.FlowDirection = 'RightToLeft'
@@ -113,7 +313,7 @@ $refresh = New-Object Windows.Forms.Button
 $refresh.Text = 'Refresh'
 $refresh.Size = New-Object Drawing.Size 120, 34
 $restoreButtons.Controls.AddRange(@($restore, $refresh))
-$restoreLayout.Controls.Add($restoreButtons, 0, 1)
+$restoreLayout.Controls.Add($restoreButtons, 0, 2)
 $refresh.Add_Click({
     try {
         $configurations.Items.Clear()
@@ -129,8 +329,16 @@ $refresh.Add_Click({
 $restore.Add_Click({
     if ($configurations.SelectedItems.Count -eq 0) { return }
     $selected = $configurations.SelectedItems[0]
-    if ([Windows.Forms.MessageBox]::Show($form, "Restore '$($selected.Text)' on this computer?", 'Confirm restore', 'YesNo', 'Warning') -ne 'Yes') { return }
-    try { Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $RootFolder -ConfigurationFile $selected.Tag }
+    try {
+        $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $selected.Tag)
+        $selection = New-RestoreSelectionFormHC -ConfigurationName $selected.Text -Entries $entries
+        try {
+            if ($selection.ShowDialog($form) -ne [Windows.Forms.DialogResult]::OK) { return }
+            $selectedItems = @($selection.Tag)
+        }
+        finally { $selection.Dispose() }
+        Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $RootFolder -ConfigurationFile $selected.Tag -Items $selectedItems
+    }
     catch { $null = [Windows.Forms.MessageBox]::Show($form, [string]$_, 'Restore error', 'OK', 'Error') }
 })
 $configurations.Add_DoubleClick({ $restore.PerformClick() })
@@ -139,21 +347,26 @@ $exportLayout = New-Object Windows.Forms.TableLayoutPanel
 $exportLayout.Dock = 'Fill'
 $exportLayout.Padding = New-Object Windows.Forms.Padding 12
 $exportLayout.ColumnCount = 1
-$exportLayout.RowCount = 5
+$null = $exportLayout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Percent), 100))
+$exportLayout.RowCount = 6
+$null = $exportLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
 foreach ($height in @(30, 38)) { $null = $exportLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), $height)) }
 $null = $exportLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Percent), 100))
 foreach ($height in @(40, 48)) { $null = $exportLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), $height)) }
 $exportTab.Controls.Add($exportLayout)
+$exportDescription = New-Object Windows.Forms.Label
+$exportDescription.Text = 'Save selected sections to a JSON file in Configurations. Some sections export editable templates rather than current settings; review the file before restoring it.'
+$exportDescription.AutoSize = $true
+$exportDescription.Dock = 'Fill'
+$exportDescription.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
+$exportLayout.Controls.Add($exportDescription, 0, 0)
 $nameLabel = New-Object Windows.Forms.Label
 $nameLabel.Text = 'Configuration name'
 $nameLabel.Dock = 'Fill'
 $nameBox = New-Object Windows.Forms.TextBox
 $nameBox.Dock = 'Fill'
 $nameBox.Text = Get-DefaultConfigurationNameHC
-$itemList = New-Object Windows.Forms.CheckedListBox
-$itemList.Dock = 'Fill'
-$itemList.CheckOnClick = $true
-foreach ($name in (Get-SnapshotScriptsHC).Keys) { $null = $itemList.Items.Add($name, $true) }
+$itemList = New-SnapshotItemListHC -Entries @(Get-SnapshotItemEntriesHC)
 $options = New-Object Windows.Forms.FlowLayoutPanel
 $options.Dock = 'Fill'
 $openReport = New-Object Windows.Forms.CheckBox
@@ -171,14 +384,14 @@ $export = New-Object Windows.Forms.Button
 $export.Text = 'Export'
 $export.Size = New-Object Drawing.Size 120, 34
 $exportButtons.Controls.Add($export)
-$exportLayout.Controls.Add($nameLabel, 0, 0)
-$exportLayout.Controls.Add($nameBox, 0, 1)
-$exportLayout.Controls.Add($itemList, 0, 2)
-$exportLayout.Controls.Add($options, 0, 3)
-$exportLayout.Controls.Add($exportButtons, 0, 4)
+$exportLayout.Controls.Add($nameLabel, 0, 1)
+$exportLayout.Controls.Add($nameBox, 0, 2)
+$exportLayout.Controls.Add($itemList, 0, 3)
+$exportLayout.Controls.Add($options, 0, 4)
+$exportLayout.Controls.Add($exportButtons, 0, 5)
 $export.Add_Click({
     try {
-        Start-ConfigurationJobHC -Action CreateSnapshot -RootFolder $RootFolder -Name $nameBox.Text -Items @($itemList.CheckedItems | ForEach-Object { [string]$_ }) -OpenReportInBrowser $openReport.Checked -RunElevated:$elevated.Checked
+        Start-ConfigurationJobHC -Action CreateSnapshot -RootFolder $RootFolder -Name $nameBox.Text -Items @($itemList.CheckedItems | ForEach-Object { [string]$_.Tag }) -OpenReportInBrowser $openReport.Checked -RunElevated:$elevated.Checked
     }
     catch { $null = [Windows.Forms.MessageBox]::Show($form, [string]$_, 'Export error', 'OK', 'Error') }
 })

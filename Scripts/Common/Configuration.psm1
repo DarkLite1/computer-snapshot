@@ -29,7 +29,7 @@ function Read-JsonValueHC {
 }
 
 function ConvertTo-LoadedConfigurationHC {
-    param($Configuration, [string]$RootFolder, [string]$Source)
+    param($Configuration, [string]$RootFolder, [string]$Source, [string[]]$Items)
     $problems = New-Object 'System.Collections.Generic.List[string]'
     $result = [pscustomobject]@{
         SchemaVersion = 2
@@ -88,7 +88,16 @@ function ConvertTo-LoadedConfigurationHC {
             $problems.Add("$Source > Items.${name}: unknown item")
         }
     }
+    if ($null -ne $Items) {
+        if (-not $Items.Count) { $problems.Add('Select at least one item.') }
+        foreach ($name in $Items) {
+            if ($name -notin $script:ItemOrder -or $name -notin @(Get-PropertiesHC $Configuration.Items)) {
+                $problems.Add("$Source > Items.${name}: selected item is not available in this configuration")
+            }
+        }
+    }
     foreach ($name in $script:ItemOrder) {
+        if ($null -ne $Items -and $name -notin $Items) { continue }
         if ((Get-PropertiesHC $Configuration.Items) -notcontains $name) { continue }
         $data = $Configuration.Items.$name
         if ($data -is [string]) {
@@ -110,11 +119,11 @@ function ConvertTo-LoadedConfigurationHC {
 
 function Read-ConfigurationHC {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$RootFolder)
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$RootFolder, [string[]]$Items)
     $fullPath = Resolve-RootPathHC $Path $RootFolder
     try { $configuration = Read-JsonValueHC $fullPath }
     catch { throw "${fullPath} > configuration: invalid or unreadable JSON: $_" }
-    return ConvertTo-LoadedConfigurationHC $configuration $RootFolder $fullPath
+    return ConvertTo-LoadedConfigurationHC $configuration $RootFolder $fullPath -Items $Items
 }
 
 function Test-ConfigurationHC {

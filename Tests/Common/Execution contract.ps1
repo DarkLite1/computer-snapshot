@@ -73,6 +73,7 @@ Describe 'Single-file execution' {
     It 'skips and reports empty sections' {
         Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @() } } $path
         $params.Action = 'RestoreSnapshot'
+        $params.Remove('Items')
         $result = Invoke-ComputerSnapshotHC @params
         $result.Results[0].Status | Should -Be 'Skipped'
         Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
@@ -84,6 +85,7 @@ Describe 'Single-file execution' {
             Items = @{ NtpTimeServers = @{ SyncTimeWithDomain = $true; TimeServerNames = @() } }
         } $path
         $params.Action = 'RestoreSnapshot'
+        $params.Remove('Items')
         $params.Script = [ordered]@{ NtpTimeServers = Join-Path $PSScriptRoot '..\..\Scripts\NTP time servers import export.ps1' }
         Mock Invoke-ChildScriptHC -ModuleName Execution { throw 'w32tm /resync failed with exit code 1: No time data available' }
         $result = Invoke-ComputerSnapshotHC @params
@@ -92,5 +94,52 @@ Describe 'Single-file execution' {
         $result.Results[0].Messages[0] | Should -Match 'exit code 1'
         Should -Invoke Restart-Computer -ModuleName Execution -Times 0 -Exactly
         Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly
+    }
+    It 'restores only selected sections without changing the configuration file' {
+        Write-ConfigurationHC @{
+            SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }
+            Items = @{ UserAccounts = @(@{ Name = 'Example' }); CreateFolders = @{ FolderPaths = @('C:\Example') } }
+        } $path
+        $before = Get-Content -LiteralPath $path -Raw
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('CreateFolders')
+        $result = Invoke-ComputerSnapshotHC @params
+        @($result.Results.Name) | Should -Be @('CreateFolders')
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter { $Data.FolderPaths -contains 'C:\Example' }
+        (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
+    }
+    It 'does not resolve references or validate assets in unchecked sections' {
+        Write-ConfigurationHC @{
+            SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }
+            Items = @{
+                UserAccounts = 'missing-users.json'
+                Software = @{ Install = @(@{ ExecutablePath = 'missing-installer.exe' }) }
+                CreateFolders = @{ FolderPaths = @('C:\Example') }
+            }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('CreateFolders')
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 1 -Exactly
+    }
+    It 'restores all configured sections when no selection is supplied' {
+        Write-ConfigurationHC @{
+            SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }
+            Items = @{ UserAccounts = @(@{ Name = 'Example' }); CreateFolders = @{ FolderPaths = @('C:\Example') } }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Remove('Items')
+        $result = Invoke-ComputerSnapshotHC @params
+        @($result.Results.Name) | Should -Be @('UserAccounts', 'CreateFolders')
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 2 -Exactly
+    }
+    It 'rejects an empty or unavailable restore selection' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @() } } $path
+        $params.Action = 'RestoreSnapshot'
+        foreach ($selection in @(@(), @('CreateFolders'), @('Unknown'))) {
+            $params.Items = $selection
+            { Invoke-ComputerSnapshotHC @params } | Should -Throw '*No items executed*'
+        }
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
     }
 }

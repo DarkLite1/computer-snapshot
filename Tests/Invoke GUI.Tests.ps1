@@ -236,17 +236,18 @@ Describe 'Restore selection controls' {
         }
         finally { $dialog.Dispose() }
     }
-    It 'shows the selected configuration description separately from restore guidance' {
+    It 'frames the selected description without a heading and separates it from restore guidance' {
         $path = "$PSScriptRoot\..\Configurations\Example PC1.json"
         $expected = (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).Description
         $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Example PC1' -Entries @(Get-RestoreItemEntriesHC -ConfigurationFile $path) -ConfigurationFile $path
         try {
             $dialog.Show()
-            $heading = $dialog.Controls.Find('ConfigurationDescriptionHeading', $true)[0]
             $description = $dialog.Controls.Find('ConfigurationDescription', $true)[0]
             $guidance = $dialog.Controls.Find('RestoreGuidance', $true)[0]
-            $heading.Text | Should -Be 'Configuration description'
-            $heading.Font.Bold | Should -BeTrue
+            $dialog.Controls.Find('ConfigurationDescriptionHeading', $true).Count | Should -Be 0
+            $description.BorderStyle | Should -Be ([Windows.Forms.BorderStyle]::FixedSingle)
+            $description.Padding.All | Should -Be 10
+            $description.AccessibleName | Should -Be 'Configuration description'
             $description.Text | Should -BeExactly $expected
             $description.Bottom | Should -BeLessThan $guidance.Top
             $guidance.Text | Should -BeLike 'Choose the sections to apply*'

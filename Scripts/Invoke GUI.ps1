@@ -167,8 +167,24 @@ function New-SnapshotItemListHC {
     return ,$list
 }
 
+function Get-RestoreSettingsHC {
+    param([string]$ConfigurationFile)
+    $settings = @{ RebootComputer = $false; OpenReportInBrowser = $true }
+    if ($ConfigurationFile) {
+        $document = Get-Content -LiteralPath $ConfigurationFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        foreach ($setting in @('RebootComputer', 'OpenReportInBrowser')) {
+            if ($document.Settings.PSObject.Properties.Name -contains $setting) {
+                if ($document.Settings.$setting -isnot [bool]) { throw "Settings.${setting} must be a Boolean." }
+                $settings[$setting] = $document.Settings.$setting
+            }
+        }
+    }
+    return $settings
+}
+
 function New-RestoreSelectionFormHC {
-    param([string]$ConfigurationName, [object[]]$Entries)
+    param([string]$ConfigurationName, [object[]]$Entries, [string]$ConfigurationFile)
+    $settings = Get-RestoreSettingsHC -ConfigurationFile $ConfigurationFile
     $dialog = New-Object Windows.Forms.Form
     $dialog.Text = "Restore - $ConfigurationName"
     $dialog.ClientSize = New-Object Drawing.Size 800, 500
@@ -181,19 +197,35 @@ function New-RestoreSelectionFormHC {
     $layout.Padding = New-Object Windows.Forms.Padding 12
     $layout.ColumnCount = 1
     $null = $layout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Percent), 100))
-    $layout.RowCount = 3
+    $layout.RowCount = 4
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Percent), 100))
+    $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), 48))
     $dialog.Controls.Add($layout)
     $description = New-Object Windows.Forms.Label
-    $description.Text = 'Choose the sections to apply to this computer. Uncheck anything you want to leave unchanged. Configuration options, including any automatic restart, still apply.'
+    $description.Text = 'Choose the sections to apply to this computer. Uncheck anything you want to leave unchanged.'
     $description.AutoSize = $true
     $description.Dock = 'Fill'
     $description.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
     $layout.Controls.Add($description, 0, 0)
     $list = New-SnapshotItemListHC -Entries $Entries
     $layout.Controls.Add($list, 0, 1)
+    $options = New-Object Windows.Forms.FlowLayoutPanel
+    $options.Dock = 'Fill'
+    $options.AutoSize = $true
+    $reboot = New-Object Windows.Forms.CheckBox
+    $reboot.Name = 'RebootComputer'
+    $reboot.Text = 'Restart computer after successful restore'
+    $reboot.AutoSize = $true
+    $reboot.Checked = $settings.RebootComputer
+    $report = New-Object Windows.Forms.CheckBox
+    $report.Name = 'OpenReportInBrowser'
+    $report.Text = 'Open report in browser'
+    $report.AutoSize = $true
+    $report.Checked = $settings.OpenReportInBrowser
+    $options.Controls.AddRange(@($reboot, $report))
+    $layout.Controls.Add($options, 0, 2)
     $buttons = New-Object Windows.Forms.FlowLayoutPanel
     $buttons.Dock = 'Fill'
     $buttons.FlowDirection = 'RightToLeft'
@@ -228,7 +260,7 @@ function New-RestoreSelectionFormHC {
         }
     })
     $buttons.Controls.AddRange(@($confirm, $cancel, $clear, $all))
-    $layout.Controls.Add($buttons, 0, 2)
+    $layout.Controls.Add($buttons, 0, 3)
     $list.Add_ItemChecked({
         $owner = $this.FindForm()
         $owner.Controls.Find('RestoreSelected', $true)[0].Enabled = $this.CheckedItems.Count -gt 0
@@ -244,6 +276,7 @@ function Start-ConfigurationJobHC {
         [string]$Name,
         [string[]]$Items,
         [bool]$OpenReportInBrowser = $true,
+        [bool]$RebootComputer = $false,
         [switch]$RunElevated,
         [switch]$Force
     )
@@ -268,6 +301,11 @@ function Start-ConfigurationJobHC {
             if (-not $Items.Count) { throw 'Select at least one item.' }
             $itemArguments = ($Items | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
             $command += " -Items @($itemArguments)"
+        }
+        foreach ($setting in @('RebootComputer', 'OpenReportInBrowser')) {
+            if ($PSBoundParameters.ContainsKey($setting)) {
+                $command += " -{0} `${1}" -f $setting, $PSBoundParameters[$setting].ToString().ToLowerInvariant()
+            }
         }
     }
     $parameters = @{
@@ -361,13 +399,17 @@ $restore.Add_Click({
     $selected = $configurations.SelectedItems[0]
     try {
         $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $selected.Tag)
-        $selection = New-RestoreSelectionFormHC -ConfigurationName $selected.Text -Entries $entries
+        $selection = New-RestoreSelectionFormHC -ConfigurationName $selected.Text -Entries $entries -ConfigurationFile $selected.Tag
         try {
             if ($selection.ShowDialog($form) -ne [Windows.Forms.DialogResult]::OK) { return }
             $selectedItems = @($selection.Tag)
+            $restoreOptions = @{
+                RebootComputer = $selection.Controls.Find('RebootComputer', $true)[0].Checked
+                OpenReportInBrowser = $selection.Controls.Find('OpenReportInBrowser', $true)[0].Checked
+            }
         }
         finally { $selection.Dispose() }
-        Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $RootFolder -ConfigurationFile $selected.Tag -Items $selectedItems
+        Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $RootFolder -ConfigurationFile $selected.Tag -Items $selectedItems @restoreOptions
     }
     catch { $null = [Windows.Forms.MessageBox]::Show($form, [string]$_, 'Restore error', 'OK', 'Error') }
 })

@@ -61,8 +61,8 @@ function Invoke-ComputerSnapshotHC {
         try {
             $configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $RootFolder -Items $Items
             $problems = @(Test-ConfigurationHC -Configuration $configuration -RootFolder $RootFolder)
-            $RebootComputer = $configuration.Settings.RebootComputer
-            $OpenReportInBrowser = $configuration.Settings.OpenReportInBrowser
+            if (-not $PSBoundParameters.ContainsKey('RebootComputer')) { $RebootComputer = $configuration.Settings.RebootComputer }
+            if (-not $PSBoundParameters.ContainsKey('OpenReportInBrowser')) { $OpenReportInBrowser = $configuration.Settings.OpenReportInBrowser }
             $Items = @($configuration.Items.Keys)
         }
         catch { $problems = @([string]$_) }

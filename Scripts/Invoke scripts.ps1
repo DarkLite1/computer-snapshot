@@ -13,9 +13,9 @@
 .PARAMETER Force
     Allow replacing an existing export configuration.
 .PARAMETER RebootComputer
-    Reboot after a successful export. Restore uses Settings.RebootComputer.
+    Reboot after a successful operation. When omitted, restore uses Settings.RebootComputer.
 .PARAMETER OpenReportInBrowser
-    Open the export report. Restore uses Settings.OpenReportInBrowser.
+    Open the report. When omitted, restore uses Settings.OpenReportInBrowser.
 .PARAMETER Script
     Item-to-script map; intended for testing and controlled customization.
 #>
@@ -42,6 +42,8 @@ if (-not [IO.Path]::IsPathRooted($ReportsFolder)) { $ReportsFolder = [IO.Path]::
 $arguments = @{
     Action = $Action; ConfigurationFile = $ConfigurationFile; Items = $Items; RootFolder = $rootFolder
     Script = $resolvedScripts; ReportsFolder = $ReportsFolder; Force = $Force
-    RebootComputer = $RebootComputer; OpenReportInBrowser = $OpenReportInBrowser
+}
+foreach ($setting in @('RebootComputer', 'OpenReportInBrowser')) {
+    if ($PSBoundParameters.ContainsKey($setting)) { $arguments[$setting] = $PSBoundParameters[$setting] }
 }
 Invoke-ComputerSnapshotHC @arguments

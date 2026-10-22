@@ -133,6 +133,51 @@ Describe 'Single-file execution' {
         @($result.Results.Name) | Should -Be @('UserAccounts', 'CreateFolders')
         Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 2 -Exactly
     }
+    It 'honors both true and false per-run settings without changing the file' {
+        foreach ($override in @($false, $true)) {
+            Write-ConfigurationHC @{
+                SchemaVersion = 2
+                Settings = @{ RebootComputer = -not $override; OpenReportInBrowser = -not $override }
+                Items = @{ UserAccounts = @(@{ Name = 'Example' }) }
+            } $path
+            $before = Get-Content -LiteralPath $path -Raw
+            $params.Action = 'RestoreSnapshot'
+            $params.Items = @('UserAccounts')
+            $params.RebootComputer = $override
+            $params.OpenReportInBrowser = $override
+            (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+            (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
+            $expected = [int]$override
+            Should -Invoke Restart-Computer -ModuleName Execution -Times $expected -Exactly
+            Should -Invoke Start-Process -ModuleName Execution -Times $expected -Exactly
+        }
+    }
+    It 'uses saved settings when overrides are omitted' {
+        Write-ConfigurationHC @{
+            SchemaVersion = 2
+            Settings = @{ RebootComputer = $true; OpenReportInBrowser = $true }
+            Items = @{ UserAccounts = @(@{ Name = 'Example' }) }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.Remove('OpenReportInBrowser')
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+        Should -Invoke Restart-Computer -ModuleName Execution -Times 1 -Exactly
+        Should -Invoke Start-Process -ModuleName Execution -Times 1 -Exactly
+    }
+    It 'does not reboot after a failed restore even when overridden to true' {
+        Write-ConfigurationHC @{
+            SchemaVersion = 2
+            Settings = @{ RebootComputer = $false; OpenReportInBrowser = $false }
+            Items = @{ UserAccounts = @(@{ Name = 'Example' }) }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.RebootComputer = $true
+        Mock Invoke-ChildScriptHC -ModuleName Execution { throw 'Restore failed' }
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeFalse
+        Should -Invoke Restart-Computer -ModuleName Execution -Times 0 -Exactly
+    }
     It 'rejects an empty or unavailable restore selection' {
         Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @() } } $path
         $params.Action = 'RestoreSnapshot'

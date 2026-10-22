@@ -56,6 +56,29 @@ Describe 'Single-file wizard commands' {
         { Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $testFile -Items @() } | Should -Throw '*Select at least one*'
         Should -Invoke Start-Process -Times 0 -Exactly
     }
+    It 'passes explicit restore setting choices without adding defaults when omitted' {
+        $testFile = Join-Path $TestDrive 'Example.json'
+        '{}' | Set-Content -LiteralPath $testFile
+        Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $testFile -Items UserAccounts -RebootComputer $true -OpenReportInBrowser $false
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
+            $command.Contains('-RebootComputer $true') -and $command.Contains('-OpenReportInBrowser $false')
+        }
+        Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $testFile -Items UserAccounts
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
+            $command -notmatch 'RebootComputer|OpenReportInBrowser'
+        }
+    }
+    It 'uses configuration defaults when restore settings are missing and rejects non-Boolean values' {
+        $testFile = Join-Path $TestDrive 'Settings.json'
+        '{"SchemaVersion":2,"Items":{"UserAccounts":[]}}' | Set-Content -LiteralPath $testFile
+        $settings = Get-RestoreSettingsHC -ConfigurationFile $testFile
+        $settings.RebootComputer | Should -BeFalse
+        $settings.OpenReportInBrowser | Should -BeTrue
+        '{"Settings":{"RebootComputer":"false"}}' | Set-Content -LiteralPath $testFile
+        { Get-RestoreSettingsHC -ConfigurationFile $testFile } | Should -Throw '*must be a Boolean*'
+    }
     It 'provides readable labels and descriptions for every supported item' {
         $entries = @(Get-SnapshotItemEntriesHC)
         @($entries.Key) | Should -Be @((Get-SnapshotScriptsHC).Keys)
@@ -146,6 +169,36 @@ Describe 'Restore selection controls' {
     BeforeAll {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
+    }
+    It 'initializes separate restore options from the file and permits unsaved overrides' {
+        $testFile = Join-Path $TestDrive 'Options.json'
+        foreach ($saved in @($false, $true)) {
+            @{ SchemaVersion = 2; Settings = @{ RebootComputer = $saved; OpenReportInBrowser = -not $saved }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } |
+                ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $testFile
+            $before = Get-Content -LiteralPath $testFile -Raw
+            $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Options' -Entries @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile) -ConfigurationFile $testFile
+            try {
+                $dialog.Show()
+                $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
+                $reboot = $dialog.Controls.Find('RebootComputer', $true)[0]
+                $report = $dialog.Controls.Find('OpenReportInBrowser', $true)[0]
+                $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
+                $reboot.Checked | Should -Be $saved
+                $report.Checked | Should -Be (-not $saved)
+                $reboot.Parent | Should -Not -Be $list
+                $report.Parent | Should -Not -Be $list
+                $reboot.Checked = -not $saved
+                $report.Checked = $saved
+                ($confirm.Parent.Controls | Where-Object Text -eq 'Clear all').PerformClick()
+                ($confirm.Parent.Controls | Where-Object Text -eq 'Select all').PerformClick()
+                $reboot.Checked | Should -Be (-not $saved)
+                $report.Checked | Should -Be $saved
+                $confirm.PerformClick()
+                $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
+                (Get-Content -LiteralPath $testFile -Raw) | Should -BeExactly $before
+            }
+            finally { $dialog.Dispose() }
+        }
     }
     It 'toggles item and description clicks but leaves checkbox clicks and disabled rows alone' {
         $entries = @(Get-SnapshotItemEntriesHC -Items UserAccounts, Software)
@@ -272,6 +325,12 @@ Describe 'Restore selection controls' {
                 $button.Left | Should -BeGreaterOrEqual 0
                 $button.Right | Should -BeLessOrEqual $button.Parent.ClientSize.Width
                 $button.Bottom | Should -BeLessOrEqual $button.Parent.ClientSize.Height
+            }
+            foreach ($name in @('RebootComputer', 'OpenReportInBrowser')) {
+                $option = $dialog.Controls.Find($name, $true)[0]
+                $option.Visible | Should -BeTrue
+                $option.Right | Should -BeLessOrEqual $option.Parent.ClientSize.Width
+                $option.Bottom | Should -BeLessOrEqual $option.Parent.ClientSize.Height
             }
         }
         finally { $dialog.Dispose() }

@@ -12,6 +12,10 @@
     Skip the interactive confirmation question.
 .PARAMETER Items
     Restore only these sections. Omit to restore all sections in the configuration.
+.PARAMETER RebootComputer
+    Override the saved restart setting for this run only.
+.PARAMETER OpenReportInBrowser
+    Override the saved report-opening setting for this run only.
 #>
 [CmdletBinding()]
 param(
@@ -19,7 +23,9 @@ param(
     [string]$ConfigurationsFolder,
     [string]$StartScript = "$PSScriptRoot\Invoke scripts.ps1",
     [switch]$Confirm,
-    [string[]]$Items
+    [string[]]$Items,
+    [bool]$RebootComputer,
+    [bool]$OpenReportInBrowser
 )
 Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
 . "$PSScriptRoot\Common\Section.ps1"
@@ -57,10 +63,18 @@ if ($configuration.Settings.RunElevated -and -not (Test-IsStartedElevatedHC)) {
         $itemArguments = ($Items | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
         $command += " -Items @($itemArguments)"
     }
+    foreach ($setting in @('RebootComputer', 'OpenReportInBrowser')) {
+        if ($PSBoundParameters.ContainsKey($setting)) {
+            $command += " -{0} `${1}" -f $setting, $PSBoundParameters[$setting].ToString().ToLowerInvariant()
+        }
+    }
     $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
     Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encodedCommand
     return
 }
 $arguments = @{ Action = 'RestoreSnapshot'; ConfigurationFile = $configurationPath }
 if ($null -ne $Items) { $arguments.Items = $Items }
+foreach ($setting in @('RebootComputer', 'OpenReportInBrowser')) {
+    if ($PSBoundParameters.ContainsKey($setting)) { $arguments[$setting] = $PSBoundParameters[$setting] }
+}
 Invoke-ScriptHC -Path $StartScript -Arguments $arguments

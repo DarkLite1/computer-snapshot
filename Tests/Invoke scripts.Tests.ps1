@@ -2,6 +2,35 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 . "$PSScriptRoot\Common\Execution contract.ps1"
 
+Describe 'Readable report filenames' {
+    BeforeAll {
+        Import-Module "$PSScriptRoot\..\Scripts\Common\Execution.psm1" -Force
+    }
+    It 'includes the computer, timestamp, readable action and configuration name' {
+        InModuleScope Execution -Parameters @{ ReportFolder = $TestDrive } {
+            Mock Get-Date { '20261022-084204' } -ParameterFilter { $Format -eq 'yyyyMMdd-HHmmss' }
+            foreach ($action in @('CreateSnapshot', 'RestoreSnapshot')) {
+                $path = Write-SnapshotReportHC -ReportsFolder $ReportFolder -Action $action -ConfigurationFile 'C:\Configurations\Example PC1.json' -Results @()
+                $operation = if ($action -eq 'CreateSnapshot') { 'Export' } else { 'Restore' }
+                [IO.Path]::GetFileName($path) | Should -BeExactly "$env:COMPUTERNAME-20261022-084204-$operation-Example PC1.html"
+                $path | Should -Exist
+            }
+        }
+    }
+    It 'preserves existing reports when the same configuration runs within one second' {
+        InModuleScope Execution -Parameters @{ ReportFolder = $TestDrive } {
+            Mock Get-Date { '20261022-084204' } -ParameterFilter { $Format -eq 'yyyyMMdd-HHmmss' }
+            $first = Write-SnapshotReportHC -ReportsFolder $ReportFolder -Action RestoreSnapshot -ConfigurationFile 'Example.json' -Results @()
+            $original = Get-Content -LiteralPath $first -Raw
+            $second = Write-SnapshotReportHC -ReportsFolder $ReportFolder -Action RestoreSnapshot -ConfigurationFile 'Example.json' -Results @()
+            $third = Write-SnapshotReportHC -ReportsFolder $ReportFolder -Action RestoreSnapshot -ConfigurationFile 'Example.json' -Results @()
+            [IO.Path]::GetFileName($second) | Should -BeExactly "$env:COMPUTERNAME-20261022-084204-Restore-Example-2.html"
+            [IO.Path]::GetFileName($third) | Should -BeExactly "$env:COMPUTERNAME-20261022-084204-Restore-Example-3.html"
+            (Get-Content -LiteralPath $first -Raw) | Should -BeExactly $original
+        }
+    }
+}
+
 Describe 'Main entry point script catalogue' {
     BeforeAll {
         $entryScript = "$PSScriptRoot\..\Scripts\Invoke scripts.ps1"

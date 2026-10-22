@@ -21,7 +21,15 @@ function Test-ElevatedHC {
 function Write-SnapshotReportHC {
     param([string]$ReportsFolder, [string]$Action, [string]$ConfigurationFile, $Results)
     $null = New-Item -Path $ReportsFolder -ItemType Directory -Force -ErrorAction Stop
-    $path = Join-Path $ReportsFolder ('{0}-{1}-{2}.html' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyyMMdd-HHmmss-ffff'), $Action)
+    $operation = if ($Action -eq 'CreateSnapshot') { 'Export' } else { 'Restore' }
+    $configurationName = [IO.Path]::GetFileNameWithoutExtension($ConfigurationFile)
+    $reportName = '{0}-{1}-{2}-{3}' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyyMMdd-HHmmss'), $operation, $configurationName
+    $path = Join-Path $ReportsFolder ($reportName + '.html')
+    $suffix = 2
+    while (Test-Path -LiteralPath $path) {
+        $path = Join-Path $ReportsFolder ('{0}-{1}.html' -f $reportName, $suffix)
+        $suffix++
+    }
     $rows = foreach ($result in $Results) {
         $item = [System.Net.WebUtility]::HtmlEncode($result.Name)
         $status = [System.Net.WebUtility]::HtmlEncode($result.Status)

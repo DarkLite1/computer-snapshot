@@ -3,7 +3,52 @@
 BeforeAll {
     Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
     . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
+    . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
 }
+Describe 'Restore input placeholders' {
+    It 'resolves nested string values once and preserves other value types and arrays' {
+        $items = '{"UserAccounts":[{"Name":"{{input:Account name}}","Password":"{{password:Account password}}","Enabled":false}],"UserGroups":[],"NetworkCards":[{"Address":"{{ipv4:IPv4 address}}"}],"CreateFolders":{"FolderPaths":["{{input:Account name}}"],"Comment":"{{input:Ignored}}"},"Number":24,"Nothing":null}' | ConvertFrom-Json
+        $script:requests = @()
+        $result = Resolve-RestoreInputHC -Items $items -ReadValue {
+            param($field)
+            $script:requests += $field.Path
+            switch ($field.Kind) { 'input' { 'Example' }; 'password' { 'Test-only password!"\$' }; 'ipv4' { '192.0.2.10' } }
+        }
+        $requests.Count | Should -Be 3
+        $items.UserAccounts[0].Name | Should -Be 'Example'
+        $items.CreateFolders.FolderPaths[0] | Should -Be 'Example'
+        $items.UserAccounts[0].Password | Should -BeExactly 'Test-only password!"\$'
+        $items.NetworkCards[0].Address | Should -Be '192.0.2.10'
+        $items.UserAccounts.GetType().IsArray | Should -BeTrue
+        $items.UserGroups.Count | Should -Be 0
+        $items.UserAccounts[0].Enabled | Should -BeFalse
+        $items.Number | Should -Be 24
+        $items.Nothing | Should -BeNullOrEmpty
+        $items.CreateFolders.Comment | Should -Be '{{input:Ignored}}'
+        $result.SecretValues | Should -Be @('Test-only password!"\$')
+    }
+    It 'leaves placeholders unchanged when any input is cancelled' {
+        $items = @{ UserAccounts = @(@{ Name = '{{input:Name}}'; Password = '{{password:Password}}' }) }
+        { Resolve-RestoreInputHC -Items $items -ReadValue { param($field) if ($field.Kind -eq 'input') { 'Example' } } } | Should -Throw '*cancelled*'
+        $items.UserAccounts[0].Name | Should -Be '{{input:Name}}'
+        $items.UserAccounts[0].Password | Should -Be '{{password:Password}}'
+    }
+    It 'rejects malformed or embedded placeholders before requesting values' {
+        foreach ($placeholder in @('{{input: }}', '{{unknown:Name}}', 'prefix {{input:Name}}')) {
+            { Get-RestoreInputFieldsHC -Data @{ UserAccounts = @(@{ Name = $placeholder }) } } | Should -Throw '*complete*'
+        }
+    }
+    It 'validates required values and canonical IPv4 addresses without exposing the value' {
+        foreach ($value in @('', ' ', '999.1.1.1', '127.1', '::1')) {
+            Test-RestoreInputValueHC -Kind ipv4 -Value $value | Should -BeFalse
+        }
+        Test-RestoreInputValueHC -Kind ipv4 -Value '192.0.2.10' | Should -BeTrue
+        $items = @{ NetworkCards = @(@{ Address = '{{ipv4:Address}}' }) }
+        { Resolve-RestoreInputHC -Items $items -ReadValue { 'invalid-address' } } | Should -Throw '*supplied input is empty or invalid*'
+        Protect-RestoreInputTextHC -Text 'Failed: test-secret' -SecretValues @('test-secret') | Should -Be 'Failed: [redacted]'
+    }
+}
+
 Describe 'Version 2 configuration' {
     BeforeEach {
         $path = Join-Path $TestDrive 'configuration.json'

@@ -3,6 +3,7 @@
 BeforeAll {
     $testScript = "$PSScriptRoot\..\Scripts\Invoke configuration.ps1"
     $testStartScript = "$PSScriptRoot\..\Scripts\Invoke scripts.ps1"
+    . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
     function Invoke-ScriptHC { param($Path, $Arguments) }
     function Test-IsStartedElevatedHC {}
 }
@@ -16,6 +17,7 @@ Describe 'Configuration launcher' {
         Mock Test-IsStartedElevatedHC { $false }
         Mock Read-Host { 'y' }
         Mock Out-GridView { [pscustomobject]@{ Path = $testConfigurationFile } }
+        Mock Read-RestoreInputHC { throw 'The launcher must not collect input.' }
     }
     It 'passes only the action and file path to the main script' {
         . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm
@@ -59,6 +61,25 @@ Describe 'Configuration launcher' {
             $Arguments.ContainsKey('OpenReportInBrowser') -and $Arguments.OpenReportInBrowser -eq $true
         }
         (Get-Content -LiteralPath $testConfigurationFile -Raw) | Should -BeExactly $before
+    }
+    It 'defers input and resolved-value validation until after elevation without passing answers' {
+        $document.Settings.RunElevated = $true
+        $document.Items.Software = @{ Install = @(@{ ExecutablePath = '{{input:Installer path}}' }) }
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
+            $Verb -eq 'RunAs' -and $command.Contains($testConfigurationFile) -and $command -notmatch 'Installer path|password'
+        }
+        Should -Invoke Read-RestoreInputHC -Times 0 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
+    }
+    It 'passes placeholder configurations to the executor without collecting answers in the launcher' {
+        $document.Items.Software = @{ Install = @(@{ ExecutablePath = '{{input:Installer path}}' }) }
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { $Arguments.Count -eq 2 }
+        Should -Invoke Read-RestoreInputHC -Times 0 -Exactly
     }
     It 'preserves selection and runtime settings when relaunching elevated' {
         $document.Settings.RunElevated = $true

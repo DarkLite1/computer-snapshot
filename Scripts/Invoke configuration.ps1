@@ -29,6 +29,7 @@ param(
 )
 Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
 . "$PSScriptRoot\Common\Section.ps1"
+. "$PSScriptRoot\Common\RestoreInput.ps1"
 function Test-IsStartedElevatedHC {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal $identity
@@ -54,7 +55,8 @@ if (-not $ConfigurationFile) {
 }
 $configurationPath = Resolve-RootPathHC $ConfigurationFile $rootFolder
 $configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $rootFolder -Items $Items
-$problems = @(Test-ConfigurationHC $configuration $rootFolder)
+$inputFields = @(Get-RestoreInputFieldsHC -Data $configuration.Items)
+$problems = @(if ($inputFields.Count) { $configuration.Problems } else { Test-ConfigurationHC $configuration $rootFolder })
 if ($problems.Count) { throw ($problems -join [Environment]::NewLine) }
 if (-not $Confirm -and (Read-Host "Restore '$configurationPath'? (y/n)") -ne 'y') { return }
 if ($configuration.Settings.RunElevated -and -not (Test-IsStartedElevatedHC)) {

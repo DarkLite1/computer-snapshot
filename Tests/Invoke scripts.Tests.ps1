@@ -31,6 +31,27 @@ Describe 'Readable report filenames' {
     }
 }
 
+Describe 'Prompted password output protection' {
+    BeforeAll { Import-Module "$PSScriptRoot\..\Scripts\Common\Execution.psm1" -Force }
+    It 'redacts child host, warning and nonterminating error streams while preserving the result object' {
+        $child = Join-Path $TestDrive 'output.ps1'
+        @'
+param($Action, $Data, $RootFolder)
+Write-Host "Host $Data"
+Write-Warning "Warning $Data"
+Write-Error "Error $Data"
+[pscustomobject]@{ Data = $null; Messages = [string[]]@('Completed') }
+'@ | Set-Content -LiteralPath $child -Encoding UTF8
+        InModuleScope Execution -Parameters @{ Child = $child; Root = $TestDrive } {
+            $output = @(Invoke-ChildScriptHC -Path $Child -Action Import -Data 'Test-secret!42' -RootFolder $Root -SecretValues @('Test-secret!42') *>&1)
+            ($output | Out-String) | Should -Not -Match 'Test-secret'
+            ($output | Out-String) | Should -Match '\[redacted\]'
+            @($output | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }).Count | Should -Be 1
+            @($output | Where-Object { $_.Messages -contains 'Completed' }).Count | Should -Be 1
+        }
+    }
+}
+
 Describe 'Main entry point script catalogue' {
     BeforeAll {
         $entryScript = "$PSScriptRoot\..\Scripts\Invoke scripts.ps1"

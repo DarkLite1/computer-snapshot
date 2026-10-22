@@ -3,10 +3,11 @@
 BeforeAll {
     Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
     . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
+    . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
     $schemaPath = Join-Path $PSScriptRoot '..\Scripts\config.schema.json'
     $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
     $root = Split-Path $PSScriptRoot -Parent
-    $shippedConfigurations = @((Join-Path $root 'Configurations\Example PC1.json'))
+    $shippedConfigurations = @((Join-Path $root 'Configurations\Example PC1.json'), (Join-Path $root 'Configurations\Example prompted setup.json'))
     $shippedSharedSections = @((Join-Path $root 'Shared\UserAccounts kiosk.json'))
     $mapping = @{
         'Folders' = 'CreateFolders'; 'Copy files folders' = 'CopyFilesFolders'; 'NTP time servers' = 'NtpTimeServers'
@@ -17,6 +18,19 @@ BeforeAll {
     }
 }
 Describe 'Schema contract' {
+    It 'resolves the prompted setup example into valid data without changing its file or applying settings' {
+        $file = Join-Path $root 'Configurations\Example prompted setup.json'
+        $before = Get-Content -LiteralPath $file -Raw
+        $loaded = Read-ConfigurationHC $file $root
+        @(Get-RestoreInputFieldsHC -Data $loaded.Items).Count | Should -Be 3
+        $null = Resolve-RestoreInputHC -Items $loaded.Items -ReadValue {
+            param($field)
+            switch ($field.Kind) { 'input' { 'Example' }; 'password' { 'Test-only password!42' }; 'ipv4' { '192.0.2.10' } }
+        }
+        @(Test-ConfigurationHC $loaded $root).Count | Should -Be 0
+        $loaded.Items.NtpTimeServers.TimeServerNames | Should -Be @('192.0.2.10')
+        (Get-Content -LiteralPath $file -Raw) | Should -BeExactly $before
+    }
     It 'validates every component example with the runtime shape validator' {
         foreach ($name in $mapping.Values) {
             $data = Read-SectionExampleHC (Join-Path $root "Examples\$name.json")

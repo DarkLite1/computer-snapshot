@@ -5,11 +5,24 @@
 #>
 Import-Module "$PSScriptRoot\Configuration.psm1" -Force
 . "$PSScriptRoot\Section.ps1"
+. "$PSScriptRoot\RestoreInput.ps1"
 
 function Invoke-ChildScriptHC {
     [CmdletBinding()]
-    param([string]$Path, [string]$Action, $Data, [string]$RootFolder)
-    & $Path -Action $Action -Data $Data -RootFolder $RootFolder
+    param([string]$Path, [string]$Action, $Data, [string]$RootFolder, [string[]]$SecretValues)
+    if (-not $SecretValues.Count) {
+        & $Path -Action $Action -Data $Data -RootFolder $RootFolder
+        return
+    }
+    & $Path -Action $Action -Data $Data -RootFolder $RootFolder *>&1 | ForEach-Object {
+        $message = Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $SecretValues
+        if ($_ -is [System.Management.Automation.ErrorRecord]) { Write-Error -Message $message }
+        elseif ($_ -is [System.Management.Automation.WarningRecord]) { Write-Warning $message }
+        elseif ($_ -is [System.Management.Automation.VerboseRecord]) { Write-Verbose $message }
+        elseif ($_ -is [System.Management.Automation.DebugRecord]) { Write-Debug $message }
+        elseif ($_ -is [System.Management.Automation.InformationRecord]) { Write-Information $message -InformationAction Continue }
+        else { $_ }
+    }
 }
 
 function Test-ElevatedHC {
@@ -64,14 +77,22 @@ function Invoke-ComputerSnapshotHC {
     $results = New-Object 'System.Collections.Generic.List[object]'
     $problems = @()
     $configuration = $null
+    $secretValues = @()
     #region Preflight
     if ($Action -eq 'RestoreSnapshot') {
         try {
             $configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $RootFolder -Items $Items
+            if ($configuration.Problems.Count) { throw ($configuration.Problems -join [Environment]::NewLine) }
+            $inputResult = Resolve-RestoreInputHC -Items $configuration.Items -ReadValue { param($field) Read-RestoreInputHC -Field $field }
+            $secretValues = $inputResult.SecretValues
             $problems = @(Test-ConfigurationHC -Configuration $configuration -RootFolder $RootFolder)
             if (-not $PSBoundParameters.ContainsKey('RebootComputer')) { $RebootComputer = $configuration.Settings.RebootComputer }
             if (-not $PSBoundParameters.ContainsKey('OpenReportInBrowser')) { $OpenReportInBrowser = $configuration.Settings.OpenReportInBrowser }
             $Items = @($configuration.Items.Keys)
+        }
+        catch [OperationCanceledException] {
+            Write-Host 'Restore cancelled. No items executed.'
+            return [pscustomobject]@{ ConfigurationFile = $configurationPath; ReportFile = $null; Results = @(); Success = $false; Cancelled = $true }
         }
         catch { $problems = @([string]$_) }
     }
@@ -86,6 +107,7 @@ function Invoke-ComputerSnapshotHC {
         elseif (-not (Test-Path -LiteralPath $Script[$name] -PathType Leaf)) { $problems += "Script for '$name' not found: '$($Script[$name])'" }
     }
     if ($problems.Count) {
+        $problems = @($problems | ForEach-Object { Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $secretValues })
         foreach ($problem in $problems) { Write-Warning $problem }
         $results.Add([pscustomobject]@{ Name = 'Validation'; Status = 'Failed'; Messages = $problems })
         $report = Write-SnapshotReportHC $ReportsFolder $Action $configurationPath $results
@@ -108,16 +130,18 @@ function Invoke-ComputerSnapshotHC {
         try {
             $errors = @()
             $childAction = if ($Action -eq 'CreateSnapshot') { 'Export' } else { 'Import' }
-            $result = @(Invoke-ChildScriptHC -Path $Script[$name] -Action $childAction -Data $data -RootFolder $RootFolder -ErrorVariable +errors)
+            $result = @(Invoke-ChildScriptHC -Path $Script[$name] -Action $childAction -Data $data -RootFolder $RootFolder -SecretValues $secretValues -ErrorVariable +errors -ErrorAction SilentlyContinue)
             if ($result.Count -ne 1 -or $result[0].PSObject.Properties.Name -notcontains 'Data' -or $result[0].Messages -isnot [string[]]) {
                 throw "'$name' did not return exactly one Data/Messages result"
             }
             if ($errors.Count) { throw ($errors -join [Environment]::NewLine) }
             if ($Action -eq 'CreateSnapshot') { $exportItems[$name] = $result[0].Data }
-            $results.Add([pscustomobject]@{ Name = $name; Status = 'Success'; Messages = $result[0].Messages })
+            $messages = [string[]]@($result[0].Messages | ForEach-Object { Protect-RestoreInputTextHC -Text $_ -SecretValues $secretValues })
+            $results.Add([pscustomobject]@{ Name = $name; Status = 'Success'; Messages = $messages })
         }
         catch {
-            $results.Add([pscustomobject]@{ Name = $name; Status = 'Failed'; Messages = @([string]$_) })
+            $message = Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $secretValues
+            $results.Add([pscustomobject]@{ Name = $name; Status = 'Failed'; Messages = @($message) })
         }
     }
     Write-Progress -Activity $Action -Completed

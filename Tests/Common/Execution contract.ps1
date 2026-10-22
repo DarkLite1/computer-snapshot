@@ -18,6 +18,7 @@ Describe 'Single-file execution' {
         Mock Restart-Computer -ModuleName Execution
         Mock Start-Process -ModuleName Execution
         Mock Invoke-ChildScriptHC -ModuleName Execution { [pscustomobject]@{ Data = @(); Messages = [string[]]@('Exported') } }
+        Mock Read-RestoreInputHC -ModuleName Execution { throw 'Unexpected input prompt in test.' }
     }
     It 'writes exactly one file and creates no folders' {
         $params.Items = @('UserAccounts')
@@ -177,6 +178,69 @@ Describe 'Single-file execution' {
         Mock Invoke-ChildScriptHC -ModuleName Execution { throw 'Restore failed' }
         (Invoke-ComputerSnapshotHC @params).Success | Should -BeFalse
         Should -Invoke Restart-Computer -ModuleName Execution -Times 0 -Exactly
+    }
+    It 'collects selected shared-section inputs before execution, redacts passwords, and preserves source files' {
+        $sharedPath = Join-Path $TestDrive 'users.json'
+        '[{"Name":"{{input:Local account}}","Password":"{{password:Local password}}"}]' | Set-Content -LiteralPath $sharedPath
+        Write-ConfigurationHC @{
+            SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }
+            Items = @{ UserAccounts = 'users.json'; Software = @{ Install = @(@{ ExecutablePath = '{{input:Unselected installer}}' }) } }
+        } $path
+        $before = Get-Content -LiteralPath $path -Raw
+        $sharedBefore = Get-Content -LiteralPath $sharedPath -Raw
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Read-RestoreInputHC -ModuleName Execution {
+            Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
+            if ($Field.Kind -eq 'password') { 'Test-secret!42' } else { 'Example' }
+        }
+        Mock Invoke-ChildScriptHC -ModuleName Execution {
+            $Data[0].Name | Should -Be 'Example'
+            $Data[0].Password | Should -Be 'Test-secret!42'
+            [pscustomobject]@{ Data = $null; Messages = [string[]]@('Applied Test-secret!42') }
+        }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeTrue
+        $result.Results[0].Messages | Should -Be @('Applied [redacted]')
+        Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 2 -Exactly
+        (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
+        (Get-Content -LiteralPath $sharedPath -Raw) | Should -BeExactly $sharedBefore
+    }
+    It 'cancels before any script, report or reboot when an input dialog is cancelled' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = '{{input:Account}}' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Read-RestoreInputHC -ModuleName Execution { $null }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Cancelled | Should -BeTrue
+        $result.Success | Should -BeFalse
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Restart-Computer -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Start-Process -ModuleName Execution -Times 0 -Exactly
+    }
+    It 'redacts prompted passwords from child failure results and reports' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @(@{ Name = 'Example'; Password = '{{password:Password}}' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Read-RestoreInputHC -ModuleName Execution { 'Test-secret!42' }
+        Mock Invoke-ChildScriptHC -ModuleName Execution { throw 'Rejected Test-secret!42' }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeFalse
+        $result.Results[0].Messages | Should -Be @('Rejected [redacted]')
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter { $Results[0].Messages -notmatch 'Test-secret' }
+    }
+    It 'validates resolved values before any child runs and redacts validation messages' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Software = @{ Install = @(@{ ExecutablePath = '{{password:Installer path}}' }) } } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('Software')
+        Mock Read-RestoreInputHC -ModuleName Execution { 'Test-secret!42' }
+        { Invoke-ComputerSnapshotHC @params } | Should -Throw '*validation failed*'
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Write-Warning -ModuleName Execution -Times 0 -Exactly -ParameterFilter { $Message -match 'Test-secret' }
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter {
+            ($Results | ConvertTo-Json -Depth 10) -notmatch 'Test-secret' -and ($Results | ConvertTo-Json -Depth 10) -match '\[redacted\]'
+        }
     }
     It 'rejects an empty or unavailable restore selection' {
         Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @() } } $path

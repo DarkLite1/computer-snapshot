@@ -1,0 +1,29 @@
+{
+  "$schema": "../Scripts/config.schema.json",
+  "SchemaVersion": 2,
+  "Description": "Prompted setup example: creates or updates a local account and configures an NTP time server. Requests the account name, password and time-server IPv4 address before applying any settings.",
+  "Settings": {
+    "RebootComputer": false,
+    "OpenReportInBrowser": true,
+    "RunElevated": true
+  },
+  "Items": {
+    "UserAccounts": [
+      {
+        "Name": "{{input:Enter the local account name to create or update}}",
+        "FullName": "Example local account",
+        "Description": "Account configured with restore-time input",
+        "Enabled": true,
+        "PasswordExpires": true,
+        "UserMayChangePassword": true,
+        "Password": "{{password:Enter the password for this local account}}"
+      }
+    ],
+    "NtpTimeServers": {
+      "SyncTimeWithDomain": false,
+      "TimeServerNames": [
+        "{{ipv4:Enter the IPv4 address of your NTP time server}}"
+      ]
+    }
+  }
+}

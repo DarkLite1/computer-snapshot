@@ -2,7 +2,51 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 BeforeAll {
     . "$PSScriptRoot\..\Scripts\Invoke GUI.ps1" -NoShow
+    . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
 }
+Describe 'Restore input popup' {
+    BeforeAll {
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+    }
+    It 'displays the field description and masks password input without modifying the supplied value' {
+        $field = [pscustomobject]@{ Kind = 'password'; Description = 'Password for the local kiosk account'; Path = 'Items.UserAccounts[0].Password' }
+        $dialog = New-RestoreInputFormHC -Field $field
+        try {
+            $dialog.Show()
+            $dialog.Controls.Find('InputDescription', $true)[0].Text | Should -Be $field.Description
+            $inputBox = $dialog.Controls.Find('InputValue', $true)[0]
+            $confirm = $dialog.Controls.Find('ConfirmInput', $true)[0]
+            $inputBox.UseSystemPasswordChar | Should -BeTrue
+            $confirm.Enabled | Should -BeFalse
+            $inputBox.Text = 'Test-only password!"\$'
+            $confirm.Enabled | Should -BeTrue
+            $confirm.PerformClick()
+            $dialog.Tag.Value | Should -BeExactly 'Test-only password!"\$'
+            $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
+        }
+        finally { $dialog.Dispose() }
+    }
+    It 'rejects invalid IPv4 input and supports cancellation without an answer' {
+        $field = [pscustomobject]@{ Kind = 'ipv4'; Description = 'IPv4 address for Ethernet'; Path = 'Items.NetworkCards[0].IPSettings.IPAddress' }
+        $dialog = New-RestoreInputFormHC -Field $field
+        try {
+            $dialog.Show()
+            $inputBox = $dialog.Controls.Find('InputValue', $true)[0]
+            $confirm = $dialog.Controls.Find('ConfirmInput', $true)[0]
+            $inputBox.UseSystemPasswordChar | Should -BeFalse
+            $inputBox.Text = '999.1.1.1'
+            $confirm.Enabled | Should -BeFalse
+            $inputBox.Text = '192.0.2.10'
+            $confirm.Enabled | Should -BeTrue
+            $dialog.CancelButton.PerformClick()
+            $dialog.Tag.Value | Should -BeNullOrEmpty
+            $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::Cancel)
+        }
+        finally { $dialog.Dispose() }
+    }
+}
+
 Describe 'Wizard console welcome' {
     BeforeEach {
         Mock Clear-Host

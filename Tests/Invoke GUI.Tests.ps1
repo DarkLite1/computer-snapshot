@@ -147,6 +147,35 @@ Describe 'Restore selection controls' {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
     }
+    It 'toggles item and description clicks but leaves checkbox clicks and disabled rows alone' {
+        $entries = @(Get-SnapshotItemEntriesHC -Items UserAccounts, Software)
+        $entries[1].Available = $false
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Click test' -Entries $entries
+        try {
+            $dialog.Show()
+            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
+            $mouseClick = $list.GetType().GetMethod('OnMouseClick', [Reflection.BindingFlags]'Instance, NonPublic')
+            $row = $list.Items[0]
+            $rowY = $row.Bounds.Top + [int]($row.Bounds.Height / 2)
+            foreach ($columnX in @(80, 300)) {
+                $eventArgs = New-Object Windows.Forms.MouseEventArgs ([Windows.Forms.MouseButtons]::Left), 1, $columnX, $rowY, 0
+                $null = $mouseClick.Invoke($list, @($eventArgs.PSObject.BaseObject))
+                $row.Checked | Should -BeFalse
+                $null = $mouseClick.Invoke($list, @($eventArgs.PSObject.BaseObject))
+                $row.Checked | Should -BeTrue
+            }
+            $checkboxX = $row.Bounds.Left + 4
+            ($list.HitTest($checkboxX, $rowY).Location -band [Windows.Forms.ListViewHitTestLocations]::StateImage) | Should -Not -Be 0
+            $null = $mouseClick.Invoke($list, @([Windows.Forms.MouseEventArgs]::new([Windows.Forms.MouseButtons]::Left, 1, $checkboxX, $rowY, 0)))
+            $row.Checked | Should -BeTrue
+            $disabledY = $list.Items[1].Bounds.Top + 2
+            $null = $mouseClick.Invoke($list, @([Windows.Forms.MouseEventArgs]::new([Windows.Forms.MouseButtons]::Left, 1, 300, $disabledY, 0)))
+            $list.Items[1].Checked | Should -BeFalse
+            $null = $mouseClick.Invoke($list, @([Windows.Forms.MouseEventArgs]::new([Windows.Forms.MouseButtons]::Right, 1, 80, $rowY, 0)))
+            $row.Checked | Should -BeTrue
+        }
+        finally { $dialog.Dispose() }
+    }
     It 'grays out missing sections and blocks checking them individually or with Select all' {
         $testFile = Join-Path $TestDrive 'Partial.json'
         '{"SchemaVersion":2,"Items":{"UserAccounts":[{"Name":"Example"}],"Software":{"Install":[{"ExecutablePath":"example.exe"}]}}}' | Set-Content -LiteralPath $testFile

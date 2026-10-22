@@ -155,6 +155,15 @@ function New-SnapshotItemListHC {
             $eventArgs.NewValue = [Windows.Forms.CheckState]::Unchecked
         }
     })
+    $list.Add_MouseClick({
+        param($sender, $eventArgs)
+        if ($eventArgs.Button -ne [Windows.Forms.MouseButtons]::Left) { return }
+        $hit = $sender.HitTest($eventArgs.Location)
+        if ($hit.Item -and $hit.Item.Tag -notin $sender.Tag -and
+            -not ($hit.Location -band [Windows.Forms.ListViewHitTestLocations]::StateImage)) {
+            $hit.Item.Checked = -not $hit.Item.Checked
+        }
+    })
     return ,$list
 }
 

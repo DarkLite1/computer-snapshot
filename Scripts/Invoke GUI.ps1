@@ -117,7 +117,9 @@ function Get-RestoreItemEntriesHC {
         if ($name -cnotin (Get-SnapshotScriptsHC).Keys) { throw "Unknown configuration item '$name'." }
     }
     foreach ($entry in Get-SnapshotItemEntriesHC) {
-        $entry.Available = $entry.Key -in $names
+        $data = $document.Items.($entry.Key)
+        $entry.Available = $entry.Key -in $names -and -not (Test-EmptySectionHC $data)
+        if ($data -is [string]) { $entry.Available = -not [string]::IsNullOrWhiteSpace($data) }
         $entry
     }
 }
@@ -143,7 +145,7 @@ function New-SnapshotItemListHC {
         $item.Checked = $entry.Available -ne $false
         if ($entry.Available -eq $false) {
             $item.ForeColor = [Drawing.SystemColors]::GrayText
-            $item.ToolTipText = 'Not included in this configuration.'
+            $item.ToolTipText = 'No settings to restore in this configuration.'
         }
         $null = $list.Items.Add($item)
     }

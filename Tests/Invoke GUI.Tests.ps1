@@ -68,11 +68,17 @@ Describe 'Single-file wizard commands' {
     }
     It 'lists all sections but only marks configured sections available without resolving references' {
         $testFile = Join-Path $TestDrive 'Example.json'
-        '{"SchemaVersion":2,"Items":{"Software":{},"UserAccounts":"missing.json","Comment":"Example"}}' | Set-Content -LiteralPath $testFile
+        '{"SchemaVersion":2,"Items":{"Software":{"Install":[{"ExecutablePath":"example.exe"}]},"UserAccounts":"missing.json","Comment":"Example"}}' | Set-Content -LiteralPath $testFile
         $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile)
         @($entries.Key) | Should -Be @((Get-SnapshotScriptsHC).Keys)
         @($entries | Where-Object Available | ForEach-Object Key) | Should -Be @('UserAccounts', 'Software')
         @($entries | Where-Object { -not $_.Available }).Count | Should -Be ($entries.Count - 2)
+    }
+    It 'disables empty arrays, objects, nulls, blank references and comment-only sections' {
+        $testFile = Join-Path $TestDrive 'Empty sections.json'
+        '{"SchemaVersion":2,"Items":{"UserAccounts":[],"Software":{},"RegionalSettings":null,"UserGroups":" ","CreateFolders":{"Comment":"No folders"}}}' | Set-Content -LiteralPath $testFile
+        $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile)
+        @($entries | Where-Object Available).Count | Should -Be 0
     }
     It 'rejects legacy or empty configurations in the restore overview' {
         $testFile = Join-Path $TestDrive 'Example.json'
@@ -143,7 +149,7 @@ Describe 'Restore selection controls' {
     }
     It 'grays out missing sections and blocks checking them individually or with Select all' {
         $testFile = Join-Path $TestDrive 'Partial.json'
-        '{"SchemaVersion":2,"Items":{"UserAccounts":[],"Software":{}}}' | Set-Content -LiteralPath $testFile
+        '{"SchemaVersion":2,"Items":{"UserAccounts":[{"Name":"Example"}],"Software":{"Install":[{"ExecutablePath":"example.exe"}]}}}' | Set-Content -LiteralPath $testFile
         $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Partial' -Entries @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile)
         try {
             $dialog.Show()
@@ -154,7 +160,7 @@ Describe 'Restore selection controls' {
             $missing = @($list.Items | Where-Object { $_.Tag -notin @('UserAccounts', 'Software') })
             foreach ($item in $missing) {
                 $item.ForeColor | Should -Be ([Drawing.SystemColors]::GrayText)
-                $item.ToolTipText | Should -Be 'Not included in this configuration.'
+                $item.ToolTipText | Should -Be 'No settings to restore in this configuration.'
                 $item.Checked = $true
                 $item.Checked | Should -BeFalse
             }
@@ -166,6 +172,24 @@ Describe 'Restore selection controls' {
             @($list.CheckedItems | ForEach-Object Tag) | Should -Be @('UserAccounts', 'Software')
             $confirm.PerformClick()
             @($dialog.Tag) | Should -Be @('UserAccounts', 'Software')
+        }
+        finally { $dialog.Dispose() }
+    }
+    It 'enables only User accounts and Software for the bundled Example PC1 configuration' {
+        $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile "$PSScriptRoot\..\Configurations\Example PC1.json")
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Example PC1' -Entries $entries
+        try {
+            $dialog.Show()
+            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
+            $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
+            @($list.CheckedItems | ForEach-Object Tag) | Should -Be @('UserAccounts', 'Software')
+            foreach ($item in $list.Items | Where-Object { $_.Tag -notin @('UserAccounts', 'Software') }) {
+                $item.ForeColor | Should -Be ([Drawing.SystemColors]::GrayText)
+                $item.Checked = $true
+                $item.Checked | Should -BeFalse
+            }
+            ($confirm.Parent.Controls | Where-Object Text -eq 'Select all').PerformClick()
+            @($list.CheckedItems | ForEach-Object Tag) | Should -Be @('UserAccounts', 'Software')
         }
         finally { $dialog.Dispose() }
     }

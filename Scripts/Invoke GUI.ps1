@@ -185,6 +185,11 @@ function Get-RestoreSettingsHC {
 function New-RestoreSelectionFormHC {
     param([string]$ConfigurationName, [object[]]$Entries, [string]$ConfigurationFile)
     $settings = Get-RestoreSettingsHC -ConfigurationFile $ConfigurationFile
+    $configurationDescription = 'No description provided.'
+    if ($ConfigurationFile) {
+        $document = Get-Content -LiteralPath $ConfigurationFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if (-not [string]::IsNullOrWhiteSpace($document.Description)) { $configurationDescription = $document.Description }
+    }
     $dialog = New-Object Windows.Forms.Form
     $dialog.Text = "Restore - $ConfigurationName"
     $dialog.ClientSize = New-Object Drawing.Size 800, 500
@@ -197,20 +202,39 @@ function New-RestoreSelectionFormHC {
     $layout.Padding = New-Object Windows.Forms.Padding 12
     $layout.ColumnCount = 1
     $null = $layout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Percent), 100))
-    $layout.RowCount = 4
+    $layout.RowCount = 6
+    $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
+    $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Percent), 100))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), 48))
     $dialog.Controls.Add($layout)
+    $descriptionHeading = New-Object Windows.Forms.Label
+    $descriptionHeading.Name = 'ConfigurationDescriptionHeading'
+    $descriptionHeading.Text = 'Configuration description'
+    $descriptionHeading.Font = New-Object Drawing.Font $dialog.Font, ([Drawing.FontStyle]::Bold)
+    $descriptionHeading.AutoSize = $true
+    $descriptionHeading.Dock = 'Fill'
+    $descriptionHeading.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 3
+    $layout.Controls.Add($descriptionHeading, 0, 0)
+    $descriptionValue = New-Object Windows.Forms.Label
+    $descriptionValue.Name = 'ConfigurationDescription'
+    $descriptionValue.Text = $configurationDescription
+    $descriptionValue.UseMnemonic = $false
+    $descriptionValue.AutoSize = $true
+    $descriptionValue.Dock = 'Fill'
+    $descriptionValue.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
+    $layout.Controls.Add($descriptionValue, 0, 1)
     $description = New-Object Windows.Forms.Label
+    $description.Name = 'RestoreGuidance'
     $description.Text = 'Choose the sections to apply to this computer. Uncheck anything you want to leave unchanged.'
     $description.AutoSize = $true
     $description.Dock = 'Fill'
     $description.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
-    $layout.Controls.Add($description, 0, 0)
+    $layout.Controls.Add($description, 0, 2)
     $list = New-SnapshotItemListHC -Entries $Entries
-    $layout.Controls.Add($list, 0, 1)
+    $layout.Controls.Add($list, 0, 3)
     $options = New-Object Windows.Forms.FlowLayoutPanel
     $options.Dock = 'Fill'
     $options.AutoSize = $true
@@ -225,7 +249,7 @@ function New-RestoreSelectionFormHC {
     $report.AutoSize = $true
     $report.Checked = $settings.OpenReportInBrowser
     $options.Controls.AddRange(@($reboot, $report))
-    $layout.Controls.Add($options, 0, 2)
+    $layout.Controls.Add($options, 0, 4)
     $buttons = New-Object Windows.Forms.FlowLayoutPanel
     $buttons.Dock = 'Fill'
     $buttons.FlowDirection = 'RightToLeft'
@@ -260,7 +284,7 @@ function New-RestoreSelectionFormHC {
         }
     })
     $buttons.Controls.AddRange(@($confirm, $cancel, $clear, $all))
-    $layout.Controls.Add($buttons, 0, 3)
+    $layout.Controls.Add($buttons, 0, 5)
     $list.Add_ItemChecked({
         $owner = $this.FindForm()
         $owner.Controls.Find('RestoreSelected', $true)[0].Enabled = $this.CheckedItems.Count -gt 0

@@ -170,6 +170,46 @@ Describe 'Restore selection controls' {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
     }
+    It 'shows the selected configuration description separately from restore guidance' {
+        $path = "$PSScriptRoot\..\Configurations\Example PC1.json"
+        $expected = (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).Description
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Example PC1' -Entries @(Get-RestoreItemEntriesHC -ConfigurationFile $path) -ConfigurationFile $path
+        try {
+            $dialog.Show()
+            $heading = $dialog.Controls.Find('ConfigurationDescriptionHeading', $true)[0]
+            $description = $dialog.Controls.Find('ConfigurationDescription', $true)[0]
+            $guidance = $dialog.Controls.Find('RestoreGuidance', $true)[0]
+            $heading.Text | Should -Be 'Configuration description'
+            $heading.Font.Bold | Should -BeTrue
+            $description.Text | Should -BeExactly $expected
+            $description.Bottom | Should -BeLessThan $guidance.Top
+            $guidance.Text | Should -BeLike 'Choose the sections to apply*'
+        }
+        finally { $dialog.Dispose() }
+    }
+    It 'wraps long descriptions literally and provides a fallback for missing descriptions' {
+        $path = Join-Path $TestDrive 'Description.json'
+        $text = 'Users & applications for this workstation. ' * 6
+        @{ Description = $text } | ConvertTo-Json | Set-Content -LiteralPath $path
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Long description' -Entries @(Get-SnapshotItemEntriesHC) -ConfigurationFile $path
+        try {
+            $dialog.Size = $dialog.MinimumSize
+            $dialog.Show()
+            $description = $dialog.Controls.Find('ConfigurationDescription', $true)[0]
+            $guidance = $dialog.Controls.Find('RestoreGuidance', $true)[0]
+            $description.Text | Should -BeExactly $text
+            $description.UseMnemonic | Should -BeFalse
+            $description.Height | Should -BeGreaterThan $description.Font.Height
+            $description.Bottom | Should -BeLessThan $guidance.Top
+            $description.Right | Should -BeLessOrEqual $description.Parent.ClientSize.Width
+        }
+        finally { $dialog.Dispose() }
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'No description' -Entries @(Get-SnapshotItemEntriesHC)
+        try {
+            $dialog.Controls.Find('ConfigurationDescription', $true)[0].Text | Should -Be 'No description provided.'
+        }
+        finally { $dialog.Dispose() }
+    }
     It 'initializes separate restore options from the file and permits unsaved overrides' {
         $testFile = Join-Path $TestDrive 'Options.json'
         foreach ($saved in @($false, $true)) {

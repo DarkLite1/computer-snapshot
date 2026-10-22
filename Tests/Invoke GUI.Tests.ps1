@@ -184,6 +184,23 @@ Describe 'Restore selection controls' {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
     }
+    It 'emphasizes the primary restore action and neutralizes it while disabled' {
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Primary action' -Entries @(Get-SnapshotItemEntriesHC -Items UserAccounts)
+        try {
+            $dialog.Show()
+            $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
+            if (-not [Windows.Forms.SystemInformation]::HighContrast) {
+                $confirm.BackColor | Should -Be ([Drawing.Color]::FromArgb(0, 103, 184))
+                $confirm.ForeColor | Should -Be ([Drawing.Color]::White)
+                ($confirm.Parent.Controls | Where-Object Text -eq 'Clear all').PerformClick()
+                $confirm.Enabled | Should -BeFalse
+                $confirm.BackColor | Should -Be ([Drawing.SystemColors]::Control)
+                ($confirm.Parent.Controls | Where-Object Text -eq 'Select all').PerformClick()
+                $confirm.BackColor | Should -Be ([Drawing.Color]::FromArgb(0, 103, 184))
+            }
+        }
+        finally { $dialog.Dispose() }
+    }
     It 'fits the initial window height to the rendered checklist without spare rows' {
         foreach ($entries in @(@(Get-SnapshotItemEntriesHC -Items UserAccounts, Software), @(Get-SnapshotItemEntriesHC))) {
             $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Fit checklist' -Entries $entries

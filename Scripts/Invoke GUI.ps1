@@ -83,6 +83,22 @@ function New-WizardElevationPanelHC {
     return ,$panel
 }
 
+function Set-WizardPrimaryButtonHC {
+    param($Button)
+    if ([Windows.Forms.SystemInformation]::HighContrast) { return }
+    $Button.UseVisualStyleBackColor = $false
+    $Button.FlatStyle = 'Flat'
+    $Button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(0, 85, 150)
+    $Button.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(0, 86, 153)
+    $Button.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(0, 65, 115)
+    $Button.BackColor = if ($Button.Enabled) { [Drawing.Color]::FromArgb(0, 103, 184) } else { [Drawing.SystemColors]::Control }
+    $Button.ForeColor = if ($Button.Enabled) { [Drawing.Color]::White } else { [Drawing.SystemColors]::GrayText }
+    $Button.Add_EnabledChanged({
+        $this.BackColor = if ($this.Enabled) { [Drawing.Color]::FromArgb(0, 103, 184) } else { [Drawing.SystemColors]::Control }
+        $this.ForeColor = if ($this.Enabled) { [Drawing.Color]::White } else { [Drawing.SystemColors]::GrayText }
+    })
+}
+
 function Get-DefaultConfigurationNameHC {
     return $env:COMPUTERNAME + ' ' + (Get-Date -Format 'yyyy-MM-dd HHmmss')
 }
@@ -271,6 +287,7 @@ function New-RestoreSelectionFormHC {
     $confirm.Name = 'RestoreSelected'
     $confirm.Text = 'Restore selected'
     $confirm.Size = New-Object Drawing.Size 150, 34
+    Set-WizardPrimaryButtonHC $confirm
     $confirm.Enabled = $list.CheckedItems.Count -gt 0
     $confirm.Add_Click({
         $owner = $this.FindForm()
@@ -430,6 +447,7 @@ $restoreButtons.FlowDirection = 'RightToLeft'
 $restore = New-Object Windows.Forms.Button
 $restore.Text = 'Restore'
 $restore.Size = New-Object Drawing.Size 120, 34
+Set-WizardPrimaryButtonHC $restore
 $refresh = New-Object Windows.Forms.Button
 $refresh.Text = 'Refresh'
 $refresh.Size = New-Object Drawing.Size 120, 34
@@ -508,6 +526,7 @@ $exportButtons.Dock = 'Fill'
 $export = New-Object Windows.Forms.Button
 $export.Text = 'Export'
 $export.Size = New-Object Drawing.Size 120, 34
+Set-WizardPrimaryButtonHC $export
 $exportButtons.Controls.Add($export)
 $exportLayout.Controls.Add($nameLabel, 0, 1)
 $exportLayout.Controls.Add($nameBox, 0, 2)

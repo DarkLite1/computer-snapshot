@@ -82,6 +82,8 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         Mock Set-SmbShare
         Mock Revoke-SmbShareAccess
         Mock Grant-SmbShareAccess
+        Mock Block-SmbShareAccess
+        Mock Unblock-SmbShareAccess
         Mock Get-Item { [pscustomobject]@{ PSIsContainer = $false } }
         Mock Test-Path { $true }
         Mock New-Item { 'command output' }

@@ -1078,7 +1078,7 @@
           },
           "NetworkCardDescription": {
             "type": "string",
-            "description": "Adapter description to match."
+            "description": "Adapter description to match: a card with exactly this description is used first, otherwise the one card whose description contains this text."
           },
           "NetworkCategory": {
             "type": "string",

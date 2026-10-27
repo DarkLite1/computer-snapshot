@@ -9,13 +9,13 @@ Describe 'Software import' {
         function Remove-ApplicationHC { param($ApplicationName, $UninstallString) }
     }
     BeforeEach {
-        $installed = [System.Collections.Generic.List[string]]@('Old App', 'Stuck App', 'Msi App')
+        $fakeInstalledApplications = [System.Collections.Generic.List[string]]@('Old App', 'Stuck App', 'Msi App')
         Mock Get-InstalledApplicationsHC {
-            foreach ($name in $installed) {
+            foreach ($name in $fakeInstalledApplications) {
                 [pscustomobject]@{ DisplayName = $name; UninstallString = if ($name -eq 'Msi App') { 'MsiExec.exe /I{AAAA}' } else { "C:\$name\uninstall.exe" } }
             }
         }
-        Mock Remove-ApplicationHC { if ($ApplicationName -ne 'Stuck App') { $null = $installed.Remove($ApplicationName) }; 0 }
+        Mock Remove-ApplicationHC { if ($ApplicationName -ne 'Stuck App') { $null = $fakeInstalledApplications.Remove($ApplicationName) }; 0 }
         Mock Remove-ApplicationHC { 3010 } -ParameterFilter { $ApplicationName -eq 'Msi App' }
         Mock Test-Path { $true }
         Mock Start-Process { [pscustomobject]@{ ExitCode = 0 } }

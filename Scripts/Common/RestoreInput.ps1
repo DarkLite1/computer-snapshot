@@ -252,19 +252,41 @@ function Resolve-RestoreInputHC {
 }
 
 function Protect-RestoreInputTextHC {
+    <#
+    .SYNOPSIS
+        Replace every secret in the text with '[redacted]'.
+    .DESCRIPTION
+        Besides the secret as typed, the forms in which programs and
+        PowerShell commonly repeat it are redacted too: XML or HTML encoded,
+        URL encoded, JSON escaped and with doubled single quotes.
+    #>
     param(
         [string]$Text,
         [string[]]$SecretValues
     )
-         
+
+    $forms = foreach ($secret in $SecretValues) {
+        if ([string]::IsNullOrEmpty($secret)) {
+            continue
+        }
+
+        $secret
+        [System.Security.SecurityElement]::Escape($secret)
+        [System.Net.WebUtility]::HtmlEncode($secret)
+        [System.Uri]::EscapeDataString($secret)
+        (ConvertTo-Json -InputObject $secret -Compress).Trim('"')
+        $secret.Replace("'", "''")
+    }
+
+    # Longest first, so a longer form is never left half redacted
     foreach (
-        $secret in
-        $SecretValues | Sort-Object Length -Descending
+        $form in
+        @($forms | Select-Object -Unique | Sort-Object Length -Descending)
     ) {
-        if (-not [string]::IsNullOrEmpty($secret)) { 
-            $Text = $Text.Replace($secret, '[redacted]') 
+        if (-not [string]::IsNullOrEmpty($form)) {
+            $Text = $Text.Replace($form, '[redacted]')
         }
     }
-    
+
     return $Text
 }

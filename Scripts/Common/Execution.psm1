@@ -562,7 +562,17 @@ function Invoke-ComputerSnapshotHC {
     $report = Write-SnapshotReportHC $ReportsFolder $Action $configurationPath $results
 
     if ($OpenReportInBrowser) {
-        Start-Process -FilePath $report 
+        try {
+            Start-Process -FilePath $report
+        }
+        catch {
+            # A computer without a program for .html files, such as Server
+            # Core, cannot open the report; the run itself is not affected
+            Write-Warning (
+                "The report could not be opened: $($_.Exception.Message). " +
+                "It is saved as '$report'"
+            )
+        }
     }
         
     if (

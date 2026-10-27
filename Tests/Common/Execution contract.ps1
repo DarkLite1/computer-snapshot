@@ -376,4 +376,11 @@ Describe 'Single-file execution' {
         $restart.Status | Should -Be 'Warning'
         $restart.Messages[0] | Should -BeLike '*exit code 1190*'
     }
+    It 'still returns the result when the report cannot be opened' {
+        $params.OpenReportInBrowser = $true
+        Mock Start-Process -ModuleName Execution { throw 'There is no application associated with the specified file' }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeTrue
+        Should -Invoke Write-Warning -ModuleName Execution -ParameterFilter { $Message -like 'The report could not be opened:*' }
+    }
 }

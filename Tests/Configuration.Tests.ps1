@@ -47,6 +47,22 @@ Describe 'Restore input placeholders' {
         { Resolve-RestoreInputHC -Items $items -ReadValue { 'invalid-address' } } | Should -Throw '*supplied input is empty or invalid*'
         Protect-RestoreInputTextHC -Text 'Failed: test-secret' -SecretValues @('test-secret') | Should -Be 'Failed: [redacted]'
     }
+    It 'redacts the encoded forms in which a secret is commonly repeated' {
+        $secret = "P&ss<w0rd>'x"
+        $forms = @(
+            [System.Security.SecurityElement]::Escape($secret)
+            [System.Net.WebUtility]::HtmlEncode($secret)
+            [System.Uri]::EscapeDataString($secret)
+            (ConvertTo-Json -InputObject $secret -Compress).Trim('"')
+            $secret.Replace("'", "''")
+        )
+        foreach ($form in $forms) {
+            Protect-RestoreInputTextHC -Text "before $form after" -SecretValues @($secret) |
+                Should -Be 'before [redacted] after' -Because $form
+        }
+        Protect-RestoreInputTextHC -Text 'R&D <ok>' -SecretValues @($secret, '', $null) |
+            Should -Be 'R&D <ok>'
+    }
 }
 
 Describe 'Version 2 configuration' {

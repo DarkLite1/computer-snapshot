@@ -2,6 +2,12 @@
 <#
 .SYNOPSIS
     Export or import Firewall rules as a configuration section.
+.DESCRIPTION
+    Import creates each rule in the persistent store. An existing rule with
+    the same Name is replaced, but only once the new rule has been created:
+    when creating fails, the existing rule is kept. Settings that are empty
+    or missing from the configuration use the Windows defaults. Each failed
+    rule is reported in Errors and the remaining rules are still processed.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -9,7 +15,8 @@
 .PARAMETER RootFolder
     Absolute USB root for asset paths. No configuration files are written here.
 .OUTPUTS
-    Exactly one object: Data (export only) and a string array of Messages.
+    Exactly one object: Data (export only), a string array of Messages and a
+    string array of Errors.
 #>
 [CmdletBinding()]
 param(
@@ -17,6 +24,7 @@ param(
     $Data,
     [Parameter(Mandatory)][string]$RootFolder
 )
+$ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
 #region Windows helpers
 Function Export-FirewallRulesHC {
@@ -84,7 +92,7 @@ Function Export-FirewallRulesHC {
             #region Create firewall rule details for export
             $firewallRuleSet = ForEach ($rule In $firewallRules) {
                 Write-Verbose "Firewall rule `"$($rule.DisplayName)`" ($($rule.Name))"
-        
+                try {
                 $AddressFilter = $rule | Get-NetFirewallAddressFilter
                 $PortFilter = $rule | Get-NetFirewallPortFilter
                 $ApplicationFilter = $rule | Get-NetFirewallApplicationFilter
@@ -125,6 +133,10 @@ Function Export-FirewallRulesHC {
                     Authentication      = [String]$SecurityFilter.Authentication
                     Encryption          = [String]$SecurityFilter.Encryption
                     OverrideBlockRules  = ConvertTo-BooleanHC $SecurityFilter.OverrideBlockRules
+                }
+                }
+                catch {
+                    $errors.Add("Failed to export firewall rule '$($rule.DisplayName)' ($($rule.Name)): $($_.Exception.Message)")
                 }
             }
             #endregion
@@ -225,22 +237,53 @@ Function Import-FirewallRulesHC {
                 if ($rule.Package) {
                     $newRuleParams.Package = $rule.Package 
                 }
-    
-                $storeParam = @{
-                    PolicyStore = $PolicyStore
+                # Empty or missing settings use the Windows default; passing $null
+                # to an enumeration parameter such as Profile or Direction fails
+                foreach ($key in @($newRuleParams.Keys)) {
+                    $value = $newRuleParams[$key]
+                    if ($null -eq $value -or ($value -is [string] -and $value -eq '')) {
+                        $newRuleParams.Remove($key)
+                    }
                 }
-                Get-NetFirewallRule @storeParam -Name $rule.Name -EA Ignore | 
-                Remove-NetFirewallRule
-                
+
                 Try {
                     Write-Verbose "Create firewall rule '$($rule.DisplayName)' '($($rule.Name))'"
-                    $null = New-NetFirewallRule @newRuleParams @storeParam -EA Stop
-                    Write-Output "Created firewall rule '$($newRuleParams.DisplayName) ($($newRuleParams.Name))'"
-
+                    #region Move an existing rule aside, so it can be restored on failure
+                    $backupName = $null
+                    if ($rule.Name) {
+                        $existingRule = @(Get-NetFirewallRule -Name $rule.Name -PolicyStore $PolicyStore -ErrorAction Ignore)
+                        if ($existingRule.Count) {
+                            $backupName = '{0}.backup-{1}' -f $rule.Name, [guid]::NewGuid().ToString('N')
+                            $existingRule | Rename-NetFirewallRule -NewName $backupName
+                        }
+                    }
+                    #endregion
+                    try {
+                        $null = New-NetFirewallRule @newRuleParams -PolicyStore $PolicyStore
+                    }
+                    catch {
+                        $createError = $_
+                        if ($backupName) {
+                            try {
+                                Get-NetFirewallRule -Name $backupName -PolicyStore $PolicyStore |
+                                    Rename-NetFirewallRule -NewName $rule.Name
+                            }
+                            catch {
+                                throw "$($createError.Exception.Message); the existing rule could not be restored and is kept as '$backupName': $($_.Exception.Message)"
+                            }
+                        }
+                        throw $createError
+                    }
+                    if ($backupName) {
+                        Get-NetFirewallRule -Name $backupName -PolicyStore $PolicyStore | Remove-NetFirewallRule
+                        $messages.Add("Replaced firewall rule '$($rule.DisplayName)' ($($rule.Name))")
+                    }
+                    else {
+                        $messages.Add("Created firewall rule '$($rule.DisplayName)' ($($rule.Name))")
+                    }
                 }
                 Catch {
-                    Write-Error "Failed to create firewall rule '$($rule.DisplayName)' '($($rule.Name))': $_"
-                    $Error.RemoveAt(1)
+                    $errors.Add("Failed to create firewall rule '$($rule.DisplayName)' ($($rule.Name)): $($_.Exception.Message)")
                 }
             }
         }
@@ -250,22 +293,22 @@ Function Import-FirewallRulesHC {
     }
 #endregion
 $exportData = $null
-$messages = @()
+# Lists, so the helper functions can add to them from their own scope
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
-    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do'); Errors = [string[]]@() }
 }
 
 if ($Action -eq 'Export') {
     #region Capture section
-$exportData = @(Export-FirewallRulesHC)
+    $exportData = @(Export-FirewallRulesHC)
     #endregion
-    $messages = @('Exported Firewall rules')
+    $messages.Add('Exported Firewall rules')
 }
 else {
     #region Apply section
-    $messages = @(& {
-Import-FirewallRulesHC -Data $Data
-    })
+    Import-FirewallRulesHC -Data $Data
     #endregion
 }
-[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages; Errors = [string[]]$errors }

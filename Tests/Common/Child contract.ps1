@@ -25,6 +25,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         function Get-NetFirewallInterfaceTypeFilter { param([Parameter(ValueFromPipeline)]$InputObject) }
         function Get-NetFirewallSecurityFilter { param([Parameter(ValueFromPipeline)]$InputObject) }
         function Remove-NetFirewallRule { param([Parameter(ValueFromPipeline)]$InputObject) }
+        function Rename-NetFirewallRule { param([Parameter(ValueFromPipeline)]$InputObject, $NewName) }
     }
     BeforeEach {
         Mock Get-LocalUser { [pscustomobject]@{ Name = 'Example'; FullName = 'Example'; Description = ''; Enabled = $true; UserMayChangePassword = $true } }
@@ -74,6 +75,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         Mock Get-NetFirewallSecurityFilter
         Mock New-NetFirewallRule
         Mock Remove-NetFirewallRule
+        Mock Rename-NetFirewallRule
         Mock Get-SmbShare { [pscustomobject]@{ Name = 'Example'; Path = ''; Description = '' } }
         Mock Get-SmbShareAccess
         Mock New-SmbShare

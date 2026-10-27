@@ -102,7 +102,7 @@ All paths in a configuration (installers, files to copy, custom scripts, shared 
 
 | Setting               | Default | Meaning                                                                   |
 | --------------------- | ------- | ------------------------------------------------------------------------- |
-| `RebootComputer`      | `false` | Restart the computer after a restore in which nothing failed.             |
+| `RebootComputer`      | `false` | Restart the computer after a restore in which nothing failed, after a 60-second countdown (`shutdown /a` cancels it). The report shows whether it restarts. |
 | `OpenReportInBrowser` | `true`  | Open the HTML report when the run is finished.                            |
 | `RunElevated`         | `false` | When restoring from a shortcut or the command line, restart as administrator first (UAC prompt). |
 

@@ -13,7 +13,9 @@
 .PARAMETER Force
     Allow replacing an existing export configuration.
 .PARAMETER RebootComputer
-    Reboot after a successful operation. When omitted, restore uses Settings.RebootComputer.
+    Restart after a restore in which nothing failed, with a 60-second countdown
+    that 'shutdown /a' cancels. Exports never restart. When omitted, restore
+    uses Settings.RebootComputer.
 .PARAMETER OpenReportInBrowser
     Open the report. When omitted, restore uses Settings.OpenReportInBrowser.
 .PARAMETER Script

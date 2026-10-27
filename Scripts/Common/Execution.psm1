@@ -118,6 +118,34 @@ function Write-SnapshotReportHC {
     return $path
 }
 
+function Start-ComputerRestartHC {
+    <#
+    .SYNOPSIS
+        Schedule a restart with a countdown that can still be cancelled.
+    .DESCRIPTION
+        Windows shows the countdown to signed-in users; 'shutdown /a' cancels
+        it. Unlike Restart-Computer this also works with other users signed
+        in, and it returns immediately, so the report can still be read.
+    #>
+    param(
+        [Parameter(Mandatory)][int]$DelaySeconds
+    )
+
+    # Windows PowerShell 5.1 turns output on the error stream of a program
+    # into a stopping error when the preference is Stop; the exit code decides
+    $ErrorActionPreference = 'Continue'
+
+    $comment = 'Computer snapshot restore completed. ' +
+    'The computer restarts to apply the changes.'
+
+    $output = & shutdown.exe /r /t $DelaySeconds /d p:4:1 /c $comment 2>&1
+
+    if ($LASTEXITCODE) {
+        throw "shutdown.exe failed with exit code $($LASTEXITCODE): " +
+        ($output -join ' ')
+    }
+}
+
 function Invoke-ComputerSnapshotHC {
     [CmdletBinding()]
     param(
@@ -129,6 +157,8 @@ function Invoke-ComputerSnapshotHC {
         [string]$ReportsFolder,
         [bool]$RebootComputer = $false,
         [bool]$OpenReportInBrowser = $true,
+        [ValidateRange(0, 600)]
+        [int]$RestartDelaySeconds = 60,
         [switch]$Force
     )
     $configurationPath = Resolve-RootPathHC $ConfigurationFile $RootFolder
@@ -473,6 +503,54 @@ function Invoke-ComputerSnapshotHC {
         }
     }
     #endregion
+
+    $failed = @(
+        $results | Where-Object { $_.Status -eq 'Failed' }
+    )
+
+    #region Restart, only after a restore in which nothing failed
+    $restartScheduled = $false
+
+    if ($RebootComputer) {
+        $restart = [pscustomobject]@{
+            Name     = 'Restart computer'
+            Status   = 'Skipped'
+            Messages = @()
+        }
+
+        if ($Action -ne 'RestoreSnapshot') {
+            $restart.Messages = @('The computer only restarts after a restore')
+        }
+        elseif ($failed.Count) {
+            $restart.Messages = @(
+                'Not restarted, because a section failed; ' +
+                'restart manually after fixing the problem'
+            )
+        }
+        else {
+            try {
+                Start-ComputerRestartHC -DelaySeconds $RestartDelaySeconds
+                $restartScheduled = $true
+
+                $restart.Status = 'Success'
+                $restart.Messages = @(
+                    "The computer restarts in $RestartDelaySeconds seconds; " +
+                    "run 'shutdown /a' to cancel"
+                )
+            }
+            catch {
+                # The restore itself succeeded
+                $restart.Status = 'Warning'
+                $restart.Messages = @(
+                    "ERROR: The restart could not be scheduled: $_"
+                )
+            }
+        }
+
+        $results.Add($restart)
+    }
+    #endregion
+
     foreach ($result in $results) {
         Write-Host ('{0}: {1}' -f $result.Name, $result.Status)
 
@@ -487,19 +565,11 @@ function Invoke-ComputerSnapshotHC {
         Start-Process -FilePath $report 
     }
         
-    $failed = @(
-        $results | Where-Object { $_.Status -eq 'Failed' }
-    )
-        
     if (
         $Action -eq 'CreateSnapshot' -and
         $exportItems.Count -eq 0
     ) {
         throw "No items exported. No configuration written. Report: '$report'" 
-    }
-    
-    if ($RebootComputer -and $failed.Count -eq 0) { 
-        Restart-Computer 
     }
 
     [pscustomobject]@{
@@ -507,6 +577,7 @@ function Invoke-ComputerSnapshotHC {
         ReportFile        = $report
         Results           = $results.ToArray()
         Success           = ($failed.Count -eq 0) 
+        RestartScheduled  = $restartScheduled
     }
 }
 Export-ModuleMember -Function Invoke-ComputerSnapshotHC

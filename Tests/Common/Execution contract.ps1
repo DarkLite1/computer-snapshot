@@ -15,7 +15,7 @@ Describe 'Single-file execution' {
         Mock Test-ElevatedHC -ModuleName Execution { $true }
         Mock Write-Host -ModuleName Execution
         Mock Write-Warning -ModuleName Execution
-        Mock Restart-Computer -ModuleName Execution
+        Mock Start-ComputerRestartHC -ModuleName Execution
         Mock Start-Process -ModuleName Execution
         Mock Invoke-ChildScriptHC -ModuleName Execution { [pscustomobject]@{ Data = @(); Messages = [string[]]@('Exported'); Errors = [string[]]@() } }
         Mock Read-RestoreInputHC -ModuleName Execution { throw 'Unexpected input prompt in test.' }
@@ -93,7 +93,7 @@ Describe 'Single-file execution' {
         $result.Success | Should -BeFalse
         $result.Results[0].Status | Should -Be 'Failed'
         $result.Results[0].Messages[0] | Should -Match 'exit code 1'
-        Should -Invoke Restart-Computer -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 0 -Exactly
         Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly
     }
     It 'restores only selected sections without changing the configuration file' {
@@ -149,7 +149,7 @@ Describe 'Single-file execution' {
             (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
             (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
             $expected = [int]$override
-            Should -Invoke Restart-Computer -ModuleName Execution -Times $expected -Exactly
+            Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times $expected -Exactly
             Should -Invoke Start-Process -ModuleName Execution -Times $expected -Exactly
         }
     }
@@ -163,7 +163,7 @@ Describe 'Single-file execution' {
         $params.Items = @('UserAccounts')
         $params.Remove('OpenReportInBrowser')
         (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
-        Should -Invoke Restart-Computer -ModuleName Execution -Times 1 -Exactly
+        Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 1 -Exactly
         Should -Invoke Start-Process -ModuleName Execution -Times 1 -Exactly
     }
     It 'does not reboot after a failed restore even when overridden to true' {
@@ -177,7 +177,7 @@ Describe 'Single-file execution' {
         $params.RebootComputer = $true
         Mock Invoke-ChildScriptHC -ModuleName Execution { throw 'Restore failed' }
         (Invoke-ComputerSnapshotHC @params).Success | Should -BeFalse
-        Should -Invoke Restart-Computer -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 0 -Exactly
     }
     It 'collects selected shared-section inputs before execution, redacts passwords, and preserves source files' {
         $sharedPath = Join-Path $TestDrive 'users.json'
@@ -216,7 +216,7 @@ Describe 'Single-file execution' {
         $result.Success | Should -BeFalse
         Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
         Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 0 -Exactly
-        Should -Invoke Restart-Computer -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 0 -Exactly
         Should -Invoke Start-Process -ModuleName Execution -Times 0 -Exactly
     }
     It 'redacts prompted passwords from child failure results and reports' {
@@ -329,5 +329,51 @@ Describe 'Single-file execution' {
         }
         $result = Invoke-ComputerSnapshotHC @params
         $result.Results[0].Messages | Should -Be @('ERROR: Rejected [redacted]')
+    }
+    It 'never restarts after an export and says so in the report' {
+        $params.RebootComputer = $true
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeTrue
+        $result.RestartScheduled | Should -BeFalse
+        $restart = $result.Results | Where-Object Name -EQ 'Restart computer'
+        $restart.Status | Should -Be 'Skipped'
+        $restart.Messages | Should -Be @('The computer only restarts after a restore')
+        Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 0 -Exactly
+    }
+    It 'reports a scheduled restart with its countdown before writing the report' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.RestartScheduled | Should -BeTrue
+        $restart = $result.Results | Where-Object Name -EQ 'Restart computer'
+        $restart.Status | Should -Be 'Success'
+        $restart.Messages | Should -Be @("The computer restarts in 60 seconds; run 'shutdown /a' to cancel")
+        Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter { $DelaySeconds -eq 60 }
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter {
+            @($Results | Where-Object Name -EQ 'Restart computer').Count -eq 1
+        }
+    }
+    It 'reports a restart that was not done because a section failed' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Invoke-ChildScriptHC -ModuleName Execution { throw 'Restore failed' }
+        $result = Invoke-ComputerSnapshotHC @params
+        $restart = $result.Results | Where-Object Name -EQ 'Restart computer'
+        $restart.Status | Should -Be 'Skipped'
+        $restart.Messages[0] | Should -BeLike 'Not restarted, because a section failed*'
+    }
+    It 'keeps a successful restore successful when the restart cannot be scheduled' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Start-ComputerRestartHC -ModuleName Execution { throw 'shutdown.exe failed with exit code 1190: A system shutdown has already been scheduled.' }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeTrue
+        $result.RestartScheduled | Should -BeFalse
+        $restart = $result.Results | Where-Object Name -EQ 'Restart computer'
+        $restart.Status | Should -Be 'Warning'
+        $restart.Messages[0] | Should -BeLike '*exit code 1190*'
     }
 }

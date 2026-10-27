@@ -28,6 +28,9 @@ $ErrorActionPreference = 'Stop'
 #region Windows helpers
 function Invoke-TimeServiceHC {
     param([Parameter(Mandatory)][string[]]$Arguments)
+    # Windows PowerShell 5.1 turns output on the error stream of a program
+    # into a stopping error when the preference is Stop; the exit code decides
+    $ErrorActionPreference = 'Continue'
     $output = & w32tm @Arguments 2>&1
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {

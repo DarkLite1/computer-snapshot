@@ -50,9 +50,20 @@ exit 3
         )
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $customRoot)
         $result[0].Errors[0] | Should -Be "Script 'Files\throws.ps1' failed: boom"
-        $result[0].Errors[1] | Should -Be "Script 'Files\exit.ps1' failed: the script ended with exit code 3"
+        $result[0].Errors[1] | Should -Be "Script 'Files\exit.ps1' failed: the script ended with exit code 3, success exit codes are 0"
         $result[0].Errors[2] | Should -BeLike "Script 'Files\missing.ps1' failed: the file '*missing.ps1' does not exist"
         $result[0].Messages | Should -Contain "Ran script 'Files\ok.ps1'"
         $result[0].Messages | Should -Contain 'Files\throws.ps1: before'
+    }
+    It 'accepts the exit codes listed in SuccessExitCodes, such as robocopy''s 1 to 7' {
+        $data = @([pscustomobject]@{ Path = 'Files\exit.ps1'; SuccessExitCodes = @(0, 1, 2, 3, 4, 5, 6, 7) })
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $customRoot)
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        $result[0].Messages | Should -Be @("Ran script 'Files\exit.ps1' (exit code 3)")
+    }
+    It 'still fails on an exit code that is not listed' {
+        $data = @([pscustomobject]@{ Path = 'Files\exit.ps1'; SuccessExitCodes = @(0, 1) })
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $customRoot)
+        $result[0].Errors | Should -Be @("Script 'Files\exit.ps1' failed: the script ended with exit code 3, success exit codes are 0, 1")
     }
 }

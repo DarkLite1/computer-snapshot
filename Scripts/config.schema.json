@@ -357,6 +357,15 @@
               }
             }
           },
+          "SuccessExitCodes": {
+            "type": "array",
+            "description": "Exit codes that mean the script succeeded; defaults to [0]. A script that ends with robocopy needs [0, 1, 2, 3, 4, 5, 6, 7], because robocopy uses 1 to 7 for success.",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "description": "An exit code that means success."
+            }
+          },
           "Comment": {
             "type": "string",
             "description": "Technician notes; ignored when applying the configuration."
@@ -393,6 +402,15 @@
               "^(?!Comment$).+$": {
                 "description": "Named script parameter value."
               }
+            }
+          },
+          "SuccessExitCodes": {
+            "type": "array",
+            "description": "Exit codes that mean the script succeeded; defaults to [0]. A script that ends with robocopy needs [0, 1, 2, 3, 4, 5, 6, 7], because robocopy uses 1 to 7 for success.",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "description": "An exit code that means success."
             }
           },
           "Comment": {

@@ -106,6 +106,26 @@ All paths in a configuration (installers, files to copy, custom scripts, shared 
 | `OpenReportInBrowser` | `true`  | Open the HTML report when the run is finished.                            |
 | `RunElevated`         | `false` | When restoring from a shortcut or the command line, restart as administrator first (UAC prompt). |
 
+### Custom scripts and exit codes
+
+`StartCustomScriptsBefore` and `StartCustomScriptsAfter` run your own
+PowerShell scripts. A script fails when it writes an error, throws, or ends
+with an exit code other than `0`. The exit code is the one from `exit <code>`,
+or from the program the script ran last.
+
+Some programs use other codes for success. `robocopy`, for example, returns
+`1` to `7` when it copied files, and only `8` and higher mean failure. List
+those codes in `SuccessExitCodes` for a script that ends with robocopy:
+
+```json
+"StartCustomScriptsAfter": [
+  {
+    "Path": "Files\\Copy logs.ps1",
+    "SuccessExitCodes": [0, 1, 2, 3, 4, 5, 6, 7]
+  }
+]
+```
+
 ### Editing with autocomplete
 
 Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works.

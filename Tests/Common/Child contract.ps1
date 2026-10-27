@@ -103,10 +103,8 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         $result[0].PSObject.Properties.Name | Should -Contain 'Data'
         $result[0].Data | Should -Not -BeNullOrEmpty
         $result[0].Messages.GetType() | Should -Be ([string[]])
-        if ($result[0].PSObject.Properties.Name -contains 'Errors') {
-            $result[0].Errors.GetType() | Should -Be ([string[]])
-            $result[0].Errors.Count | Should -Be 0
-        }
+        $result[0].Errors.GetType() | Should -Be ([string[]])
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
         $problems = @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ $itemNames[$Name] = $result[0].Data } } $TestDrive)
         @($problems | Where-Object { $_ -notmatch "file '.+' not found" }).Count | Should -Be 0 -Because ($problems -join '; ')
         @(Get-ChildItem -LiteralPath $TestDrive -Recurse).FullName | Should -Be $before
@@ -118,7 +116,8 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         $result.Count | Should -Be 1
         $result[0].Data | Should -BeNullOrEmpty
         $result[0].Messages | Should -Contain 'Nothing to do'
-        if ($result[0].PSObject.Properties.Name -contains 'Errors') { $result[0].Errors.Count | Should -Be 0 }
+        $result[0].Errors.GetType() | Should -Be ([string[]])
+        $result[0].Errors.Count | Should -Be 0
         Should -Invoke New-Item -Times 0 -Exactly
         Should -Invoke Start-Process -Times 0 -Exactly
         Should -Invoke Set-LocalUser -Times 0 -Exactly
@@ -144,10 +143,8 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         $result = @(. $ScriptPath -Action Import -Data $data -RootFolder $TestDrive -ErrorAction Stop)
         $result.Count | Should -Be 1
         $result[0].Data | Should -BeNullOrEmpty
-        if ($result[0].PSObject.Properties.Name -contains 'Errors') {
-            $result[0].Errors.GetType() | Should -Be ([string[]])
-            $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
-        }
+        $result[0].Errors.GetType() | Should -Be ([string[]])
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
         Should -Invoke $command -Times 1
     }
 }

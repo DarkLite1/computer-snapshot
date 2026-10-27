@@ -17,8 +17,8 @@ function Invoke-ChildScriptHC {
         caller, whatever the caller's ErrorAction is. Inside the child, errors stay
         nonterminating so one failed entry does not stop the remaining entries.
         Errors are rewritten as new error records with secrets redacted, so the
-        caller's -ErrorVariable receives each reported error exactly once. Errors
-        the child handles itself (try/catch without Write-Error) are not reported.
+        caller receives each reported error exactly once. Errors the child
+        handles itself (try/catch without Write-Error) are not reported.
     #>
     [CmdletBinding()]
     param(
@@ -335,22 +335,14 @@ function Invoke-ComputerSnapshotHC {
         $isValidResult = (
             $output.Count -eq 1 -and
             $output[0].PSObject.Properties.Name -contains 'Data' -and
-            $output[0].Messages -is [string[]]
+            $output[0].Messages -is [string[]] -and
+            $output[0].Errors -is [string[]]
         )
-
-        $hasErrorsProperty = (
-            $isValidResult -and 
-            $output[0].PSObject.Properties.Name -contains 'Errors'
-        )
-
-        if ($hasErrorsProperty -and $output[0].Errors -isnot [string[]]) {
-            $isValidResult = $false 
-        }
 
         $errorMessages = New-Object 'System.Collections.Generic.List[string]'
 
         # Errors the child reports itself, one per failed entry
-        if ($isValidResult -and $hasErrorsProperty) {
+        if ($isValidResult) {
             foreach ($childError in $output[0].Errors) {
                 $errorMessages.Add(
                     (Protect-RestoreInputTextHC `
@@ -377,7 +369,10 @@ function Invoke-ComputerSnapshotHC {
         }
 
         if (-not $isValidResult -and -not $terminatingError) {
-            $errorMessages.Add("'$name' did not return exactly one result with Data, Messages (string array) and optional Errors (string array)")
+            $errorMessages.Add(
+                "'$name' did not return exactly one result with Data, " +
+                'Messages (string array) and Errors (string array)'
+            )
         }
         #endregion
 

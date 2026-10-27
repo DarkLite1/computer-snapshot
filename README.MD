@@ -199,10 +199,11 @@ Each section is handled by one script in `Scripts/` (for example `User accounts 
 }
 ```
 
-- Handle each entry in its own `try`/`catch` and add a line to `$errors` in the `catch`, so one failed entry doesn't stop the others.
+- All three properties are required. `Messages` and `Errors` must be string arrays, also when they are empty (`[string[]]@()`); a result without them is reported as **Failed**.
+- Set `$ErrorActionPreference = 'Stop'` at the top, handle each entry in its own `try`/`catch` and add a line to `$errors` in the `catch`. A failed step then skips the rest of that entry only, and the other entries still run.
 - A section with any `Errors` is reported as **Failed**, and on export its data is not saved.
 - Don't let commands write stray output: capture it or discard it with `$null =`, because anything extra breaks the "exactly one object" rule.
-- Errors written with `Write-Error` or a `throw` are still caught and reported as a safety net, but returning them in `Errors` is the intended way.
+- Errors written with `Write-Error` or a `throw` that escape the script are still caught and reported as a safety net, but report expected problems in `Errors`.
 
 ## 🧪 Running the Tests
 

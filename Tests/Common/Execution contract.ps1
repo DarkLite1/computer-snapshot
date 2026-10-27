@@ -17,7 +17,7 @@ Describe 'Single-file execution' {
         Mock Write-Warning -ModuleName Execution
         Mock Restart-Computer -ModuleName Execution
         Mock Start-Process -ModuleName Execution
-        Mock Invoke-ChildScriptHC -ModuleName Execution { [pscustomobject]@{ Data = @(); Messages = [string[]]@('Exported') } }
+        Mock Invoke-ChildScriptHC -ModuleName Execution { [pscustomobject]@{ Data = @(); Messages = [string[]]@('Exported'); Errors = [string[]]@() } }
         Mock Read-RestoreInputHC -ModuleName Execution { throw 'Unexpected input prompt in test.' }
     }
     It 'writes exactly one file and creates no folders' {
@@ -66,7 +66,7 @@ Describe 'Single-file execution' {
         Mock Invoke-ChildScriptHC -ModuleName Execution {
             if (-not $Data.FolderPaths) { $Data.GetType().IsArray | Should -BeTrue }
             $script:order.Add($(if ($Data.FolderPaths) { 'CreateFolders' } else { 'UserAccounts' }))
-            [pscustomobject]@{ Data = $null; Messages = [string[]]@('Imported') }
+            [pscustomobject]@{ Data = $null; Messages = [string[]]@('Imported'); Errors = [string[]]@() }
         }
         Invoke-ComputerSnapshotHC @params
         @($script:order) | Should -Be @('UserAccounts', 'CreateFolders')
@@ -197,7 +197,7 @@ Describe 'Single-file execution' {
         Mock Invoke-ChildScriptHC -ModuleName Execution {
             $Data[0].Name | Should -Be 'Example'
             $Data[0].Password | Should -Be 'Test-secret!42'
-            [pscustomobject]@{ Data = $null; Messages = [string[]]@('Applied Test-secret!42') }
+            [pscustomobject]@{ Data = $null; Messages = [string[]]@('Applied Test-secret!42'); Errors = [string[]]@() }
         }
         $result = Invoke-ComputerSnapshotHC @params
         $result.Success | Should -BeTrue
@@ -305,7 +305,19 @@ Describe 'Single-file execution' {
         }
         $result = Invoke-ComputerSnapshotHC @params 3>$null
         $result.Results[0].Status | Should -Be 'Failed'
-        $result.Results[0].Messages | Should -Be @("ERROR: 'UserAccounts' did not return exactly one result with Data, Messages (string array) and optional Errors (string array)")
+        $result.Results[0].Messages | Should -Be @("ERROR: 'UserAccounts' did not return exactly one result with Data, Messages (string array) and Errors (string array)")
+    }
+    It 'rejects a result without an Errors property' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @(@{ Name = 'A' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Invoke-ChildScriptHC -ModuleName Execution {
+            [pscustomobject]@{ Data = $null; Messages = [string[]]@('Imported') }
+        }
+        $result = Invoke-ComputerSnapshotHC @params 3>$null
+        $result.Success | Should -BeFalse
+        $result.Results[0].Status | Should -Be 'Failed'
+        $result.Results[0].Messages | Should -Be @("ERROR: 'UserAccounts' did not return exactly one result with Data, Messages (string array) and Errors (string array)")
     }
     It 'redacts prompted passwords in returned errors' {
         Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @(@{ Name = 'Example'; Password = '{{password:Password}}' }) } } $path

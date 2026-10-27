@@ -40,7 +40,7 @@ param($Action, $Data, $RootFolder)
 Write-Host "Host $Data"
 Write-Warning "Warning $Data"
 Write-Error "Error $Data"
-[pscustomobject]@{ Data = $null; Messages = [string[]]@('Completed') }
+[pscustomobject]@{ Data = $null; Messages = [string[]]@('Completed'); Errors = [string[]]@() }
 '@ | Set-Content -LiteralPath $child -Encoding UTF8
         InModuleScope Execution -Parameters @{ Child = $child; Root = $TestDrive } {
             $output = @(Invoke-ChildScriptHC -Path $Child -Action Import -Data 'Test-secret!42' -RootFolder $Root -SecretValues @('Test-secret!42') *>&1)
@@ -70,6 +70,7 @@ param($Action, $Data, $RootFolder)
 [pscustomobject]@{
     Data = [pscustomobject]@{ FolderPaths = @('C:\CustomCatalogueTest') }
     Messages = [string[]]@('Custom export')
+    Errors = [string[]]@()
 }
 '@ | Set-Content -LiteralPath $child -Encoding UTF8
         $path = Join-Path $TestDrive 'custom.json'
@@ -92,7 +93,7 @@ foreach ($entry in 'A', 'B', 'C') {
     }
     catch { Write-Error "Failed entry ${entry}: $_" }
 }
-[pscustomobject]@{ Data = [pscustomobject]@{ FolderPaths = @('C:\Partial') }; Messages = [string[]]@('Applied entry A') }
+[pscustomobject]@{ Data = [pscustomobject]@{ FolderPaths = @('C:\Partial') }; Messages = [string[]]@('Applied entry A'); Errors = [string[]]@() }
 '@ | Set-Content -LiteralPath $partialChild -Encoding UTF8
         $throwingChild = Join-Path $TestDrive 'throwing.ps1'
         @'
@@ -103,7 +104,7 @@ throw 'fatal problem'
         $goodChild = Join-Path $TestDrive 'good.ps1'
         @'
 param($Action, $Data, $RootFolder)
-[pscustomobject]@{ Data = [pscustomobject]@{ FolderPaths = @('C:\Good') }; Messages = [string[]]@('Exported good') }
+[pscustomobject]@{ Data = [pscustomobject]@{ FolderPaths = @('C:\Good') }; Messages = [string[]]@('Exported good'); Errors = [string[]]@() }
 '@ | Set-Content -LiteralPath $goodChild -Encoding UTF8
     }
     BeforeEach {
@@ -162,7 +163,7 @@ Describe 'Child error capture with password redaction' {
 param($Action, $Data, $RootFolder)
 try { throw "handled $Data" } catch { Write-Error "Failed with $Data" }
 Write-Error 'second problem'
-[pscustomobject]@{ Data = $null; Messages = [string[]]@('Completed') }
+[pscustomobject]@{ Data = $null; Messages = [string[]]@('Completed'); Errors = [string[]]@() }
 '@ | Set-Content -LiteralPath $child -Encoding UTF8
         InModuleScope Execution -Parameters @{ Child = $child; Root = $TestDrive } {
             foreach ($secrets in @(@(), @('Test-secret!42'))) {
@@ -182,7 +183,7 @@ Describe 'Script map validation' {
         $child = Join-Path $TestDrive 'child.ps1'
         @'
 param($Action, $Data, $RootFolder)
-[pscustomobject]@{ Data = [pscustomobject]@{ FolderPaths = @('C:\MapTest') }; Messages = [string[]]@('Exported') }
+[pscustomobject]@{ Data = [pscustomobject]@{ FolderPaths = @('C:\MapTest') }; Messages = [string[]]@('Exported'); Errors = [string[]]@() }
 '@ | Set-Content -LiteralPath $child -Encoding UTF8
     }
     BeforeEach {

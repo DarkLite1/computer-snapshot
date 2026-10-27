@@ -120,7 +120,8 @@ if ($Action -eq 'Export') {
 }
 else {
     #region Apply section
-    foreach ($share in @($Data.Shares)) {
+    # A missing Shares list is $null, and @($null) would loop once over nothing
+    foreach ($share in @($Data.Shares | Where-Object { $null -ne $_ })) {
         if (Test-AdministrativeShareHC $share.Name) {
             $messages += "Skipped share '$($share.Name)': administrative shares are managed by Windows"
             continue

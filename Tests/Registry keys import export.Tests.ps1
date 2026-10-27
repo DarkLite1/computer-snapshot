@@ -92,4 +92,9 @@ Describe 'Registry keys import' {
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
         $result[0].Errors[0] | Should -BeLike "Failed to unload the registry of user 'bob' from 'HKEY_USERS\ComputerSnapshot_*'*exit code 1"
     }
+    It 'does nothing for a section without RunAsCurrentUser or RunAsOtherUser' {
+        $result = @(& $scriptPath -Action Import -Data ([pscustomobject]@{ RunAsCurrentUser = [pscustomobject]@{ Comment = 'none yet' } }) -RootFolder $TestDrive)
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        Should -Invoke New-ItemProperty -Times 0 -Exactly
+    }
 }

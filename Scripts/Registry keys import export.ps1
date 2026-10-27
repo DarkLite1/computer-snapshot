@@ -91,7 +91,8 @@ function Set-RegistryValueHC {
 function Set-RegistryValuesHC {
     # Set each value independently; HKCU:\ is redirected to $UserRoot when given
     param($RegistryKeys, [string]$UserRoot, [string]$UserLabel)
-    foreach ($key in @($RegistryKeys)) {
+    # A missing section is $null, and @($null) would loop once over nothing
+    foreach ($key in @($RegistryKeys | Where-Object { $null -ne $_ })) {
         $path = $key.Path
         if ($UserRoot -and $path -match '^HKCU:\\?') {
             $path = $path -replace '^HKCU:\\?', "$UserRoot\"
@@ -151,8 +152,7 @@ else {
     #region Apply section
     Set-RegistryValuesHC -RegistryKeys $Data.RunAsCurrentUser.RegistryKeys
 
-    foreach ($user in @($Data.RunAsOtherUser)) {
-        if (-not $user) { continue }
+    foreach ($user in @($Data.RunAsOtherUser | Where-Object { $null -ne $_ })) {
         $tempKey = $null
         try {
             if (-not $user.UserName) { throw "the property 'UserName' is required in 'RunAsOtherUser'" }

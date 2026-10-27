@@ -153,4 +153,10 @@ Describe 'Smb shares import' {
         $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
         @($result[0].Data.Shares.Name) | Should -Be @('Data')
     }
+    It 'does nothing for a configuration without a Shares list' {
+        $data = [pscustomobject]@{ NTFS = @() ; Access = @() }
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        Should -Invoke Set-SmbShare -Times 0 -Exactly
+    }
 }

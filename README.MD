@@ -25,6 +25,16 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
 - **Rebooting & Reports:** At the bottom of the restore screen, you can easily check boxes to automatically **Restart computer after successful restore** or **Open report in browser**.
 - **Check Your Results:** Once you run a task, look in the `Log` folder on your USB stick for an easy-to-read HTML report showing exactly what succeeded and what failed.
 
+## 🔗 Shortcuts
+
+| Shortcut                           | What it does                                                                                               |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `Start wizard.lnk`                 | Opens the graphical wizard for exporting and restoring.                                                    |
+| `_Start example confirm first.lnk` | Restores `Configurations\Example PC1.json` after asking you to confirm with `y`.                           |
+| `_Start example immediately.lnk`   | Restores `Configurations\Example PC1.json` straight away, without asking.                                  |
+
+Copy one of the `_Start example` shortcuts and change the `-ConfigurationFile` path to make a one-click restore for your own configuration.
+
 ## 📂 Know Your Folders
 
 Your USB stick has a specific layout to keep everything organized. Here are the main folders you will use:
@@ -34,6 +44,10 @@ Your USB stick has a specific layout to keep everything organized. Here are the 
 - **`Files/`**: Put any standard files or custom scripts you want copied to the new PC here.
 - **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers.
 - **`Log/`**: Check here for your execution reports.
+- **`Examples/`**: Ready-made sample data for every section. Copy what you need into your own configuration.
+- **`Scripts/`**: The tool itself. You normally don't need to touch anything here.
+- **`Tests/`**: Automated Pester tests for developers (see [Running the Tests](#-running-the-tests)).
+- **`Snapshots/`**: Legacy version-1 sample data, kept only for testing the configuration converter.
 
 ## ✍️ Customizing Your Setups
 
@@ -42,6 +56,59 @@ All configurations are saved as standard JSON files. You can open and edit them 
 - **Smart Automation:** You don't need to worry about the order of operations. The script automatically handles things in a safe sequence (for example, creating user accounts before trying to copy files into their folders).
 - **Skipping Items:** If an item or section is missing from your file, the script simply skips it and moves on.
 - **Safety First:** If a specific setting fails to apply, the tool won't crash. It will continue setting up the rest of the computer and log the error for you to review later.
+
+### What can be exported and restored?
+
+Each configuration has an `Items` object with one entry per section. Sections always run in this order, regardless of the order in your file:
+
+| Order | Section                    | What it covers                                                          |
+| ----- | -------------------------- | ----------------------------------------------------------------------- |
+| 1     | `StartCustomScriptsBefore` | Your own PowerShell scripts (from `Files/`) to run before everything else. |
+| 2     | `RegionalSettings`         | System locale, time zone, home location and culture.                    |
+| 3     | `UserAccounts`             | Local user accounts.                                                    |
+| 4     | `UserGroups`               | Local groups and their members.                                         |
+| 5     | `FirewallRules`            | Windows Defender Firewall rules.                                        |
+| 6     | `CreateFolders`            | Folders to create.                                                      |
+| 7     | `SmbShares`                | SMB shares with their share and NTFS permissions.                       |
+| 8     | `NetworkCards`             | Network adapter names, network profile (category) and DNS suffix.       |
+| 9     | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
+| 10    | `RegistryKeys`             | Registry values to set.                                                 |
+| 11    | `ScheduledTasks`           | Scheduled tasks, stored as their full XML plus enabled state.           |
+| 12    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
+| 13    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
+| 14    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
+
+An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Examples/` folder for the exact format of each section.
+
+Some sections can't be fully captured automatically, so exporting them only gives you a starting example to edit: `StartCustomScriptsBefore`/`After`, `CreateFolders`, `CopyFilesFolders`, `RegistryKeys` and `Software`.
+
+### Reusing sections across computers
+
+Instead of writing a section inline, you can point to a file. The path is relative to the USB stick root:
+
+```json
+"Items": {
+  "UserAccounts": "Shared\\UserAccounts kiosk.json"
+}
+```
+
+The referenced file contains only that section's data (for example, a JSON array of user accounts). Referenced files can't point to other files.
+
+### Paths
+
+All paths in a configuration (installers, files to copy, custom scripts, shared sections) are relative to the root of the USB stick, unless you give a full path like `C:\Temp\file.txt`. Environment variables such as `%SystemRoot%` are expanded.
+
+### Settings
+
+| Setting               | Default | Meaning                                                                   |
+| --------------------- | ------- | ------------------------------------------------------------------------- |
+| `RebootComputer`      | `false` | Restart the computer after a restore in which nothing failed.             |
+| `OpenReportInBrowser` | `true`  | Open the HTML report when the run is finished.                            |
+| `RunElevated`         | `false` | When restoring from a shortcut or the command line, restart as administrator first (UAC prompt). |
+
+### Editing with autocomplete
+
+Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works.
 
 > **🔒 Important Security Warning:**
 > When you save settings that include passwords (like user accounts or certain registry keys), **they are saved in plain text**. Please keep your USB stick physically secure, and never upload files containing sensitive passwords to public spaces.
@@ -75,6 +142,41 @@ Command-line restores use the same popups and require an interactive Windows des
 See [Configurations/Example prompted setup.json](Configurations/Example%20prompted%20setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. This example does not set a network adapter's static IP address, which the current `NetworkCards` section does not support.
 
 **Password handling:** Answers are kept in memory for the current run. The original configuration and shared files are not rewritten, and answers are not included in the wizard's process-launch arguments or a resolved temporary JSON file. Password placeholders mask typing and redact exact matches from the tool's generated results, HTML reports and captured PowerShell child output. This is not encrypted storage: the restore scripts receive plain strings in memory, and custom scripts or external programs can independently log, persist or transform them. Only run trusted scripts and use `password` placeholders for sensitive values. Ordinary `input` answers are not redacted.
+
+## 💻 Command-Line Use
+
+For scripting or one-off runs, open PowerShell in the root of the USB stick.
+
+Restore a configuration (asks for confirmation; add `-Confirm` to skip the question, or leave out `-ConfigurationFile` to pick from a list):
+
+```powershell
+& '.\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Example PC1.json'
+```
+
+Restore only some sections, and override saved settings for this run:
+
+```powershell
+& '.\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Example PC1.json' -Items UserAccounts, Software -RebootComputer $false
+```
+
+Export this computer to a new configuration file (add `-Force` to overwrite an existing file):
+
+```powershell
+& '.\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\KIOSK01.json' -Items RegionalSettings, UserAccounts, FirewallRules
+```
+
+`Invoke scripts.ps1` is the engine behind everything else. It returns an object with `Success`, `ReportFile` and per-section `Results`, so you can check the outcome from your own scripts.
+
+## 🧪 Running the Tests
+
+The tests use Pester 6 and mock all Windows changes, so they are safe to run on your own computer:
+
+```powershell
+Install-Module Pester -MinimumVersion 6.0.0 -Scope CurrentUser
+Invoke-Pester -Path .\Tests
+```
+
+They run on Windows PowerShell 5.1. On PowerShell 7 the JSON schema is also checked with `Test-Json`.
 
 ## 🔄 Upgrading from an Older Version?
 

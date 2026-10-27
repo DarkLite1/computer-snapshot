@@ -266,4 +266,56 @@ Describe 'Single-file execution' {
         Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly
         (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
     }
+    It 'reports errors returned in the Errors property next to the success messages' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @(@{ Name = 'A' }, @{ Name = 'B' }, @{ Name = 'C' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Invoke-ChildScriptHC -ModuleName Execution {
+            [pscustomobject]@{ Data = $null; Messages = [string[]]@('Updated A'); Errors = [string[]]@('Failed B', 'Failed C') }
+        }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeFalse
+        $result.Results[0].Status | Should -Be 'Failed'
+        $result.Results[0].Messages | Should -Be @('Updated A', 'ERROR: Failed B', 'ERROR: Failed C')
+    }
+    It 'does not export a section that returned errors' {
+        $params.Script.UserAccounts = Join-Path $PSScriptRoot '..\..\Scripts\User accounts import export.ps1'
+        Mock Invoke-ChildScriptHC -ModuleName Execution {
+            [pscustomobject]@{ Data = @(); Messages = [string[]]@('Exported'); Errors = [string[]]@('Failed') }
+        } -ParameterFilter { $Path -like '*User accounts import export.ps1' }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeFalse
+        @((Read-ConfigurationHC $path $TestDrive).Items.Keys) | Should -Be @('CreateFolders')
+    }
+    It 'treats an empty Errors property as success' {
+        $params.Items = @('UserAccounts')
+        Mock Invoke-ChildScriptHC -ModuleName Execution {
+            [pscustomobject]@{ Data = @(); Messages = [string[]]@('Exported'); Errors = [string[]]@() }
+        }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeTrue
+        $result.Results[0].Messages | Should -Be @('Exported')
+    }
+    It 'rejects an Errors property that is not a string array' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @(@{ Name = 'A' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Invoke-ChildScriptHC -ModuleName Execution {
+            [pscustomobject]@{ Data = @(); Messages = [string[]]@('Exported'); Errors = 'Failed B' }
+        }
+        $result = Invoke-ComputerSnapshotHC @params 3>$null
+        $result.Results[0].Status | Should -Be 'Failed'
+        $result.Results[0].Messages | Should -Be @("ERROR: 'UserAccounts' did not return exactly one result with Data, Messages (string array) and optional Errors (string array)")
+    }
+    It 'redacts prompted passwords in returned errors' {
+        Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @(@{ Name = 'Example'; Password = '{{password:Password}}' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Read-RestoreInputHC -ModuleName Execution { 'Test-secret!42' }
+        Mock Invoke-ChildScriptHC -ModuleName Execution {
+            [pscustomobject]@{ Data = $null; Messages = [string[]]@(); Errors = [string[]]@('Rejected Test-secret!42') }
+        }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Results[0].Messages | Should -Be @('ERROR: Rejected [redacted]')
+    }
 }

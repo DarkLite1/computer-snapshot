@@ -167,6 +167,23 @@ Export this computer to a new configuration file (add `-Force` to overwrite an e
 
 `Invoke scripts.ps1` is the engine behind everything else. It returns an object with `Success`, `ReportFile` and per-section `Results`, so you can check the outcome from your own scripts.
 
+## 🧩 Writing a Child Script
+
+Each section is handled by one script in `Scripts/` (for example `User accounts import export.ps1`). The main script calls it with three parameters, `-Action` (`Export` or `Import`), `-Data` (the section's data on import) and `-RootFolder` (the USB stick root), and expects exactly **one** object back:
+
+```powershell
+[pscustomobject]@{
+    Data     = $exportData          # the captured section on Export, $null on Import
+    Messages = [string[]]$messages  # what was done, shown in the report
+    Errors   = [string[]]$errors    # one line per failed entry; empty when all went well
+}
+```
+
+- Handle each entry in its own `try`/`catch` and add a line to `$errors` in the `catch`, so one failed entry doesn't stop the others.
+- A section with any `Errors` is reported as **Failed**, and on export its data is not saved.
+- Don't let commands write stray output: capture it or discard it with `$null =`, because anything extra breaks the "exactly one object" rule.
+- Errors written with `Write-Error` or a `throw` are still caught and reported as a safety net, but returning them in `Errors` is the intended way.
+
 ## 🧪 Running the Tests
 
 The tests use Pester 6 and mock all Windows changes, so they are safe to run on your own computer:

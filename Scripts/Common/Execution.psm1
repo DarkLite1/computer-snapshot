@@ -174,18 +174,27 @@ function Invoke-ComputerSnapshotHC {
         }
         catch { $terminatingError = $_ }
         #region Collect every reported problem, not only the first
+        $isValidResult = $output.Count -eq 1 -and
+            $output[0].PSObject.Properties.Name -contains 'Data' -and
+            $output[0].Messages -is [string[]]
+        $hasErrorsProperty = $isValidResult -and $output[0].PSObject.Properties.Name -contains 'Errors'
+        if ($hasErrorsProperty -and $output[0].Errors -isnot [string[]]) { $isValidResult = $false }
         $errorMessages = New-Object 'System.Collections.Generic.List[string]'
+        # Errors the child reports itself, one per failed entry
+        if ($isValidResult -and $hasErrorsProperty) {
+            foreach ($childError in $output[0].Errors) {
+                $errorMessages.Add((Protect-RestoreInputTextHC -Text $childError -SecretValues $secretValues))
+            }
+        }
+        # Safety net: errors written to the error stream or thrown
         foreach ($childError in $errors) {
             $errorMessages.Add((Protect-RestoreInputTextHC -Text ([string]$childError) -SecretValues $secretValues))
         }
         if ($terminatingError) {
             $errorMessages.Add((Protect-RestoreInputTextHC -Text ([string]$terminatingError) -SecretValues $secretValues))
         }
-        $isValidResult = $output.Count -eq 1 -and
-            $output[0].PSObject.Properties.Name -contains 'Data' -and
-            $output[0].Messages -is [string[]]
         if (-not $isValidResult -and -not $terminatingError) {
-            $errorMessages.Add("'$name' did not return exactly one Data/Messages result")
+            $errorMessages.Add("'$name' did not return exactly one result with Data, Messages (string array) and optional Errors (string array)")
         }
         #endregion
         $messages = New-Object 'System.Collections.Generic.List[string]'

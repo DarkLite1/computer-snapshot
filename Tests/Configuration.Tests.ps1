@@ -195,3 +195,42 @@ Describe 'Shared snapshot catalogue' {
         @(Test-ConfigurationHC $loaded $TestDrive).Count | Should -Be 0
     }
 }
+
+Describe 'Safe configuration writing' {
+    BeforeEach {
+        $folder = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -Path $folder -ItemType Directory
+        $path = Join-Path $folder 'Example.json'
+        $document = @{ SchemaVersion = 2; Items = [ordered]@{ CreateFolders = @{ FolderPaths = @('C:\Example') } } }
+    }
+    It 'creates a new configuration file' {
+        Write-ConfigurationHC $document $path
+        (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).Items.CreateFolders.FolderPaths | Should -Be @('C:\Example')
+    }
+    It 'replaces an existing configuration file' {
+        '{"existing":true}' | Set-Content -LiteralPath $path -Encoding UTF8
+        Write-ConfigurationHC $document $path
+        (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).SchemaVersion | Should -Be 2
+    }
+    It 'leaves no temporary files behind' {
+        '{"existing":true}' | Set-Content -LiteralPath $path -Encoding UTF8
+        Write-ConfigurationHC $document $path
+        @(Get-ChildItem -LiteralPath $folder -Force).Name | Should -Be @('Example.json')
+    }
+    It 'keeps the existing file intact and cleans up when replacing fails' {
+        '{"existing":true}' | Set-Content -LiteralPath $path -Encoding UTF8
+        $before = Get-Content -LiteralPath $path -Raw
+        Set-ItemProperty -LiteralPath $path -Name IsReadOnly -Value $true
+        try {
+            { Write-ConfigurationHC $document $path } | Should -Throw '*Failed to write configuration*'
+            (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
+            @(Get-ChildItem -LiteralPath $folder -Force).Name | Should -Be @('Example.json')
+        }
+        finally { Set-ItemProperty -LiteralPath $path -Name IsReadOnly -Value $false }
+    }
+    It 'reports a missing folder without creating anything' {
+        $missing = Join-Path $folder 'Missing\Example.json'
+        { Write-ConfigurationHC $document $missing } | Should -Throw '*Failed to write configuration*'
+        Join-Path $folder 'Missing' | Should -Not -Exist
+    }
+}

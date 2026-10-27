@@ -251,4 +251,19 @@ Describe 'Single-file execution' {
         }
         Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
     }
+    It 'keeps the existing configuration and still writes the report when saving fails' {
+        '{"existing":true}' | Set-Content -LiteralPath $path -Encoding UTF8
+        $before = Get-Content -LiteralPath $path -Raw
+        $params.Items = @('UserAccounts')
+        Mock Write-ConfigurationHC -ModuleName Execution { throw 'disk full' }
+        $result = Invoke-ComputerSnapshotHC @params -Force
+        $result.Success | Should -BeFalse
+        $failed = $result.Results | Where-Object Name -EQ 'Configuration file'
+        $failed.Status | Should -Be 'Failed'
+        $failed.Messages[0] | Should -BeLike 'ERROR: *disk full*'
+        ($result.Results | Where-Object Name -EQ 'UserAccounts').Status | Should -Be 'Success'
+        @($result.Results.Name) | Should -Not -Contain 'Export validation'
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly
+        (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
+    }
 }

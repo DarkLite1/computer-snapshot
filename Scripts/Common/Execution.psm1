@@ -209,15 +209,25 @@ function Invoke-ComputerSnapshotHC {
             Settings = [ordered]@{ RebootComputer = $false; OpenReportInBrowser = $true; RunElevated = $false }
             Items = $exportItems
         }
-        Write-ConfigurationHC -Configuration $document -Path $configurationPath
+        $isWritten = $false
         try {
-            $exported = Read-ConfigurationHC -Path $configurationPath -RootFolder $RootFolder
-            $warnings = @(Test-ConfigurationHC -Configuration $exported -RootFolder $RootFolder)
+            Write-ConfigurationHC -Configuration $document -Path $configurationPath
+            $isWritten = $true
         }
-        catch { $warnings = @([string]$_) }
-        if ($warnings.Count) {
-            foreach ($warning in $warnings) { Write-Warning $warning }
-            $results.Add([pscustomobject]@{ Name = 'Export validation'; Status = 'Warning'; Messages = $warnings })
+        catch {
+            # The previous configuration, if any, is left untouched
+            $results.Add([pscustomobject]@{ Name = 'Configuration file'; Status = 'Failed'; Messages = @("ERROR: $_") })
+        }
+        if ($isWritten) {
+            try {
+                $exported = Read-ConfigurationHC -Path $configurationPath -RootFolder $RootFolder
+                $warnings = @(Test-ConfigurationHC -Configuration $exported -RootFolder $RootFolder)
+            }
+            catch { $warnings = @([string]$_) }
+            if ($warnings.Count) {
+                foreach ($warning in $warnings) { Write-Warning $warning }
+                $results.Add([pscustomobject]@{ Name = 'Export validation'; Status = 'Warning'; Messages = $warnings })
+            }
         }
     }
     #endregion

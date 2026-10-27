@@ -246,7 +246,20 @@ function Write-ConfigurationHC {
     if ($null -ne $Configuration.Settings) { $document.Settings = $Configuration.Settings }
     $document.Items = $Configuration.Items
     $json = Format-ConfigurationJsonHC $document
-    [IO.File]::WriteAllText($Path, $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false))
+    #region Write safely: the existing file is only replaced by a complete new file
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    $folder = [IO.Path]::GetDirectoryName($fullPath)
+    $tempPath = Join-Path $folder ('.{0}.{1}.tmp' -f [IO.Path]::GetFileName($fullPath), [guid]::NewGuid().ToString('N'))
+    try {
+        [IO.File]::WriteAllText($tempPath, $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false))
+        if ([IO.File]::Exists($fullPath)) { [IO.File]::Replace($tempPath, $fullPath, [NullString]::Value) }
+        else { [IO.File]::Move($tempPath, $fullPath) }
+    }
+    catch {
+        Remove-Item -LiteralPath $tempPath -Force -ErrorAction Ignore
+        throw "Failed to write configuration '$fullPath': $($_.Exception.Message)"
+    }
+    #endregion
 }
 
 Export-ModuleMember -Function Read-ConfigurationHC, Test-ConfigurationHC, Write-ConfigurationHC

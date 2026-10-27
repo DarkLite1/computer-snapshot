@@ -29,7 +29,9 @@ Describe 'NTP peer capture' {
     }
     It 'fails export when time-service settings cannot be read' {
         Mock Get-ItemProperty { throw 'Registry unavailable' }
-        { . $scriptPath -Action Export -RootFolder $TestDrive } | Should -Throw '*Registry unavailable*'
+        $result = . $scriptPath -Action Export -RootFolder $TestDrive
+        $result.Errors | Should -Be @('Failed to read the time service settings: Registry unavailable')
+        $result.Data | Should -BeNullOrEmpty
     }
 }
 
@@ -55,26 +57,32 @@ Describe 'NTP command failures' {
         }
         It 'reports source-query exit codes and diagnostics on export' {
             Mock w32tm { $global:LASTEXITCODE = 5; 'Access denied' }
-            { . $scriptPath -Action Export -RootFolder $TestDrive } | Should -Throw '*exit code 5*Access denied*'
+            $result = . $scriptPath -Action Export -RootFolder $TestDrive
+            $result.Errors[0] | Should -BeLike '*exit code 5*Access denied*'
         }
         It 'stops a domain import when configuration fails' {
             Mock w32tm { $global:LASTEXITCODE = 5; 'Access denied' } -ParameterFilter { $Arguments -contains '/config' }
-            { . $scriptPath -Action Import -Data $domainData -RootFolder $TestDrive } | Should -Throw '*exit code 5*'
+            $result = . $scriptPath -Action Import -Data $domainData -RootFolder $TestDrive
+            $result.Errors[0] | Should -BeLike 'Failed to configure the time service:*exit code 5*'
             Should -Invoke Restart-Service -Times 0 -Exactly
             Should -Invoke w32tm -Times 0 -Exactly -ParameterFilter { $Arguments -contains '/resync' }
         }
         It 'stops a manual import when configuration fails' {
             Mock w32tm { $global:LASTEXITCODE = 87; 'Invalid parameter' } -ParameterFilter { $Arguments -contains '/config' }
-            { . $scriptPath -Action Import -Data $manualData -RootFolder $TestDrive } | Should -Throw '*exit code 87*Invalid parameter*'
+            $result = . $scriptPath -Action Import -Data $manualData -RootFolder $TestDrive
+            $result.Errors[0] | Should -BeLike '*exit code 87*Invalid parameter*'
             Should -Invoke Restart-Service -Times 0 -Exactly
         }
         It 'reports resynchronization failures rather than returning a success result' {
             Mock w32tm { $global:LASTEXITCODE = 1; 'No time data available' } -ParameterFilter { $Arguments -contains '/resync' }
-            { . $scriptPath -Action Import -Data $domainData -RootFolder $TestDrive } | Should -Throw '*exit code 1*No time data available*'
+            $result = . $scriptPath -Action Import -Data $domainData -RootFolder $TestDrive
+            $result.Errors[0] | Should -BeLike 'Failed to synchronize the time now (the settings were applied):*exit code 1*No time data available*'
+            $result.Messages | Should -Not -Contain 'Time synchronized with the domain'
         }
         It 'stops before resynchronization if restarting the service fails' {
             Mock Restart-Service { Write-Error 'Service restart failed' }
-            { . $scriptPath -Action Import -Data $domainData -RootFolder $TestDrive } | Should -Throw '*Service restart failed*'
+            $result = . $scriptPath -Action Import -Data $domainData -RootFolder $TestDrive
+            $result.Errors | Should -Be @('Failed to restart the time service: Service restart failed')
             Should -Invoke w32tm -Times 0 -Exactly -ParameterFilter { $Arguments -contains '/resync' }
         }
         It 'configures all manual peers in one argument and resynchronizes once' {
@@ -93,5 +101,11 @@ Describe 'NTP command failures' {
             $result.Messages | Should -Contain "Time synchronized with custom time servers 'server1 server2'"
             Should -Invoke Test-Connection -Times 0 -Exactly
             Should -Invoke w32tm -Times 1 -Exactly -ParameterFilter { $Arguments -contains '/resync' }
+        }
+            It 'reports missing time servers without touching the time service' {
+            $result = . $scriptPath -Action Import -Data ([pscustomobject]@{ SyncTimeWithDomain = $false; TimeServerNames = @('', ' ') }) -RootFolder $TestDrive
+            $result.Errors[0] | Should -BeLike '*no time server names are configured*'
+            Should -Invoke w32tm -Times 0 -Exactly
+            Should -Invoke Restart-Service -Times 0 -Exactly
         }
     }

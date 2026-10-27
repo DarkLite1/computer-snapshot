@@ -502,7 +502,7 @@
           },
           "Password": {
             "type": "string",
-            "description": "Plain-text password, unchanged from the previous format. Empty prompts interactively."
+            "description": "Plain-text password. Required to create a new user; empty keeps the current password of an existing user. Use a {{password:...}} placeholder to ask for it at restore time."
           },
           "Comment": {
             "type": "string",

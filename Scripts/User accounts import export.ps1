@@ -2,6 +2,14 @@
 <#
 .SYNOPSIS
     Export or import User accounts as a configuration section.
+.DESCRIPTION
+    Import never prompts. A user that fails is reported in Errors and the
+    remaining users are still processed.
+    - New user without a Password: not created, reported as an error.
+      Use a {{password:...}} placeholder to ask for it at restore time.
+    - Existing user without a Password: the current password is kept.
+    - Password rejected by the password policy: reported as an error; a
+      user that was just created for it is removed again.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -9,7 +17,8 @@
 .PARAMETER RootFolder
     Absolute USB root for asset paths. No configuration files are written here.
 .OUTPUTS
-    Exactly one object: Data (export only) and a string array of Messages.
+    Exactly one object: Data (export only), a string array of Messages and a
+    string array of Errors.
 #>
 [CmdletBinding()]
 param(
@@ -17,196 +26,104 @@ param(
     $Data,
     [Parameter(Mandatory)][string]$RootFolder
 )
+$ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
 #region Windows helpers
-Function Compare-EncryptedPasswordsEqualHC {
-        
-        Param (
-            [Parameter(Mandatory)]
-            [System.Security.SecureString]$Password1, 
-            [Parameter(Mandatory)]
-            [System.Security.SecureString]$Password2
-        )
-    
-        if ([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringtoBSTR($password1)) -ne [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringtoBSTR($password2))) {
-            $false
-        }
-        else {
-            $true
-        }
+function Set-UserPasswordHC {
+    param(
+        [Parameter(Mandatory)][string]$UserName,
+        [Parameter(Mandatory)][string]$Password,
+        [switch]$NewUser
+    )
+    $securePassword = ConvertTo-SecureString $Password -AsPlainText -Force
+    try {
+        if ($NewUser) { $null = New-LocalUser -Name $UserName -Password $securePassword }
+        else { Set-LocalUser -Name $UserName -Password $securePassword }
     }
-Function Request-PasswordHC {
-        
-
-        [OutputType([System.Security.SecureString])]
-        Param (
-            [Parameter(Mandatory)]
-            [String]$UserName
-        )
-        do {
-            $compareParams = @{
-                Password1 = Read-Host "Please type a password for user account '$UserName'" -AsSecureString
-                Password2 = Read-Host "Type the password again to confirm it's correct" -AsSecureString
-            }
-            $passwordsMatching = Compare-EncryptedPasswordsEqualHC @compareParams
-    
-            if (-not $passwordsMatching) {
-                Write-Host 'Passwords are not matching, please try again' -ForegroundColor Red
-            }
-            if (
-                (-not $AllowBlankPassword) -and 
-                ($compareParams.Password1.Length -eq 0)
-            ) {
-                $passwordsMatching = $false
-                Write-Host 'Passwords can not be blank, please try again' -ForegroundColor Red
-            }
+    catch {
+        # Match by name and error id: the exception type only exists once the
+        # LocalAccounts module is loaded, and PowerShell 7 may deserialize it
+        $isInvalidPassword = $_.Exception.GetType().Name -eq 'InvalidPasswordException' -or
+            $_.FullyQualifiedErrorId -like 'InvalidPassword*'
+        if (-not $isInvalidPassword) { throw }
+        if ($NewUser) {
+            # Windows can create the account before rejecting the password
+            Remove-LocalUser -Name $UserName -ErrorAction Ignore
         }
-        until ($passwordsMatching)
-    
-        $compareParams.Password1
+        throw 'the password does not meet the length, complexity or history requirements of the password policy'
     }
-Function Set-NewPasswordHC {
-        
-        Param (
-            [Parameter(Mandatory)]
-            [String]$UserName,
-            [String]$UserPassword,
-            [Switch]$NewUser
-        )
-
-        if (-not $UserPassword) {
-            $encryptedPassword = Request-PasswordHC -UserName $UserName
-            # $UserPassword = Read-Host "Please type a password for user account '$UserName':"
-        }
-        else {
-            $encryptedPassword = ConvertTo-SecureString $UserPassword -AsPlainText -Force
-        }
-
-        Do {
-            try {
-                $isPasswordAccepted = $false
-                $params = @{
-                    Name        = $user.Name 
-                    Password    = $encryptedPassword
-                    ErrorAction = 'Stop'
-                }
-                if ($NewUser) {
-                    New-LocalUser @params
-                }
-                else {
-                    Set-LocalUser @params
-                }
-                $isPasswordAccepted = $true
-            }
-            catch [Microsoft.PowerShell.Commands.InvalidPasswordException] {
-                if ($NewUser) {
-                    # a user account is created first and only
-                    # afterwards the password is set. So a user will
-                    # be created when the password is not complex enough
-                    Remove-LocalUser -Name $UserName -EA Ignore
-                }
-                Write-Host 'Password not accepted: The value provided for the password does not meet the length, complexity, or history requirements of the domain.' -ForegroundColor Red
-                $encryptedPassword = Request-PasswordHC -UserName $UserName
-                $Error.RemoveAt(0)
-            }
-        }
-        while (-not $isPasswordAccepted)
-    }
+}
 #endregion
 $exportData = $null
 $messages = @()
+$errors = @()
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
-    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do') }
+    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do'); Errors = [string[]]@() }
 }
-$AllowBlankPassword = $true
 if ($Action -eq 'Export') {
     #region Capture section
-$users = @(Get-LocalUser)
-$exportData = @($users | Select-Object Name, FullName, Description, Enabled, PasswordExpires,
-    UserMayChangePassword, @{ Name = 'Password'; Expression = { '' } })
+    $users = @(Get-LocalUser)
+    $exportData = @($users | Select-Object Name, FullName, Description, Enabled, PasswordExpires,
+        UserMayChangePassword, @{ Name = 'Password'; Expression = { '' } })
     #endregion
     $messages = @('Exported User accounts')
 }
 else {
     #region Apply section
-    $messages = @(& {
+    $knownUserNames = @(Get-LocalUser | ForEach-Object { $_.Name })
+    foreach ($user in $Data) {
+        try {
+            Write-Verbose "User '$($user.Name)'"
+            $isNewUser = $knownUserNames -notcontains $user.Name
 
-$importedUsers = $Data
-$knownComputerUsers = Get-LocalUser
-foreach ($user in $importedUsers) {
-                try {                    
-                    Write-Verbose "User '$($user.Name)'"
-                    $passwordParams = @{
-                        UserName     = $user.Name 
-                        UserPassword = $user.Password 
-                        NewUser      = $false
-                    }
-
-                    #region Create incomplete user
-                    if ($knownComputerUsers.Name -notContains $user.Name) {
-                        $passwordParams.NewUser = $true
-                        Set-NewPasswordHC @passwordParams
-                    }
-                    #endregion
-
-                    #region Set user account details
-                    $setUserParams = @{
-                        Name                  = $user.Name
-                        Description           = $user.Description
-                        FullName              = $user.FullName
-                        PasswordNeverExpires  = ![Boolean]$user.PasswordExpires
-                        UserMayChangePassword = $user.UserMayChangePassword
-                        ErrorAction           = 'Stop'
-                    }
-                    if ($user.AccountExpires) {
-                        $setUserParams.AccountExpires = $user.AccountExpires
-                    }
-                    else {
-                        $setUserParams.AccountNeverExpires = $true
-                    }
-                    Set-LocalUser @setUserParams
-                    #endregion
-
-                    #region Enable or disable user account
-                    if ($user.Enabled) {
-                        Enable-LocalUser -Name $user.Name
-                    }
-                    else {
-                        Write-Warning "Disable user account '$($user.Name)' as requested in the import file"
-                        Disable-LocalUser -Name $user.Name
-                    }
-                    #endregion
-
-                    if (-not $passwordParams.NewUser) {
-                        if ($user.Password) {
-                            Set-NewPasswordHC @passwordParams
-                        }
-                        else {
-                            do { 
-                                $answer = (
-                                    Read-Host "Would you like to set a new password for user account '$($user.Name)'? [Y]es or [N]o"
-                                ).ToLower()
-                            } 
-                            until ('y', 'n' -contains $answer)
-                            if ($answer -eq 'y') {
-                                Set-NewPasswordHC @passwordParams
-                            }
-                        }
-                    }
-
-                    if ($passwordParams.NewUser) {
-                        Write-Output "Created user '$($User.Name)'"
-                    }
-                    else {
-                        Write-Output "updated user '$($User.Name)'"
-                    }
+            #region Create the user, which requires a password
+            if ($isNewUser) {
+                if (-not $user.Password) {
+                    throw 'a Password is required to create a new user; set one or use a {{password:...}} placeholder'
                 }
-                catch {
-                    Write-Error "Failed to create user account '$($user.Name)': $_"
-                    $Error.RemoveAt(1)
-                }
+                Set-UserPasswordHC -UserName $user.Name -Password $user.Password -NewUser
             }
-    })
+            #endregion
+
+            #region Set user account details
+            # Only Name is required: settings missing from the configuration are left
+            # unchanged, because passing $null to a Boolean parameter fails
+            $properties = @($user.PSObject.Properties | ForEach-Object { $_.Name })
+            $setUserParams = @{
+                Name                 = $user.Name
+                PasswordNeverExpires = ![Boolean]$user.PasswordExpires
+            }
+            if ($null -ne $user.FullName) { $setUserParams.FullName = $user.FullName }
+            if ($null -ne $user.Description) { $setUserParams.Description = $user.Description }
+            if ($null -ne $user.UserMayChangePassword) { $setUserParams.UserMayChangePassword = [bool]$user.UserMayChangePassword }
+            if ($user.AccountExpires) { $setUserParams.AccountExpires = $user.AccountExpires }
+            else { $setUserParams.AccountNeverExpires = $true }
+            Set-LocalUser @setUserParams
+            #endregion
+
+            #region Enable or disable user account, only when configured
+            if ($properties -contains 'Enabled' -and $null -ne $user.Enabled) {
+                if ($user.Enabled) { Enable-LocalUser -Name $user.Name }
+                else { Disable-LocalUser -Name $user.Name }
+            }
+            #endregion
+
+            #region Update the password of an existing user
+            if (-not $isNewUser -and $user.Password) {
+                Set-UserPasswordHC -UserName $user.Name -Password $user.Password
+            }
+            #endregion
+
+            $state = if ($properties -notcontains 'Enabled' -or $null -eq $user.Enabled) { '' }
+            elseif ($user.Enabled) { ' (enabled)' } else { ' (disabled)' }
+            if ($isNewUser) { $messages += "Created user '$($user.Name)'$state" }
+            elseif ($user.Password) { $messages += "Updated user '$($user.Name)' and its password$state" }
+            else { $messages += "Updated user '$($user.Name)', password unchanged$state" }
+        }
+        catch {
+            $errors += "Failed to create or update user account '$($user.Name)': $($_.Exception.Message)"
+        }
+    }
     #endregion
 }
-[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages }
+[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages; Errors = [string[]]$errors }

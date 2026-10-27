@@ -8,20 +8,39 @@ Import-Module "$PSScriptRoot\Configuration.psm1" -Force
 . "$PSScriptRoot\RestoreInput.ps1"
 
 function Invoke-ChildScriptHC {
+    <#
+    .SYNOPSIS
+        Run one child script and pass on everything it writes.
+    .DESCRIPTION
+        All streams are captured so that every error the child writes reaches the
+        caller, whatever the caller's ErrorAction is. Inside the child, errors stay
+        nonterminating so one failed entry does not stop the remaining entries.
+        Errors are rewritten as new error records with secrets redacted, so the
+        caller's -ErrorVariable receives each reported error exactly once. Errors
+        the child handles itself (try/catch without Write-Error) are not reported.
+    #>
     [CmdletBinding()]
     param([string]$Path, [string]$Action, $Data, [string]$RootFolder, [string[]]$SecretValues)
-    if (-not $SecretValues.Count) {
-        & $Path -Action $Action -Data $Data -RootFolder $RootFolder
-        return
-    }
+    $callerPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     & $Path -Action $Action -Data $Data -RootFolder $RootFolder *>&1 | ForEach-Object {
-        $message = Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $SecretValues
-        if ($_ -is [System.Management.Automation.ErrorRecord]) { Write-Error -Message $message }
-        elseif ($_ -is [System.Management.Automation.WarningRecord]) { Write-Warning $message }
-        elseif ($_ -is [System.Management.Automation.VerboseRecord]) { Write-Verbose $message }
-        elseif ($_ -is [System.Management.Automation.DebugRecord]) { Write-Debug $message }
-        elseif ($_ -is [System.Management.Automation.InformationRecord]) { Write-Information $message -InformationAction Continue }
-        else { $_ }
+        if ($_ -is [System.Management.Automation.ErrorRecord]) {
+            $message = Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $SecretValues
+            Write-Error -Message $message -ErrorAction $callerPreference
+            return
+        }
+        if ($_ -is [System.Management.Automation.WarningRecord] -or
+            $_ -is [System.Management.Automation.VerboseRecord] -or
+            $_ -is [System.Management.Automation.DebugRecord] -or
+            $_ -is [System.Management.Automation.InformationRecord]) {
+            $message = Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $SecretValues
+            if ($_ -is [System.Management.Automation.WarningRecord]) { Write-Warning $message }
+            elseif ($_ -is [System.Management.Automation.VerboseRecord]) { Write-Verbose $message }
+            elseif ($_ -is [System.Management.Automation.DebugRecord]) { Write-Debug $message }
+            else { Write-Information $message -InformationAction Continue }
+            return
+        }
+        $_
     }
 }
 
@@ -127,22 +146,41 @@ function Invoke-ComputerSnapshotHC {
             $results.Add([pscustomobject]@{ Name = $name; Status = 'Skipped'; Messages = @('Nothing to do') })
             continue
         }
+        $childAction = if ($Action -eq 'CreateSnapshot') { 'Export' } else { 'Import' }
+        $errors = @()
+        $output = @()
+        $terminatingError = $null
         try {
-            $errors = @()
-            $childAction = if ($Action -eq 'CreateSnapshot') { 'Export' } else { 'Import' }
-            $result = @(Invoke-ChildScriptHC -Path $Script[$name] -Action $childAction -Data $data -RootFolder $RootFolder -SecretValues $secretValues -ErrorVariable +errors -ErrorAction SilentlyContinue)
-            if ($result.Count -ne 1 -or $result[0].PSObject.Properties.Name -notcontains 'Data' -or $result[0].Messages -isnot [string[]]) {
-                throw "'$name' did not return exactly one Data/Messages result"
-            }
-            if ($errors.Count) { throw ($errors -join [Environment]::NewLine) }
-            if ($Action -eq 'CreateSnapshot') { $exportItems[$name] = $result[0].Data }
-            $messages = [string[]]@($result[0].Messages | ForEach-Object { Protect-RestoreInputTextHC -Text $_ -SecretValues $secretValues })
-            $results.Add([pscustomobject]@{ Name = $name; Status = 'Success'; Messages = $messages })
+            $output = @(Invoke-ChildScriptHC -Path $Script[$name] -Action $childAction -Data $data -RootFolder $RootFolder -SecretValues $secretValues -ErrorVariable +errors -ErrorAction SilentlyContinue)
         }
-        catch {
-            $message = Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $secretValues
-            $results.Add([pscustomobject]@{ Name = $name; Status = 'Failed'; Messages = @($message) })
+        catch { $terminatingError = $_ }
+        #region Collect every reported problem, not only the first
+        $errorMessages = New-Object 'System.Collections.Generic.List[string]'
+        foreach ($childError in $errors) {
+            $errorMessages.Add((Protect-RestoreInputTextHC -Text ([string]$childError) -SecretValues $secretValues))
         }
+        if ($terminatingError) {
+            $text = Protect-RestoreInputTextHC -Text ([string]$terminatingError) -SecretValues $secretValues
+            if ($errorMessages -notcontains $text) { $errorMessages.Add($text) }
+        }
+        $isValidResult = $output.Count -eq 1 -and
+            $output[0].PSObject.Properties.Name -contains 'Data' -and
+            $output[0].Messages -is [string[]]
+        if (-not $isValidResult -and -not $terminatingError) {
+            $errorMessages.Add("'$name' did not return exactly one Data/Messages result")
+        }
+        #endregion
+        $messages = New-Object 'System.Collections.Generic.List[string]'
+        if ($isValidResult) {
+            foreach ($message in $output[0].Messages) { $messages.Add((Protect-RestoreInputTextHC -Text $message -SecretValues $secretValues)) }
+        }
+        foreach ($message in $errorMessages) { $messages.Add("ERROR: $message") }
+        if ($errorMessages.Count) {
+            $results.Add([pscustomobject]@{ Name = $name; Status = 'Failed'; Messages = $messages.ToArray() })
+            continue
+        }
+        if ($Action -eq 'CreateSnapshot') { $exportItems[$name] = $output[0].Data }
+        $results.Add([pscustomobject]@{ Name = $name; Status = 'Success'; Messages = $messages.ToArray() })
     }
     Write-Progress -Activity $Action -Completed
     #region Single-file export

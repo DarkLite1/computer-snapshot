@@ -227,7 +227,7 @@ Describe 'Single-file execution' {
         Mock Invoke-ChildScriptHC -ModuleName Execution { throw 'Rejected Test-secret!42' }
         $result = Invoke-ComputerSnapshotHC @params
         $result.Success | Should -BeFalse
-        $result.Results[0].Messages | Should -Be @('Rejected [redacted]')
+        $result.Results[0].Messages | Should -Be @('ERROR: Rejected [redacted]')
         Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter { $Results[0].Messages -notmatch 'Test-secret' }
     }
     It 'validates resolved values before any child runs and redacts validation messages' {

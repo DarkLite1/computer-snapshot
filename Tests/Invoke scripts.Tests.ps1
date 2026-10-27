@@ -130,6 +130,18 @@ param($Action, $Data, $RootFolder)
         $firewall.Status | Should -Be 'Failed'
         $firewall.Messages | Should -Be @('ERROR: first problem', 'ERROR: fatal problem')
     }
+    It 'reports a terminating error from nested functions only once' {
+        $nestedChild = Join-Path $TestDrive 'nested.ps1'
+        @'
+param($Action, $Data, $RootFolder)
+function Invoke-InnerHC { [CmdletBinding()] param() throw 'nested failure' }
+function Invoke-OuterHC { [CmdletBinding()] param() Invoke-InnerHC }
+Invoke-OuterHC
+'@ | Set-Content -LiteralPath $nestedChild -Encoding UTF8
+        $params.Script.FirewallRules = $nestedChild
+        $result = & $entryScript @params 3>$null
+        ($result.Results | Where-Object Name -EQ 'FirewallRules').Messages | Should -Be @('ERROR: nested failure')
+    }
     It 'does not depend on the caller error preference' {
         $ErrorActionPreference = 'Stop'
         $result = & $entryScript @params 3>$null
@@ -154,11 +166,52 @@ Write-Error 'second problem'
 '@ | Set-Content -LiteralPath $child -Encoding UTF8
         InModuleScope Execution -Parameters @{ Child = $child; Root = $TestDrive } {
             foreach ($secrets in @(@(), @('Test-secret!42'))) {
-                $errors = @()
-                $null = Invoke-ChildScriptHC -Path $Child -Action Import -Data 'Test-secret!42' -RootFolder $Root -SecretValues $secrets -ErrorVariable +errors -ErrorAction SilentlyContinue
+                $streams = @(Invoke-ChildScriptHC -Path $Child -Action Import -Data 'Test-secret!42' -RootFolder $Root -SecretValues $secrets -ErrorAction Continue 2>&1)
+                $errors = @($streams | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })
                 $errors.Count | Should -Be 2
             }
             ([string]$errors[0]) | Should -Be 'Failed with [redacted]'
+            ([string]$errors[1]) | Should -Be 'second problem'
         }
+    }
+}
+
+Describe 'Script map validation' {
+    BeforeAll {
+        $entryScript = "$PSScriptRoot\..\Scripts\Invoke scripts.ps1"
+        $child = Join-Path $TestDrive 'child.ps1'
+        @'
+param($Action, $Data, $RootFolder)
+[pscustomobject]@{ Data = [pscustomobject]@{ FolderPaths = @('C:\MapTest') }; Messages = [string[]]@('Exported') }
+'@ | Set-Content -LiteralPath $child -Encoding UTF8
+    }
+    BeforeEach {
+        $path = Join-Path $TestDrive (([guid]::NewGuid().ToString('N')) + '.json')
+        $params = @{ Action = 'CreateSnapshot'; ConfigurationFile = $path; ReportsFolder = $TestDrive; OpenReportInBrowser = $false }
+    }
+    It 'rejects an unknown item in the script map before any child runs' {
+        $params.Script = [ordered]@{ CreateFolders = $child; MyCustomItem = $child }
+        { & $entryScript @params 3>$null } | Should -Throw '*No items executed*'
+        $path | Should -Not -Exist
+        $report = Get-ChildItem -LiteralPath $TestDrive -Filter '*.html' | Sort-Object LastWriteTime | Select-Object -Last 1
+        (Get-Content -LiteralPath $report.FullName -Raw) | Should -Match 'MyCustomItem'
+    }
+    It 'rejects an unknown item name in Items' {
+        $params.Script = [ordered]@{ CreateFolders = $child }
+        $params.Items = @('CreateFolders', 'Typo')
+        { & $entryScript @params 3>$null } | Should -Throw '*No items executed*'
+        $path | Should -Not -Exist
+    }
+    It 'rejects a known item that has no script in the map' {
+        $params.Script = [ordered]@{ CreateFolders = $child }
+        $params.Items = @('UserAccounts')
+        { & $entryScript @params 3>$null } | Should -Throw '*No items executed*'
+    }
+    It 'accepts item names in any case and stores the official name' {
+        $params.Script = [ordered]@{ CreateFolders = $child }
+        $params.Items = @('createfolders')
+        $result = & $entryScript @params 3>$null
+        $result.Success | Should -BeTrue
+        @((Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).Items.PSObject.Properties.Name) | Should -BeExactly @('CreateFolders')
     }
 }

@@ -121,10 +121,21 @@ function Invoke-ComputerSnapshotHC {
             $problems += "Configuration directory does not exist: '$(Split-Path $configurationPath -Parent)'"
         }
     }
+    #region Only the built-in items can run, always in their fixed order
+    $knownItems = @((Get-SnapshotScriptsHC).Keys)
+    $supportedText = $knownItems -join ', '
+    foreach ($name in $Script.Keys) {
+        if ($name -notin $knownItems) { $problems += "Unknown item '$name' in the script map. Supported items: $supportedText" }
+    }
     foreach ($name in $Items) {
-        if (-not $Script.Contains($name)) { $problems += "Unknown item '$name'" }
+        if ($name -notin $knownItems) {
+            # Unknown names that are in the script map were reported above
+            if (-not $Script.Contains($name)) { $problems += "Unknown item '$name'. Supported items: $supportedText" }
+        }
+        elseif (-not $Script.Contains($name)) { $problems += "No script configured for item '$name'" }
         elseif (-not (Test-Path -LiteralPath $Script[$name] -PathType Leaf)) { $problems += "Script for '$name' not found: '$($Script[$name])'" }
     }
+    #endregion
     if ($problems.Count) {
         $problems = @($problems | ForEach-Object { Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $secretValues })
         foreach ($problem in $problems) { Write-Warning $problem }
@@ -134,7 +145,8 @@ function Invoke-ComputerSnapshotHC {
     }
     if (-not (Test-ElevatedHC)) { Write-Warning 'Not running as administrator; some Windows operations may be unavailable.' }
     #endregion
-    $selected = @((Get-SnapshotScriptsHC).Keys | Where-Object { $_ -in $Items })
+    # Validation above guarantees that every selected item is known and has a script
+    $selected = @($knownItems | Where-Object { $_ -in $Items })
     $exportItems = [ordered]@{}
     $step = 0
     foreach ($name in $selected) {
@@ -147,11 +159,18 @@ function Invoke-ComputerSnapshotHC {
             continue
         }
         $childAction = if ($Action -eq 'CreateSnapshot') { 'Export' } else { 'Import' }
-        $errors = @()
-        $output = @()
+        $errors = New-Object 'System.Collections.Generic.List[object]'
+        $output = New-Object 'System.Collections.Generic.List[object]'
         $terminatingError = $null
         try {
-            $output = @(Invoke-ChildScriptHC -Path $Script[$name] -Action $childAction -Data $data -RootFolder $RootFolder -SecretValues $secretValues -ErrorVariable +errors -ErrorAction SilentlyContinue)
+            # Redirect instead of -ErrorVariable: -ErrorVariable also records every
+            # frame a terminating error passes through, which duplicates messages.
+            # Sorting while streaming keeps errors written before a terminating error.
+            Invoke-ChildScriptHC -Path $Script[$name] -Action $childAction -Data $data -RootFolder $RootFolder -SecretValues $secretValues -ErrorAction Continue 2>&1 |
+                ForEach-Object {
+                    if ($_ -is [System.Management.Automation.ErrorRecord]) { $errors.Add($_) }
+                    else { $output.Add($_) }
+                }
         }
         catch { $terminatingError = $_ }
         #region Collect every reported problem, not only the first
@@ -160,8 +179,7 @@ function Invoke-ComputerSnapshotHC {
             $errorMessages.Add((Protect-RestoreInputTextHC -Text ([string]$childError) -SecretValues $secretValues))
         }
         if ($terminatingError) {
-            $text = Protect-RestoreInputTextHC -Text ([string]$terminatingError) -SecretValues $secretValues
-            if ($errorMessages -notcontains $text) { $errorMessages.Add($text) }
+            $errorMessages.Add((Protect-RestoreInputTextHC -Text ([string]$terminatingError) -SecretValues $secretValues))
         }
         $isValidResult = $output.Count -eq 1 -and
             $output[0].PSObject.Properties.Name -contains 'Data' -and

@@ -18,6 +18,9 @@
     uses Settings.RebootComputer.
 .PARAMETER OpenReportInBrowser
     Open the report. When omitted, restore uses Settings.OpenReportInBrowser.
+.PARAMETER ExportOptions
+    Export only: options per section, for example
+    @{ ScheduledTasks = @{ TaskPath = '\HC\', '\Vendor\' } }.
 .PARAMETER Script
     Item-to-script map; intended for testing and controlled customization.
 #>
@@ -30,6 +33,7 @@ param(
     [bool]$RebootComputer = $false,
     [bool]$OpenReportInBrowser = $true,
     [switch]$Force,
+    [System.Collections.IDictionary]$ExportOptions,
     [System.Collections.IDictionary]$Script
 )
 Import-Module "$PSScriptRoot\Common\Execution.psm1" -Force
@@ -45,7 +49,7 @@ $arguments = @{
     Action = $Action; ConfigurationFile = $ConfigurationFile; Items = $Items; RootFolder = $rootFolder
     Script = $resolvedScripts; ReportsFolder = $ReportsFolder; Force = $Force
 }
-foreach ($setting in @('RebootComputer', 'OpenReportInBrowser')) {
+foreach ($setting in @('RebootComputer', 'OpenReportInBrowser', 'ExportOptions')) {
     if ($PSBoundParameters.ContainsKey($setting)) { $arguments[$setting] = $PSBoundParameters[$setting] }
 }
 Invoke-ComputerSnapshotHC @arguments

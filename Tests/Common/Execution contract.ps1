@@ -383,4 +383,12 @@ Describe 'Single-file execution' {
         $result.Success | Should -BeTrue
         Should -Invoke Write-Warning -ModuleName Execution -ParameterFilter { $Message -like 'The report could not be opened:*' }
     }
+    It 'passes export options to the child script as Data on export only' {
+        $params.Items = @('UserAccounts')
+        $params.ExportOptions = @{ UserAccounts = @{ Example = 'Option' } }
+        $null = Invoke-ComputerSnapshotHC @params
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter {
+            $Action -eq 'Export' -and $Data.Example -eq 'Option'
+        }
+    }
 }

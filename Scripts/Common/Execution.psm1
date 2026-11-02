@@ -159,6 +159,8 @@ function Invoke-ComputerSnapshotHC {
         [bool]$OpenReportInBrowser = $true,
         [ValidateRange(0, 600)]
         [int]$RestartDelaySeconds = 60,
+        # Per section, options that a child script receives as Data on export
+        [System.Collections.IDictionary]$ExportOptions,
         [switch]$Force
     )
     $configurationPath = Resolve-RootPathHC $ConfigurationFile $RootFolder
@@ -313,6 +315,9 @@ function Invoke-ComputerSnapshotHC {
         
         if ($Action -eq 'RestoreSnapshot') {
             $data = $configuration.Items[$name] 
+        }
+        elseif ($ExportOptions -and $ExportOptions.Contains($name)) {
+            $data = $ExportOptions[$name]
         }
 
         if ($Action -eq 'RestoreSnapshot' -and (Test-EmptySectionHC $data)) {

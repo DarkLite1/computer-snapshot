@@ -1286,7 +1286,7 @@
     },
     "ScheduledTasks": {
       "type": "array",
-      "description": "Scheduled tasks with inline XML.",
+      "description": "Scheduled tasks, each with its XML inline or in a file exported from Task Scheduler.",
       "items": {
         "type": "object",
         "description": "Task definition and enabled state.",
@@ -1306,7 +1306,11 @@
           },
           "Xml": {
             "type": "string",
-            "description": "Complete XML returned by Export-ScheduledTask."
+            "description": "Complete task XML, as returned by Export-ScheduledTask. Use either Xml or XmlFile."
+          },
+          "XmlFile": {
+            "type": "string",
+            "description": "Task XML file exported from Task Scheduler (right-click a task, Export...), relative to the USB root unless it is a full path. Use either Xml or XmlFile."
           },
           "Comment": {
             "type": "string",
@@ -1316,8 +1320,19 @@
         "required": [
           "TaskName",
           "TaskPath",
-          "Enabled",
-          "Xml"
+          "Enabled"
+        ],
+        "oneOf": [
+          {
+            "required": [
+              "Xml"
+            ]
+          },
+          {
+            "required": [
+              "XmlFile"
+            ]
+          }
         ]
       }
     },

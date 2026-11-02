@@ -340,7 +340,20 @@ function Test-ConfigurationHC {
             }
             'ScheduledTasks' {
                 for ($index = 0; $index -lt $data.Count; $index++) {
-                    foreach ($property in @('TaskName', 'TaskPath', 'Xml')) {
+                    # The XML is inline (Xml) or in an exported file (XmlFile)
+                    $xmlProperty = 'Xml'
+
+                    if ((Get-PropertiesHC $data[$index]) -contains 'XmlFile') {
+                        $xmlProperty = 'XmlFile'
+
+                        $assets += @{
+                            Value    = $data[$index].XmlFile
+                            Property = "[$index].XmlFile"
+                            Leaf     = $true
+                        }
+                    }
+
+                    foreach ($property in @('TaskName', 'TaskPath', $xmlProperty)) {
                         if (
                             [string]::IsNullOrWhiteSpace($data[$index].$property)
                         ) { 

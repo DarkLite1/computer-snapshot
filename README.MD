@@ -73,7 +73,7 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 8     | `NetworkCards`             | Network adapter names, network profile (category) and DNS suffix.       |
 | 9     | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
 | 10    | `RegistryKeys`             | Registry values to set.                                                 |
-| 11    | `ScheduledTasks`           | Scheduled tasks, stored as their full XML plus enabled state.           |
+| 11    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file.  |
 | 12    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
 | 13    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
 | 14    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
@@ -109,6 +109,26 @@ All paths in a configuration (installers, files to copy, custom scripts, shared 
 | `RebootComputer`      | `false` | Restart the computer after a restore in which nothing failed, after a 60-second countdown (`shutdown /a` cancels it). The report shows whether it restarts. |
 | `OpenReportInBrowser` | `true`  | Open the HTML report when the run is finished.                            |
 | `RunElevated`         | `false` | When restoring from a shortcut or the command line, restart as administrator first (UAC prompt). |
+
+### Scheduled tasks
+
+An export captures the tasks in the Task Scheduler folder `\HC\` and its subfolders. To export other folders, use `-ExportOptions` on the command line (see [Command-Line Use](#-command-line-use)).
+
+Each task needs its XML definition, in one of two ways:
+
+- `Xml`: the complete XML inline, as an export writes it.
+- `XmlFile`: a file exported from Task Scheduler (right-click a task, **Export...**), relative to the USB stick root unless it is a full path. This is easier to edit and review than XML inside JSON.
+
+```json
+"ScheduledTasks": [
+  {
+    "TaskName": "Clean up logs",
+    "TaskPath": "\\HC\\",
+    "Enabled": true,
+    "XmlFile": "Files\\Clean up logs.xml"
+  }
+]
+```
 
 ### Custom scripts and exit codes
 
@@ -191,6 +211,12 @@ Export this computer to a new configuration file (add `-Force` to overwrite an e
 & '.\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\KIOSK01.json' -Items RegionalSettings, UserAccounts, FirewallRules
 ```
 
+Export the scheduled tasks of other Task Scheduler folders than the default `\HC\` (subfolders are included):
+
+```powershell
+& '.\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\KIOSK01.json' -Items ScheduledTasks -ExportOptions @{ ScheduledTasks = @{ TaskPath = '\HC\', '\Vendor\' } }
+```
+
 `Invoke scripts.ps1` is the engine behind everything else. It returns an object with `Success`, `ReportFile` and per-section `Results`, so you can check the outcome from your own scripts.
 
 ## 🧩 Writing a Child Script
@@ -205,6 +231,7 @@ Each section is handled by one script in `Scripts/` (for example `User accounts 
 }
 ```
 
+- On export, `-Data` holds the section's export options from `-ExportOptions`, or `$null`.
 - All three properties are required. `Messages` and `Errors` must be string arrays, also when they are empty (`[string[]]@()`); a result without them is reported as **Failed**.
 - Set `$ErrorActionPreference = 'Stop'` at the top, handle each entry in its own `try`/`catch` and add a line to `$errors` in the `catch`. A failed step then skips the rest of that entry only, and the other entries still run.
 - A section with any `Errors` is reported as **Failed**, and on export its data is not saved.

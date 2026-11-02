@@ -403,7 +403,7 @@ function Start-ConfigurationJobHC {
     else {
         if (-not (Test-Path -LiteralPath $ConfigurationFile -PathType Leaf)) { throw 'Select an existing configuration file.' }
         $script = Join-Path $RootFolder 'Scripts\Invoke configuration.ps1'
-        $command = "& '{0}' -ConfigurationFile '{1}' -Confirm" -f $script.Replace("'", "''"), $ConfigurationFile.Replace("'", "''")
+        $command = "& '{0}' -ConfigurationFile '{1}' -SkipConfirmation" -f $script.Replace("'", "''"), $ConfigurationFile.Replace("'", "''")
         if ($PSBoundParameters.ContainsKey('Items')) {
             if (-not $Items.Count) { throw 'Select at least one item.' }
             $itemArguments = ($Items | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','

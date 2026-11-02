@@ -169,7 +169,7 @@ See [Configurations/Example prompted setup.json](Configurations/Example%20prompt
 
 For scripting or one-off runs, open PowerShell in the root of the USB stick.
 
-Restore a configuration (asks for confirmation; add `-Confirm` to skip the question, or leave out `-ConfigurationFile` to pick from a list):
+Restore a configuration (asks for confirmation; add `-SkipConfirmation` to skip the question, or leave out `-ConfigurationFile` to pick from a list). The old name `-Confirm` still works, so existing shortcuts keep working:
 
 ```powershell
 & '.\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Example PC1.json'
@@ -209,14 +209,31 @@ Each section is handled by one script in `Scripts/` (for example `User accounts 
 
 ## 🧪 Running the Tests
 
-The tests use Pester 6 and mock all Windows changes, so they are safe to run on your own computer:
+The tests use Pester 6. They mock all Windows changes and only create files in a temporary folder, so they are safe to run on your own computer. Run them on both Windows PowerShell 5.1 and PowerShell 7; on PowerShell 7 the JSON schema is also checked with `Test-Json`.
+
+**PowerShell 7:**
 
 ```powershell
 Install-Module Pester -MinimumVersion 6.0.0 -Scope CurrentUser
 Invoke-Pester -Path .\Tests
 ```
 
-They run on Windows PowerShell 5.1. On PowerShell 7 the JSON schema is also checked with `Test-Json`.
+**Windows PowerShell 5.1:** Windows ships with the old Pester 3.4.0, and PowerShell 7 keeps its modules in a separate folder, so install Pester 6 again from a Windows PowerShell window. `-SkipPublisherCheck` is needed because the built-in Pester is signed by a different publisher:
+
+```powershell
+Install-Module Pester -MinimumVersion 6.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+Import-Module Pester -MinimumVersion 6.0.0 -Force
+Invoke-Pester -Path .\Tests
+```
+
+Always import Pester 6 explicitly in Windows PowerShell; otherwise `Invoke-Pester` can load 3.4.0, and every test file fails with *the following modules that are specified by the "#requires" statements of the script are missing: Pester*.
+
+If installing fails with a download or NuGet error, run this first and try again:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Install-PackageProvider NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force
+```
 
 ## 🔄 Upgrading from an Older Version?
 

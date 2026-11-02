@@ -8,8 +8,9 @@
     Folder to list, defaulting to Configurations under the USB root.
 .PARAMETER StartScript
     Main execution script. Defaults to the bundled Invoke scripts script.
-.PARAMETER Confirm
-    Skip the interactive confirmation question.
+.PARAMETER SkipConfirmation
+    Restore without asking for confirmation first. The old name -Confirm
+    still works, for existing shortcuts.
 .PARAMETER Items
     Restore only these sections. Omit to restore all sections in the configuration.
 .PARAMETER RebootComputer
@@ -22,7 +23,8 @@ param(
     [string]$ConfigurationFile,
     [string]$ConfigurationsFolder,
     [string]$StartScript = "$PSScriptRoot\Invoke scripts.ps1",
-    [switch]$Confirm,
+    [Alias('Confirm')]
+    [switch]$SkipConfirmation,
     [string[]]$Items,
     [bool]$RebootComputer,
     [bool]$OpenReportInBrowser
@@ -44,10 +46,10 @@ if (-not (Test-Path -LiteralPath $StartScript -PathType Leaf)) { throw "Start sc
 if (-not $ConfigurationFile) {
     if (-not $ConfigurationsFolder) { $ConfigurationsFolder = Join-Path $rootFolder 'Configurations' }
     $entries = @(foreach ($file in Get-ChildItem -LiteralPath $ConfigurationsFolder -Filter '*.json' -File -ErrorAction Stop | Where-Object { $_.Name -notlike '*.v1.json' }) {
-        try { $description = (Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop).Description }
-        catch { $description = 'Invalid JSON' }
-        [pscustomobject]@{ Name = $file.BaseName; Description = $description; Path = $file.FullName }
-    })
+            try { $description = (Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop).Description }
+            catch { $description = 'Invalid JSON' }
+            [pscustomobject]@{ Name = $file.BaseName; Description = $description; Path = $file.FullName }
+        })
     if (-not $entries.Count) { throw "No configurations found in '$ConfigurationsFolder'" }
     $selected = $entries | Out-GridView -Title 'Select a configuration to restore' -OutputMode Single
     if (-not $selected) { return }
@@ -58,9 +60,14 @@ $configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $root
 $inputFields = @(Get-RestoreInputFieldsHC -Data $configuration.Items)
 $problems = @(if ($inputFields.Count) { $configuration.Problems } else { Test-ConfigurationHC $configuration $rootFolder })
 if ($problems.Count) { throw ($problems -join [Environment]::NewLine) }
-if (-not $Confirm -and (Read-Host "Restore '$configurationPath'? (y/n)") -ne 'y') { return }
+if (
+    -not $SkipConfirmation -and
+    (Read-Host "Restore '$configurationPath'? (y/n)") -ne 'y'
+) {
+    return
+}
 if ($configuration.Settings.RunElevated -and -not (Test-IsStartedElevatedHC)) {
-    $command = "& '{0}' -ConfigurationFile '{1}' -StartScript '{2}' -Confirm" -f $PSCommandPath.Replace("'", "''"), $configurationPath.Replace("'", "''"), $StartScript.Replace("'", "''")
+    $command = "& '{0}' -ConfigurationFile '{1}' -StartScript '{2}' -SkipConfirmation" -f $PSCommandPath.Replace("'", "''"), $configurationPath.Replace("'", "''"), $StartScript.Replace("'", "''")
     if ($null -ne $Items) {
         $itemArguments = ($Items | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
         $command += " -Items @($itemArguments)"

@@ -20,11 +20,11 @@ Describe 'Configuration launcher' {
         Mock Read-RestoreInputHC { throw 'The launcher must not collect input.' }
     }
     It 'passes only the action and file path to the main script' {
-        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation
         Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { $Arguments.Action -eq 'RestoreSnapshot' -and $Arguments.ConfigurationFile -eq $testConfigurationFile -and $Arguments.Count -eq 2 }
     }
     It 'selects a configuration from the picker' {
-        . $testScript -ConfigurationsFolder $TestDrive -StartScript $testStartScript -Confirm
+        . $testScript -ConfigurationsFolder $TestDrive -StartScript $testStartScript -SkipConfirmation
         Should -Invoke Out-GridView -Times 1 -Exactly
         Should -Invoke Invoke-ScriptHC -Times 1 -Exactly
     }
@@ -36,7 +36,7 @@ Describe 'Configuration launcher' {
     It 'relaunches the selected file with an encoded command when elevation is requested' {
         $document.Settings.RunElevated = $true
         $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
-        . $testScript -ConfigurationsFolder $TestDrive -StartScript $testStartScript -Confirm
+        . $testScript -ConfigurationsFolder $TestDrive -StartScript $testStartScript -SkipConfirmation
         Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
             $Verb -eq 'RunAs' -and [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1])).Contains($testConfigurationFile)
         }
@@ -44,18 +44,18 @@ Describe 'Configuration launcher' {
     }
     It 'rejects version 1 files without running any child scripts' {
         '{"StartScript":{}}' | Set-Content -LiteralPath $testConfigurationFile
-        { . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm } | Should -Throw '*converter*'
+        { . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation } | Should -Throw '*converter*'
         Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
     }
     It 'forwards the selected sections to the main script' {
         $document.Items.Software = @{ Install = @(@{ ExecutablePath = 'missing.exe' }) }
         $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
-        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm -Items UserAccounts
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation -Items UserAccounts
         Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { $Arguments.Items.Count -eq 1 -and $Arguments.Items[0] -eq 'UserAccounts' }
     }
     It 'forwards explicit runtime settings without editing the saved configuration' {
         $before = Get-Content -LiteralPath $testConfigurationFile -Raw
-        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm -RebootComputer $false -OpenReportInBrowser $true
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation -RebootComputer $false -OpenReportInBrowser $true
         Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
             $Arguments.ContainsKey('RebootComputer') -and $Arguments.RebootComputer -eq $false -and
             $Arguments.ContainsKey('OpenReportInBrowser') -and $Arguments.OpenReportInBrowser -eq $true
@@ -66,7 +66,7 @@ Describe 'Configuration launcher' {
         $document.Settings.RunElevated = $true
         $document.Items.Software = @{ Install = @(@{ ExecutablePath = '{{input:Installer path}}' }) }
         $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
-        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation
         Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
             $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
             $Verb -eq 'RunAs' -and $command.Contains($testConfigurationFile) -and $command -notmatch 'Installer path|password'
@@ -77,19 +77,39 @@ Describe 'Configuration launcher' {
     It 'passes placeholder configurations to the executor without collecting answers in the launcher' {
         $document.Items.Software = @{ Install = @(@{ ExecutablePath = '{{input:Installer path}}' }) }
         $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
-        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation
         Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { $Arguments.Count -eq 2 }
         Should -Invoke Read-RestoreInputHC -Times 0 -Exactly
     }
     It 'preserves selection and runtime settings when relaunching elevated' {
         $document.Settings.RunElevated = $true
         $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
-        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm -Items UserAccounts -RebootComputer $true -OpenReportInBrowser $false
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation -Items UserAccounts -RebootComputer $true -OpenReportInBrowser $false
         Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
             $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
             $Verb -eq 'RunAs' -and $command.Contains("-Items @('UserAccounts')") -and
             $command.Contains('-RebootComputer $true') -and $command.Contains('-OpenReportInBrowser $false')
         }
         Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
+    }
+    It 'asks for confirmation without -SkipConfirmation and stops on another answer than y' {
+        Mock Read-Host { 'n' }
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript
+        Should -Invoke Read-Host -Times 1 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
+    }
+    It 'still accepts the old name -Confirm, for existing shortcuts' {
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Confirm
+        Should -Invoke Read-Host -Times 0 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly
+    }
+    It 'relaunches elevated with -SkipConfirmation' {
+        $document.Settings.RunElevated = $true
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
+            $command.Contains(' -SkipConfirmation') -and -not $command.Contains(' -Confirm')
+        }
     }
 }

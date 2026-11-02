@@ -27,22 +27,6 @@ param(
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
 #region Windows helpers
-function Convert-AccountNameHC {
-    param([Parameter(Mandatory)][string]$Name)
-    $accountName = $Name
-    if ($accountName -like '*\*') {
-        $split = $accountName.Split('\')
-        if (
-            ($split[0] -ne $env:USERDOMAIN) -and
-            ($split[0] -ne $env:COMPUTERNAME) -and
-            ($split[0] -ne 'BUILTIN') -and
-            ($split[0] -ne 'NT AUTHORITY')
-        ) {
-            $accountName = "$env:COMPUTERNAME\$($split[1])"
-        }
-    }
-    $accountName
-}
 function Set-LocalGroupDescriptionHC {
     # Set-LocalGroup cannot set an empty description
     # https://stackoverflow.com/questions/69041644/how-to-set-the-description-of-a-local-group-to-blank
@@ -130,8 +114,14 @@ else {
         #region Add members, one at a time
         foreach ($member in @($group.Members | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
             try {
-                Add-LocalGroupMember -Group $group.Name -Member (Convert-AccountNameHC $member)
-                $messages += "Added account '$member' to group '$($group.Name)'"
+                $accountName = Convert-AccountNameHC $member
+                Add-LocalGroupMember -Group $group.Name -Member $accountName
+                if ($accountName -ne $member) {
+                    $messages += "Added account '$member' as '$accountName' to group '$($group.Name)'"
+                }
+                else {
+                    $messages += "Added account '$member' to group '$($group.Name)'"
+                }
             }
             catch {
                 if (Test-ErrorKindHC $_ 'MemberExists') {

@@ -67,3 +67,17 @@ Describe 'User groups errors' {
         $empty.Members.Count | Should -Be 0
     }
 }
+Describe 'User groups member names' {
+    It 'reports a local account of the exported computer under its new name' {
+        $scriptPath = "$PSScriptRoot\..\Scripts\User groups import export.ps1"
+        function Convert-AccountNameHC { param($Name) }
+        Mock Convert-AccountNameHC { $Name -replace '^PC1\\', 'PC2\' }
+        Mock Get-LocalGroup { [pscustomobject]@{ Name = 'Captains'; Description = '' } }
+        Mock Add-LocalGroupMember
+        $data = @([pscustomobject]@{ Name = 'Captains'; Members = @('PC1\picard', 'CONTOSO\kirk') })
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Messages | Should -Contain "Added account 'PC1\picard' as 'PC2\picard' to group 'Captains'"
+        $result[0].Messages | Should -Contain "Added account 'CONTOSO\kirk' to group 'Captains'"
+        Should -Invoke Add-LocalGroupMember -Times 2 -Exactly
+    }
+}

@@ -35,33 +35,6 @@ param(
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
 #region Windows helpers
-function Convert-AccountNameHC {
-    param([Parameter(Mandatory)][string]$Name)
-    $accountName = $Name
-    if ($accountName -like '*\*') {
-        $split = $accountName.Split('\')
-        if (
-            ($split[0] -ne $env:USERDOMAIN) -and
-            ($split[0] -ne $env:COMPUTERNAME) -and
-            ($split[0] -ne 'BUILTIN') -and
-            ($split[0] -ne 'NT AUTHORITY')
-        ) {
-            $accountName = "$env:COMPUTERNAME\$($split[1])"
-        }
-    }
-    $accountName
-}
-function Test-AccountExistsHC {
-    param([Parameter(Mandatory)][string]$Name)
-    if (-not $accountExists.ContainsKey($Name)) {
-        try {
-            $null = ([System.Security.Principal.NTAccount]$Name).Translate([System.Security.Principal.SecurityIdentifier])
-            $accountExists[$Name] = $true
-        }
-        catch { $accountExists[$Name] = $false }
-    }
-    $accountExists[$Name]
-}
 function Resolve-AccountNameHC {
     # Convert the account name and fail when it does not exist on this computer
     param([Parameter(Mandatory)][string]$Name)
@@ -79,7 +52,6 @@ function Test-AdministrativeShareHC {
 $exportData = $null
 $messages = @()
 $errors = @()
-$accountExists = @{}
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do'); Errors = [string[]]@() }
 }

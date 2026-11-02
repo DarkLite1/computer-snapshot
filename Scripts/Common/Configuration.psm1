@@ -371,6 +371,16 @@ function Test-ConfigurationHC {
                     catch { 
                         $problems.Add("${location}[$index].Xml: invalid XML") 
                     }
+
+                    if (
+                        $data[$index].RunAsPassword -and
+                        [string]::IsNullOrWhiteSpace($data[$index].RunAsUser)
+                    ) {
+                        $problems.Add(
+                            "${location}[$index].RunAsPassword: " +
+                            'needs RunAsUser, the account the password is for'
+                        )
+                    }
                 }
             }
             'SmbShares' {

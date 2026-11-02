@@ -73,7 +73,7 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 8     | `NetworkCards`             | Network adapter names, network profile (category) and DNS suffix.       |
 | 9     | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
 | 10    | `RegistryKeys`             | Registry values to set.                                                 |
-| 11    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file.  |
+| 11    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
 | 12    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
 | 13    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
 | 14    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
@@ -119,13 +119,25 @@ Each task needs its XML definition, in one of two ways:
 - `Xml`: the complete XML inline, as an export writes it.
 - `XmlFile`: a file exported from Task Scheduler (right-click a task, **Export...**), relative to the USB stick root unless it is a full path. This is easier to edit and review than XML inside JSON.
 
+The account a task runs as:
+
+| Properties                       | The task runs                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------------- |
+| `RunAsUser` and `RunAsPassword`  | as that user, whether or not the user is signed in; the password is saved in Task Scheduler |
+| `RunAsUser` only                 | as that account: a service account such as `S-1-5-19` (LOCAL SERVICE), or a user while signed in |
+| neither                          | as SYSTEM                                                                              |
+
+Use a `{{password:...}}` placeholder for `RunAsPassword`, so the password is asked for during the restore and never stored in the configuration. An export does exactly that for each task with a saved password. A task that runs for a group can't be exported with its account and is restored as SYSTEM; the export report says so.
+
 ```json
 "ScheduledTasks": [
   {
     "TaskName": "Clean up logs",
     "TaskPath": "\\HC\\",
     "Enabled": true,
-    "XmlFile": "Files\\Clean up logs.xml"
+    "XmlFile": "Files\\Clean up logs.xml",
+    "RunAsUser": "svc-cleanup",
+    "RunAsPassword": "{{password:Password of svc-cleanup for the clean-up task}}"
   }
 ]
 ```

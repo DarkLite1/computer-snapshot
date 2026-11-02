@@ -19,7 +19,7 @@ Describe 'Scheduled tasks import and export' {
             [pscustomobject]@{ TaskName = 'New'; TaskPath = '\HC\'; Enabled = $false; Xml = '<Task/>' }
         )
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
-        $result[0].Messages | Should -Be @("Replaced scheduled task '\HC\Existing' (enabled)", "Created scheduled task '\HC\New' (disabled)")
+        $result[0].Messages | Should -Be @("Replaced scheduled task '\HC\Existing' (enabled, runs as SYSTEM)", "Created scheduled task '\HC\New' (disabled, runs as SYSTEM)")
         $result[0].Errors | Should -Be @("Failed to register scheduled task '\HC\Bad': (1,2)::ERROR: incorrect document syntax")
         Should -Invoke Enable-ScheduledTask -Times 0 -Exactly -ParameterFilter { $TaskName -eq 'Bad' }
         Should -Invoke Disable-ScheduledTask -Times 1 -Exactly -ParameterFilter { $TaskName -eq 'New' }
@@ -81,7 +81,7 @@ Describe 'Scheduled task folders and XML files' {
         $data = @([pscustomobject]@{ TaskName = 'FromFile'; TaskPath = '\HC\'; Enabled = $true; XmlFile = 'Files\Task.xml' })
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $taskFolder)
         $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
-        $result[0].Messages | Should -Be @("Created scheduled task '\HC\FromFile' from 'Files\Task.xml' (enabled)")
+        $result[0].Messages | Should -Be @("Created scheduled task '\HC\FromFile' from 'Files\Task.xml' (enabled, runs as SYSTEM)")
         Should -Invoke Register-ScheduledTask -Times 1 -Exactly -ParameterFilter { $Xml -eq '<?xml version="1.0" encoding="UTF-16"?><Task version="1.2" />' }
     }
     It 'reports a missing XML file and a task with both Xml and XmlFile' {
@@ -93,5 +93,63 @@ Describe 'Scheduled task folders and XML files' {
         $result[0].Errors[0] | Should -BeLike "Failed to register scheduled task '\HC\Missing': the file '*Nope.xml' does not exist"
         $result[0].Errors[1] | Should -Be "Failed to register scheduled task '\HC\Both': use either Xml or XmlFile, not both"
         Should -Invoke Register-ScheduledTask -Times 0 -Exactly
+    }
+}
+
+Describe 'Scheduled task accounts' {
+    BeforeAll {
+        $scriptPath = "$PSScriptRoot\..\Scripts\Scheduled tasks import export.ps1"
+        function Convert-AccountNameHC { param($Name) }
+        function ConvertTo-PortableAccountNameHC { param($Name, $Sid) }
+    }
+    BeforeEach {
+        Mock Convert-AccountNameHC { $Name -replace '^PC1\\', 'PC2\' }
+        Mock ConvertTo-PortableAccountNameHC { if ($Name -eq 'SYSTEM') { 'S-1-5-18' } else { $Name } }
+        Mock Get-ScheduledTask { }
+        Mock Register-ScheduledTask
+        Mock Register-ScheduledTask { throw 'The user name or password is incorrect.' } -ParameterFilter { $Password -eq 'wrong' }
+        Mock Enable-ScheduledTask
+        Mock Disable-ScheduledTask
+        Mock Export-ScheduledTask { '<Task/>' }
+    }
+    It 'registers a task as a user with a saved password, as a service account, or as SYSTEM' {
+        $data = @(
+            [pscustomobject]@{ TaskName = 'Saved'; TaskPath = '\HC\'; Enabled = $true; Xml = '<Task/>'; RunAsUser = 'PC1\backup'; RunAsPassword = 'S3cret!' }
+            [pscustomobject]@{ TaskName = 'Service'; TaskPath = '\HC\'; Enabled = $true; Xml = '<Task/>'; RunAsUser = 'S-1-5-19' }
+            [pscustomobject]@{ TaskName = 'Default'; TaskPath = '\HC\'; Enabled = $true; Xml = '<Task/>' }
+        )
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        $result[0].Messages[0] | Should -Be "Created scheduled task '\HC\Saved' (enabled, runs as 'PC2\backup' with saved password)"
+        Should -Invoke Register-ScheduledTask -Times 1 -Exactly -ParameterFilter { $TaskName -eq 'Saved' -and $User -eq 'PC2\backup' -and $Password -eq 'S3cret!' }
+        Should -Invoke Register-ScheduledTask -Times 1 -Exactly -ParameterFilter { $TaskName -eq 'Service' -and $User -eq 'S-1-5-19' -and -not $Password }
+        Should -Invoke Register-ScheduledTask -Times 1 -Exactly -ParameterFilter { $TaskName -eq 'Default' -and $User -eq 'NT AUTHORITY\SYSTEM' }
+    }
+    It 'reports a wrong password and a password without a user' {
+        $data = @(
+            [pscustomobject]@{ TaskName = 'Wrong'; TaskPath = '\HC\'; Enabled = $true; Xml = '<Task/>'; RunAsUser = 'kiosk'; RunAsPassword = 'wrong' }
+            [pscustomobject]@{ TaskName = 'NoUser'; TaskPath = '\HC\'; Enabled = $true; Xml = '<Task/>'; RunAsPassword = 'x' }
+        )
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Errors | Should -Be @(
+            "Failed to register scheduled task '\HC\Wrong': The user name or password is incorrect."
+            "Failed to register scheduled task '\HC\NoUser': RunAsPassword needs RunAsUser, the account the password is for"
+        )
+    }
+    It 'exports the account, with a password placeholder for a saved password' {
+        Mock Get-ScheduledTask {
+            [pscustomobject]@{ TaskName = 'Backup'; TaskPath = '\HC\'; Settings = @{ Enabled = $true }; Principal = [pscustomobject]@{ UserId = 'PC1\backup'; LogonType = 'Password' } }
+            [pscustomobject]@{ TaskName = 'Cleanup'; TaskPath = '\HC\'; Settings = @{ Enabled = $true }; Principal = [pscustomobject]@{ UserId = 'SYSTEM'; LogonType = 'ServiceAccount' } }
+            [pscustomobject]@{ TaskName = 'ForUsers'; TaskPath = '\HC\'; Settings = @{ Enabled = $true }; Principal = [pscustomobject]@{ UserId = $null; GroupId = 'Users'; LogonType = 'Group' } }
+        } -ParameterFilter { $TaskPath -eq '\HC\*' }
+        $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
+        $tasks = @{}
+        foreach ($task in $result[0].Data) { $tasks[$task.TaskName] = $task }
+        $tasks['Backup'].RunAsUser | Should -Be 'PC1\backup'
+        $tasks['Backup'].RunAsPassword | Should -Be "{{password:Password of 'PC1\backup' for scheduled task '\HC\Backup'}}"
+        $tasks['Cleanup'].RunAsUser | Should -Be 'S-1-5-18'
+        $tasks['Cleanup'].PSObject.Properties.Name | Should -Not -Contain 'RunAsPassword'
+        $tasks['ForUsers'].PSObject.Properties.Name | Should -Not -Contain 'RunAsUser'
+        $result[0].Messages | Should -Contain "Task '\HC\ForUsers' runs for group 'Users', which cannot be exported; it is restored to run as SYSTEM unless you set RunAsUser"
     }
 }

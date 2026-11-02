@@ -1312,6 +1312,14 @@
             "type": "string",
             "description": "Task XML file exported from Task Scheduler (right-click a task, Export...), relative to the USB root unless it is a full path. Use either Xml or XmlFile."
           },
+          "RunAsUser": {
+            "type": "string",
+            "description": "Account the task runs as, such as 'kiosk', 'CONTOSO\\svc-backup' or a SID like S-1-5-19 (LOCAL SERVICE). Without it, the task runs as SYSTEM."
+          },
+          "RunAsPassword": {
+            "type": "string",
+            "description": "Password of RunAsUser. The task then runs whether or not the user is signed in, with the password saved in Task Scheduler. Use a {{password:...}} placeholder to ask for it at restore time instead of storing it in this file."
+          },
           "Comment": {
             "type": "string",
             "description": "Technician notes; ignored when applying the configuration."

@@ -12,9 +12,18 @@
     a file exported from Task Scheduler (right-click a task, Export...). A
     task with the same name and path is replaced; Windows only replaces it
     when the new definition is valid, so a failed registration keeps the
-    existing task. Tasks are registered to run as SYSTEM. Afterwards each
-    task is enabled or disabled as configured. Each failed task is reported
-    in Errors and the remaining tasks are still processed.
+    existing task. Afterwards each task is enabled or disabled as
+    configured. Each failed task is reported in Errors and the remaining
+    tasks are still processed.
+
+    The account a task runs as:
+    - RunAsUser and RunAsPassword: that user, whether or not the user is
+      signed in, with the password saved in Task Scheduler.
+    - RunAsUser only: that account, for example a service account such as
+      LOCAL SERVICE, or a user when the task only runs while signed in.
+    - Neither: SYSTEM.
+    Export writes RunAsUser for each task, and a {{password:...}}
+    placeholder in RunAsPassword for a task that has a saved password.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -56,6 +65,32 @@ function Get-ExportTaskFolderHC {
     }
 
     $folders
+}
+
+function Get-TaskRunAsHC {
+    # RunAsUser and RunAsPassword to export for a task's principal
+    param(
+        [Parameter(Mandatory)]$Task
+    )
+
+    $principal = $Task.Principal
+    $result = [ordered]@{}
+
+    if (-not $principal -or -not $principal.UserId) {
+        # A group principal cannot be expressed; the task runs as SYSTEM
+        return $result
+    }
+
+    $result.RunAsUser = ConvertTo-PortableAccountNameHC -Name $principal.UserId
+
+    if ([string]$principal.LogonType -eq 'Password') {
+        $result.RunAsPassword = (
+            "{{password:Password of '$($principal.UserId)' for scheduled " +
+            "task '$($Task.TaskPath)$($Task.TaskName)'}}"
+        )
+    }
+
+    $result
 }
 
 function Get-TaskXmlHC {
@@ -112,7 +147,8 @@ if ($Action -eq 'Export') {
     # can return the same task twice
     $tasks = @(
         foreach ($folder in $folders) {
-            Get-ScheduledTask -TaskPath "$folder*" -ErrorAction SilentlyContinue
+            Get-ScheduledTask `
+                -TaskPath "$folder*" -ErrorAction SilentlyContinue
         }
     ) | Sort-Object -Property TaskPath, TaskName -Unique
 
@@ -122,12 +158,32 @@ if ($Action -eq 'Export') {
                 $xml = Export-ScheduledTask `
                     -TaskName $task.TaskName -TaskPath $task.TaskPath
 
-                [pscustomobject]@{
+                $exportTask = [ordered]@{
                     TaskName = $task.TaskName
                     TaskPath = $task.TaskPath
                     Enabled  = [bool]$task.Settings.Enabled
                     Xml      = [string]$xml
                 }
+
+                $runAs = Get-TaskRunAsHC -Task $task
+
+                foreach ($key in $runAs.Keys) {
+                    $exportTask[$key] = $runAs[$key]
+                }
+
+                if (
+                    -not $runAs.Contains('RunAsUser') -and
+                    $task.Principal.GroupId
+                ) {
+                    $messages += (
+                        "Task '$($task.TaskPath)$($task.TaskName)' runs " +
+                        "for group '$($task.Principal.GroupId)', which " +
+                        'cannot be exported; it is restored to run as ' +
+                        'SYSTEM unless you set RunAsUser'
+                    )
+                }
+
+                [pscustomobject]$exportTask
             }
             catch {
                 $errors += (
@@ -143,7 +199,7 @@ if ($Action -eq 'Export') {
     $messages = @(
         "Exported $($exportData.Count) scheduled task(s) from the task " +
         "folder(s) '$($folders -join "', '")'"
-    )
+    ) + @($messages)
 }
 else {
     #region Apply section
@@ -166,6 +222,27 @@ else {
                 User     = 'NT AUTHORITY\SYSTEM'
                 Force    = $true
             }
+            $runAs = 'SYSTEM'
+
+            if ($task.RunAsPassword -and -not $task.RunAsUser) {
+                throw (
+                    'RunAsPassword needs RunAsUser, ' +
+                    'the account the password is for'
+                )
+            }
+
+            if ($task.RunAsUser) {
+                # SIDs and the exported computer's accounts get local names
+                $registerParams.User = Convert-AccountNameHC `
+                    -Name $task.RunAsUser
+                $runAs = "'$($registerParams.User)'"
+
+                if ($task.RunAsPassword) {
+                    $registerParams.Password = [string]$task.RunAsPassword
+                    $runAs += ' with saved password'
+                }
+            }
+
             $null = Register-ScheduledTask @registerParams
 
             if ($task.Enabled) {
@@ -193,7 +270,10 @@ else {
                 'Created'
             }
 
-            $messages += "$verb scheduled task '$fullName'$source ($state)"
+            $messages += (
+                "$verb scheduled task '$fullName'$source " +
+                "($state, runs as $runAs)"
+            )
         }
         catch {
             $errors += (

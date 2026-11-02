@@ -5,6 +5,7 @@
 Describe 'User groups errors' {
     BeforeAll {
         $scriptPath = "$PSScriptRoot\..\Scripts\User groups import export.ps1"
+        function Get-GroupMemberAdsiHC { param($GroupName) }
         function New-LocalAccountsErrorHC {
             param([string]$Message, [string]$Id)
             [System.Management.Automation.ErrorRecord]::new([Exception]::new($Message), "$Id,Microsoft.PowerShell.Commands.AddLocalGroupMemberCommand", 'InvalidArgument', $null)
@@ -19,6 +20,7 @@ Describe 'User groups errors' {
         Mock Get-LocalGroupMember { [pscustomobject]@{ Name = 'PC1\admin' } }
         Mock Get-LocalGroupMember { throw 'An error (1332) occurred while enumerating the group membership' } -ParameterFilter { $Name -eq 'Orphans' }
         Mock Get-LocalGroupMember { } -ParameterFilter { $Name -eq 'Empty' }
+        Mock Get-GroupMemberAdsiHC { throw 'The group name could not be found.' }
         Mock New-LocalGroup { [pscustomobject]@{ Name = $Name } }
         Mock New-LocalGroup { throw 'Access denied' } -ParameterFilter { $Name -eq 'Broken' }
         Mock Set-LocalGroup
@@ -114,5 +116,37 @@ Describe 'User groups across Windows languages' {
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
         $result[0].Errors[0] | Should -BeLike "*there is no group with SID 'S-1-5-32-999'*"
         Should -Invoke New-LocalGroup -Times 0 -Exactly
+    }
+}
+
+Describe 'User groups with orphaned members' {
+    BeforeAll {
+        $scriptPath = "$PSScriptRoot\..\Scripts\User groups import export.ps1"
+        function Get-GroupMemberAdsiHC { param($GroupName) }
+    }
+    BeforeEach {
+        Mock Get-LocalGroup { [pscustomobject]@{ Name = 'Helpdesk'; Description = 'Support'; SID = 'S-1-5-21-1-2-3-1009' } }
+        Mock Get-LocalGroupMember { throw 'An error (1332) occurred while enumerating the group membership.' }
+        Mock Get-GroupMemberAdsiHC {
+            [pscustomobject]@{ Name = 'PC1\kirk'; SID = 'S-1-5-21-1-2-3-1001' }
+            [pscustomobject]@{ Name = $null; SID = 'S-1-5-21-9-9-9-1234' }
+        }
+    }
+    It 'exports the other members through ADSI and reports the orphaned one' {
+        $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        $result[0].Data[0].Members | Should -Be @('PC1\kirk')
+        $result[0].Messages | Should -Contain "Group 'Helpdesk': skipped member 'S-1-5-21-9-9-9-1234', an account that cannot be resolved (deleted, or its domain is unreachable)"
+    }
+    It 'reports both reasons when ADSI fails too' {
+        Mock Get-GroupMemberAdsiHC { throw 'Access is denied.' }
+        $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
+        $result[0].Errors | Should -Be @("Failed to read the members of group 'Helpdesk': An error (1332) occurred while enumerating the group membership.; reading them through ADSI failed too: Access is denied.")
+        @($result[0].Data).Count | Should -Be 0
+    }
+    It 'does not use ADSI when Get-LocalGroupMember works' {
+        Mock Get-LocalGroupMember { [pscustomobject]@{ Name = 'PC1\kirk'; SID = 'S-1-5-21-1-2-3-1001' } }
+        $null = & $scriptPath -Action Export -RootFolder $TestDrive
+        Should -Invoke Get-GroupMemberAdsiHC -Times 0 -Exactly
     }
 }

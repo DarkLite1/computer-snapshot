@@ -3,6 +3,11 @@
 .SYNOPSIS
     Export or import User groups as a configuration section.
 .DESCRIPTION
+    Export reads each group's members. When Get-LocalGroupMember fails,
+    typically because a member account no longer exists (an orphaned SID),
+    the members are read through ADSI instead; orphaned members are skipped
+    and reported, the other members are exported.
+
     Import creates missing groups, updates descriptions and adds members.
     Members are only added, never removed. Each failed group or member is
     reported in Errors and the remaining groups and members are still
@@ -27,6 +32,42 @@ param(
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
 #region Windows helpers
+function Get-GroupMemberAdsiHC {
+    <#
+    .SYNOPSIS
+        Read a local group's members through ADSI.
+    .DESCRIPTION
+        Unlike Get-LocalGroupMember, this also works when a member account
+        no longer exists. Such a member has no Name, only its SID.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$GroupName
+    )
+
+    $group = [ADSI]"WinNT://./$GroupName,group"
+
+    foreach ($member in @($group.psbase.Invoke('Members'))) {
+        $sidBytes = $member.GetType().InvokeMember(
+            'objectSid', 'GetProperty', $null, $member, $null
+        )
+        $sid = New-Object System.Security.Principal.SecurityIdentifier(
+            $sidBytes, 0
+        )
+
+        $name = try {
+            $sid.Translate([System.Security.Principal.NTAccount]).Value
+        }
+        catch {
+            $null
+        }
+
+        [pscustomobject]@{
+            Name = $name
+            SID  = $sid.Value
+        }
+    }
+}
+
 function Set-LocalGroupDescriptionHC {
     # Set-LocalGroup cannot set an empty description
     # https://stackoverflow.com/questions/69041644/how-to-set-the-description-of-a-local-group-to-blank
@@ -63,17 +104,34 @@ if ($Action -eq 'Export') {
         foreach ($group in @(Get-LocalGroup)) {
             Write-Verbose "Group '$($group.Name)'"
             try {
-                # Built-in members such as Everyone are exported by SID
-                $memberNames = @(
+                $members = @(
                     Get-LocalGroupMember -Name $group.Name | ForEach-Object {
-                        ConvertTo-PortableAccountNameHC -Name $_.Name -Sid ([string]$_.SID)
+                        [pscustomobject]@{ Name = $_.Name; SID = [string]$_.SID }
                     }
                 )
             }
             catch {
-                $errors += "Failed to read the members of group '$($group.Name)', it probably contains an invalid or orphaned account: $($_.Exception.Message)"
-                continue
+                # Usually an orphaned member: ADSI can still read the others
+                $localGroupMemberError = $_.Exception.Message
+                try {
+                    $members = @(Get-GroupMemberAdsiHC -GroupName $group.Name)
+                }
+                catch {
+                    $errors += "Failed to read the members of group '$($group.Name)': $localGroupMemberError; reading them through ADSI failed too: $($_.Exception.Message)"
+                    continue
+                }
             }
+
+            foreach ($orphan in @($members | Where-Object { -not $_.Name })) {
+                $messages += "Group '$($group.Name)': skipped member '$($orphan.SID)', an account that cannot be resolved (deleted, or its domain is unreachable)"
+            }
+
+            # Built-in members such as Everyone are exported by SID
+            $memberNames = @(
+                $members | Where-Object { $_.Name } | ForEach-Object {
+                    ConvertTo-PortableAccountNameHC -Name $_.Name -Sid $_.SID
+                }
+            )
             $groupName = ConvertTo-PortableAccountNameHC -Name $group.Name -Sid ([string]$group.SID)
             if ($groupName -ne $group.Name) {
                 # A built-in group: its name and description depend on the
@@ -95,7 +153,7 @@ if ($Action -eq 'Export') {
         }
     )
     #endregion
-    $messages = @('Exported User groups')
+    $messages = @('Exported User groups') + @($messages)
 }
 else {
     #region Apply section

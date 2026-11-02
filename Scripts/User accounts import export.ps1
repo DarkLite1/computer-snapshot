@@ -3,6 +3,11 @@
 .SYNOPSIS
     Export or import User accounts as a configuration section.
 .DESCRIPTION
+    Export cannot read passwords, so it writes a {{password:...}} placeholder
+    for each user: restoring the export asks for each password. Accounts that
+    Windows manages itself (Guest, DefaultAccount, WDAGUtilityAccount) get an
+    empty Password instead, so their current password is kept.
+
     Import never prompts. A user that fails is reported in Errors and the
     remaining users are still processed.
     - New user without a Password: not created, reported as an error.
@@ -63,10 +68,29 @@ if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
 if ($Action -eq 'Export') {
     #region Capture section
     $users = @(Get-LocalUser)
-    $exportData = @($users | Select-Object Name, FullName, Description, Enabled, PasswordExpires,
-        UserMayChangePassword, @{ Name = 'Password'; Expression = { '' } })
+
+    $password = @{
+        Name       = 'Password'
+        Expression = {
+            # Guest (501), DefaultAccount (503) and WDAGUtilityAccount (504)
+            if ([string]$_.SID -match '-50[134]$') {
+                ''
+            }
+            else {
+                "{{password:Password for local user '$($_.Name)'}}"
+            }
+        }
+    }
+
+    $exportData = @(
+        $users | Select-Object Name, FullName, Description, Enabled,
+        PasswordExpires, UserMayChangePassword, $password
+    )
     #endregion
-    $messages = @('Exported User accounts')
+    $messages = @(
+        'Exported User accounts; restoring this export asks for the ' +
+        'password of each user'
+    )
 }
 else {
     #region Apply section

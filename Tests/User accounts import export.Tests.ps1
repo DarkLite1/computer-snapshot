@@ -76,3 +76,32 @@ Describe 'User accounts import errors' {
         Should -Invoke Set-LocalUser -Times 1 -Exactly -ParameterFilter { -not $PSBoundParameters.ContainsKey('UserMayChangePassword') -and -not $PSBoundParameters.ContainsKey('FullName') }
     }
 }
+
+Describe 'User accounts export' {
+    It 'writes a password placeholder for each user, except for accounts Windows manages' {
+        Mock Get-LocalUser {
+            [pscustomobject]@{ Name = 'Administrator'; SID = 'S-1-5-21-1-2-3-500'; Enabled = $false }
+            [pscustomobject]@{ Name = 'Guest'; SID = 'S-1-5-21-1-2-3-501'; Enabled = $false }
+            [pscustomobject]@{ Name = 'DefaultAccount'; SID = 'S-1-5-21-1-2-3-503'; Enabled = $false }
+            [pscustomobject]@{ Name = 'WDAGUtilityAccount'; SID = 'S-1-5-21-1-2-3-504'; Enabled = $false }
+            [pscustomobject]@{ Name = 'kiosk'; SID = 'S-1-5-21-1-2-3-5010'; Enabled = $true }
+        }
+        $result = @(& "$PSScriptRoot\..\Scripts\User accounts import export.ps1" -Action Export -RootFolder $TestDrive)
+        $passwords = @{}
+        foreach ($user in $result[0].Data) { $passwords[$user.Name] = $user.Password }
+        $passwords['Administrator'] | Should -Be "{{password:Password for local user 'Administrator'}}"
+        $passwords['kiosk'] | Should -Be "{{password:Password for local user 'kiosk'}}"
+        foreach ($name in 'Guest', 'DefaultAccount', 'WDAGUtilityAccount') {
+            $passwords[$name] | Should -Be '' -Because $name
+        }
+    }
+    It 'writes placeholders that a restore recognizes' {
+        . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+        Mock Get-LocalUser { [pscustomobject]@{ Name = 'kiosk'; SID = 'S-1-5-21-1-2-3-1001'; Enabled = $true } }
+        $result = @(& "$PSScriptRoot\..\Scripts\User accounts import export.ps1" -Action Export -RootFolder $TestDrive)
+        $fields = @(Get-RestoreInputFieldsHC -Data @{ UserAccounts = $result[0].Data })
+        $fields.Count | Should -Be 1
+        $fields[0].Kind | Should -Be 'password'
+        $fields[0].Description | Should -Be "Password for local user 'kiosk'"
+    }
+}

@@ -6,7 +6,7 @@
     "Enabled": true,
     "PasswordExpires": null,
     "UserMayChangePassword": true,
-    "Password": "98udfna;slkjdf"
+    "Password": "{{password:Password for local user 'SuperAdmin'}}"
   },
   {
     "Name": "cnorris",
@@ -15,7 +15,7 @@
     "Enabled": false,
     "PasswordExpires": null,
     "UserMayChangePassword": false,
-    "Password": ""
+    "Password": "{{password:Password for local user 'cnorris'}}"
   },
   {
     "Name": "bswagger",
@@ -24,6 +24,6 @@
     "Enabled": true,
     "PasswordExpires": null,
     "UserMayChangePassword": true,
-    "Password": ""
+    "Password": "{{password:Password for local user 'bswagger'}}"
   }
 ]

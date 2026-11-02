@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 BeforeAll {
-    . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
+    . "$PSScriptRoot\..\..\Scripts\Common\Section.ps1"
 }
 
 Describe 'Account names' {

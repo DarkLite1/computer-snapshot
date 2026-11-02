@@ -1,6 +1,6 @@
-param([string]$ScriptPath, [string]$Name)
+param([string]$ScriptPath, [string]$Name, [switch]$EmptyExport)
 
-Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $Name }) {
+Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $Name; EmptyExport = [bool]$EmptyExport }) {
     BeforeAll {
         Import-Module "$PSScriptRoot\..\..\Scripts\Common\Configuration.psm1" -Force
         $itemNames = @{
@@ -101,7 +101,14 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         $result = @(. $ScriptPath -Action Export -RootFolder $TestDrive)
         $result.Count | Should -Be 1
         $result[0].PSObject.Properties.Name | Should -Contain 'Data'
-        $result[0].Data | Should -Not -BeNullOrEmpty
+        if ($EmptyExport) {
+            # Sections that cannot be read from a computer export an empty list
+            , $result[0].Data | Should -BeOfType [array]
+            @($result[0].Data).Count | Should -Be 0
+        }
+        else {
+            $result[0].Data | Should -Not -BeNullOrEmpty
+        }
         $result[0].Messages.GetType() | Should -Be ([string[]])
         $result[0].Errors.GetType() | Should -Be ([string[]])
         $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')

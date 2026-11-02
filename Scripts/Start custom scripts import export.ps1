@@ -4,6 +4,9 @@
 .SYNOPSIS
     Export or import Start custom scripts as a configuration section.
 .DESCRIPTION
+    Export returns an empty list: custom scripts cannot be read from a
+    computer.
+
     Import runs each PowerShell script in the list, relative to the USB root
     unless it is a full path, with Arguments as named parameters. Scripts run
     with the normal PowerShell error behavior, so an error inside a script
@@ -106,10 +109,15 @@ if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
 
 if ($Action -eq 'Export') {
     #region Capture section
-    $exportData = Read-SectionExampleHC `
-        "$PSScriptRoot\..\Examples\StartCustomScriptsBefore.json"
+    # Custom scripts cannot be read from a computer. An example would run
+    # on restore when nobody edits the export, and this script serves both
+    # the Before and After sections, so the example would even run twice.
+    $exportData = @()
     #endregion
-    $messages.Add('Exported Start custom scripts')
+    $messages.Add(
+        'Custom scripts cannot be exported; add your own scripts to the ' +
+        'configuration, see Examples\StartCustomScriptsBefore.json'
+    )
 }
 else {
     #region Apply section

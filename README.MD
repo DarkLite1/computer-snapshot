@@ -80,7 +80,7 @@ Each configuration has an `Items` object with one entry per section. Sections al
 
 An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Examples/` folder for the exact format of each section.
 
-Some sections can't be fully captured automatically, so exporting them only gives you a starting example to edit: `StartCustomScriptsBefore`/`After`, `CreateFolders`, `CopyFilesFolders`, `RegistryKeys` and `Software`.
+Some sections can't be fully captured automatically, so exporting them only gives you a starting example to edit: `CreateFolders`, `CopyFilesFolders`, `RegistryKeys` and `Software`. `StartCustomScriptsBefore` and `StartCustomScriptsAfter` export an empty list, so no example script can run by accident; see `Examples\StartCustomScriptsBefore.json` for the format.
 
 ### Reusing sections across computers
 

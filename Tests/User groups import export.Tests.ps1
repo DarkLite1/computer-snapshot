@@ -12,9 +12,9 @@ Describe 'User groups errors' {
     }
     BeforeEach {
         Mock Get-LocalGroup {
-            [pscustomobject]@{ Name = 'Administrators'; Description = 'Admins' }
-            [pscustomobject]@{ Name = 'Orphans'; Description = '' }
-            [pscustomobject]@{ Name = 'Empty'; Description = '' }
+            [pscustomobject]@{ Name = 'Administrators'; Description = 'Admins'; SID = 'S-1-5-32-544' }
+            [pscustomobject]@{ Name = 'Orphans'; Description = ''; SID = 'S-1-5-21-1-2-3-1001' }
+            [pscustomobject]@{ Name = 'Empty'; Description = ''; SID = 'S-1-5-21-1-2-3-1002' }
         }
         Mock Get-LocalGroupMember { [pscustomobject]@{ Name = 'PC1\admin' } }
         Mock Get-LocalGroupMember { throw 'An error (1332) occurred while enumerating the group membership' } -ParameterFilter { $Name -eq 'Orphans' }
@@ -59,7 +59,7 @@ Describe 'User groups errors' {
         $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
         $result[0].Errors.Count | Should -Be 1
         $result[0].Errors[0] | Should -BeLike "Failed to read the members of group 'Orphans'*"
-        @($result[0].Data.Name) | Should -Be @('Administrators', 'Empty')
+        @($result[0].Data.Name) | Should -Be @('S-1-5-32-544', 'Empty')
     }
     It 'exports an empty member list instead of a null member' {
         $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
@@ -79,5 +79,40 @@ Describe 'User groups member names' {
         $result[0].Messages | Should -Contain "Added account 'PC1\picard' as 'PC2\picard' to group 'Captains'"
         $result[0].Messages | Should -Contain "Added account 'CONTOSO\kirk' to group 'Captains'"
         Should -Invoke Add-LocalGroupMember -Times 2 -Exactly
+    }
+}
+
+Describe 'User groups across Windows languages' {
+    BeforeAll { $scriptPath = "$PSScriptRoot\..\Scripts\User groups import export.ps1" }
+    BeforeEach {
+        Mock Get-LocalGroup {
+            [pscustomobject]@{ Name = 'Administratoren'; Description = 'Lokale beheerders'; SID = 'S-1-5-32-544' }
+            [pscustomobject]@{ Name = 'Captains'; Description = 'Star fleet'; SID = 'S-1-5-21-1-2-3-1005' }
+        }
+        Mock Get-LocalGroupMember { [pscustomobject]@{ Name = 'NT AUTHORITY\Iedereen'; SID = 'S-1-1-0' } }
+        Mock Add-LocalGroupMember
+        Mock New-LocalGroup
+        Mock Set-LocalGroup
+    }
+    It 'exports built-in groups and members by SID, without their translated description' {
+        $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
+        $builtIn = $result[0].Data | Where-Object { $_.Name -eq 'S-1-5-32-544' }
+        $builtIn.Members | Should -Be @('S-1-1-0')
+        $builtIn.Keys | Should -Not -Contain 'Description'
+        $builtIn.Comment | Should -BeLike "Built-in group 'Administratoren'*"
+        ($result[0].Data | Where-Object { $_.Name -eq 'Captains' }).Description | Should -Be 'Star fleet'
+    }
+    It 'finds a built-in group by SID and never creates a group named after a SID' {
+        $data = @([pscustomobject]@{ Name = 'S-1-5-32-544'; Members = @('kirk') })
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Messages | Should -Contain "Group 'Administratoren' already exists and is correct"
+        $result[0].Messages | Should -Contain "Added account 'kirk' to group 'Administratoren'"
+        Should -Invoke New-LocalGroup -Times 0 -Exactly
+    }
+    It 'reports a SID that is not a group on this computer' {
+        $data = @([pscustomobject]@{ Name = 'S-1-5-32-999' })
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Errors[0] | Should -BeLike "*there is no group with SID 'S-1-5-32-999'*"
+        Should -Invoke New-LocalGroup -Times 0 -Exactly
     }
 }

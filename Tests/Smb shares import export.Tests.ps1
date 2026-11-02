@@ -10,10 +10,13 @@ Describe 'Inline NTFS permissions' {
 		function Test-AccountExistsHC { param($Name) }
 	}
 	It 'captures explicit permissions and applies them without intermediate JSON' {
+		# Use the names of this Windows language; the export stores them by SID
+		$everyone = ([System.Security.Principal.SecurityIdentifier]'S-1-1-0').Translate([System.Security.Principal.NTAccount]).Value
+		$administrators = ([System.Security.Principal.SecurityIdentifier]'S-1-5-32-544').Translate([System.Security.Principal.NTAccount]).Value
 		$testAcl = [pscustomobject]@{
-			Owner = 'BUILTIN\Administrators'; AreAccessRulesProtected = $true; ProtectionApplied = $false
+			Owner = $administrators; AreAccessRulesProtected = $true; ProtectionApplied = $false
 			Access = @([pscustomobject]@{
-				IdentityReference = 'Everyone'; AccessControlType = 'Allow'; FileSystemRights = 'ReadAndExecute'
+				IdentityReference = $everyone; AccessControlType = 'Allow'; FileSystemRights = 'ReadAndExecute'
 				InheritanceFlags = 'ContainerInherit, ObjectInherit'; PropagationFlags = 'None'; IsInherited = $false
 			})
 		}
@@ -35,7 +38,8 @@ Describe 'Inline NTFS permissions' {
 		Mock Test-AccountExistsHC { $true }
 		$exportResult = . $testScript -Action Export -RootFolder $TestDrive
 		$exportResult.Data.NTFS[0].Access.Count | Should -Be 1
-		$exportResult.Data.NTFS[0].Access[0].IdentityReference | Should -Be 'Everyone'
+		$exportResult.Data.NTFS[0].Access[0].IdentityReference | Should -Be 'S-1-1-0'
+		$exportResult.Data.NTFS[0].Owner | Should -Be 'S-1-5-32-544'
 		@(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ SmbShares = $exportResult.Data } } $TestDrive).Count | Should -Be 0
 		$importResult = . $testScript -Action Import -Data $exportResult.Data -RootFolder $TestDrive -ErrorAction Stop
 		$importResult.Data | Should -BeNullOrEmpty

@@ -542,7 +542,7 @@
         "properties": {
           "Name": {
             "type": "string",
-            "description": "Local group name."
+            "description": "Local group name, or the SID of a built-in group such as S-1-5-32-544 (Administrators), which works in every Windows language."
           },
           "Description": {
             "type": "string",
@@ -556,7 +556,7 @@
                 "string",
                 "null"
               ],
-              "description": "Account name in local or domain notation."
+              "description": "Account name in local or domain notation, or the SID of a built-in account such as S-1-1-0 (Everyone)."
             }
           },
           "Comment": {
@@ -963,7 +963,7 @@
                   "string",
                   "null"
                 ],
-                "description": "SMB access AccountName value."
+                "description": "Account name, or the SID of a built-in account such as S-1-1-0 (Everyone), which works in every Windows language."
               },
               "AccessControlType": {
                 "type": [
@@ -1005,7 +1005,7 @@
               },
               "Owner": {
                 "type": "string",
-                "description": "Owner account name."
+                "description": "Folder owner: account name, or the SID of a built-in account such as S-1-5-32-544 (Administrators)."
               },
               "AreAccessRulesProtected": {
                 "type": "boolean",
@@ -1021,7 +1021,7 @@
                   "properties": {
                     "IdentityReference": {
                       "type": "string",
-                      "description": "NTFS access-rule IdentityReference value."
+                      "description": "Account name, or the SID of a built-in account such as S-1-1-0 (Everyone), which works in every Windows language."
                     },
                     "AccessControlType": {
                       "type": "string",

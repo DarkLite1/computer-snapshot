@@ -94,6 +94,10 @@ Instead of writing a section inline, you can point to a file. The path is relati
 
 The referenced file contains only that section's data (for example, a JSON array of user accounts). Referenced files can't point to other files.
 
+### Accounts in other Windows languages
+
+Built-in accounts and groups have a different name in each Windows language: *Everyone* is *Iedereen* in Dutch and *Jeder* in German. So exports store them by their security ID (SID), which is the same everywhere, for example `S-1-1-0` for Everyone and `S-1-5-32-544` for Administrators. A restore turns the SID back into the name used by that computer. This applies to user group names and members, share permissions and folder permissions. You can write SIDs in your own configurations too. Local and domain accounts keep their name, because their SID differs per computer or domain.
+
 ### Paths
 
 All paths in a configuration (installers, files to copy, custom scripts, shared sections) are relative to the root of the USB stick, unless you give a full path like `C:\Temp\file.txt`. Environment variables such as `%SystemRoot%` are expanded.

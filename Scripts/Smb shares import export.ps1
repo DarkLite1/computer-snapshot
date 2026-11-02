@@ -65,7 +65,10 @@ if ($Action -eq 'Export') {
             @{Name = 'SmbInstance'; Expression = { [string]$_.SmbInstance } },
             @{Name = 'FolderEnumerationMode'; Expression = { [string]$_.FolderEnumerationMode } },
             CATimeout, EncryptData, ThrottleLimit, ConcurrentUserLimit, ContinuouslyAvailable)
-        Access = @($shares | Get-SmbShareAccess | Select-Object Name, ScopeName, AccountName,
+        # Built-in accounts such as Everyone are exported by SID, so the
+        # configuration works in every Windows language
+        Access = @($shares | Get-SmbShareAccess | Select-Object Name, ScopeName,
+            @{Name = 'AccountName'; Expression = { ConvertTo-PortableAccountNameHC -Name ([string]$_.AccountName) } },
             @{Name = 'AccessControlType'; Expression = { [string]$_.AccessControlType } },
             @{Name = 'AccessRight'; Expression = { [string]$_.AccessRight } })
         NTFS   = @(foreach ($share in $shares | Where-Object { $_.Path -and (Test-Path -LiteralPath $_.Path -PathType Container -ErrorAction Ignore) }) {
@@ -73,9 +76,9 @@ if ($Action -eq 'Export') {
                     $acl = Get-Acl -LiteralPath $share.Path
                     [ordered]@{
                         Name                    = $share.Name
-                        Owner                   = $acl.Owner
+                        Owner                   = if ($acl.Owner) { ConvertTo-PortableAccountNameHC -Name $acl.Owner } else { $acl.Owner }
                         AreAccessRulesProtected = $acl.AreAccessRulesProtected
-                        Access                  = @($acl.Access | Where-Object { -not $_.IsInherited } | Select-Object @{Name = 'IdentityReference'; Expression = { [string]$_.IdentityReference } },
+                        Access                  = @($acl.Access | Where-Object { -not $_.IsInherited } | Select-Object @{Name = 'IdentityReference'; Expression = { ConvertTo-PortableAccountNameHC -Name ([string]$_.IdentityReference) } },
                             @{Name = 'AccessControlType'; Expression = { [string]$_.AccessControlType } },
                             @{Name = 'FileSystemRights'; Expression = { [string]$_.FileSystemRights } },
                             @{Name = 'InheritanceFlags'; Expression = { [string]$_.InheritanceFlags } },

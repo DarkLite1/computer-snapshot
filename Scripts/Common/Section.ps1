@@ -96,6 +96,43 @@ function Test-AccountExistsHC {
     }
 }
 
+function ConvertTo-PortableAccountNameHC {
+    <#
+    .SYNOPSIS
+        The name to export for an account: its SID when that is the same on
+        every computer, otherwise the account name.
+    .DESCRIPTION
+        Built-in accounts and groups such as Everyone (S-1-1-0) or
+        Administrators (S-1-5-32-544) have a fixed SID, but their name
+        depends on the Windows language. Exporting the SID makes the
+        configuration work in every language. Local and domain accounts
+        (S-1-5-21-...) have a SID that differs per computer or domain, so
+        they keep their name. A name that cannot be resolved, such as an
+        orphaned account, is kept as it is.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [string]$Sid
+    )
+
+    if (-not $Sid) {
+        try {
+            $Sid = ([System.Security.Principal.NTAccount]$Name).Translate(
+                [System.Security.Principal.SecurityIdentifier]
+            ).Value
+        }
+        catch {
+            return $Name
+        }
+    }
+
+    if ($Sid -like 'S-1-5-21-*') {
+        return $Name
+    }
+
+    $Sid
+}
+
 function Convert-AccountNameHC {
     <#
     .SYNOPSIS
@@ -106,6 +143,8 @@ function Convert-AccountNameHC {
         'PC2\bob'. Other names are kept: names without a prefix, built-in
         and service accounts, and every account this computer can resolve,
         such as 'CONTOSO\Domain Admins' on a computer in that domain.
+        A SID, which an export writes for built-in accounts, becomes the
+        account's name in this computer's language.
 
         When neither the name nor the local name can be resolved, the name
         is returned unchanged, so the error names the configured account.
@@ -113,6 +152,18 @@ function Convert-AccountNameHC {
     param(
         [Parameter(Mandatory)][string]$Name
     )
+
+    # A SID, as exported for built-in accounts: use this computer's name
+    if ($Name -match '^S-1-\d+(-\d+)+$') {
+        try {
+            return ([System.Security.Principal.SecurityIdentifier]$Name).Translate(
+                [System.Security.Principal.NTAccount]
+            ).Value
+        }
+        catch {
+            return $Name
+        }
+    }
 
     if ($Name -notlike '*\*') {
         return $Name

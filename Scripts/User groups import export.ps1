@@ -63,16 +63,34 @@ if ($Action -eq 'Export') {
         foreach ($group in @(Get-LocalGroup)) {
             Write-Verbose "Group '$($group.Name)'"
             try {
-                $memberNames = @(Get-LocalGroupMember -Name $group.Name | ForEach-Object { $_.Name })
+                # Built-in members such as Everyone are exported by SID
+                $memberNames = @(
+                    Get-LocalGroupMember -Name $group.Name | ForEach-Object {
+                        ConvertTo-PortableAccountNameHC -Name $_.Name -Sid ([string]$_.SID)
+                    }
+                )
             }
             catch {
                 $errors += "Failed to read the members of group '$($group.Name)', it probably contains an invalid or orphaned account: $($_.Exception.Message)"
                 continue
             }
-            [ordered]@{
-                Name        = $group.Name
-                Description = $group.Description
-                Members     = $memberNames
+            $groupName = ConvertTo-PortableAccountNameHC -Name $group.Name -Sid ([string]$group.SID)
+            if ($groupName -ne $group.Name) {
+                # A built-in group: its name and description depend on the
+                # Windows language, so it is stored by SID and its
+                # description is left to Windows
+                [ordered]@{
+                    Name    = $groupName
+                    Comment = "Built-in group '$($group.Name)', stored by SID so it works in every Windows language"
+                    Members = $memberNames
+                }
+            }
+            else {
+                [ordered]@{
+                    Name        = $group.Name
+                    Description = $group.Description
+                    Members     = $memberNames
+                }
             }
         }
     )
@@ -88,8 +106,16 @@ else {
         $hasDescription = $properties -contains 'Description'
 
         #region Create the group or update its description
+        $groupName = $group.Name
         try {
-            $existingGroup = $knownGroups | Where-Object { $_.Name -eq $group.Name }
+            $isSid = $group.Name -match '^S-1-\d+(-\d+)+$'
+            $existingGroup = $knownGroups | Where-Object {
+                $_.Name -eq $group.Name -or ($isSid -and [string]$_.SID -eq $group.Name)
+            } | Select-Object -First 1
+            if ($existingGroup) { $groupName = $existingGroup.Name }
+            if (-not $existingGroup -and $isSid) {
+                throw "there is no group with SID '$($group.Name)' on '$env:COMPUTERNAME'"
+            }
             if (-not $existingGroup) {
                 $newGroupParams = @{ Name = $group.Name }
                 if ($group.Description) { $newGroupParams.Description = $group.Description }
@@ -97,15 +123,15 @@ else {
                 $messages += "Created group '$($group.Name)'"
             }
             elseif ($hasDescription -and [string]$group.Description -ne [string]$existingGroup.Description) {
-                Set-LocalGroupDescriptionHC -Name $group.Name -Description $group.Description
-                $messages += "Updated the description of group '$($group.Name)'"
+                Set-LocalGroupDescriptionHC -Name $groupName -Description $group.Description
+                $messages += "Updated the description of group '$groupName'"
             }
             else {
-                $messages += "Group '$($group.Name)' already exists and is correct"
+                $messages += "Group '$groupName' already exists and is correct"
             }
         }
         catch {
-            $errors += "Failed to create or update group '$($group.Name)': $($_.Exception.Message)"
+            $errors += "Failed to create or update group '$groupName': $($_.Exception.Message)"
             # Without the group, adding members can only fail
             continue
         }
@@ -115,23 +141,23 @@ else {
         foreach ($member in @($group.Members | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
             try {
                 $accountName = Convert-AccountNameHC $member
-                Add-LocalGroupMember -Group $group.Name -Member $accountName
+                Add-LocalGroupMember -Group $groupName -Member $accountName
                 if ($accountName -ne $member) {
-                    $messages += "Added account '$member' as '$accountName' to group '$($group.Name)'"
+                    $messages += "Added account '$member' as '$accountName' to group '$($groupName)'"
                 }
                 else {
-                    $messages += "Added account '$member' to group '$($group.Name)'"
+                    $messages += "Added account '$member' to group '$($groupName)'"
                 }
             }
             catch {
                 if (Test-ErrorKindHC $_ 'MemberExists') {
-                    $messages += "Account '$member' is already a member of group '$($group.Name)'"
+                    $messages += "Account '$member' is already a member of group '$($groupName)'"
                 }
                 elseif (Test-ErrorKindHC $_ 'PrincipalNotFound') {
-                    $errors += "Failed to add account '$member' to group '$($group.Name)': account not found"
+                    $errors += "Failed to add account '$member' to group '$($groupName)': account not found"
                 }
                 else {
-                    $errors += "Failed to add account '$member' to group '$($group.Name)': $($_.Exception.Message)"
+                    $errors += "Failed to add account '$member' to group '$($groupName)': $($_.Exception.Message)"
                 }
             }
         }

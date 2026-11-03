@@ -89,7 +89,8 @@ Describe 'NTP command failures' {
             $result = . $scriptPath -Action Import -Data $manualData -RootFolder $TestDrive
             $result.Messages | Should -Contain "Time synchronized with custom time servers 'server1 server2'"
             Should -Invoke w32tm -Times 1 -Exactly -ParameterFilter {
-                $Arguments -contains '/config' -and $Arguments -contains '/manualpeerlist:server1 server2' -and $Arguments -contains '/update'
+                $Arguments -contains '/config' -and $Arguments -contains '/manualpeerlist:server1 server2' -and $Arguments -contains '/update' -and
+                $Arguments -contains '/reliable:NO' -and $Arguments -notcontains '/reliable:YES'
             }
             Should -Invoke Restart-Service -Times 1 -Exactly -ParameterFilter { $ErrorAction -eq 'Stop' }
             Should -Invoke w32tm -Times 1 -Exactly -ParameterFilter { $Arguments -contains '/resync' }

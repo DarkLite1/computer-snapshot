@@ -60,7 +60,10 @@ Function Set-SynchronizeTimeWithServerHC {
 
         $manualpeerlist = $ComputerName -join ' '
 
-        $null = Invoke-TimeServiceHC -Arguments '/config', "/manualpeerlist:$manualpeerlist", '/syncfromflags:manual', '/reliable:YES', '/update'
+        # /reliable:NO: this computer only uses the time servers. YES would
+        # announce it as a reliable time source for other computers, which
+        # is meant for domain controllers and dedicated time servers
+        $null = Invoke-TimeServiceHC -Arguments '/config', "/manualpeerlist:$manualpeerlist", '/syncfromflags:manual', '/reliable:NO', '/update'
     }
 Function Set-SynchronizeTimeWithDomainHC {
         $null = Invoke-TimeServiceHC -Arguments '/config', '/syncfromflags:domhier', '/reliable:NO', '/update'

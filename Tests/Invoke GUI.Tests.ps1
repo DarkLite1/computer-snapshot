@@ -561,6 +561,10 @@ Describe 'Restore selection controls' {
         }
         finally { $dialog.Dispose() }
     }
+    It 'enables only Create folders and Registry keys for the bundled combined sections example' {
+        $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile "$PSScriptRoot\..\Configurations\Example combined sections.json")
+        @($entries | Where-Object Available | ForEach-Object Key) | Should -Be @('CreateFolders', 'RegistryKeys')
+    }
     It 'shows checked names and descriptions and returns only checked keys' {
         $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Example' -Entries @(Get-SnapshotItemEntriesHC -Items UserAccounts, Software)
         try {

@@ -7,8 +7,8 @@ BeforeAll {
     $schemaPath = Join-Path $PSScriptRoot '..\Scripts\config.schema.json'
     $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
     $root = Split-Path $PSScriptRoot -Parent
-    $shippedConfigurations = @((Join-Path $root 'Configurations\Example PC1.json'), (Join-Path $root 'Configurations\Example prompted setup.json'))
-    $shippedSharedSections = @((Join-Path $root 'Shared\UserAccounts kiosk.json'))
+    $shippedConfigurations = @(Get-ChildItem -LiteralPath (Join-Path $root 'Configurations') -Filter '*.json' -File | ForEach-Object FullName)
+    $shippedSharedSections = @(Get-ChildItem -LiteralPath (Join-Path $root 'Shared') -Filter '*.json' -File | ForEach-Object FullName)
     $mapping = @{
         'Folders' = 'CreateFolders'; 'Copy files folders' = 'CopyFilesFolders'; 'NTP time servers' = 'NtpTimeServers'
         'Network cards' = 'NetworkCards'; 'Regional settings' = 'RegionalSettings'; 'Software' = 'Software'
@@ -67,7 +67,23 @@ Describe 'Schema contract' {
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ software = @{} } } $TestDrive) -join ';' | Should -Match 'software: unknown'
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Comment = 5; Software = @{} } } $TestDrive) -join ';' | Should -Match 'Comment: expected a string'
     }
+    It 'combines the shared files of the combined sections example in order, only below safe example locations' {
+        $loaded = Read-ConfigurationHC (Join-Path $root 'Configurations\Example combined sections.json') $root
+        $loaded.Problems.Count | Should -Be 0 -Because ($loaded.Problems -join '; ')
+        @($loaded.Items.Keys) | Should -Be @('CreateFolders', 'RegistryKeys')
+        @($loaded.Items.CreateFolders.FolderPaths) | Should -Be @(
+            '%ProgramData%\ComputerSnapshot example\Logs'
+            '%ProgramData%\ComputerSnapshot example\Scripts'
+            '%ProgramData%\ComputerSnapshot example\Kiosk\Media'
+        )
+        $entries = @($loaded.Items.RegistryKeys.RunAsCurrentUser.RegistryKeys)
+        @($entries.Name) | Should -Be @('Role', 'SupportDesk', 'StartPage', 'IdleLogoffMinutes')
+        foreach ($entry in $entries) { $entry.Path | Should -BeLike 'HKCU:\Software\ComputerSnapshot\Example*' }
+        $loaded.Settings.RebootComputer | Should -BeFalse
+    }
     It 'validates every shipped configuration and its shared references' {
+        $shippedConfigurations.Count | Should -BeGreaterOrEqual 3
+        $shippedSharedSections.Count | Should -BeGreaterOrEqual 5
         foreach ($file in Get-Item -LiteralPath $shippedConfigurations -ErrorAction Stop) {
             $loaded = Read-ConfigurationHC $file.FullName $root
             $problems = @(Test-ConfigurationHC $loaded $root)

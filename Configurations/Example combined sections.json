@@ -1,0 +1,22 @@
+{
+  "$schema": "../Scripts/config.schema.json",
+  "SchemaVersion": 3,
+  "Description": "Combined sections example: an office PC base plus kiosk extras, each section built from two files in Shared. Only adds example registry values under HKCU\\Software\\ComputerSnapshot\\Example and folders under %ProgramData%\\ComputerSnapshot example.",
+  "Settings": {
+    "RebootComputer": false,
+    "RestartDelaySeconds": 60,
+    "OpenReportInBrowser": true,
+    "RunElevated": false
+  },
+  "Items": {
+    "Comment": "Each section lists its files; they are combined in this order.",
+    "CreateFolders": [
+      "Shared\\Folders common.json",
+      "Shared\\Folders kiosk.json"
+    ],
+    "RegistryKeys": [
+      "Shared\\Registry common.json",
+      "Shared\\Registry kiosk.json"
+    ]
+  }
+}

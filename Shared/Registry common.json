@@ -1,0 +1,19 @@
+{
+  "Comment": "Registry values every office PC gets. Example only: the values are under HKCU\\Software\\ComputerSnapshot\\Example and change nothing in Windows.",
+  "RunAsCurrentUser": {
+    "RegistryKeys": [
+      {
+        "Path": "HKCU:\\Software\\ComputerSnapshot\\Example",
+        "Name": "Role",
+        "Type": "String",
+        "Value": "Office PC"
+      },
+      {
+        "Path": "HKCU:\\Software\\ComputerSnapshot\\Example",
+        "Name": "SupportDesk",
+        "Type": "String",
+        "Value": "helpdesk@contoso.com"
+      }
+    ]
+  }
+}

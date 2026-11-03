@@ -1,0 +1,6 @@
+{
+  "Comment": "Extra folders for kiosk PCs, added to the common ones. Example only: everything is below %ProgramData%\\ComputerSnapshot example.",
+  "FolderPaths": [
+    "%ProgramData%\\ComputerSnapshot example\\Kiosk\\Media"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "Comment": "Extra registry values for kiosk PCs, added to the common ones. Example only: the values are under HKCU\\Software\\ComputerSnapshot\\Example\\Kiosk.",
+  "RunAsCurrentUser": {
+    "RegistryKeys": [
+      {
+        "Path": "HKCU:\\Software\\ComputerSnapshot\\Example\\Kiosk",
+        "Name": "StartPage",
+        "Type": "String",
+        "Value": "https://intranet.contoso.com/kiosk"
+      },
+      {
+        "Path": "HKCU:\\Software\\ComputerSnapshot\\Example\\Kiosk",
+        "Name": "IdleLogoffMinutes",
+        "Type": "DWord",
+        "Value": 15
+      }
+    ]
+  }
+}

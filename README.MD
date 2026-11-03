@@ -111,6 +111,8 @@ The files are combined in the order you list them:
 - A single setting may appear in several files only with the same value. Two different values, such as two time zones in `RegionalSettings`, are reported as an error naming both files, instead of one silently winning.
 - The combined section is checked as a whole, so the same share or user in two files is reported as well.
 
+See [Configurations/Example combined sections.json](Configurations/Example%20combined%20sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares common.json` with the shares of every PC and `Shared\SmbShares kiosk.json` with the extra kiosk shares.
+
 ### Accounts in other Windows languages
 
 Built-in accounts and groups have a different name in each Windows language: *Everyone* is *Iedereen* in Dutch and *Jeder* in German. So exports store them by their security ID (SID), which is the same everywhere, for example `S-1-1-0` for Everyone and `S-1-5-32-544` for Administrators. A restore turns the SID back into the name used by that computer. This applies to user group names and members, share permissions and folder permissions. You can write SIDs in your own configurations too. Local and domain accounts keep their name, because their SID differs per computer or domain.

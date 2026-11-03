@@ -246,3 +246,251 @@ Describe 'Finding the card and IPv4 settings' {
         $result.Messages | Should -Contain "Network card 'Ethernet' has 2 IPv4 addresses; only 10.20.67.2 was exported"
     }
 }
+
+Describe 'Keeping the old IPv4 settings when a change fails' {
+    BeforeAll {
+        $scriptPath = "$PSScriptRoot\..\Scripts\Network cards import export.ps1"
+    }
+    BeforeEach {
+        Mock Get-NetAdapter {
+            [pscustomobject]@{
+                Name                 = 'Ethernet'
+                InterfaceDescription = 'Intel(R) Ethernet'
+                InterfaceIndex       = 7
+                InterfaceGuid        = '{GUID-7}'
+            }
+            [pscustomobject]@{
+                Name                 = 'Wi-Fi'
+                InterfaceDescription = 'Wireless'
+                InterfaceIndex       = 8
+                InterfaceGuid        = '{GUID-8}'
+            }
+        }
+        Mock Get-DnsClient
+        Mock Get-NetConnectionProfile
+        Mock Rename-NetAdapter
+
+        # One card whose settings change as the mocked cmdlets are called
+        $fakeCard = @{
+            Dhcp          = 'Disabled'
+            Addresses     = @(
+                [pscustomobject]@{
+                    IPAddress    = '10.20.67.2'
+                    PrefixLength = 24
+                    PrefixOrigin = 'Manual'
+                }
+            )
+            Gateways      = @('10.20.67.254')
+            NameServer    = '10.75.38.23'
+            FailAddresses = @('10.20.67.9')
+            FailDhcp      = $false
+            FailDns       = $false
+        }
+        Mock Get-NetIPInterface {
+            [pscustomobject]@{ Dhcp = $fakeCard.Dhcp }
+        }
+        Mock Get-NetIPAddress { $fakeCard.Addresses }
+        Mock Get-NetRoute {
+            $fakeCard.Gateways |
+            ForEach-Object { [pscustomobject]@{ NextHop = $_ } }
+        }
+        Mock Get-ItemProperty
+        Mock Get-ItemProperty {
+            [pscustomobject]@{ NameServer = $fakeCard.NameServer }
+        } -ParameterFilter {
+            $LiteralPath -like '*\Tcpip\Parameters\Interfaces\{GUID-7}'
+        }
+        Mock Set-NetIPInterface {
+            if ($fakeCard.FailDhcp -and $Dhcp -eq 'Enabled') {
+                throw 'DHCP is blocked by policy'
+            }
+            $fakeCard.Dhcp = [string]$Dhcp
+        }
+        Mock Remove-NetIPAddress {
+            $fakeCard.Addresses = @(
+                $fakeCard.Addresses |
+                Where-Object { $IPAddress -and $_.IPAddress -ne $IPAddress }
+            )
+        }
+        Mock Remove-NetRoute {
+            $fakeCard.Gateways = @(
+                $fakeCard.Gateways |
+                Where-Object { $NextHop -and $_ -ne $NextHop }
+            )
+        }
+        Mock New-NetIPAddress {
+            if ($fakeCard.FailAddresses -contains $IPAddress) {
+                throw "The address $IPAddress is already in use"
+            }
+            $fakeCard.Addresses += [pscustomobject]@{
+                IPAddress    = $IPAddress
+                PrefixLength = $PrefixLength
+                PrefixOrigin = 'Manual'
+            }
+            if ($DefaultGateway) {
+                $fakeCard.Gateways += $DefaultGateway
+            }
+        }
+        Mock New-NetRoute {
+            $fakeCard.Gateways += $NextHop
+        }
+        Mock Set-DnsClientServerAddress {
+            if ($fakeCard.FailDns -and $ServerAddresses) {
+                if ($ServerAddresses -notcontains '10.75.38.23') {
+                    throw 'DNS server is not reachable'
+                }
+            }
+            $fakeCard.NameServer = if ($ResetServerAddresses) { '' }
+            else { $ServerAddresses -join ',' }
+        }
+
+        $fakeStaticSettings = [pscustomobject]@{
+            IPAddress      = '10.20.67.9'
+            PrefixLength   = 24
+            DefaultGateway = '10.20.67.254'
+        }
+        $fakeData = @(
+            [pscustomobject]@{
+                FindBy = [pscustomobject]@{ Name = 'Ethernet' }
+                Change = [pscustomobject]@{
+                    IPSettings = $fakeStaticSettings
+                }
+            }
+        )
+    }
+    It 'adds the old static address and gateway back when the new address fails' {
+        $result = . $scriptPath -Action Import -Data $fakeData `
+            -RootFolder $TestDrive
+
+        $result.Errors | Should -Be @(
+            "Failed to configure network card 'Ethernet': the static " +
+            'address 10.20.67.9/24 could not be set: The address ' +
+            '10.20.67.9 is already in use; the previous IPv4 settings ' +
+            'were restored'
+        )
+
+        Should -Invoke New-NetIPAddress -Times 1 -Exactly -ParameterFilter {
+            $InterfaceIndex -eq 7 -and
+            $IPAddress -eq '10.20.67.2' -and
+            $PrefixLength -eq 24
+        }
+
+        Should -Invoke New-NetRoute -Times 1 -Exactly -ParameterFilter {
+            $InterfaceIndex -eq 7 -and
+            $DestinationPrefix -eq '0.0.0.0/0' -and
+            $NextHop -eq '10.20.67.254'
+        }
+
+        $fakeCard.Dhcp | Should -Be 'Disabled'
+        $fakeCard.Addresses.IPAddress | Should -Be @('10.20.67.2')
+        $fakeCard.Gateways | Should -Be @('10.20.67.254')
+        $result.Messages | Should -BeNullOrEmpty
+    }
+    It 'turns DHCP on again when the new static address of a DHCP card fails' {
+        $fakeCard.Dhcp = 'Enabled'
+        $fakeCard.Addresses = @(
+            [pscustomobject]@{
+                IPAddress    = '192.168.1.50'
+                PrefixLength = 24
+                PrefixOrigin = 'Dhcp'
+            }
+        )
+        $fakeCard.Gateways = @('192.168.1.1')
+
+        $result = . $scriptPath -Action Import -Data $fakeData `
+            -RootFolder $TestDrive
+
+        $result.Errors[0] | Should -BeLike (
+            '*the static address 10.20.67.9/24 could not be set: *; ' +
+            'the previous IPv4 settings were restored'
+        )
+
+        Should -Invoke Set-NetIPInterface -Times 1 -Exactly -ParameterFilter {
+            $InterfaceIndex -eq 7 -and $Dhcp -eq 'Disabled'
+        }
+        Should -Invoke Set-NetIPInterface -Times 1 -Exactly -ParameterFilter {
+            $InterfaceIndex -eq 7 -and $Dhcp -eq 'Enabled'
+        }
+        $fakeCard.Dhcp | Should -Be 'Enabled'
+    }
+    It 'removes the new address and restores the old settings when DNS fails' {
+        $fakeCard.FailDns = $true
+        $fakeStaticSettings | Add-Member -NotePropertyName DNSServers `
+            -NotePropertyValue @('10.99.99.99')
+
+        $fakeData[0].Change.IPSettings.IPAddress = '10.20.67.5'
+
+        $result = . $scriptPath -Action Import -Data $fakeData `
+            -RootFolder $TestDrive
+
+        $result.Errors | Should -Be @(
+            "Failed to configure network card 'Ethernet': the DNS " +
+            'servers 10.99.99.99 could not be set: DNS server is not ' +
+            'reachable; the previous IPv4 settings were restored'
+        )
+
+        Should -Invoke Remove-NetIPAddress -Times 1 -Exactly -ParameterFilter {
+            $InterfaceIndex -eq 7 -and $IPAddress -eq '10.20.67.5'
+        }
+        Should -Invoke Set-DnsClientServerAddress -Times 1 -Exactly `
+            -ParameterFilter {
+            ($ServerAddresses -join ',') -eq '10.75.38.23'
+        }
+        $fakeCard.Addresses.IPAddress | Should -Be @('10.20.67.2')
+        $fakeCard.Gateways | Should -Be @('10.20.67.254')
+        $fakeCard.NameServer | Should -Be '10.75.38.23'
+    }
+    It 'says so when restoring fails too and still configures the next card' {
+        $fakeCard.FailAddresses = @('10.20.67.9', '10.20.67.2')
+        $fakeData += [pscustomobject]@{
+            FindBy = [pscustomobject]@{ Name = 'Wi-Fi' }
+            Change = [pscustomobject]@{ NewName = 'Wireless LAN' }
+        }
+
+        $result = . $scriptPath -Action Import -Data $fakeData `
+            -RootFolder $TestDrive
+
+        $result.Errors | Should -Be @(
+            "Failed to configure network card 'Ethernet': the static " +
+            'address 10.20.67.9/24 could not be set: The address ' +
+            '10.20.67.9 is already in use; restoring the previous ' +
+            'settings failed too: the address 10.20.67.2/24 could not ' +
+            'be added back: The address 10.20.67.2 is already in use'
+        )
+
+        Should -Invoke New-NetRoute -Times 1 -Exactly -ParameterFilter {
+            $NextHop -eq '10.20.67.254'
+        }
+        Should -Invoke Rename-NetAdapter -Times 1 -Exactly -ParameterFilter {
+            $Name -eq 'Wi-Fi' -and $NewName -eq 'Wireless LAN'
+        }
+        $result.Messages | Should -Contain (
+            "Renamed network card 'Wireless' from 'Wi-Fi' to 'Wireless LAN'"
+        )
+    }
+    It 'restores the static settings when switching to DHCP fails' {
+        $fakeCard.FailDhcp = $true
+        $fakeData[0].Change.IPSettings = [pscustomobject]@{ Dhcp = $true }
+
+        $result = . $scriptPath -Action Import -Data $fakeData `
+            -RootFolder $TestDrive
+
+        $result.Errors | Should -Be @(
+            "Failed to configure network card 'Ethernet': DHCP could not " +
+            'be enabled: DHCP is blocked by policy; the previous IPv4 ' +
+            'settings were restored'
+        )
+
+        Should -Invoke New-NetIPAddress -Times 1 -Exactly -ParameterFilter {
+            $IPAddress -eq '10.20.67.2' -and $PrefixLength -eq 24
+        }
+        Should -Invoke New-NetRoute -Times 1 -Exactly -ParameterFilter {
+            $NextHop -eq '10.20.67.254'
+        }
+        Should -Invoke Set-DnsClientServerAddress -Times 0 -Exactly
+        $fakeCard.Dhcp | Should -Be 'Disabled'
+        $fakeCard.Addresses.IPAddress | Should -Be @('10.20.67.2')
+        $fakeCard.Gateways | Should -Be @('10.20.67.254')
+        $fakeCard.NameServer | Should -Be '10.75.38.23'
+    }
+}

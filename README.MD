@@ -243,6 +243,7 @@ Each entry in `NetworkCards` has two parts: `FindBy` says how to find the card, 
 - `{ "Dhcp": true }` makes the address automatic again; static addresses and the gateway are removed, and hand-set DNS servers too unless `DNSServers` is given.
 - `DNSServers` replaces the DNS servers, in order of use. An empty list makes DNS automatic; leaving it out keeps the current DNS servers.
 - Use `{{ipv4:...}}` and `{{prefix:...}}` placeholders to ask for the values during the restore (see [Restore-Time Input](#restore-time-input)).
+- When a change to the IPv4 settings fails, for example because the address is already in use, the previous settings are put back: DHCP on or off, the addresses, the default gateway and the DNS servers. The report names the failure and says whether restoring them worked.
 - An export finds each card by its description and writes its current name in `NewName`, with its settings: `Dhcp: true`, or its static address, prefix and gateway, plus DNS servers that were set by hand. A card with several IPv4 addresses exports the first one; the report says so.
 
 > Changing the IP address of the card you are connected through, for example over remote desktop, ends that connection. Restore network settings at the computer itself.

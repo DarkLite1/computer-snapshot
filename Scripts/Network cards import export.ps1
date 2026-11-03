@@ -20,6 +20,9 @@
     optional DNSServers. A static address replaces all IPv4 addresses and the
     default gateway of the card. DNSServers replaces the DNS servers; an empty
     list makes DNS automatic again and omitting it leaves DNS unchanged.
+    When an IPv4 change fails, the previous DHCP setting, addresses, default
+    gateway and DNS servers are restored, best effort, and the error says
+    whether that worked.
 
     Export finds each card by its description and writes its current name
     and settings in Change, including its IPv4 settings: Dhcp true, or its
@@ -111,8 +114,170 @@ function Get-IPv4StateHC {
         DnsServers = $dnsServers
     }
 }
+function Restore-IPv4StateHC {
+    # Best effort: puts back the IPv4 settings read by Get-IPv4StateHC before
+    # a change, step by step, and returns the steps that failed
+    param(
+        [Parameter(Mandatory)]$Adapter,
+        [Parameter(Mandatory)]$State,
+        [switch]$Dns
+    )
+    $index = $Adapter.InterfaceIndex
+    $failures = [System.Collections.Generic.List[string]]::new()
+    $restoreStep = {
+        param([string]$Description, [scriptblock]$Action)
+        try {
+            $null = & $Action
+        }
+        catch {
+            $failures.Add("${Description}: $($_.Exception.Message)")
+        }
+    }
+    $getCurrent = {
+        $current = Get-IPv4StateHC -Adapter $Adapter
+        if (-not $current) {
+            throw 'the card has no IPv4 settings'
+        }
+        $current
+    }
+
+    $current = $null
+    try {
+        $current = & $getCurrent
+    }
+    catch {
+        $failures.Add(
+            "the current settings could not be read: $($_.Exception.Message)"
+        )
+    }
+
+    if ($current -and $State.Dhcp) {
+        if (-not $current.Dhcp) {
+            if ($current.Addresses.Count) {
+                & $restoreStep 'the static addresses could not be removed' {
+                    Remove-NetIPAddress -InterfaceIndex $index `
+                        -AddressFamily IPv4 -Confirm:$false
+                }
+            }
+            if ($current.Routes.Count) {
+                & $restoreStep 'the default gateway could not be removed' {
+                    Remove-NetRoute -InterfaceIndex $index `
+                        -DestinationPrefix '0.0.0.0/0' -Confirm:$false
+                }
+            }
+            & $restoreStep 'DHCP could not be enabled again' {
+                Set-NetIPInterface -InterfaceIndex $index `
+                    -AddressFamily IPv4 -Dhcp Enabled
+            }
+        }
+    }
+    elseif ($current) {
+        if ($current.Dhcp) {
+            & $restoreStep 'DHCP could not be turned off again' {
+                Set-NetIPInterface -InterfaceIndex $index `
+                    -AddressFamily IPv4 -Dhcp Disabled
+            }
+            try {
+                $current = & $getCurrent
+            }
+            catch {
+                $failures.Add(
+                    "the current settings could not be read: $($_.Exception.Message)"
+                )
+                $current = [pscustomobject]@{
+                    Addresses = @()
+                    Routes    = @()
+                }
+            }
+        }
+
+        $oldAddresses = @(
+            $State.Addresses |
+            ForEach-Object { "$($_.IPAddress)/$($_.PrefixLength)" }
+        )
+        $currentAddresses = @(
+            $current.Addresses |
+            ForEach-Object { "$($_.IPAddress)/$($_.PrefixLength)" }
+        )
+        $oldGateways = @(
+            $State.Routes |
+            ForEach-Object { [string]$_.NextHop } |
+            Where-Object { $_ -and $_ -ne '0.0.0.0' }
+        )
+        $currentGateways = @(
+            $current.Routes | ForEach-Object { [string]$_.NextHop }
+        )
+
+        foreach ($address in @($current.Addresses)) {
+            if ($oldAddresses -notcontains
+                "$($address.IPAddress)/$($address.PrefixLength)"
+            ) {
+                & $restoreStep `
+                    "the address $($address.IPAddress) could not be removed" {
+                    Remove-NetIPAddress -InterfaceIndex $index `
+                        -IPAddress $address.IPAddress -Confirm:$false
+                }
+            }
+        }
+
+        foreach ($gateway in $currentGateways) {
+            if ($gateway -and $oldGateways -notcontains $gateway) {
+                & $restoreStep `
+                    "the default gateway $gateway could not be removed" {
+                    Remove-NetRoute -InterfaceIndex $index `
+                        -DestinationPrefix '0.0.0.0/0' -NextHop $gateway `
+                        -Confirm:$false
+                }
+            }
+        }
+
+        foreach ($address in @($State.Addresses)) {
+            $text = "$($address.IPAddress)/$($address.PrefixLength)"
+            if ($currentAddresses -notcontains $text) {
+                & $restoreStep "the address $text could not be added back" {
+                    $oldAddress = @{
+                        InterfaceIndex = $index
+                        AddressFamily  = 'IPv4'
+                        IPAddress      = [string]$address.IPAddress
+                        PrefixLength   = [int]$address.PrefixLength
+                    }
+                    New-NetIPAddress @oldAddress
+                }
+            }
+        }
+
+        foreach ($gateway in $oldGateways) {
+            if ($currentGateways -notcontains $gateway) {
+                & $restoreStep `
+                    "the default gateway $gateway could not be added back" {
+                    New-NetRoute -InterfaceIndex $index `
+                        -DestinationPrefix '0.0.0.0/0' -NextHop $gateway
+                }
+            }
+        }
+    }
+
+    if ($Dns) {
+        if ($State.DnsServers.Count) {
+            & $restoreStep 'the DNS servers could not be set back' {
+                Set-DnsClientServerAddress -InterfaceIndex $index `
+                    -ServerAddresses @($State.DnsServers)
+            }
+        }
+        else {
+            & $restoreStep 'automatic DNS could not be set back' {
+                Set-DnsClientServerAddress -InterfaceIndex $index `
+                    -ResetServerAddresses
+            }
+        }
+    }
+
+    $failures
+}
 function Set-IPv4SettingsHC {
-    # Returns the messages of the changes; nothing when already correct
+    # Returns the messages of the changes; nothing when already correct.
+    # When a change fails, the previous IPv4 settings are restored and one
+    # error says what failed and whether restoring worked
     param(
         [Parameter(Mandatory)]$Adapter,
         [Parameter(Mandatory)]$Settings,
@@ -124,68 +289,94 @@ function Set-IPv4SettingsHC {
     $names = @($Settings.PSObject.Properties.Name)
     if ($Settings -is [System.Collections.IDictionary]) { $names = @($Settings.Keys) }
     $dnsChanged = $false
+    $failedStep = $null
 
-    if ($Settings.Dhcp -eq $true) {
-        if (-not $state.Dhcp) {
-            if ($state.Addresses.Count) {
-                Remove-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4 -Confirm:$false
+    try {
+        if ($Settings.Dhcp -eq $true) {
+            if (-not $state.Dhcp) {
+                $failedStep = 'DHCP could not be enabled'
+                if ($state.Addresses.Count) {
+                    Remove-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4 -Confirm:$false
+                }
+                if ($state.Routes.Count) {
+                    Remove-NetRoute -InterfaceIndex $index -DestinationPrefix '0.0.0.0/0' -Confirm:$false
+                }
+                Set-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4 -Dhcp Enabled
+                "Network card $Label now gets its IPv4 address from DHCP"
+                if ($names -notcontains 'DNSServers' -and $state.DnsServers.Count) {
+                    $failedStep = 'automatic DNS could not be set'
+                    $dnsChanged = $true
+                    Set-DnsClientServerAddress -InterfaceIndex $index -ResetServerAddresses
+                    "Network card $Label now gets its DNS servers from DHCP"
+                }
             }
-            if ($state.Routes.Count) {
-                Remove-NetRoute -InterfaceIndex $index -DestinationPrefix '0.0.0.0/0' -Confirm:$false
+        }
+        else {
+            $address = [string]$Settings.IPAddress
+            $prefix = [int]$Settings.PrefixLength
+            $gateway = [string]$Settings.DefaultGateway
+            $isCorrect = (
+                -not $state.Dhcp -and
+                $state.Addresses.Count -eq 1 -and
+                $state.Addresses[0].IPAddress -eq $address -and
+                [int]$state.Addresses[0].PrefixLength -eq $prefix -and
+                (@($state.Routes | ForEach-Object { $_.NextHop }) -join ',') -eq $gateway
+            )
+            if (-not $isCorrect) {
+                $failedStep = "the static address $address/$prefix could not be set"
+                if ($state.Dhcp) {
+                    Set-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4 -Dhcp Disabled
+                }
+                # Read again: turning DHCP off can already remove its address
+                $current = Get-IPv4StateHC -Adapter $Adapter
+                if ($current.Addresses.Count) {
+                    Remove-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4 -Confirm:$false
+                }
+                if ($current.Routes.Count) {
+                    Remove-NetRoute -InterfaceIndex $index -DestinationPrefix '0.0.0.0/0' -Confirm:$false
+                }
+                $newAddress = @{ InterfaceIndex = $index; AddressFamily = 'IPv4'; IPAddress = $address; PrefixLength = $prefix }
+                if ($gateway) { $newAddress.DefaultGateway = $gateway }
+                $null = New-NetIPAddress @newAddress
+                $text = "Network card $Label now has the static IPv4 address $address/$prefix"
+                if ($gateway) { $text += " with default gateway $gateway" }
+                $text
             }
-            Set-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4 -Dhcp Enabled
-            "Network card $Label now gets its IPv4 address from DHCP"
-            if ($names -notcontains 'DNSServers' -and $state.DnsServers.Count) {
-                Set-DnsClientServerAddress -InterfaceIndex $index -ResetServerAddresses
+        }
+
+        if (-not $dnsChanged -and $names -contains 'DNSServers') {
+            $servers = @($Settings.DNSServers | Where-Object { $_ })
+            if (($servers -join ',') -ne ($state.DnsServers -join ',')) {
                 $dnsChanged = $true
-                "Network card $Label now gets its DNS servers from DHCP"
+                if ($servers.Count) {
+                    $failedStep = "the DNS servers $($servers -join ', ') could not be set"
+                    Set-DnsClientServerAddress -InterfaceIndex $index -ServerAddresses $servers
+                    "Network card $Label now uses the DNS servers $($servers -join ', ')"
+                }
+                else {
+                    $failedStep = 'automatic DNS could not be set'
+                    Set-DnsClientServerAddress -InterfaceIndex $index -ResetServerAddresses
+                    "Network card $Label now gets its DNS servers automatically"
+                }
             }
         }
     }
-    else {
-        $address = [string]$Settings.IPAddress
-        $prefix = [int]$Settings.PrefixLength
-        $gateway = [string]$Settings.DefaultGateway
-        $isCorrect = (
-            -not $state.Dhcp -and
-            $state.Addresses.Count -eq 1 -and
-            $state.Addresses[0].IPAddress -eq $address -and
-            [int]$state.Addresses[0].PrefixLength -eq $prefix -and
-            (@($state.Routes | ForEach-Object { $_.NextHop }) -join ',') -eq $gateway
+    catch {
+        if (-not $failedStep) {
+            throw
+        }
+        $reason = $_.Exception.Message
+        $restoreFailures = @(
+            Restore-IPv4StateHC -Adapter $Adapter -State $state `
+                -Dns:$dnsChanged
         )
-        if (-not $isCorrect) {
-            if ($state.Dhcp) {
-                Set-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4 -Dhcp Disabled
-            }
-            # Read again: turning DHCP off can already remove its address
-            $state = Get-IPv4StateHC -Adapter $Adapter
-            if ($state.Addresses.Count) {
-                Remove-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4 -Confirm:$false
-            }
-            if ($state.Routes.Count) {
-                Remove-NetRoute -InterfaceIndex $index -DestinationPrefix '0.0.0.0/0' -Confirm:$false
-            }
-            $newAddress = @{ InterfaceIndex = $index; AddressFamily = 'IPv4'; IPAddress = $address; PrefixLength = $prefix }
-            if ($gateway) { $newAddress.DefaultGateway = $gateway }
-            $null = New-NetIPAddress @newAddress
-            $text = "Network card $Label now has the static IPv4 address $address/$prefix"
-            if ($gateway) { $text += " with default gateway $gateway" }
-            $text
+        if ($restoreFailures.Count) {
+            throw (
+                "${failedStep}: $reason; restoring the previous settings " +
+                "failed too: $($restoreFailures -join '; ')"
+            )
         }
-    }
-
-    if (-not $dnsChanged -and $names -contains 'DNSServers') {
-        $servers = @($Settings.DNSServers | Where-Object { $_ })
-        if (($servers -join ',') -ne ($state.DnsServers -join ',')) {
-            if ($servers.Count) {
-                Set-DnsClientServerAddress -InterfaceIndex $index -ServerAddresses $servers
-                "Network card $Label now uses the DNS servers $($servers -join ', ')"
-            }
-            else {
-                Set-DnsClientServerAddress -InterfaceIndex $index -ResetServerAddresses
-                "Network card $Label now gets its DNS servers automatically"
-            }
-        }
+        throw "${failedStep}: $reason; the previous IPv4 settings were restored"
     }
 }
 function Get-IPv4SettingsHC {

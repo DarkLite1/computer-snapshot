@@ -37,10 +37,11 @@ Describe 'Inline NTFS permissions' {
 		Mock New-SmbShare
 		Mock Test-AccountExistsHC { $true }
 		$exportResult = . $testScript -Action Export -RootFolder $TestDrive
-		$exportResult.Data.NTFS[0].Access.Count | Should -Be 1
-		$exportResult.Data.NTFS[0].Access[0].IdentityReference | Should -Be 'S-1-1-0'
-		$exportResult.Data.NTFS[0].Owner | Should -Be 'S-1-5-32-544'
-		@(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ SmbShares = $exportResult.Data } } $TestDrive).Count | Should -Be 0
+		$exportResult.Data[0].Name | Should -Be 'Example'
+		$exportResult.Data[0].NTFS.Access.Count | Should -Be 1
+		$exportResult.Data[0].NTFS.Access[0].IdentityReference | Should -Be 'S-1-1-0'
+		$exportResult.Data[0].NTFS.Owner | Should -Be 'S-1-5-32-544'
+		@(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ SmbShares = $exportResult.Data } } $TestDrive).Count | Should -Be 0
 		$importResult = . $testScript -Action Import -Data $exportResult.Data -RootFolder $TestDrive -ErrorAction Stop
 		$importResult.Data | Should -BeNullOrEmpty
 		$testAcl.ProtectionApplied | Should -BeTrue
@@ -71,31 +72,26 @@ Describe 'Smb shares import' {
         Mock Unblock-SmbShareAccess
     }
     It 'blocks a Deny entry instead of granting it' {
-        $data = [pscustomobject]@{
-            Shares = @([pscustomobject]@{ Name = 'Data'; Path = $folder })
-            Access = @([pscustomobject]@{ Name = 'Data'; AccountName = $guests; AccessControlType = 'Deny'; AccessRight = 'Full' })
-        }
+        $data = @([pscustomobject]@{ Name = 'Data'; Path = $folder; Access = @(
+                    [pscustomobject]@{ AccountName = $guests; AccessControlType = 'Deny'; AccessRight = 'Full' }
+                ) })
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
         $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
         Should -Invoke Block-SmbShareAccess -Times 1 -Exactly
         Should -Invoke Grant-SmbShareAccess -Times 0 -Exactly
     }
     It 'removes unconfigured share permissions once all configured ones are applied' {
-        $data = [pscustomobject]@{
-            Shares = @([pscustomobject]@{ Name = 'Data'; Path = $folder })
-            Access = @([pscustomobject]@{ Name = 'Data'; AccountName = $everyone; AccessControlType = 'Allow'; AccessRight = 'Read' })
-        }
+        $data = @([pscustomobject]@{ Name = 'Data'; Path = $folder; Access = @(
+                    [pscustomobject]@{ AccountName = $everyone; AccessControlType = 'Allow'; AccessRight = 'Read' }
+                ) })
         $null = & $scriptPath -Action Import -Data $data -RootFolder $TestDrive
         Should -Invoke Revoke-SmbShareAccess -Times 1 -Exactly -ParameterFilter { $AccountName -eq 'PC\Old' }
     }
     It 'keeps existing share permissions when a configured account does not exist' {
-        $data = [pscustomobject]@{
-            Shares = @([pscustomobject]@{ Name = 'Data'; Path = $folder })
-            Access = @(
-                [pscustomobject]@{ Name = 'Data'; AccountName = $everyone; AccessControlType = 'Allow'; AccessRight = 'Read' }
-                [pscustomobject]@{ Name = 'Data'; AccountName = 'NoSuchAccount8f3a'; AccessControlType = 'Allow'; AccessRight = 'Full' }
-            )
-        }
+        $data = @([pscustomobject]@{ Name = 'Data'; Path = $folder; Access = @(
+                    [pscustomobject]@{ AccountName = $everyone; AccessControlType = 'Allow'; AccessRight = 'Read' }
+                    [pscustomobject]@{ AccountName = 'NoSuchAccount8f3a'; AccessControlType = 'Allow'; AccessRight = 'Full' }
+                ) })
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
         $result[0].Errors.Count | Should -Be 2
         $result[0].Errors[1] | Should -BeLike "*existing share permissions that are not in the configuration were kept*"
@@ -103,31 +99,28 @@ Describe 'Smb shares import' {
         Should -Invoke Revoke-SmbShareAccess -Times 0 -Exactly
     }
     It 'leaves share permissions unchanged when none are configured' {
-        $data = [pscustomobject]@{ Shares = @([pscustomobject]@{ Name = 'Data'; Path = $folder }) }
+        $data = @([pscustomobject]@{ Name = 'Data'; Path = $folder })
         $null = & $scriptPath -Action Import -Data $data -RootFolder $TestDrive
         Should -Invoke Grant-SmbShareAccess -Times 0 -Exactly
         Should -Invoke Revoke-SmbShareAccess -Times 0 -Exactly
     }
     It 'skips administrative shares and reports a share without a path' {
-        $data = [pscustomobject]@{ Shares = @(
-                [pscustomobject]@{ Name = 'IPC$'; Path = '' }
-                [pscustomobject]@{ Name = 'NoPath'; Path = '' }
-                [pscustomobject]@{ Name = 'Data'; Path = $folder }
-            )
-        }
+        $data = @(
+            [pscustomobject]@{ Name = 'IPC$'; Path = '' }
+            [pscustomobject]@{ Name = 'NoPath'; Path = '' }
+            [pscustomobject]@{ Name = 'Data'; Path = $folder }
+        )
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
         $result[0].Messages[0] | Should -BeLike "Skipped share 'IPC$'*"
         $result[0].Errors | Should -Be @("Failed to create or update share 'NoPath': the share has no Path")
         Should -Invoke Set-SmbShare -Times 1 -Exactly
     }
     It 'applies configured NTFS permissions' {
-        $data = [pscustomobject]@{
-            Shares = @([pscustomobject]@{ Name = 'Data'; Path = $folder })
-            NTFS   = @([pscustomobject]@{ Name = 'Data'; AreAccessRulesProtected = $false; Access = @(
+        $data = @([pscustomobject]@{ Name = 'Data'; Path = $folder
+                NTFS = [pscustomobject]@{ AreAccessRulesProtected = $false; Access = @(
                         [pscustomobject]@{ IdentityReference = $users; AccessControlType = 'Allow'; FileSystemRights = 'ReadAndExecute'; InheritanceFlags = 'ContainerInherit, ObjectInherit'; PropagationFlags = 'None' }
                     )
-                })
-        }
+                } })
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
         $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
         $explicit = @((Get-Acl -LiteralPath $folder).Access | Where-Object { -not $_.IsInherited })
@@ -135,14 +128,12 @@ Describe 'Smb shares import' {
     }
     It 'keeps the current NTFS permissions when a configured account does not exist' {
         $before = (Get-Acl -LiteralPath $folder).Sddl
-        $data = [pscustomobject]@{
-            Shares = @([pscustomobject]@{ Name = 'Data'; Path = $folder })
-            NTFS   = @([pscustomobject]@{ Name = 'Data'; AreAccessRulesProtected = $true; Access = @(
+        $data = @([pscustomobject]@{ Name = 'Data'; Path = $folder
+                NTFS = [pscustomobject]@{ AreAccessRulesProtected = $true; Access = @(
                         [pscustomobject]@{ IdentityReference = $users; AccessControlType = 'Allow'; FileSystemRights = 'ReadAndExecute'; InheritanceFlags = 'None'; PropagationFlags = 'None' }
                         [pscustomobject]@{ IdentityReference = 'NoSuchAccount8f3a'; AccessControlType = 'Allow'; FileSystemRights = 'FullControl'; InheritanceFlags = 'None'; PropagationFlags = 'None' }
                     )
-                })
-        }
+                } })
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
         $result[0].Errors[-1] | Should -BeLike '*the current NTFS permissions were kept*'
         (Get-Acl -LiteralPath $folder).Sddl | Should -BeExactly $before
@@ -155,10 +146,22 @@ Describe 'Smb shares import' {
         }
         Mock Get-SmbShareAccess
         $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
-        @($result[0].Data.Shares.Name) | Should -Be @('Data')
+        @($result[0].Data | ForEach-Object { $_.Name }) | Should -Be @('Data')
     }
-    It 'does nothing for a configuration without a Shares list' {
-        $data = [pscustomobject]@{ NTFS = @() ; Access = @() }
+    It 'configures several shares, each with its own permissions' {
+        $second = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -Path $second -ItemType Directory
+        $data = @(
+            [pscustomobject]@{ Name = 'Data'; Path = $folder; Access = @([pscustomobject]@{ AccountName = $everyone; AccessControlType = 'Allow'; AccessRight = 'Read' }) }
+            [pscustomobject]@{ Name = 'Scans'; Path = $second; Access = @([pscustomobject]@{ AccountName = $users; AccessControlType = 'Allow'; AccessRight = 'Change' }) }
+        )
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        Should -Invoke Grant-SmbShareAccess -Times 1 -Exactly -ParameterFilter { $Name -eq 'Data' -and $AccountName -eq $everyone -and $AccessRight -eq 'Read' }
+        Should -Invoke Grant-SmbShareAccess -Times 1 -Exactly -ParameterFilter { $Name -eq 'Scans' -and $AccountName -eq $users -and $AccessRight -eq 'Change' }
+    }
+    It 'does nothing for an empty list of shares' {
+        $data = @()
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
         $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
         Should -Invoke Set-SmbShare -Times 0 -Exactly

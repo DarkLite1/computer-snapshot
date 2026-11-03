@@ -16,6 +16,7 @@ $script:ArrayItems = @(
     'FirewallRules',
     'NetworkCards',
     'ScheduledTasks', 
+    'SmbShares',
     'CopyFilesFolders', 
     'StartCustomScriptsAfter'
 )
@@ -66,7 +67,7 @@ function ConvertTo-LoadedConfigurationHC {
     $problems = New-Object 'System.Collections.Generic.List[string]'
 
     $result = [pscustomobject]@{
-        SchemaVersion = 2
+        SchemaVersion = 3
         Description   = $Configuration.Description
         Settings      = [ordered]@{ RebootComputer = $false; OpenReportInBrowser = $true; RunElevated = $false }
         Items         = [ordered]@{}
@@ -92,10 +93,13 @@ function ConvertTo-LoadedConfigurationHC {
     }
 
     if (
-        $Configuration.SchemaVersion -ne 2 -or 
+        $Configuration.SchemaVersion -ne 3 -or 
         $Configuration.SchemaVersion -is [string]
     ) {
-        $problems.Add("$Source > SchemaVersion: expected 2; run the configuration converter for a version-1 file")
+        $problems.Add(
+            "$Source > SchemaVersion: expected 3; run the configuration " +
+            "converter (Scripts\Convert configuration.ps1) for an older file"
+        )
     }
 
     foreach ($property in @('Description', '$schema')) {
@@ -419,12 +423,27 @@ function Test-ConfigurationHC {
                 }
             }
             'SmbShares' {
-                foreach ($property in @('Shares', 'Access', 'NTFS')) {
+                # Each share once; its permissions are part of the share
+                $shareNames = @{}
+
+                for ($index = 0; $index -lt $data.Count; $index++) {
+                    $shareName = [string]$data[$index].Name
+
+                    if ($shareNames.ContainsKey($shareName)) {
+                        $problems.Add(
+                            "${location}[$index].Name: share '$shareName' " +
+                            "is already configured at [$($shareNames[$shareName])]"
+                        )
+                    }
+                    else {
+                        $shareNames[$shareName] = $index
+                    }
+
                     if (
-                        (Get-PropertiesHC $data) -contains $property -and 
-                        $data.$property -isnot [array]
+                        (Get-PropertiesHC $data[$index]) -contains 'Access' -and
+                        $data[$index].Access -isnot [array]
                     ) {
-                        $problems.Add("${location}.${property}: expected an array") 
+                        $problems.Add("${location}[$index].Access: expected an array")
                     }
                 }
             }
@@ -537,7 +556,7 @@ function Write-ConfigurationHC {
         
     $document = [ordered]@{
         '$schema'     = '../Scripts/config.schema.json'
-        SchemaVersion = 2
+        SchemaVersion = 3
     }
 
     if ($null -ne $Configuration.Description) {

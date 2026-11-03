@@ -10,7 +10,7 @@ BeforeAll {
 Describe 'Configuration launcher' {
     BeforeEach {
         $testConfigurationFile = Join-Path $TestDrive 'Example.json'
-        $document = @{ SchemaVersion = 2; Description = 'Example computer'; Settings = @{ RunElevated = $false }; Items = @{ UserAccounts = @() } }
+        $document = @{ SchemaVersion = 3; Description = 'Example computer'; Settings = @{ RunElevated = $false }; Items = @{ UserAccounts = @() } }
         $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
         Mock Invoke-ScriptHC
         Mock Start-Process

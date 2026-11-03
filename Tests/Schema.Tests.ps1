@@ -34,28 +34,28 @@ Describe 'Schema contract' {
     It 'validates every component example with the runtime shape validator' {
         foreach ($name in $mapping.Values) {
             $data = Read-SectionExampleHC (Join-Path $root "Examples\$name.json")
-            $problems = @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ $name = $data } } $TestDrive)
+            $problems = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ $name = $data } } $TestDrive)
             @($problems | Where-Object { $_ -notmatch "file '.+' not found" }).Count | Should -Be 0 -Because ($problems -join '; ')
         }
     }
     It 'validates every component example using Test-Json on PowerShell 7' -Skip:($PSVersionTable.PSVersion.Major -lt 7) {
         foreach ($name in $mapping.Values) {
-            $document = @{ SchemaVersion = 2; Items = @{ $name = Read-SectionExampleHC (Join-Path $root "Examples\$name.json") } }
+            $document = @{ SchemaVersion = 3; Items = @{ $name = Read-SectionExampleHC (Join-Path $root "Examples\$name.json") } }
             $document | ConvertTo-Json -Depth 20 | Test-Json -SchemaFile $schemaPath -ErrorAction Stop | Should -BeTrue
         }
     }
     It 'rejects misspelled section properties at runtime' {
-        $problems = @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Software = @{ Instal = @() } } } $TestDrive)
+        $problems = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Instal = @() } } } $TestDrive)
         $problems -join ';' | Should -Match 'Software.Instal: unknown property'
     }
     It 'rejects empty array entries but permits empty sections' {
-        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @(@{}) } } $TestDrive) -join ';' | Should -Match 'Name: required'
-        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ CreateFolders = @{}; ScheduledTasks = @() } } $TestDrive).Count | Should -Be 0
+        @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{}) } } $TestDrive) -join ';' | Should -Match 'Name: required'
+        @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ CreateFolders = @{}; ScheduledTasks = @() } } $TestDrive).Count | Should -Be 0
     }
     It 'requires schema property casing and string comments' {
-        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Software = @{ install = @() } } } $TestDrive) -join ';' | Should -Match 'install: unknown'
-        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ software = @{} } } $TestDrive) -join ';' | Should -Match 'software: unknown'
-        @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Comment = 5; Software = @{} } } $TestDrive) -join ';' | Should -Match 'Comment: expected a string'
+        @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ install = @() } } } $TestDrive) -join ';' | Should -Match 'install: unknown'
+        @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ software = @{} } } $TestDrive) -join ';' | Should -Match 'software: unknown'
+        @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Comment = 5; Software = @{} } } $TestDrive) -join ';' | Should -Match 'Comment: expected a string'
     }
     It 'validates every shipped configuration and its shared references' {
         foreach ($file in Get-Item -LiteralPath $shippedConfigurations -ErrorAction Stop) {
@@ -71,7 +71,7 @@ Describe 'Schema contract' {
         foreach ($file in Get-Item -LiteralPath $shippedSharedSections -ErrorAction Stop) {
             $data = Read-SectionExampleHC $file.FullName
             $matches = @($schema.'$defs'.PSObject.Properties.Name | Where-Object {
-                $document = @{ SchemaVersion = 2; Items = @{ $_ = $data } }
+                $document = @{ SchemaVersion = 3; Items = @{ $_ = $data } }
                 $document | ConvertTo-Json -Depth 20 | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue
             })
             $matches.Count | Should -BeGreaterThan 0 -Because "Shared file '$($file.Name)' must match a section shape"

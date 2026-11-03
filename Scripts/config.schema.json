@@ -4,19 +4,16 @@
   "description": "Version 2 single-file Windows computer configuration.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "SchemaVersion",
-    "Items"
-  ],
+  "required": ["SchemaVersion", "Items"],
   "properties": {
     "$schema": {
       "type": "string",
       "description": "Schema location for editor completion and validation."
     },
     "SchemaVersion": {
-      "description": "Configuration format version. Must be 2.",
+      "description": "Configuration format version. Must be 3; convert older files with Scripts\\Convert configuration.ps1.",
       "type": "integer",
-      "const": 2
+      "const": 3
     },
     "Description": {
       "type": "string",
@@ -256,74 +253,46 @@
       },
       "anyOf": [
         {
-          "required": [
-            "StartCustomScriptsBefore"
-          ]
+          "required": ["StartCustomScriptsBefore"]
         },
         {
-          "required": [
-            "RegionalSettings"
-          ]
+          "required": ["RegionalSettings"]
         },
         {
-          "required": [
-            "UserAccounts"
-          ]
+          "required": ["UserAccounts"]
         },
         {
-          "required": [
-            "UserGroups"
-          ]
+          "required": ["UserGroups"]
         },
         {
-          "required": [
-            "FirewallRules"
-          ]
+          "required": ["FirewallRules"]
         },
         {
-          "required": [
-            "CreateFolders"
-          ]
+          "required": ["CreateFolders"]
         },
         {
-          "required": [
-            "SmbShares"
-          ]
+          "required": ["SmbShares"]
         },
         {
-          "required": [
-            "NetworkCards"
-          ]
+          "required": ["NetworkCards"]
         },
         {
-          "required": [
-            "NtpTimeServers"
-          ]
+          "required": ["NtpTimeServers"]
         },
         {
-          "required": [
-            "RegistryKeys"
-          ]
+          "required": ["RegistryKeys"]
         },
         {
-          "required": [
-            "ScheduledTasks"
-          ]
+          "required": ["ScheduledTasks"]
         },
         {
-          "required": [
-            "CopyFilesFolders"
-          ]
+          "required": ["CopyFilesFolders"]
         },
         {
-          "required": [
-            "Software"
-          ]
+          "required": ["Software"]
         },
         {
-          "required": [
-            "StartCustomScriptsAfter"
-          ]
+          "required": ["StartCustomScriptsAfter"]
         }
       ]
     }
@@ -371,9 +340,7 @@
             "description": "Technician notes; ignored when applying the configuration."
           }
         },
-        "required": [
-          "Path"
-        ]
+        "required": ["Path"]
       }
     },
     "StartCustomScriptsAfter": {
@@ -418,9 +385,7 @@
             "description": "Technician notes; ignored when applying the configuration."
           }
         },
-        "required": [
-          "Path"
-        ]
+        "required": ["Path"]
       }
     },
     "RegionalSettings": {
@@ -463,9 +428,7 @@
         },
         {
           "maxProperties": 1,
-          "required": [
-            "Comment"
-          ]
+          "required": ["Comment"]
         }
       ]
     },
@@ -482,17 +445,11 @@
             "description": "Local account name."
           },
           "FullName": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Display name."
           },
           "Description": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Account description."
           },
           "Enabled": {
@@ -500,18 +457,11 @@
             "description": "Whether the account is enabled."
           },
           "PasswordExpires": {
-            "type": [
-              "string",
-              "null",
-              "boolean"
-            ],
+            "type": ["string", "null", "boolean"],
             "description": "Existing password expiry value; null means no expiry."
           },
           "AccountExpires": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Optional account expiry date."
           },
           "UserMayChangePassword": {
@@ -527,9 +477,7 @@
             "description": "Technician notes; ignored when applying the configuration."
           }
         },
-        "required": [
-          "Name"
-        ]
+        "required": ["Name"]
       }
     },
     "UserGroups": {
@@ -552,10 +500,7 @@
             "type": "array",
             "description": "Members to add to this group.",
             "items": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": ["string", "null"],
               "description": "Account name in local or domain notation, or the SID of a built-in account such as S-1-1-0 (Everyone)."
             }
           },
@@ -564,9 +509,7 @@
             "description": "Technician notes; ignored when applying the configuration."
           }
         },
-        "required": [
-          "Name"
-        ]
+        "required": ["Name"]
       }
     },
     "FirewallRules": {
@@ -578,192 +521,111 @@
         "additionalProperties": false,
         "properties": {
           "Name": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Name setting, as captured by the firewall export."
           },
           "DisplayName": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall DisplayName setting, as captured by the firewall export."
           },
           "Description": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Description setting, as captured by the firewall export."
           },
           "Action": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Action setting, as captured by the firewall export."
           },
           "Direction": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Direction setting, as captured by the firewall export."
           },
           "Profile": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Profile setting, as captured by the firewall export."
           },
           "Protocol": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Protocol setting, as captured by the firewall export."
           },
           "LocalPort": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall LocalPort setting, as captured by the firewall export."
           },
           "RemotePort": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall RemotePort setting, as captured by the firewall export."
           },
           "IcmpType": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall IcmpType setting, as captured by the firewall export."
           },
           "DynamicTarget": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall DynamicTarget setting, as captured by the firewall export."
           },
           "Group": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Group setting, as captured by the firewall export."
           },
           "Platform": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Platform setting, as captured by the firewall export."
           },
           "EdgeTraversalPolicy": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall EdgeTraversalPolicy setting, as captured by the firewall export."
           },
           "Owner": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Owner setting, as captured by the firewall export."
           },
           "LocalAddress": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall LocalAddress setting, as captured by the firewall export."
           },
           "RemoteAddress": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall RemoteAddress setting, as captured by the firewall export."
           },
           "Program": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Program setting, as captured by the firewall export."
           },
           "Package": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Package setting, as captured by the firewall export."
           },
           "Service": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Service setting, as captured by the firewall export."
           },
           "InterfaceAlias": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall InterfaceAlias setting, as captured by the firewall export."
           },
           "InterfaceType": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall InterfaceType setting, as captured by the firewall export."
           },
           "LocalUser": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall LocalUser setting, as captured by the firewall export."
           },
           "RemoteUser": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall RemoteUser setting, as captured by the firewall export."
           },
           "RemoteMachine": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall RemoteMachine setting, as captured by the firewall export."
           },
           "Authentication": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Authentication setting, as captured by the firewall export."
           },
           "Encryption": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Windows firewall Encryption setting, as captured by the firewall export."
           },
           "Enabled": {
@@ -787,10 +649,7 @@
             "description": "Technician notes; ignored when applying the configuration."
           }
         },
-        "required": [
-          "Name",
-          "DisplayName"
-        ]
+        "required": ["Name", "DisplayName"]
       }
     },
     "CreateFolders": {
@@ -816,193 +675,107 @@
           "maxProperties": 0
         },
         {
-          "required": [
-            "FolderPaths"
-          ]
+          "required": ["FolderPaths"]
         },
         {
           "maxProperties": 1,
-          "required": [
-            "Comment"
-          ]
+          "required": ["Comment"]
         }
       ]
     },
     "SmbShares": {
-      "type": "object",
-      "description": "Combined SMB shares, share access and NTFS permissions.",
-      "additionalProperties": false,
-      "properties": {
-        "Shares": {
-          "type": "array",
-          "description": "Shares to create or update.",
-          "items": {
+      "type": "array",
+      "description": "SMB shares, each with its share permissions (Access) and the NTFS permissions of its folder (NTFS).",
+      "items": {
+        "type": "object",
+        "description": "One SMB share.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": ["string", "null"],
+            "description": "Share name."
+          },
+          "Description": {
+            "type": ["string", "null"],
+            "description": "SMB share Description setting."
+          },
+          "Path": {
+            "type": ["string", "null"],
+            "description": "Folder to share; created when it does not exist."
+          },
+          "ScopeName": {
+            "type": ["string", "null"],
+            "description": "SMB share ScopeName setting."
+          },
+          "CachingMode": {
+            "type": ["string", "null"],
+            "description": "SMB share CachingMode setting."
+          },
+          "SmbInstance": {
+            "type": ["string", "null"],
+            "description": "SMB share SmbInstance setting."
+          },
+          "FolderEnumerationMode": {
+            "type": ["string", "null"],
+            "description": "SMB share FolderEnumerationMode setting."
+          },
+          "CATimeout": {
+            "type": ["integer", "null"],
+            "description": "SMB share CATimeout value."
+          },
+          "ThrottleLimit": {
+            "type": ["integer", "null"],
+            "description": "SMB share ThrottleLimit value."
+          },
+          "ConcurrentUserLimit": {
+            "type": ["integer", "null"],
+            "description": "SMB share ConcurrentUserLimit value."
+          },
+          "EncryptData": {
+            "type": ["boolean", "null"],
+            "description": "SMB share EncryptData flag."
+          },
+          "ContinuouslyAvailable": {
+            "type": ["boolean", "null"],
+            "description": "SMB share ContinuouslyAvailable flag."
+          },
+          "Access": {
+            "type": "array",
+            "description": "Share permissions. Without it, the share's permissions are left unchanged.",
+            "items": {
+              "type": "object",
+              "description": "Share permission for one account.",
+              "additionalProperties": false,
+              "properties": {
+                "ScopeName": {
+                  "type": ["string", "null"],
+                  "description": "SMB access ScopeName value."
+                },
+                "AccountName": {
+                  "type": ["string", "null"],
+                  "description": "Account name, or the SID of a built-in account such as S-1-1-0 (Everyone), which works in every Windows language."
+                },
+                "AccessControlType": {
+                  "type": ["string", "null"],
+                  "description": "SMB access AccessControlType value."
+                },
+                "AccessRight": {
+                  "type": ["string", "null"],
+                  "description": "SMB access AccessRight value."
+                },
+                "Comment": {
+                  "type": "string",
+                  "description": "Technician notes; ignored when applying the configuration."
+                }
+              },
+              "required": ["AccountName", "AccessRight"]
+            }
+          },
+          "NTFS": {
             "type": "object",
-            "description": "SMB share settings.",
+            "description": "NTFS permissions of the shared folder. Without it, the folder's permissions are left unchanged.",
             "additionalProperties": false,
             "properties": {
-              "Name": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB share Name setting."
-              },
-              "Description": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB share Description setting."
-              },
-              "Path": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB share Path setting."
-              },
-              "ScopeName": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB share ScopeName setting."
-              },
-              "CachingMode": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB share CachingMode setting."
-              },
-              "SmbInstance": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB share SmbInstance setting."
-              },
-              "FolderEnumerationMode": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB share FolderEnumerationMode setting."
-              },
-              "CATimeout": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "description": "SMB share CATimeout value."
-              },
-              "ThrottleLimit": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "description": "SMB share ThrottleLimit value."
-              },
-              "ConcurrentUserLimit": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "description": "SMB share ConcurrentUserLimit value."
-              },
-              "EncryptData": {
-                "type": [
-                  "boolean",
-                  "null"
-                ],
-                "description": "SMB share EncryptData flag."
-              },
-              "ContinuouslyAvailable": {
-                "type": [
-                  "boolean",
-                  "null"
-                ],
-                "description": "SMB share ContinuouslyAvailable flag."
-              },
-              "Comment": {
-                "type": "string",
-                "description": "Technician notes; ignored when applying the configuration."
-              }
-            },
-            "required": [
-              "Name",
-              "Path"
-            ]
-          }
-        },
-        "Access": {
-          "type": "array",
-          "description": "SMB access permissions.",
-          "items": {
-            "type": "object",
-            "description": "SMB share access entry.",
-            "additionalProperties": false,
-            "properties": {
-              "Name": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB access Name value."
-              },
-              "ScopeName": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB access ScopeName value."
-              },
-              "AccountName": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "Account name, or the SID of a built-in account such as S-1-1-0 (Everyone), which works in every Windows language."
-              },
-              "AccessControlType": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB access AccessControlType value."
-              },
-              "AccessRight": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "SMB access AccessRight value."
-              },
-              "Comment": {
-                "type": "string",
-                "description": "Technician notes; ignored when applying the configuration."
-              }
-            },
-            "required": [
-              "Name",
-              "AccountName",
-              "AccessRight"
-            ]
-          }
-        },
-        "NTFS": {
-          "type": "array",
-          "description": "Optional NTFS permissions by share name.",
-          "items": {
-            "type": "object",
-            "description": "Captured NTFS permissions.",
-            "additionalProperties": false,
-            "properties": {
-              "Name": {
-                "type": "string",
-                "description": "Name of the share whose folder receives these permissions."
-              },
               "Owner": {
                 "type": "string",
                 "description": "Folder owner: account name, or the SID of a built-in account such as S-1-5-32-544 (Administrators)."
@@ -1051,36 +824,15 @@
                 "description": "Technician notes; ignored when applying the configuration."
               }
             },
-            "required": [
-              "Name",
-              "Owner",
-              "AreAccessRulesProtected",
-              "Access"
-            ]
+            "required": ["Owner", "AreAccessRulesProtected", "Access"]
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
           }
         },
-        "Comment": {
-          "type": "string",
-          "description": "Technician notes; ignored when applying the configuration."
-        }
-      },
-      "anyOf": [
-        {
-          "maxProperties": 0
-        },
-        {
-          "required": [
-            "Shares",
-            "Access"
-          ]
-        },
-        {
-          "maxProperties": 1,
-          "required": [
-            "Comment"
-          ]
-        }
-      ]
+        "required": ["Name", "Path"]
+      }
     },
     "NetworkCards": {
       "type": "array",
@@ -1103,10 +855,7 @@
             "description": "Desired connection profile; empty leaves it unchanged."
           },
           "NetworkCardDnsSuffix": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Connection-specific DNS suffix. An empty string clears it; null or omission leaves it unchanged."
           },
           "Comment": {
@@ -1152,16 +901,11 @@
           "maxProperties": 0
         },
         {
-          "required": [
-            "SyncTimeWithDomain",
-            "TimeServerNames"
-          ]
+          "required": ["SyncTimeWithDomain", "TimeServerNames"]
         },
         {
           "maxProperties": 1,
-          "required": [
-            "Comment"
-          ]
+          "required": ["Comment"]
         }
       ]
     },
@@ -1216,10 +960,7 @@
                 "description": "Technician notes; ignored when applying the configuration."
               }
             },
-            "required": [
-              "UserName",
-              "RegistryKeys"
-            ]
+            "required": ["UserName", "RegistryKeys"]
           }
         },
         "Comment": {
@@ -1277,11 +1018,7 @@
           "description": "Value type, required for Set: String, ExpandString, MultiString, Binary, DWord or QWord."
         },
         "Value": {
-          "type": [
-            "string",
-            "integer",
-            "array"
-          ],
+          "type": ["string", "integer", "array"],
           "description": "Value data, required for Set. String and ExpandString: text. MultiString: a list of texts. Binary: hex text such as '01 0A FF' or a list of numbers 0-255. DWord and QWord: a number, or text in decimal ('16') or hexadecimal ('0x10')."
         },
         "Comment": {
@@ -1289,9 +1026,7 @@
           "description": "Technician notes; ignored when applying the configuration."
         }
       },
-      "required": [
-        "Path"
-      ]
+      "required": ["Path"]
     },
     "ScheduledTasks": {
       "type": "array",
@@ -1334,21 +1069,13 @@
             "description": "Technician notes; ignored when applying the configuration."
           }
         },
-        "required": [
-          "TaskName",
-          "TaskPath",
-          "Enabled"
-        ],
+        "required": ["TaskName", "TaskPath", "Enabled"],
         "oneOf": [
           {
-            "required": [
-              "Xml"
-            ]
+            "required": ["Xml"]
           },
           {
-            "required": [
-              "XmlFile"
-            ]
+            "required": ["XmlFile"]
           }
         ]
       }
@@ -1374,10 +1101,7 @@
             "description": "Technician notes; ignored when applying the configuration."
           }
         },
-        "required": [
-          "From",
-          "To"
-        ]
+        "required": ["From", "To"]
       }
     },
     "Software": {
@@ -1406,10 +1130,7 @@
                 "description": "Installer path, relative to the USB root or absolute."
               },
               "Arguments": {
-                "type": [
-                  "string",
-                  "null"
-                ],
+                "type": ["string", "null"],
                 "description": "Command-line arguments passed to the installer."
               },
               "SuccessExitCodes": {
@@ -1426,9 +1147,7 @@
                 "description": "Technician notes; ignored when applying the configuration."
               }
             },
-            "required": [
-              "ExecutablePath"
-            ]
+            "required": ["ExecutablePath"]
           }
         },
         "Comment": {

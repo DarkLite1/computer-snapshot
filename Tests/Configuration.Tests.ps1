@@ -68,7 +68,7 @@ Describe 'Restore input placeholders' {
 Describe 'Version 2 configuration' {
     BeforeEach {
         $path = Join-Path $TestDrive 'configuration.json'
-        $configuration = [ordered]@{ SchemaVersion = 2; Items = [ordered]@{ Software = @{}; UserAccounts = @() } }
+        $configuration = [ordered]@{ SchemaVersion = 3; Items = [ordered]@{ Software = @{}; UserAccounts = @() } }
     }
     It 'loads inline sections with defaults in fixed order' {
         Write-ConfigurationHC $configuration $path
@@ -93,7 +93,7 @@ Describe 'Version 2 configuration' {
         }
         Write-ConfigurationHC $configuration $path
         $text = [IO.File]::ReadAllText($path)
-        $text | Should -Match '(?m)^  "SchemaVersion": 2,'
+        $text | Should -Match '(?m)^  "SchemaVersion": 3,'
         $text | Should -Match '"Settings": \{\r?\n    "Comment": "Settings note",'
         $text | Should -Match '"Items": \{\r?\n    "Comment": "Items note",'
         $text | Should -Match '\{\r?\n        "Comment": "Account note",\r?\n        "Name": "Example",'
@@ -124,7 +124,7 @@ Describe 'Version 2 configuration' {
         $loaded.Items.ScheduledTasks[0].Xml | Should -BeExactly $xml
         $loaded.Items.ScheduledTasks[0].Enabled | Should -BeFalse
         $loaded.Items.Software.Install[0].Arguments | Should -BeNullOrEmpty
-        ([IO.File]::ReadAllText($path) | ConvertFrom-Json).SchemaVersion | Should -Be 2
+        ([IO.File]::ReadAllText($path) | ConvertFrom-Json).SchemaVersion | Should -Be 3
     }
     It 'resolves references from the USB root rather than the current directory' {
         '[{"Name":"Example"}]' | Set-Content -LiteralPath (Join-Path $TestDrive 'shared.json') -Encoding UTF8
@@ -205,7 +205,7 @@ Describe 'Shared snapshot catalogue' {
             $items[$name] = if ($schema.'$defs'.$name.type -eq 'array') { ,@() } else { @{} }
         }
         $path = Join-Path $TestDrive 'all-items.json'
-        Write-ConfigurationHC @{ SchemaVersion = 2; Items = $items } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = $items } $path
         $loaded = Read-ConfigurationHC $path $TestDrive
         @($loaded.Items.Keys) | Should -Be @((Get-SnapshotScriptsHC).Keys)
         @(Test-ConfigurationHC $loaded $TestDrive).Count | Should -Be 0
@@ -217,7 +217,7 @@ Describe 'Safe configuration writing' {
         $folder = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         $null = New-Item -Path $folder -ItemType Directory
         $path = Join-Path $folder 'Example.json'
-        $document = @{ SchemaVersion = 2; Items = [ordered]@{ CreateFolders = @{ FolderPaths = @('C:\Example') } } }
+        $document = @{ SchemaVersion = 3; Items = [ordered]@{ CreateFolders = @{ FolderPaths = @('C:\Example') } } }
     }
     It 'creates a new configuration file' {
         Write-ConfigurationHC $document $path
@@ -226,7 +226,7 @@ Describe 'Safe configuration writing' {
     It 'replaces an existing configuration file' {
         '{"existing":true}' | Set-Content -LiteralPath $path -Encoding UTF8
         Write-ConfigurationHC $document $path
-        (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).SchemaVersion | Should -Be 2
+        (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).SchemaVersion | Should -Be 3
     }
     It 'leaves no temporary files behind' {
         '{"existing":true}' | Set-Content -LiteralPath $path -Encoding UTF8

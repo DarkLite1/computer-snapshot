@@ -1,6 +1,6 @@
 {
   "$schema": "../Scripts/config.schema.json",
-  "SchemaVersion": 2,
+  "SchemaVersion": 3,
   "Description": "Converted from RestoreSnapshot PC1 Example.json",
   "Settings": { "RebootComputer": false, "OpenReportInBrowser": true, "RunElevated": false },
   "Items": {

@@ -451,7 +451,7 @@ function Invoke-ComputerSnapshotHC {
     #region Single-file export
     if ($Action -eq 'CreateSnapshot' -and $exportItems.Count) {
         $document = [ordered]@{
-            SchemaVersion = 2
+            SchemaVersion = 3
             Description   = 'Exported from {0} on {1}' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyy-MM-dd HH:mm')
             Settings      = [ordered]@{ RebootComputer = $false; OpenReportInBrowser = $true; RunElevated = $false }
             Items         = $exportItems

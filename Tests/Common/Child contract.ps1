@@ -119,7 +119,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         $result[0].Messages.GetType() | Should -Be ([string[]])
         $result[0].Errors.GetType() | Should -Be ([string[]])
         $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
-        $problems = @(Test-ConfigurationHC @{ SchemaVersion = 2; Items = @{ $itemNames[$Name] = $result[0].Data } } $TestDrive)
+        $problems = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ $itemNames[$Name] = $result[0].Data } } $TestDrive)
         @($problems | Where-Object { $_ -notmatch "file '.+' not found" }).Count | Should -Be 0 -Because ($problems -join '; ')
         @(Get-ChildItem -LiteralPath $TestDrive -Recurse).FullName | Should -Be $before
         Should -Invoke New-Item -Times 0 -Exactly
@@ -152,7 +152,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
             'Start custom scripts' { $data = @([pscustomobject]@{ Path = 'Files\example.ps1'; Arguments = [pscustomobject]@{ Value = 'Example' } }); $command = 'Invoke-CustomScriptHC' }
             'Scheduled tasks' { $data = @([pscustomobject]@{ TaskName = 'Example'; TaskPath = '\HC\'; Enabled = $false; Xml = '<Task/>' }); $command = 'Disable-ScheduledTask' }
             'Firewall rules' { $data = @([pscustomobject]@{ Name = 'Example'; DisplayName = 'Example'; Enabled = $true; Direction = 'Inbound'; Action = 'Allow'; Protocol = 'TCP'; Profile = 'Any'; DynamicTarget = 'Any'; EdgeTraversalPolicy = 'Block'; InterfaceType = 'Any'; Authentication = 'NotRequired'; Encryption = 'NotRequired' }); $command = 'New-NetFirewallRule' }
-            'Smb shares' { $data = [pscustomobject]@{ Shares = @([pscustomobject]@{ Name = 'Example'; Path = 'C:\Example' }); Access = @(); NTFS = @() }; $command = 'Set-SmbShare' }
+            'Smb shares' { $data = @([pscustomobject]@{ Name = 'Example'; Path = 'C:\Example'; Access = @() }); $command = 'Set-SmbShare' }
         }
         $result = @(. $ScriptPath -Action Import -Data $data -RootFolder $TestDrive -ErrorAction Stop)
         $result.Count | Should -Be 1

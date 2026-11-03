@@ -179,7 +179,7 @@ function Get-SnapshotItemEntriesHC {
 function Get-RestoreItemEntriesHC {
     param([string]$ConfigurationFile)
     $document = Get-Content -LiteralPath $ConfigurationFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-    if ($document.SchemaVersion -ne 2 -or $document.SchemaVersion -is [string]) { throw 'Select a version-2 configuration; convert older configurations first.' }
+    if ($document.SchemaVersion -ne 3 -or $document.SchemaVersion -is [string]) { throw 'Select a version-3 configuration; run the configuration converter (Scripts\Convert configuration.ps1) for older configurations first.' }
     if ($document.Items -isnot [pscustomobject]) { throw 'The configuration must contain an Items object.' }
     $names = @($document.Items.PSObject.Properties | Where-Object { $_.Name -cne 'Comment' } | ForEach-Object { $_.Name })
     if (-not $names.Count) { throw 'The configuration contains no items to restore.' }

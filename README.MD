@@ -69,7 +69,7 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 4     | `UserGroups`               | Local groups and their members.                                         |
 | 5     | `FirewallRules`            | Windows Defender Firewall rules.                                        |
 | 6     | `CreateFolders`            | Folders to create.                                                      |
-| 7     | `SmbShares`                | SMB shares with their share and NTFS permissions.                       |
+| 7     | `SmbShares`                | SMB shares, each with its share and NTFS permissions.                   |
 | 8     | `NetworkCards`             | Network adapter names, network profile (category) and DNS suffix.       |
 | 9     | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
 | 10    | `RegistryKeys`             | Registry values to set.                                                 |
@@ -109,6 +109,39 @@ All paths in a configuration (installers, files to copy, custom scripts, shared 
 | `RebootComputer`      | `false` | Restart the computer after a restore in which nothing failed, after a 60-second countdown (`shutdown /a` cancels it). The report shows whether it restarts. |
 | `OpenReportInBrowser` | `true`  | Open the HTML report when the run is finished.                            |
 | `RunElevated`         | `false` | When restoring from a shortcut or the command line, restart as administrator first (UAC prompt). |
+
+### SMB shares
+
+`SmbShares` is a list with one entry per share. Each share has its settings, its share permissions in `Access`, and the permissions of its folder in `NTFS`:
+
+```json
+"SmbShares": [
+  {
+    "Name": "Data",
+    "Path": "C:\\Data",
+    "Access": [
+      { "AccountName": "S-1-5-32-544", "AccessControlType": "Allow", "AccessRight": "Full" },
+      { "AccountName": "S-1-5-11", "AccessControlType": "Allow", "AccessRight": "Change" }
+    ],
+    "NTFS": {
+      "Owner": "S-1-5-32-544",
+      "AreAccessRulesProtected": false,
+      "Access": [
+        { "IdentityReference": "S-1-5-32-545", "AccessControlType": "Allow", "FileSystemRights": "Modify, Synchronize", "InheritanceFlags": "ContainerInherit, ObjectInherit", "PropagationFlags": "None" }
+      ]
+    }
+  },
+  {
+    "Name": "Scans",
+    "Path": "D:\\Scans",
+    "Access": [ { "AccountName": "S-1-5-32-545", "AccessControlType": "Allow", "AccessRight": "Read" } ]
+  }
+]
+```
+
+- A share without `Access` keeps its current share permissions; a share without `NTFS` keeps the current permissions of its folder.
+- Configured permissions are applied first. Existing share permissions that aren't configured are only removed when every configured one could be applied, so a share never ends up with less access than configured.
+- Each share name may appear only once.
 
 ### Registry changes
 
@@ -333,4 +366,11 @@ Just open PowerShell from your USB stick and run:
 & '.\Scripts\Convert configuration.ps1' -OldConfigurationFile 'Configurations\Old PC.json' -RootFolder $PWD.Path
 ```
 
-This will automatically update your old file to the new format and safely back up your original setup as a `.v1.json` file just in case.
+This updates your old file to the current format (version 3) and keeps the original as a backup:
+
+| Your file                                    | Result                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Version 1 (old `StartScript` format)         | written to `Configurations\<name>.json`; the original is kept as `<name>.v1.json`          |
+| Version 2 (`"SchemaVersion": 2`)             | converted in place; the original is kept as `<name>.v2.json`                               |
+
+For version 2, the only change is the layout of `SmbShares`: the three lists `Shares`, `Access` and `NTFS` become one entry per share with its own `Access` and `NTFS` (see [SMB shares](#smb-shares)). A shared file in `Shared\` that the configuration refers to for `SmbShares` is converted too, and kept as `<name>.v2.json`. Run the converter once per configuration file; a file that is already version 3 is left alone. Share permissions that belong to a share that isn't in the list can't be applied, and are reported.

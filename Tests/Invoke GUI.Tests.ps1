@@ -161,7 +161,7 @@ Describe 'Single-file wizard commands' {
     }
     It 'uses configuration defaults when restore settings are missing and rejects non-Boolean values' {
         $testFile = Join-Path $TestDrive 'Settings.json'
-        '{"SchemaVersion":2,"Items":{"UserAccounts":[]}}' | Set-Content -LiteralPath $testFile
+        '{"SchemaVersion":3,"Items":{"UserAccounts":[]}}' | Set-Content -LiteralPath $testFile
         $settings = Get-RestoreSettingsHC -ConfigurationFile $testFile
         $settings.RebootComputer | Should -BeFalse
         $settings.OpenReportInBrowser | Should -BeTrue
@@ -180,7 +180,7 @@ Describe 'Single-file wizard commands' {
     }
     It 'lists all sections but only marks configured sections available without resolving references' {
         $testFile = Join-Path $TestDrive 'Example.json'
-        '{"SchemaVersion":2,"Items":{"Software":{"Install":[{"ExecutablePath":"example.exe"}]},"UserAccounts":"missing.json","Comment":"Example"}}' | Set-Content -LiteralPath $testFile
+        '{"SchemaVersion":3,"Items":{"Software":{"Install":[{"ExecutablePath":"example.exe"}]},"UserAccounts":"missing.json","Comment":"Example"}}' | Set-Content -LiteralPath $testFile
         $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile)
         @($entries.Key) | Should -Be @((Get-SnapshotScriptsHC).Keys)
         @($entries | Where-Object Available | ForEach-Object Key) | Should -Be @('UserAccounts', 'Software')
@@ -188,15 +188,15 @@ Describe 'Single-file wizard commands' {
     }
     It 'disables empty arrays, objects, nulls, blank references and comment-only sections' {
         $testFile = Join-Path $TestDrive 'Empty sections.json'
-        '{"SchemaVersion":2,"Items":{"UserAccounts":[],"Software":{},"RegionalSettings":null,"UserGroups":" ","CreateFolders":{"Comment":"No folders"}}}' | Set-Content -LiteralPath $testFile
+        '{"SchemaVersion":3,"Items":{"UserAccounts":[],"Software":{},"RegionalSettings":null,"UserGroups":" ","CreateFolders":{"Comment":"No folders"}}}' | Set-Content -LiteralPath $testFile
         $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile)
         @($entries | Where-Object Available).Count | Should -Be 0
     }
     It 'rejects legacy or empty configurations in the restore overview' {
         $testFile = Join-Path $TestDrive 'Example.json'
         '{"StartScript":{}}' | Set-Content -LiteralPath $testFile
-        { Get-RestoreItemEntriesHC -ConfigurationFile $testFile } | Should -Throw '*version-2*'
-        '{"SchemaVersion":2,"Items":{}}' | Set-Content -LiteralPath $testFile
+        { Get-RestoreItemEntriesHC -ConfigurationFile $testFile } | Should -Throw '*version-3*'
+        '{"SchemaVersion":3,"Items":{}}' | Set-Content -LiteralPath $testFile
         { Get-RestoreItemEntriesHC -ConfigurationFile $testFile } | Should -Throw '*no items*'
     }
 }
@@ -371,7 +371,7 @@ Describe 'Restore selection controls' {
     It 'initializes separate restore options from the file and permits unsaved overrides' {
         $testFile = Join-Path $TestDrive 'Options.json'
         foreach ($saved in @($false, $true)) {
-            @{ SchemaVersion = 2; Settings = @{ RebootComputer = $saved; OpenReportInBrowser = -not $saved }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } |
+            @{ SchemaVersion = 3; Settings = @{ RebootComputer = $saved; OpenReportInBrowser = -not $saved }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } |
                 ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $testFile
             $before = Get-Content -LiteralPath $testFile -Raw
             $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Options' -Entries @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile) -ConfigurationFile $testFile
@@ -429,7 +429,7 @@ Describe 'Restore selection controls' {
     }
     It 'grays out missing sections and blocks checking them individually or with Select all' {
         $testFile = Join-Path $TestDrive 'Partial.json'
-        '{"SchemaVersion":2,"Items":{"UserAccounts":[{"Name":"Example"}],"Software":{"Install":[{"ExecutablePath":"example.exe"}]}}}' | Set-Content -LiteralPath $testFile
+        '{"SchemaVersion":3,"Items":{"UserAccounts":[{"Name":"Example"}],"Software":{"Install":[{"ExecutablePath":"example.exe"}]}}}' | Set-Content -LiteralPath $testFile
         $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Partial' -Entries @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile)
         try {
             $dialog.Show()

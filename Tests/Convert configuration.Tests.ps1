@@ -41,10 +41,64 @@ Describe 'One-time configuration conversion' {
         $result = & $testScript -OldConfigurationFile $oldPath -RootFolder $TestDrive
         $result.Problems.Count | Should -Be 0
         $loaded = Read-ConfigurationHC $result.Path $TestDrive
-        $loaded.Items.SmbShares.Shares.Count | Should -Be 1
-        $loaded.Items.SmbShares.Shares[0].Name | Should -Be 'Example'
+        @($loaded.Items.SmbShares).Count | Should -Be 1
+        $loaded.Items.SmbShares[0].Name | Should -Be 'Example'
         $loaded.Items.ScheduledTasks[0].Enabled | Should -BeFalse
         $loaded.Items.ScheduledTasks[0].Xml.Trim() | Should -Be '<Task/>'
         "$legacyRoot\ScheduledTasks\1 - Example.xml" | Should -Exist
+    }
+    It 'converts a version-2 configuration in place and moves share permissions into each share' {
+        $folder = Join-Path $TestDrive 'Version2'
+        $null = New-Item -Path "$folder\Configurations", "$folder\Shared" -ItemType Directory -Force
+        $path = Join-Path $folder 'Configurations\Office.json'
+        @'
+{
+  "SchemaVersion": 2,
+  "Description": "Office PC",
+  "Settings": { "RebootComputer": true },
+  "Items": {
+    "SmbShares": {
+      "Shares": [ { "Name": "Data", "Path": "C:\\Data" }, { "Name": "Scans", "Path": "D:\\Scans" } ],
+      "Access": [
+        { "Name": "Data", "AccountName": "S-1-5-32-544", "AccessControlType": "Allow", "AccessRight": "Full" },
+        { "Name": "Scans", "AccountName": "S-1-5-11", "AccessControlType": "Allow", "AccessRight": "Read" },
+        { "Name": "Gone", "AccountName": "S-1-1-0", "AccessControlType": "Allow", "AccessRight": "Read" }
+      ],
+      "NTFS": [ { "Name": "Data", "Owner": "S-1-5-32-544", "AreAccessRulesProtected": false, "Access": [] } ]
+    }
+  }
+}
+'@ | Set-Content -LiteralPath $path -Encoding UTF8
+        $original = Get-Content -LiteralPath $path -Raw
+        $result = & $testScript -OldConfigurationFile $path -RootFolder $folder 3>$null
+        $result.Path | Should -Be $path
+        Get-Content -LiteralPath $result.Original -Raw | Should -BeExactly $original
+        $result.Problems | Should -Be @("SmbShares: permissions for share 'Gone' were dropped, because that share is not in Shares")
+        $loaded = Read-ConfigurationHC $path $folder
+        $loaded.SchemaVersion | Should -Be 3
+        $loaded.Description | Should -Be 'Office PC'
+        $loaded.Settings.RebootComputer | Should -BeTrue
+        @($loaded.Items.SmbShares).Count | Should -Be 2
+        $data = $loaded.Items.SmbShares | Where-Object { $_.Name -eq 'Data' }
+        @($data.Access).Count | Should -Be 1
+        $data.Access[0].AccountName | Should -Be 'S-1-5-32-544'
+        $data.Access[0].PSObject.Properties.Name | Should -Not -Contain 'Name'
+        $data.NTFS.Owner | Should -Be 'S-1-5-32-544'
+        ($loaded.Items.SmbShares | Where-Object { $_.Name -eq 'Scans' }).Access[0].AccountName | Should -Be 'S-1-5-11'
+        { & $testScript -OldConfigurationFile $path -RootFolder $folder } | Should -Throw '*already a version-3 configuration*'
+    }
+    It 'converts a shared SmbShares file that a version-2 configuration refers to' {
+        $folder = Join-Path $TestDrive 'Version2Shared'
+        $null = New-Item -Path "$folder\Configurations", "$folder\Shared" -ItemType Directory -Force
+        '{ "Shares": [ { "Name": "Common", "Path": "C:\\Common" } ], "Access": [ { "Name": "Common", "AccountName": "S-1-1-0", "AccessControlType": "Allow", "AccessRight": "Read" } ], "NTFS": [] }' |
+            Set-Content -LiteralPath "$folder\Shared\Shares.json" -Encoding UTF8
+        '{ "SchemaVersion": 2, "Items": { "SmbShares": "Shared\\Shares.json" } }' |
+            Set-Content -LiteralPath "$folder\Configurations\Office.json" -Encoding UTF8
+        $result = & $testScript -OldConfigurationFile "$folder\Configurations\Office.json" -RootFolder $folder 3>$null
+        $result.Problems.Count | Should -Be 0 -Because ($result.Problems -join '; ')
+        "$folder\Shared\Shares.v2.json" | Should -Exist
+        $loaded = Read-ConfigurationHC "$folder\Configurations\Office.json" $folder
+        $loaded.Items.SmbShares[0].Name | Should -Be 'Common'
+        $loaded.Items.SmbShares[0].Access[0].AccountName | Should -Be 'S-1-1-0'
     }
 }

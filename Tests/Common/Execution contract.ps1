@@ -59,7 +59,7 @@ Describe 'Single-file execution' {
         Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly
     }
     It 'restores in fixed order independently of JSON key order' {
-        $document = @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }; Items = [ordered]@{ CreateFolders = @{ FolderPaths = @('C:\Example') }; UserAccounts = @(@{ Name = 'Example' }) } }
+        $document = @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }; Items = [ordered]@{ CreateFolders = @{ FolderPaths = @('C:\Example') }; UserAccounts = @(@{ Name = 'Example' }) } }
         Write-ConfigurationHC $document $path
         $params.Action = 'RestoreSnapshot'
         $script:order = New-Object 'System.Collections.Generic.List[string]'
@@ -72,7 +72,7 @@ Describe 'Single-file execution' {
         @($script:order) | Should -Be @('UserAccounts', 'CreateFolders')
     }
     It 'skips and reports empty sections' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @() } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @() } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Remove('Items')
         $result = Invoke-ComputerSnapshotHC @params
@@ -81,7 +81,7 @@ Describe 'Single-file execution' {
     }
     It 'reports a failed time-service operation and never reboots after it' {
         Write-ConfigurationHC @{
-            SchemaVersion = 2
+            SchemaVersion = 3
             Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }
             Items = @{ NtpTimeServers = @{ SyncTimeWithDomain = $true; TimeServerNames = @() } }
         } $path
@@ -98,7 +98,7 @@ Describe 'Single-file execution' {
     }
     It 'restores only selected sections without changing the configuration file' {
         Write-ConfigurationHC @{
-            SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }
+            SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }
             Items = @{ UserAccounts = @(@{ Name = 'Example' }); CreateFolders = @{ FolderPaths = @('C:\Example') } }
         } $path
         $before = Get-Content -LiteralPath $path -Raw
@@ -111,7 +111,7 @@ Describe 'Single-file execution' {
     }
     It 'does not resolve references or validate assets in unchecked sections' {
         Write-ConfigurationHC @{
-            SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }
+            SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }
             Items = @{
                 UserAccounts = 'missing-users.json'
                 Software = @{ Install = @(@{ ExecutablePath = 'missing-installer.exe' }) }
@@ -125,7 +125,7 @@ Describe 'Single-file execution' {
     }
     It 'restores all configured sections when no selection is supplied' {
         Write-ConfigurationHC @{
-            SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }
+            SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }
             Items = @{ UserAccounts = @(@{ Name = 'Example' }); CreateFolders = @{ FolderPaths = @('C:\Example') } }
         } $path
         $params.Action = 'RestoreSnapshot'
@@ -137,7 +137,7 @@ Describe 'Single-file execution' {
     It 'honors both true and false per-run settings without changing the file' {
         foreach ($override in @($false, $true)) {
             Write-ConfigurationHC @{
-                SchemaVersion = 2
+                SchemaVersion = 3
                 Settings = @{ RebootComputer = -not $override; OpenReportInBrowser = -not $override }
                 Items = @{ UserAccounts = @(@{ Name = 'Example' }) }
             } $path
@@ -155,7 +155,7 @@ Describe 'Single-file execution' {
     }
     It 'uses saved settings when overrides are omitted' {
         Write-ConfigurationHC @{
-            SchemaVersion = 2
+            SchemaVersion = 3
             Settings = @{ RebootComputer = $true; OpenReportInBrowser = $true }
             Items = @{ UserAccounts = @(@{ Name = 'Example' }) }
         } $path
@@ -168,7 +168,7 @@ Describe 'Single-file execution' {
     }
     It 'does not reboot after a failed restore even when overridden to true' {
         Write-ConfigurationHC @{
-            SchemaVersion = 2
+            SchemaVersion = 3
             Settings = @{ RebootComputer = $false; OpenReportInBrowser = $false }
             Items = @{ UserAccounts = @(@{ Name = 'Example' }) }
         } $path
@@ -183,7 +183,7 @@ Describe 'Single-file execution' {
         $sharedPath = Join-Path $TestDrive 'users.json'
         '[{"Name":"{{input:Local account}}","Password":"{{password:Local password}}"}]' | Set-Content -LiteralPath $sharedPath
         Write-ConfigurationHC @{
-            SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }
+            SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }
             Items = @{ UserAccounts = 'users.json'; Software = @{ Install = @(@{ ExecutablePath = '{{input:Unselected installer}}' }) } }
         } $path
         $before = Get-Content -LiteralPath $path -Raw
@@ -207,7 +207,7 @@ Describe 'Single-file execution' {
         (Get-Content -LiteralPath $sharedPath -Raw) | Should -BeExactly $sharedBefore
     }
     It 'cancels before any script, report or reboot when an input dialog is cancelled' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = '{{input:Account}}' }) } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = '{{input:Account}}' }) } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         Mock Read-RestoreInputHC -ModuleName Execution { $null }
@@ -220,7 +220,7 @@ Describe 'Single-file execution' {
         Should -Invoke Start-Process -ModuleName Execution -Times 0 -Exactly
     }
     It 'redacts prompted passwords from child failure results and reports' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @(@{ Name = 'Example'; Password = '{{password:Password}}' }) } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{ Name = 'Example'; Password = '{{password:Password}}' }) } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         Mock Read-RestoreInputHC -ModuleName Execution { 'Test-secret!42' }
@@ -231,7 +231,7 @@ Describe 'Single-file execution' {
         Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter { $Results[0].Messages -notmatch 'Test-secret' }
     }
     It 'validates resolved values before any child runs and redacts validation messages' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ Software = @{ Install = @(@{ ExecutablePath = '{{password:Installer path}}' }) } } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Install = @(@{ ExecutablePath = '{{password:Installer path}}' }) } } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('Software')
         Mock Read-RestoreInputHC -ModuleName Execution { 'Test-secret!42' }
@@ -243,7 +243,7 @@ Describe 'Single-file execution' {
         }
     }
     It 'rejects an empty or unavailable restore selection' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @() } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @() } } $path
         $params.Action = 'RestoreSnapshot'
         foreach ($selection in @(@(), @('CreateFolders'), @('Unknown'))) {
             $params.Items = $selection
@@ -267,7 +267,7 @@ Describe 'Single-file execution' {
         (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
     }
     It 'reports errors returned in the Errors property next to the success messages' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @(@{ Name = 'A' }, @{ Name = 'B' }, @{ Name = 'C' }) } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @(@{ Name = 'A' }, @{ Name = 'B' }, @{ Name = 'C' }) } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         Mock Invoke-ChildScriptHC -ModuleName Execution {
@@ -297,7 +297,7 @@ Describe 'Single-file execution' {
         $result.Results[0].Messages | Should -Be @('Exported')
     }
     It 'rejects an Errors property that is not a string array' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @(@{ Name = 'A' }) } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @(@{ Name = 'A' }) } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         Mock Invoke-ChildScriptHC -ModuleName Execution {
@@ -308,7 +308,7 @@ Describe 'Single-file execution' {
         $result.Results[0].Messages | Should -Be @("ERROR: 'UserAccounts' did not return exactly one result with Data, Messages (string array) and Errors (string array)")
     }
     It 'rejects a result without an Errors property' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @(@{ Name = 'A' }) } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }; Items = @{ UserAccounts = @(@{ Name = 'A' }) } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         Mock Invoke-ChildScriptHC -ModuleName Execution {
@@ -320,7 +320,7 @@ Describe 'Single-file execution' {
         $result.Results[0].Messages | Should -Be @("ERROR: 'UserAccounts' did not return exactly one result with Data, Messages (string array) and Errors (string array)")
     }
     It 'redacts prompted passwords in returned errors' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Items = @{ UserAccounts = @(@{ Name = 'Example'; Password = '{{password:Password}}' }) } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{ Name = 'Example'; Password = '{{password:Password}}' }) } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         Mock Read-RestoreInputHC -ModuleName Execution { 'Test-secret!42' }
@@ -341,7 +341,7 @@ Describe 'Single-file execution' {
         Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 0 -Exactly
     }
     It 'reports a scheduled restart with its countdown before writing the report' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         $result = Invoke-ComputerSnapshotHC @params
@@ -355,7 +355,7 @@ Describe 'Single-file execution' {
         }
     }
     It 'reports a restart that was not done because a section failed' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         Mock Invoke-ChildScriptHC -ModuleName Execution { throw 'Restore failed' }
@@ -365,7 +365,7 @@ Describe 'Single-file execution' {
         $restart.Messages[0] | Should -BeLike 'Not restarted, because a section failed*'
     }
     It 'keeps a successful restore successful when the restart cannot be scheduled' {
-        Write-ConfigurationHC @{ SchemaVersion = 2; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         Mock Start-ComputerRestartHC -ModuleName Execution { throw 'shutdown.exe failed with exit code 1190: A system shutdown has already been scheduled.' }

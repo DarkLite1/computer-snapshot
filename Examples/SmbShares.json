@@ -1,37 +1,29 @@
-{
-  "Shares": [
-    {
-      "Name": "Data",
-      "Path": "C:\\Data",
-      "Description": "Shared data"
-    }
-  ],
-  "Access": [
-    {
-      "Name": "Data",
-      "AccountName": "S-1-5-32-544",
-      "AccessControlType": "Allow",
-      "AccessRight": "Full",
-      "Comment": "Administrators, by SID so it works in every Windows language"
-    },
-    {
-      "Name": "Data",
-      "AccountName": "S-1-5-11",
-      "AccessControlType": "Allow",
-      "AccessRight": "Change",
-      "Comment": "Authenticated Users"
-    },
-    {
-      "Name": "Data",
-      "AccountName": "S-1-5-32-546",
-      "AccessControlType": "Deny",
-      "AccessRight": "Full",
-      "Comment": "Guests are denied"
-    }
-  ],
-  "NTFS": [
-    {
-      "Name": "Data",
+[
+  {
+    "Name": "Data",
+    "Path": "C:\\Data",
+    "Description": "Shared data",
+    "Access": [
+      {
+        "AccountName": "S-1-5-32-544",
+        "AccessControlType": "Allow",
+        "AccessRight": "Full",
+        "Comment": "Administrators, by SID so it works in every Windows language"
+      },
+      {
+        "AccountName": "S-1-5-11",
+        "AccessControlType": "Allow",
+        "AccessRight": "Change",
+        "Comment": "Authenticated Users"
+      },
+      {
+        "AccountName": "S-1-5-32-546",
+        "AccessControlType": "Deny",
+        "AccessRight": "Full",
+        "Comment": "Guests are denied"
+      }
+    ],
+    "NTFS": {
       "Owner": "S-1-5-32-544",
       "AreAccessRulesProtected": false,
       "Access": [
@@ -44,7 +36,26 @@
           "Comment": "Users"
         }
       ]
-    }
-  ],
-  "Comment": "Export an existing share to capture its SMB and NTFS permissions. Built-in accounts are stored by SID."
-}
+    },
+    "Comment": "Export an existing share to capture its settings and permissions. Built-in accounts are stored by SID."
+  },
+  {
+    "Name": "Scans",
+    "Path": "D:\\Scans",
+    "Description": "Scanned documents",
+    "Access": [
+      {
+        "AccountName": "S-1-5-32-545",
+        "AccessControlType": "Allow",
+        "AccessRight": "Read",
+        "Comment": "Users"
+      },
+      {
+        "AccountName": "CONTOSO\\Scanner service",
+        "AccessControlType": "Allow",
+        "AccessRight": "Change"
+      }
+    ],
+    "Comment": "Without NTFS, the permissions of the folder itself are left unchanged."
+  }
+]

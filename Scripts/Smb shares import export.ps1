@@ -3,6 +3,9 @@
 .SYNOPSIS
     Export or import Smb shares as a configuration section.
 .DESCRIPTION
+    Data is a list of shares. Each share has its settings, its share
+    permissions in Access and the NTFS permissions of its folder in NTFS.
+
     Import creates or updates each share, then brings its share and NTFS
     permissions in line with the configuration. Permissions are changed in a
     way that never leaves a share with less access than configured:
@@ -58,24 +61,40 @@ if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
 
 if ($Action -eq 'Export') {
     #region Capture section
+    # One entry per share, with its share permissions (Access) and the NTFS
+    # permissions of its folder (NTFS). Built-in accounts such as Everyone
+    # are exported by SID, so the configuration works in every language.
     $shares = @(Get-SmbShare | Where-Object { -not $_.Special -and -not (Test-AdministrativeShareHC $_.Name) })
-    $exportData = [ordered]@{
-        Shares = @($shares | Select-Object Name, Description, Path, ScopeName,
-            @{Name = 'CachingMode'; Expression = { [string]$_.CachingMode } },
-            @{Name = 'SmbInstance'; Expression = { [string]$_.SmbInstance } },
-            @{Name = 'FolderEnumerationMode'; Expression = { [string]$_.FolderEnumerationMode } },
-            CATimeout, EncryptData, ThrottleLimit, ConcurrentUserLimit, ContinuouslyAvailable)
-        # Built-in accounts such as Everyone are exported by SID, so the
-        # configuration works in every Windows language
-        Access = @($shares | Get-SmbShareAccess | Select-Object Name, ScopeName,
-            @{Name = 'AccountName'; Expression = { ConvertTo-PortableAccountNameHC -Name ([string]$_.AccountName) } },
-            @{Name = 'AccessControlType'; Expression = { [string]$_.AccessControlType } },
-            @{Name = 'AccessRight'; Expression = { [string]$_.AccessRight } })
-        NTFS   = @(foreach ($share in $shares | Where-Object { $_.Path -and (Test-Path -LiteralPath $_.Path -PathType Container -ErrorAction Ignore) }) {
+    $exportData = @(
+        foreach ($share in $shares) {
+            $entry = [ordered]@{
+                Name                  = $share.Name
+                Description           = $share.Description
+                Path                  = $share.Path
+                ScopeName             = $share.ScopeName
+                CachingMode           = [string]$share.CachingMode
+                SmbInstance           = [string]$share.SmbInstance
+                FolderEnumerationMode = [string]$share.FolderEnumerationMode
+                CATimeout             = $share.CATimeout
+                EncryptData           = $share.EncryptData
+                ThrottleLimit         = $share.ThrottleLimit
+                ConcurrentUserLimit   = $share.ConcurrentUserLimit
+                ContinuouslyAvailable = $share.ContinuouslyAvailable
+                Access                = @(
+                    Get-SmbShareAccess -Name $share.Name | ForEach-Object {
+                        [ordered]@{
+                            AccountName       = ConvertTo-PortableAccountNameHC -Name ([string]$_.AccountName)
+                            AccessControlType = [string]$_.AccessControlType
+                            AccessRight       = [string]$_.AccessRight
+                        }
+                    }
+                )
+            }
+
+            if ($share.Path -and (Test-Path -LiteralPath $share.Path -PathType Container -ErrorAction Ignore)) {
                 try {
                     $acl = Get-Acl -LiteralPath $share.Path
-                    [ordered]@{
-                        Name                    = $share.Name
+                    $entry.NTFS = [ordered]@{
                         Owner                   = if ($acl.Owner) { ConvertTo-PortableAccountNameHC -Name $acl.Owner } else { $acl.Owner }
                         AreAccessRulesProtected = $acl.AreAccessRulesProtected
                         Access                  = @($acl.Access | Where-Object { -not $_.IsInherited } | Select-Object @{Name = 'IdentityReference'; Expression = { ConvertTo-PortableAccountNameHC -Name ([string]$_.IdentityReference) } },
@@ -88,15 +107,17 @@ if ($Action -eq 'Export') {
                 catch {
                     $errors += "Failed to read the NTFS permissions of share '$($share.Name)' on '$($share.Path)': $($_.Exception.Message)"
                 }
-            })
-    }
+            }
+
+            $entry
+        }
+    )
     #endregion
     $messages = @('Exported Smb shares')
 }
 else {
     #region Apply section
-    # A missing Shares list is $null, and @($null) would loop once over nothing
-    foreach ($share in @($Data.Shares | Where-Object { $null -ne $_ })) {
+    foreach ($share in @($Data | Where-Object { $null -ne $_ })) {
         if (Test-AdministrativeShareHC $share.Name) {
             $messages += "Skipped share '$($share.Name)': administrative shares are managed by Windows"
             continue
@@ -133,7 +154,7 @@ else {
         #endregion
 
         #region Share permissions: apply configured entries, then remove the others
-        $configuredAccess = @($Data.Access | Where-Object { $_.Name -eq $share.Name })
+        $configuredAccess = @($share.Access | Where-Object { $null -ne $_ })
         if ($configuredAccess.Count) {
             $wanted = @()
             $accessFailed = $false
@@ -182,7 +203,7 @@ else {
         #endregion
 
         #region NTFS permissions: build the complete ACL and write it once
-        $aclImport = @($Data.NTFS | Where-Object { $_.Name -eq $share.Name }) | Select-Object -First 1
+        $aclImport = $share.NTFS
         if ($aclImport) {
             try {
                 $ntfsProblems = @()

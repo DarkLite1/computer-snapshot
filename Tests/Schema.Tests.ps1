@@ -48,6 +48,16 @@ Describe 'Schema contract' {
         $problems = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Instal = @() } } } $TestDrive)
         $problems -join ';' | Should -Match 'Software.Instal: unknown property'
     }
+    It 'names the choice when a task has both or neither of Xml and XmlFile' {
+        $task = [ordered]@{ TaskName = 'T'; TaskPath = '\HC\'; Enabled = $true }
+
+        $none = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ ScheduledTasks = @($task) } } $TestDrive)
+        $none -join ';' | Should -Match 'ScheduledTasks\[0\]: needs Xml or XmlFile'
+
+        $both = @{ TaskName = 'T'; TaskPath = '\HC\'; Enabled = $true; Xml = '<Task/>'; XmlFile = 'Files\Task.xml' }
+        $problems = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ ScheduledTasks = @($both) } } $TestDrive)
+        $problems -join ';' | Should -Match 'ScheduledTasks\[0\]: use either Xml or XmlFile, not both'
+    }
     It 'rejects empty array entries but permits empty sections' {
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{}) } } $TestDrive) -join ';' | Should -Match 'Name: required'
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ CreateFolders = @{}; ScheduledTasks = @() } } $TestDrive).Count | Should -Be 0

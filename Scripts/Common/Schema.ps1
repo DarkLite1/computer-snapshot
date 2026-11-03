@@ -97,7 +97,35 @@ function Test-ShapeHC {
             if (
                 $matches -eq 0 -or ($keyword -eq 'oneOf' -and $matches -ne 1)
             ) { 
-                "${Location}: missing required properties or invalid section shape" 
+                # Alternatives that only name one required property each
+                $choices = [System.Collections.Generic.List[string]]::new()
+
+                foreach ($alternative in $Schema.$keyword) {
+                    if (
+                        @(Get-PropertiesHC $alternative) -ceq 'required' -and
+                        @(Get-PropertiesHC $alternative).Count -eq 1 -and
+                        @($alternative.required).Count -eq 1
+                    ) {
+                        $choices.Add($alternative.required[0])
+                    }
+                }
+
+                if (
+                    $keyword -eq 'oneOf' -and
+                    $choices.Count -eq @($Schema.$keyword).Count
+                ) {
+                    $list = $choices -join ' or '
+
+                    if ($matches -eq 0) {
+                        "${Location}: needs $list"
+                    }
+                    else {
+                        "${Location}: use either $list, not both"
+                    }
+                }
+                else {
+                    "${Location}: missing required properties or invalid section shape" 
+                }
             }
         }
     }

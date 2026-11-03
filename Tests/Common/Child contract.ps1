@@ -14,7 +14,8 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         function Set-SynchronizeTimeWithServerHC { param($ComputerName) }
         function Set-SynchronizeTimeWithDomainHC {}
         function Get-InstalledApplicationsHC {}
-        function Remove-ApplicationHC { param($ApplicationName, $UninstallString) }
+        function Remove-ApplicationHC { param($ApplicationName, $UninstallString, $TimeoutSeconds) }
+        function Wait-ProcessTreeHC { param($Process, $TimeoutSeconds, $What) }
         function Start-ScriptHC { param($Path) }
         function Invoke-CustomScriptHC { param($Path, $Arguments) }
         function Get-RegistryKeyStateHC { param($Path, $Name) }
@@ -100,6 +101,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         Mock Get-InstalledApplicationsHC
         Mock Remove-ApplicationHC
         Mock Start-Process { [pscustomobject]@{ ExitCode = 0 } }
+        Mock Wait-ProcessTreeHC { [int]$Process.ExitCode }
         Mock Convert-Path { Join-Path $TestDrive 'example.exe' }
         Mock Invoke-CustomScriptHC { 'Custom script output' }
     }

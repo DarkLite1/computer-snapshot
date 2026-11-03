@@ -67,6 +67,17 @@ Describe 'Schema contract' {
         $removal.Remove('UninstallCommand')
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Remove = @($removal) } } } $TestDrive).Count | Should -Be 0
     }
+    It 'accepts TimeoutMinutes from 1 to 1440 for removals and installers' {
+        foreach ($minutes in @(1, 1440)) {
+            @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Remove = @(@{ DisplayName = 'A'; TimeoutMinutes = $minutes }) } } } $TestDrive).Count | Should -Be 0
+        }
+        foreach ($minutes in @(0, 1441)) {
+            @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Remove = @(@{ DisplayName = 'A'; TimeoutMinutes = $minutes }) } } } $TestDrive) -join ';' |
+                Should -Match 'Remove\[0\]\.TimeoutMinutes: expected a number from 1 to 1440'
+        }
+        @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Install = @(@{ ExecutablePath = 'C:\Windows\notepad.exe'; TimeoutMinutes = 0 }) } } } $TestDrive) -join ';' |
+            Should -Match 'Install\[0\]\.TimeoutMinutes: expected a number from 1 to 1440'
+    }
     It 'rejects empty array entries but permits empty sections' {
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{}) } } $TestDrive) -join ';' | Should -Match 'Name: required'
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ CreateFolders = @{}; ScheduledTasks = @() } } $TestDrive).Count | Should -Be 0

@@ -1276,6 +1276,13 @@
                 "type": "boolean",
                 "description": "Allow DisplayName to match more than 5 applications. Without it, such a removal is refused to protect against a too broad pattern."
               },
+              "TimeoutMinutes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1440,
+                "default": 15,
+                "description": "Minutes the uninstaller, with the processes it starts, may run; then it is stopped and the removal fails."
+              },
               "Comment": {
                 "type": "string",
                 "description": "Technician notes; ignored when applying the configuration."
@@ -1308,6 +1315,13 @@
                   "type": "integer",
                   "description": "An exit code that means success."
                 }
+              },
+              "TimeoutMinutes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1440,
+                "default": 15,
+                "description": "Minutes the installer, with the processes it starts, may run; then it is stopped and the installation fails."
               },
               "Comment": {
                 "type": "string",

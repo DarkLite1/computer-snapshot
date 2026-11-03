@@ -84,6 +84,18 @@ function Test-ShapeHC {
         "${Location}: string is empty" 
     }
 
+    $isNumber = $Value -is [int] -or $Value -is [long] -or $Value -is [double]
+
+    if (
+        $isNumber -and 
+        (
+            ($null -ne $Schema.minimum -and $Value -lt $Schema.minimum) -or
+            ($null -ne $Schema.maximum -and $Value -gt $Schema.maximum)
+        )
+    ) {
+        "${Location}: expected a number from $($Schema.minimum) to $($Schema.maximum)"
+    }
+
     foreach ($keyword in @('oneOf', 'anyOf')) {
         if ($Schema.$keyword) {
             $matches = 0

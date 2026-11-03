@@ -277,6 +277,16 @@ Each entry in `Software` → `Remove` names an application as it appears in Prog
 - `UninstallArguments` are added to the application's own uninstall command, to make it silent: `/S` for most NSIS uninstallers, `/VERYSILENT /NORESTART` for Inno Setup.
 - `UninstallCommand` replaces the uninstall command completely. It runs once, also when several applications match.
 - Exit codes work as for installers: `0`, `3010` and `1641` mean success, others can be listed in `SuccessExitCodes`.
+- Applications installed for one user only, such as some Zoom or Teams installs, are found for every user who is signed in, and the report names the user. Their uninstaller runs as the account that runs the restore, which not every per-user uninstaller supports. Users who are signed out are not searched.
+- Some uninstallers start a second process and end straight away. The tool waits for the processes an uninstaller starts, and afterwards gives the application up to 60 seconds to disappear from Programs and Features.
+
+### Time limit for installers and uninstallers
+
+Each entry in `Install` and `Remove` gets `TimeoutMinutes` to finish, by default 15, from 1 to 1440. That includes the processes it starts. An installer or uninstaller that is still running then, for example because it waits for a click, is stopped and reported as failed; the next entries still run.
+
+```json
+{ "ExecutablePath": "Software\\BigSuite.exe", "Arguments": "/quiet", "TimeoutMinutes": 60 }
+```
 
 ### Editing with autocomplete
 

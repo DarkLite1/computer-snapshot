@@ -464,11 +464,6 @@ Just open PowerShell from your USB stick and run:
 & '.\Scripts\Convert configuration.ps1' -OldConfigurationFile 'Configurations\Old PC.json' -RootFolder $PWD.Path
 ```
 
-This updates your old file to the current format (version 3) and keeps the original as a backup:
+This converts an old configuration (version 1, the `StartScript` format) to the current format (version 3). The result is written to `Configurations\<name>.json` and the original is kept as `<name>.v1.json`.
 
-| Your file                                    | Result                                                                                     |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Version 1 (old `StartScript` format)         | written to `Configurations\<name>.json`; the original is kept as `<name>.v1.json`          |
-| Version 2 (`"SchemaVersion": 2`)             | converted in place; the original is kept as `<name>.v2.json`                               |
-
-For version 2, the only change is the layout of `SmbShares`: the three lists `Shares`, `Access` and `NTFS` become one entry per share with its own `Access` and `NTFS` (see [SMB shares](#smb-shares)). A shared file in `Shared\` that the configuration refers to for `SmbShares` is converted too, and kept as `<name>.v2.json`. Run the converter once per configuration file; a file that is already version 3 is left alone. Share permissions that belong to a share that isn't in the list can't be applied, and are reported.
+Run the converter once per configuration file; a file that is already version 3 is left alone. Share permissions that belong to a share that isn't in the old share list can't be applied, and are reported.

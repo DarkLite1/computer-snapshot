@@ -3,19 +3,14 @@
 .SYNOPSIS
     Convert one older configuration to version 3 without deleting its data.
 .DESCRIPTION
-    Two kinds of files are converted:
-    - Version 1, the old StartScript format with a snapshot folder. The
-      original is renamed to name.v1.json and the result is written to
-      Configurations\<name>.json.
-    - Version 2. The original is renamed to name.v2.json and the result is
-      written in its place. SmbShares changes from three lists (Shares,
-      Access and NTFS, linked by share name) to one entry per share with
-      its own Access and NTFS. A shared section file it refers to is
-      converted as well, after renaming it to name.v2.json.
+    Convert a version 1 configuration, the old StartScript format with a
+    snapshot folder, to version 3. The original is renamed to name.v1.json
+    and the result is written to Configurations\<name>.json.
 
-    Both versions: Software.Remove changes from a list of names to a list
-    of objects, { "DisplayName": "name" }. Version 1: each network card
-    becomes { "FindBy": { "Description": ... }, "Change": { ... } }.
+    SmbShares become one entry per share with its own Access and NTFS,
+    Software.Remove becomes a list of objects, { "DisplayName": "name" },
+    and each network card becomes
+    { "FindBy": { "Description": ... }, "Change": { ... } }.
 .PARAMETER OldConfigurationFile
     Configuration to convert.
 .PARAMETER RootFolder
@@ -54,7 +49,8 @@ function Convert-CommentsHC {
 function ConvertTo-ShareListHC {
     <#
     .SYNOPSIS
-        Turn the version-2 SmbShares lists into one entry per share.
+        Turn the version 1 share, access and NTFS lists into one entry per
+        share.
     .DESCRIPTION
         Access and NTFS entries are matched to their share by Name. Entries
         for a share that is not in Shares cannot be applied and are reported
@@ -153,38 +149,6 @@ function ConvertTo-SoftwareHC {
     $Data
 }
 
-function Convert-SharedSectionHC {
-    # Convert a shared section file once, keeping the original as name.v2.json
-    param(
-        [Parameter(Mandatory)][string]$Reference,
-        [Parameter(Mandatory)][scriptblock]$IsOld,
-        [Parameter(Mandatory)][scriptblock]$Convert
-    )
-
-    $sharedPath = Resolve-RootPathHC $Reference $RootFolder
-    $sharedData = Read-SectionExampleHC $sharedPath
-
-    if (-not (& $IsOld $sharedData)) {
-        return
-    }
-
-    $sharedFile = Get-Item -LiteralPath $sharedPath
-    $sharedBackup = Join-Path $sharedFile.DirectoryName ($sharedFile.BaseName + '.v2.json')
-
-    if (Test-Path -LiteralPath $sharedBackup) {
-        throw "Backup '$sharedBackup' already exists"
-    }
-
-    $converted = & $Convert $sharedData
-    Rename-Item -LiteralPath $sharedPath -NewName (Split-Path $sharedBackup -Leaf) -ErrorAction Stop
-    [IO.File]::WriteAllText(
-        $sharedPath,
-        (ConvertTo-Json -InputObject $converted -Depth 20) + [Environment]::NewLine,
-        (New-Object System.Text.UTF8Encoding $false)
-    )
-    Write-Host "Converted shared section '$sharedPath'. Original: '$sharedBackup'."
-}
-
 function ConvertTo-NetworkCardHC {
     # Version 1 card settings become FindBy (by description) and Change
     param($Card)
@@ -211,18 +175,6 @@ function ConvertTo-NetworkCardHC {
     }
 
     [pscustomobject]$entry
-}
-
-function Test-OldShareLayoutHC {
-    # The version-2 layout: an object, normally with Shares, Access and NTFS
-    # lists; an empty object {} is converted to an empty list as well
-    param($Data)
-
-    $null -ne $Data -and $Data -isnot [array] -and $Data -isnot [string] -and
-    @($Data.PSObject.Properties.Name | Where-Object { $_ -ne 'Comment' }).Count -eq
-    @($Data.PSObject.Properties.Name | Where-Object {
-            $_ -in @('Shares', 'Access', 'NTFS')
-        }).Count
 }
 
 function Get-RootRelativePathHC {
@@ -273,70 +225,12 @@ $oldPath = Resolve-RootPathHC $OldConfigurationFile $RootFolder
 $oldFile = Get-Item -LiteralPath $oldPath -ErrorAction Stop
 $old = Read-SectionExampleHC $oldPath
 
-#region Version 2: convert in place
 if ($old.SchemaVersion -eq 3) {
     throw "'$oldPath' is already a version-3 configuration"
 }
 
-if ($old.SchemaVersion -eq 2) {
-    $problems = New-Object 'System.Collections.Generic.List[string]'
-    $backupPath = Join-Path $oldFile.DirectoryName ($oldFile.BaseName + '.v2.json')
-
-    if (Test-Path -LiteralPath $backupPath) {
-        throw "Backup '$backupPath' already exists"
-    }
-
-    $sharesData = $old.Items.SmbShares
-
-    if ($sharesData -is [string]) {
-        # A shared section file, converted once for every configuration
-        Convert-SharedSectionHC `
-            -Reference $sharesData `
-            -IsOld { param($Data) Test-OldShareLayoutHC $Data } `
-            -Convert {
-            param($Data)
-            ConvertTo-ShareListHC -OldShares $Data -Problems $problems
-        }
-    }
-    elseif (Test-OldShareLayoutHC $sharesData) {
-        $old.Items.SmbShares = ConvertTo-ShareListHC -OldShares $sharesData -Problems $problems
-    }
-
-    $softwareData = $old.Items.Software
-
-    if ($softwareData -is [string]) {
-        Convert-SharedSectionHC `
-            -Reference $softwareData `
-            -IsOld { param($Data) Test-OldSoftwareLayoutHC $Data } `
-            -Convert { param($Data) ConvertTo-SoftwareHC $Data }
-    }
-    elseif (Test-OldSoftwareLayoutHC $softwareData) {
-        $old.Items.Software = ConvertTo-SoftwareHC $softwareData
-    }
-
-    Rename-Item -LiteralPath $oldPath -NewName (Split-Path $backupPath -Leaf) -ErrorAction Stop
-    Write-ConfigurationHC -Configuration $old -Path $oldPath
-
-    foreach ($problem in @(Test-ConfigurationHC (Read-ConfigurationHC $oldPath $RootFolder) $RootFolder)) {
-        $problems.Add($problem)
-    }
-
-    foreach ($problem in $problems) {
-        Write-Warning $problem
-    }
-
-    Write-Host "Converted to '$oldPath'. Validation problems: $($problems.Count). Original: '$backupPath'."
-
-    return [pscustomobject]@{
-        Path     = $oldPath
-        Original = $backupPath
-        Problems = $problems.ToArray()
-    }
-}
-#endregion
-
 if (-not $old.StartScript) {
-    throw 'Expected a version-2 configuration or an old StartScript-format configuration.'
+    throw 'Expected an old StartScript-format (version 1) configuration.'
 }
 $outputFolder = Join-Path $RootFolder 'Configurations'
 $outputPath = Join-Path $outputFolder $oldFile.Name

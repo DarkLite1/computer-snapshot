@@ -64,76 +64,24 @@ Describe 'One-time configuration conversion' {
         $card.Change.NetworkCategory | Should -Be 'Private'
         $card.Change.DnsSuffix | Should -Be 'contoso.com'
     }
-    It 'converts a version-2 configuration in place and moves share permissions into each share' {
-        $folder = Join-Path $TestDrive 'Version2'
-        $null = New-Item -Path "$folder\Configurations", "$folder\Shared" -ItemType Directory -Force
-        $path = Join-Path $folder 'Configurations\Office.json'
-        @'
-{
-  "SchemaVersion": 2,
-  "Description": "Office PC",
-  "Settings": { "RebootComputer": true },
-  "Items": {
-    "SmbShares": {
-      "Shares": [ { "Name": "Data", "Path": "C:\\Data" }, { "Name": "Scans", "Path": "D:\\Scans" } ],
-      "Access": [
-        { "Name": "Data", "AccountName": "S-1-5-32-544", "AccessControlType": "Allow", "AccessRight": "Full" },
-        { "Name": "Scans", "AccountName": "S-1-5-11", "AccessControlType": "Allow", "AccessRight": "Read" },
-        { "Name": "Gone", "AccountName": "S-1-1-0", "AccessControlType": "Allow", "AccessRight": "Read" }
-      ],
-      "NTFS": [ { "Name": "Data", "Owner": "S-1-5-32-544", "AreAccessRulesProtected": false, "Access": [] } ]
-    }
-  }
-}
-'@ | Set-Content -LiteralPath $path -Encoding UTF8
-        $original = Get-Content -LiteralPath $path -Raw
-        $result = & $testScript -OldConfigurationFile $path -RootFolder $folder 3>$null
-        $result.Path | Should -Be $path
-        Get-Content -LiteralPath $result.Original -Raw | Should -BeExactly $original
-        $result.Problems | Should -Be @("SmbShares: permissions for share 'Gone' were dropped, because that share is not in Shares")
-        $loaded = Read-ConfigurationHC $path $folder
-        $loaded.SchemaVersion | Should -Be 3
-        $loaded.Description | Should -Be 'Office PC'
-        $loaded.Settings.RebootComputer | Should -BeTrue
-        @($loaded.Items.SmbShares).Count | Should -Be 2
-        $data = $loaded.Items.SmbShares | Where-Object { $_.Name -eq 'Data' }
-        @($data.Access).Count | Should -Be 1
-        $data.Access[0].AccountName | Should -Be 'S-1-5-32-544'
-        $data.Access[0].PSObject.Properties.Name | Should -Not -Contain 'Name'
-        $data.NTFS.Owner | Should -Be 'S-1-5-32-544'
-        ($loaded.Items.SmbShares | Where-Object { $_.Name -eq 'Scans' }).Access[0].AccountName | Should -Be 'S-1-5-11'
-        { & $testScript -OldConfigurationFile $path -RootFolder $folder } | Should -Throw '*already a version-3 configuration*'
-    }
-    It 'turns Software.Remove names into objects, inline and in a shared file' {
-        $folder = Join-Path $TestDrive 'Version2Software'
-        $null = New-Item -Path "$folder\Configurations", "$folder\Shared" -ItemType Directory -Force
-        '{ "Remove": ["Shared App"], "Install": [] }' | Set-Content -LiteralPath "$folder\Shared\Software.json" -Encoding UTF8
-        '{ "SchemaVersion": 2, "Items": { "Software": { "Remove": ["Old App", "Other App"] } } }' |
-            Set-Content -LiteralPath "$folder\Configurations\Inline.json" -Encoding UTF8
-        '{ "SchemaVersion": 2, "Items": { "Software": "Shared\\Software.json" } }' |
-            Set-Content -LiteralPath "$folder\Configurations\Shared.json" -Encoding UTF8
-        foreach ($name in @('Inline', 'Shared')) {
-            $result = & $testScript -OldConfigurationFile "$folder\Configurations\$name.json" -RootFolder $folder 6>$null
-            $result.Problems.Count | Should -Be 0 -Because ($result.Problems -join '; ')
-        }
-        $inline = Read-ConfigurationHC "$folder\Configurations\Inline.json" $folder
-        @($inline.Items.Software.Remove.DisplayName) | Should -Be @('Old App', 'Other App')
-        $shared = Read-ConfigurationHC "$folder\Configurations\Shared.json" $folder
-        @($shared.Items.Software.Remove.DisplayName) | Should -Be @('Shared App')
-        "$folder\Shared\Software.v2.json" | Should -Exist
-    }
-    It 'converts a shared SmbShares file that a version-2 configuration refers to' {
-        $folder = Join-Path $TestDrive 'Version2Shared'
-        $null = New-Item -Path "$folder\Configurations", "$folder\Shared" -ItemType Directory -Force
-        '{ "Shares": [ { "Name": "Common", "Path": "C:\\Common" } ], "Access": [ { "Name": "Common", "AccountName": "S-1-1-0", "AccessControlType": "Allow", "AccessRight": "Read" } ], "NTFS": [] }' |
-            Set-Content -LiteralPath "$folder\Shared\Shares.json" -Encoding UTF8
-        '{ "SchemaVersion": 2, "Items": { "SmbShares": "Shared\\Shares.json" } }' |
-            Set-Content -LiteralPath "$folder\Configurations\Office.json" -Encoding UTF8
-        $result = & $testScript -OldConfigurationFile "$folder\Configurations\Office.json" -RootFolder $folder 3>$null
+    It 'turns version 1 Software.Remove names into objects' {
+        $legacyRoot = Join-Path $TestDrive 'LegacySoftware'
+        $null = New-Item -Path "$legacyRoot\Software" -ItemType Directory -Force
+        '{ "SoftwarePackages": { "Remove": ["Old App", "Other App"], "Install": [] } }' |
+            Set-Content -LiteralPath "$legacyRoot\Software\Software.json"
+        $oldPath = Join-Path $TestDrive 'Configurations\Software only.json'
+        @{ StartScript = @{ SnapshotFolder = $legacyRoot; Snapshot = @{ Software = $true } } } |
+            ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $oldPath
+        $result = & $testScript -OldConfigurationFile $oldPath -RootFolder $TestDrive 6>$null
         $result.Problems.Count | Should -Be 0 -Because ($result.Problems -join '; ')
-        "$folder\Shared\Shares.v2.json" | Should -Exist
-        $loaded = Read-ConfigurationHC "$folder\Configurations\Office.json" $folder
-        $loaded.Items.SmbShares[0].Name | Should -Be 'Common'
-        $loaded.Items.SmbShares[0].Access[0].AccountName | Should -Be 'S-1-1-0'
+        $loaded = Read-ConfigurationHC $result.Path $TestDrive
+        @($loaded.Items.Software.Remove.DisplayName) | Should -Be @('Old App', 'Other App')
+    }
+    It 'only converts version 1 files' {
+        $path = Join-Path $TestDrive 'Configurations\Other.json'
+        '{ "SchemaVersion": 2, "Items": { "UserAccounts": [] } }' | Set-Content -LiteralPath $path
+        { & $testScript -OldConfigurationFile $path -RootFolder $TestDrive } | Should -Throw '*version 1*'
+        '{ "SchemaVersion": 3, "Items": { "UserAccounts": [] } }' | Set-Content -LiteralPath $path
+        { & $testScript -OldConfigurationFile $path -RootFolder $TestDrive } | Should -Throw '*already a version-3 configuration*'
     }
 }

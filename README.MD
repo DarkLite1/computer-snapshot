@@ -142,7 +142,7 @@ Use a `{{password:...}}` placeholder for `RunAsPassword`, so the password is ask
 ]
 ```
 
-### Custom scripts and exit codes
+### Exit codes of custom scripts and installers
 
 `StartCustomScriptsBefore` and `StartCustomScriptsAfter` run your own
 PowerShell scripts. A script fails when it writes an error, throws, or ends
@@ -162,12 +162,24 @@ those codes in `SuccessExitCodes` for a script that ends with robocopy:
 ]
 ```
 
+Installers in `Software` → `Install` work the same way. `0` means success, and `3010` and `1641` always mean "success, a restart is needed". An installer that uses other codes for success, such as `1` for "already installed", lists them in `SuccessExitCodes`:
+
+```json
+"Install": [
+  {
+    "ExecutablePath": "Software\\VendorTool.exe",
+    "Arguments": "/silent",
+    "SuccessExitCodes": [0, 1]
+  }
+]
+```
+
 ### Editing with autocomplete
 
 Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works.
 
 > **🔒 Important Security Warning:**
-> When you save settings that include passwords (like user accounts or certain registry keys), **they are saved in plain text**. Please keep your USB stick physically secure, and never upload files containing sensitive passwords to public spaces.
+> When you save settings that include passwords (like user accounts or certain registry keys), **they are saved in plain text**. Please keep your USB stick physically secure, and never upload files containing sensitive passwords to public spaces. Where possible, use a `{{password:...}}` placeholder instead, so the password is asked for during the restore and never stored (see [Restore-Time Input](#restore-time-input)).
 
 ## Restore-Time Input
 

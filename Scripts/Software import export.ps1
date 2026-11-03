@@ -13,7 +13,8 @@
       Windows Installer (MsiExec) commands are made silent and always uninstall
       (/X); other uninstallers without a quiet command may show a window.
     - Exit codes 0, 3010 and 1641 mean success; 3010 and 1641 mean that a
-      restart is needed to complete the change.
+      restart is needed to complete the change. An installer that uses other
+      success codes lists them in SuccessExitCodes, for example [0, 1].
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -72,14 +73,33 @@ function Remove-ApplicationHC {
     $global:LASTEXITCODE
 }
 function Get-ExitCodeResultHC {
-    # $null for success, 'restart' for success that needs a restart
-    param([int]$ExitCode, [string]$What)
-    switch ($ExitCode) {
-        0 { return $null }
-        3010 { return 'restart' }
-        1641 { return 'restart' }
-        default { throw "$What failed with exit code $ExitCode" }
+    <#
+    .SYNOPSIS
+        Interpret an exit code: $null for success, 'restart' for success
+        that needs a restart; any other code throws.
+    .DESCRIPTION
+        3010 and 1641 are the Windows Installer codes for success with a
+        restart, and always count as such. SuccessExitCodes lists the
+        codes that mean success, by default only 0.
+    #>
+    param(
+        [int]$ExitCode,
+        [string]$What,
+        [int[]]$SuccessExitCodes = @(0)
+    )
+
+    if ($ExitCode -in @(3010, 1641)) {
+        return 'restart'
     }
+
+    if ($SuccessExitCodes -contains $ExitCode) {
+        return $null
+    }
+
+    throw (
+        "$What failed with exit code $ExitCode, " +
+        "success exit codes are $($SuccessExitCodes -join ', ')"
+    )
 }
 #endregion
 $exportData = $null
@@ -139,9 +159,30 @@ else {
                 $startParams = @{ FilePath = $executablePath; NoNewWindow = $true; Wait = $true; PassThru = $true }
                 if ($application.Arguments) { $startParams.ArgumentList = $application.Arguments }
                 $process = Start-Process @startParams
-                $result = Get-ExitCodeResultHC -ExitCode $process.ExitCode -What 'the installation'
-                if ($result -eq 'restart') { $messages += "Installed $label, a restart is needed to complete the installation" }
-                else { $messages += "Installed $label" }
+                $successExitCodes = @(
+                    $application.SuccessExitCodes |
+                    Where-Object { $null -ne $_ } |
+                    ForEach-Object { [int]$_ }
+                )
+
+                if (-not $successExitCodes.Count) {
+                    $successExitCodes = @(0)
+                }
+
+                $exitCode = [int]$process.ExitCode
+                $result = Get-ExitCodeResultHC `
+                    -ExitCode $exitCode -What 'the installation' `
+                    -SuccessExitCodes $successExitCodes
+
+                if ($result -eq 'restart') {
+                    $messages += "Installed $label, a restart is needed to complete the installation"
+                }
+                elseif ($exitCode) {
+                    $messages += "Installed $label (exit code $exitCode)"
+                }
+                else {
+                    $messages += "Installed $label"
+                }
             }
             catch {
                 $errors += "Failed to install ${label}: $($_.Exception.Message)"

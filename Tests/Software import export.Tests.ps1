@@ -43,7 +43,7 @@ Describe 'Software import' {
         }
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
         $result[0].Messages | Should -Be @("Installed 'Software\reboot.exe', a restart is needed to complete the installation", "Installed 'Software\ok.exe'")
-        $result[0].Errors | Should -Be @("Failed to install 'Software\fail.exe': the installation failed with exit code 1603")
+        $result[0].Errors | Should -Be @("Failed to install 'Software\fail.exe': the installation failed with exit code 1603, success exit codes are 0")
     }
     It 'reports a missing installer with its full path' {
         Mock Test-Path { $false }
@@ -63,7 +63,25 @@ Describe 'Software import' {
         $null = & $scriptPath -Action Import -Data ([pscustomobject]@{ Install = @([pscustomobject]@{ ExecutablePath = 'Software\fail.exe' }) }) -RootFolder $TestDrive
         (Get-Location).Path | Should -Be $before
     }
+    It 'accepts the exit codes listed in SuccessExitCodes and shows them' {
+        Mock Start-Process { [pscustomobject]@{ ExitCode = 1 } } -ParameterFilter { $FilePath -like '*vendor.exe' }
+        $data = [pscustomobject]@{ Install = @([pscustomobject]@{ ExecutablePath = 'Software\vendor.exe'; SuccessExitCodes = @(0, 1) }) }
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        $result[0].Messages | Should -Be @("Installed 'Software\vendor.exe' (exit code 1)")
+    }
+    It 'still treats 3010 as success with a restart when SuccessExitCodes is set' {
+        $data = [pscustomobject]@{ Install = @([pscustomobject]@{ ExecutablePath = 'Software\reboot.exe'; SuccessExitCodes = @(0, 1) }) }
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Messages | Should -Be @("Installed 'Software\reboot.exe', a restart is needed to complete the installation")
+    }
+    It 'reports an exit code that is not listed' {
+        $data = [pscustomobject]@{ Install = @([pscustomobject]@{ ExecutablePath = 'Software\fail.exe'; SuccessExitCodes = @(0, 1) }) }
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        $result[0].Errors | Should -Be @("Failed to install 'Software\fail.exe': the installation failed with exit code 1603, success exit codes are 0, 1")
+    }
 }
+
 
 Describe 'Installed applications lookup' {
     It 'handles exactly one 32-bit application next to 64-bit applications' {

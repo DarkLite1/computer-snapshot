@@ -1403,6 +1403,15 @@
                 ],
                 "description": "Command-line arguments passed to the installer."
               },
+              "SuccessExitCodes": {
+                "type": "array",
+                "description": "Exit codes that mean the installation succeeded; defaults to [0]. 3010 and 1641 always mean success with a restart needed.",
+                "minItems": 1,
+                "items": {
+                  "type": "integer",
+                  "description": "An exit code that means success."
+                }
+              },
               "Comment": {
                 "type": "string",
                 "description": "Technician notes; ignored when applying the configuration."

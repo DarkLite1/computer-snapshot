@@ -113,7 +113,8 @@ else {
             }
                 
             $from = Resolve-RootPathHC -Path $item.From -RootFolder $RootFolder
-            $to = $item.To
+            # %ProgramData%\Vendor becomes C:\ProgramData\Vendor
+            $to = Expand-PathVariableHC -Path $item.To
             $fromItem = Get-Item `
                 -LiteralPath $from -Force `
                 -ErrorAction SilentlyContinue

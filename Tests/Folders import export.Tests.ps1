@@ -32,4 +32,15 @@ Describe 'Folders import' {
         $good | Should -Exist
         'relative' | Should -Not -Exist
     }
+    It 'expands environment variables and reports unknown ones' {
+        $env:COMPUTER_SNAPSHOT_TEST = $TestDrive
+        try {
+            $data = [pscustomobject]@{ FolderPaths = @('%COMPUTER_SNAPSHOT_TEST%\Expanded', '%COMPUTER_SNAPSHOT_UNKNOWN%\Logs') }
+            $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+        }
+        finally { Remove-Item Env:\COMPUTER_SNAPSHOT_TEST }
+        Join-Path $TestDrive 'Expanded' | Should -Exist
+        $result[0].Messages | Should -Be @("Created folder '%COMPUTER_SNAPSHOT_TEST%\Expanded' ('$(Join-Path $TestDrive 'Expanded')')")
+        $result[0].Errors | Should -Be @("Failed to create folder '%COMPUTER_SNAPSHOT_UNKNOWN%\Logs': unknown environment variable '%COMPUTER_SNAPSHOT_UNKNOWN%'")
+    }
 }

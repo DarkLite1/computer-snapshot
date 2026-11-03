@@ -5,7 +5,8 @@
 .DESCRIPTION
     Import creates each folder in FolderPaths, including missing parent
     folders. Each path must be a full path such as 'C:\Data\Logs' or
-    '\\server\share\Logs'. Each failed folder is reported in Errors and
+    '\\server\share\Logs'. Environment variables such as %ProgramData% are
+    expanded. Each failed folder is reported in Errors and
     the remaining folders are still created.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
@@ -56,13 +57,16 @@ else {
     foreach ($path in @($Data.FolderPaths)) {
         try {
             Write-Verbose "Folder '$path'"
-            Assert-FolderPathHC $path
-            if (Test-Path -LiteralPath $path -PathType Container) {
-                $messages += "Folder '$path' already exists"
+            # %ProgramData%\Vendor becomes C:\ProgramData\Vendor
+            $folder = Expand-PathVariableHC -Path ([string]$path)
+            $label = if ($folder -ne $path) { "'$path' ('$folder')" } else { "'$path'" }
+            Assert-FolderPathHC $folder
+            if (Test-Path -LiteralPath $folder -PathType Container) {
+                $messages += "Folder $label already exists"
             }
             else {
-                $null = New-Item -Path $path -ItemType Directory
-                $messages += "Created folder '$path'"
+                $null = New-Item -Path $folder -ItemType Directory
+                $messages += "Created folder $label"
             }
         }
         catch {

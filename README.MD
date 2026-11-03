@@ -100,7 +100,7 @@ Built-in accounts and groups have a different name in each Windows language: *Ev
 
 ### Paths
 
-All paths in a configuration (installers, files to copy, custom scripts, shared sections) are relative to the root of the USB stick, unless you give a full path like `C:\Temp\file.txt`. Environment variables such as `%SystemRoot%` are expanded.
+All paths in a configuration (installers, files to copy, custom scripts, shared sections) are relative to the root of the USB stick, unless you give a full path like `C:\Temp\file.txt`. Environment variables such as `%ProgramData%` are expanded in these paths, in the folders to create (`CreateFolders`) and in the destinations of `CopyFilesFolders`. An unknown variable is reported as an error instead of becoming part of a folder name.
 
 ### Settings
 

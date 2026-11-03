@@ -191,3 +191,24 @@ function Convert-AccountNameHC {
 
     $Name
 }
+
+function Expand-PathVariableHC {
+    <#
+    .SYNOPSIS
+        Expand environment variables such as %ProgramData% in a path.
+    .DESCRIPTION
+        Windows leaves an unknown variable as it is, which would silently
+        create a folder named '%Name%'; that throws instead.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Path
+    )
+
+    $expandedPath = [Environment]::ExpandEnvironmentVariables($Path)
+
+    if ($expandedPath -match '%([^%\\]+)%') {
+        throw "unknown environment variable '%$($Matches[1])%'"
+    }
+
+    $expandedPath
+}

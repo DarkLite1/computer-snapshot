@@ -62,4 +62,14 @@ Describe 'Copy files folders import' {
         $result[0].Errors[0] | Should -BeLike "Failed to copy 'Files\Missing.txt'*not found"
         $result[0].Messages | Should -Be @("Copied the contents of folder 'Files\App' to '$destination'")
     }
+    It 'expands environment variables in the destination' {
+        $env:COMPUTER_SNAPSHOT_TEST = $root
+        try {
+            $data = @([pscustomobject]@{ From = 'Files\App'; To = '%COMPUTER_SNAPSHOT_TEST%\Expanded' })
+            $result = @(& $scriptPath -Action Import -Data $data -RootFolder $root)
+        }
+        finally { Remove-Item Env:\COMPUTER_SNAPSHOT_TEST }
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        Join-Path $root 'Expanded\a.txt' | Should -Exist
+    }
 }

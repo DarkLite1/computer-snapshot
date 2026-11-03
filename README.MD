@@ -330,6 +330,40 @@ Installers in `Software` → `Install` work the same way. `0` means success, and
 ]
 ```
 
+### Example: Dell driver updates after a restore
+
+[Examples/StartCustomScriptsAfter.json](Examples/StartCustomScriptsAfter.json)
+runs [Files/Update Dell drivers.ps1](Files/Update%20Dell%20drivers.ps1) after the
+other restore sections. This example is opt-in; it is not enabled in the
+shipped configurations. Add this entry inside your configuration's `Items`:
+
+```json
+"StartCustomScriptsAfter": "Examples\\StartCustomScriptsAfter.json"
+```
+
+- Install Dell Command Update first, either beforehand or through
+  `Software.Install` using your reviewed installer and its silent arguments.
+  The wrapper does not download or install Command Update itself.
+- Run the restore as administrator on a supported Dell computer, with access
+  to Command Update's configured update source.
+- Only drivers are selected (`-updateType=driver`); BIOS and firmware updates
+  are deliberately excluded.
+- The script waits for Command Update and disables its automatic restart.
+  Also leave **Restart computer after successful restore** unchecked
+  (`Settings.RebootComputer: false`) if you want to restart manually.
+- Each run writes a separate log under
+  `%ProgramData%\ComputerSnapshot\Logs` and includes its path in the restore
+  report.
+- Dell exit codes `0` (success), `1` (restart required) and `500` (no applicable
+  updates) become successful script outcomes. Code `1` adds a warning to the
+  report; it does not schedule a restart. Code `5` (a restart is already
+  pending) and all other codes fail the action instead of pretending updates
+  were installed. After a pending restart, reboot and rerun the action.
+
+Review the CLI options and exit codes for the Dell Command Update version
+you deploy. Driver installation can temporarily interrupt network access, so
+prefer running this locally rather than relying on a remote connection.
+
 ### Removing software
 
 Each entry in `Software` → `Remove` names an application as it appears in Programs and Features. Removals run before the installers.

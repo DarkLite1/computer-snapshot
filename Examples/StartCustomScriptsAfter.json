@@ -1,0 +1,8 @@
+[
+  {
+    "Comment": "Opt-in Dell driver updates. Requires Dell Command Update, administrator rights and access to its update source. Excludes BIOS/firmware and never restarts automatically.",
+    "Path": "Files\\Update Dell drivers.ps1",
+    "Arguments": {},
+    "SuccessExitCodes": [0]
+  }
+]

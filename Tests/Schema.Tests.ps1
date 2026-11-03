@@ -15,6 +15,7 @@ BeforeAll {
         'User accounts' = 'UserAccounts'; 'User groups' = 'UserGroups'; 'Registry keys' = 'RegistryKeys'
         'Firewall rules' = 'FirewallRules'; 'Scheduled tasks' = 'ScheduledTasks'; 'Smb shares' = 'SmbShares'
         'Start custom scripts' = 'StartCustomScriptsBefore'
+        'Start custom scripts after' = 'StartCustomScriptsAfter'
     }
 }
 Describe 'Schema contract' {

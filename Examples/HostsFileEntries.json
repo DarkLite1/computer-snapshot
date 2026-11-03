@@ -1,0 +1,22 @@
+[
+  {
+    "Comment": "Both the short and the full name point to the same server.",
+    "IPAddress": "10.20.60.47",
+    "Hostnames": ["belsdaise0001", "belsdaise0001.grouphc.net"]
+  },
+  {
+    "Comment": "An IPv6 address.",
+    "IPAddress": "fd00::47",
+    "Hostnames": ["belsdaise0001-v6.grouphc.net"]
+  },
+  {
+    "Comment": "The address is asked for during the restore.",
+    "IPAddress": "{{ipv4:IP address of the print server}}",
+    "Hostnames": ["printserver", "printserver.grouphc.net"]
+  },
+  {
+    "Comment": "Remove old names from the hosts file, whatever address they point to.",
+    "Action": "Remove",
+    "Hostnames": ["oldserver", "oldserver.grouphc.net"]
+  }
+]

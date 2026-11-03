@@ -72,12 +72,13 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 6     | `CreateFolders`            | Folders to create.                                                      |
 | 7     | `SmbShares`                | SMB shares, each with its share and NTFS permissions.                   |
 | 8     | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and IPv4 settings. |
-| 9     | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
-| 10    | `RegistryKeys`             | Registry values to set.                                                 |
-| 11    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
-| 12    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
-| 13    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
-| 14    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
+| 9     | `HostsFileEntries`         | Host names in the Windows hosts file and the IP addresses they point to. |
+| 10    | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
+| 11    | `RegistryKeys`             | Registry values to set.                                                 |
+| 12    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
+| 13    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
+| 14    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
+| 15    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
 
 An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Examples/` folder for the exact format of each section.
 
@@ -211,6 +212,26 @@ Each entry in `NetworkCards` has two parts: `FindBy` says how to find the card, 
 - An export finds each card by its description and writes its current name in `NewName`, with its settings: `Dhcp: true`, or its static address, prefix and gateway, plus DNS servers that were set by hand. A card with several IPv4 addresses exports the first one; the report says so.
 
 > Changing the IP address of the card you are connected through, for example over remote desktop, ends that connection. Restore network settings at the computer itself.
+
+### Hosts file
+
+`HostsFileEntries` lists host names per IP address, for the Windows hosts file (`C:\Windows\System32\drivers\etc\hosts`):
+
+```json
+"HostsFileEntries": [
+  { "IPAddress": "10.20.60.47", "Hostnames": ["belsdaise0001", "belsdaise0001.grouphc.net"] },
+  { "IPAddress": "fd00::47", "Hostnames": ["belsdaise0001-v6.grouphc.net"] },
+  { "IPAddress": "{{ipv4:IP address of the print server}}", "Hostnames": ["printserver"] },
+  { "Action": "Remove", "Hostnames": ["oldserver", "oldserver.grouphc.net"] }
+]
+```
+
+- Each host name is made to point to its `IPAddress` (IPv4 or IPv6). A name that already does is left alone; a name that points to another address is moved, and the report says from which address; a missing name is added on a new line.
+- `"Action": "Remove"` removes the host names, whatever address they point to. It has no `IPAddress`.
+- Comments, empty lines and all other entries in the hosts file are kept as they are. A line whose names were all moved or removed is dropped.
+- The file is only written when something changed. The previous version is kept as `hosts.bak`, and the DNS cache is cleared so the change works straight away.
+- A host name may point to one address only, across the whole section, also when it is combined from several files in `Shared\`.
+- An export writes every active line of the hosts file, one entry per address.
 
 ### Registry changes
 

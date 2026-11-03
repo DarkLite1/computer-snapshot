@@ -241,6 +241,29 @@
             }
           ]
         },
+        "HostsFileEntries": {
+          "description": "Inline HostsFileEntries data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline HostsFileEntries data.",
+              "$ref": "#/$defs/HostsFileEntries"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
         "NtpTimeServers": {
           "description": "Inline NtpTimeServers data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
@@ -408,6 +431,9 @@
         },
         {
           "required": ["NetworkCards"]
+        },
+        {
+          "required": ["HostsFileEntries"]
         },
         {
           "required": ["NtpTimeServers"]
@@ -1082,6 +1108,39 @@
           "type": "string",
           "description": "Technician notes; ignored when applying the configuration."
         }
+      }
+    },
+    "HostsFileEntries": {
+      "type": "array",
+      "description": "Entries for the Windows hosts file, one per IP address. Other lines of the hosts file are kept.",
+      "items": {
+        "type": "object",
+        "description": "Host names that point to one IP address, or host names to remove.",
+        "additionalProperties": false,
+        "properties": {
+          "Action": {
+            "type": "string",
+            "enum": ["Set", "Remove"],
+            "description": "Set (default): make each host name point to IPAddress; a name that points elsewhere is moved. Remove: remove the host names from the hosts file."
+          },
+          "IPAddress": {
+            "type": "string",
+            "description": "IPv4 or IPv6 address, such as 10.20.60.47 or fd00::47, or {{ipv4:Description}}. Required for Set, not used for Remove."
+          },
+          "Hostnames": {
+            "type": "array",
+            "description": "Host names, such as server01 and server01.contoso.com.",
+            "items": {
+              "type": "string",
+              "description": "Host name: letters, digits, '-' and '_', in labels separated by dots."
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Hostnames"]
       }
     },
     "NtpTimeServers": {

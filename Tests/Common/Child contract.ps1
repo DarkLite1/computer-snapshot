@@ -4,7 +4,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
     BeforeAll {
         Import-Module "$PSScriptRoot\..\..\Scripts\Common\Configuration.psm1" -Force
         $itemNames = @{
-            Folders = 'CreateFolders'; 'Copy files folders' = 'CopyFilesFolders'; 'NTP time servers' = 'NtpTimeServers'
+            Folders = 'CreateFolders'; 'Copy files folders' = 'CopyFilesFolders'; 'NTP time servers' = 'NtpTimeServers'; 'Hosts file entries' = 'HostsFileEntries'
             'Network cards' = 'NetworkCards'; 'Regional settings' = 'RegionalSettings'; Software = 'Software'
             'User accounts' = 'UserAccounts'; 'User groups' = 'UserGroups'; 'Registry keys' = 'RegistryKeys'
             'Firewall rules' = 'FirewallRules'; 'Scheduled tasks' = 'ScheduledTasks'; 'Smb shares' = 'SmbShares'
@@ -15,6 +15,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         function Set-SynchronizeTimeWithDomainHC {}
         function Get-InstalledApplicationsHC {}
         function Remove-ApplicationHC { param($ApplicationName, $UninstallString, $TimeoutSeconds) }
+        function Get-HostsFilePathHC {}
         function Wait-ProcessTreeHC { param($Process, $TimeoutSeconds, $What) }
         function Start-ScriptHC { param($Path) }
         function Invoke-CustomScriptHC { param($Path, $Arguments) }
@@ -46,6 +47,8 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         Mock Get-DnsClient { [pscustomobject]@{ InterfaceIndex = 1; ConnectionSpecificSuffix = 'old' } }
         Mock Get-NetConnectionProfile { [pscustomobject]@{ InterfaceAlias = 'Old'; InterfaceIndex = 1; NetworkCategory = 'Public' } }
         Mock Rename-NetAdapter
+        Mock Get-HostsFilePathHC { Join-Path $TestDrive 'hosts' }
+        Mock Clear-DnsClientCache
         Mock Get-NetIPInterface { [pscustomobject]@{ Dhcp = 'Enabled' } }
         Mock Get-NetIPAddress
         Mock Get-NetRoute
@@ -149,6 +152,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
             'Copy files folders' { $data = @([pscustomobject]@{ From = 'Files\example.ps1'; To = 'C:\Example\file.ps1' }); $command = 'Copy-Item' }
             'NTP time servers' { $data = [pscustomobject]@{ SyncTimeWithDomain = $true }; $command = 'Restart-Service' }
             'Network cards' { $data = @([pscustomobject]@{ FindBy = [pscustomobject]@{ Description = 'Example' }; Change = [pscustomobject]@{ NewName = 'New'; NetworkCategory = 'Private'; DnsSuffix = 'new' } }); $command = 'Rename-NetAdapter' }
+            'Hosts file entries' { $data = @([pscustomobject]@{ IPAddress = '192.0.2.10'; Hostnames = @('server01') }); $command = 'Clear-DnsClientCache' }
             'Regional settings' { $data = [pscustomobject]@{ WinSystemLocaleName = 'en-US'; TimeZoneId = 'UTC'; WinHomeLocationGeoId = 21; CultureName = 'en-US' }; $command = 'Start-ScriptHC' }
             'User accounts' { $data = @([pscustomobject]@{ Name = 'Example'; FullName = 'Example'; Description = ''; Enabled = $true; UserMayChangePassword = $true; Password = 'Example-only' }); $command = 'Set-LocalUser' }
             'User groups' { $data = @([pscustomobject]@{ Name = 'Example'; Description = 'Example'; Members = @('Everyone') }); $command = 'Add-LocalGroupMember' }

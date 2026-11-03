@@ -15,6 +15,7 @@ $script:ArrayItems = @(
     'UserGroups', 
     'FirewallRules',
     'NetworkCards',
+    'HostsFileEntries',
     'ScheduledTasks', 
     'SmbShares',
     'CopyFilesFolders', 
@@ -720,6 +721,62 @@ function Test-ConfigurationHC {
                         @(Get-IPSettingsProblemHC -Settings $data[$index].Change.IPSettings)
                     ) {
                         $problems.Add("${location}[$index].Change.IPSettings$problem")
+                    }
+                }
+            }
+            'HostsFileEntries' {
+                # Each host name points to one address and is not also removed
+                $addressOf = @{}
+                $placeholder = '\A\{\{(?:ipv4|input):[^{}\r\n]+\}\}\z'
+
+                for ($index = 0; $index -lt $data.Count; $index++) {
+                    $entry = $data[$index]
+                    $isRemove = $entry.Action -eq 'Remove'
+                    $names = @($entry.Hostnames | Where-Object { $null -ne $_ })
+
+                    if (-not $names.Count) {
+                        $problems.Add("${location}[$index].Hostnames: expected at least one host name")
+                    }
+
+                    if ($isRemove -and (Get-PropertiesHC $entry) -contains 'IPAddress') {
+                        $problems.Add("${location}[$index].IPAddress: not used with Action Remove; remove it")
+                    }
+                    elseif (-not $isRemove) {
+                        if (
+                            -not (Test-HostsIPAddressHC $entry.IPAddress) -and
+                            [string]$entry.IPAddress -notmatch $placeholder
+                        ) {
+                            $problems.Add(
+                                "${location}[$index].IPAddress: '$($entry.IPAddress)' is not an " +
+                                'IPv4 or IPv6 address such as 10.20.60.47 or fd00::47'
+                            )
+                        }
+                    }
+
+                    $address = if ($isRemove) { '(removed)' } else { [string]$entry.IPAddress }
+
+                    for ($nameIndex = 0; $nameIndex -lt $names.Count; $nameIndex++) {
+                        $name = [string]$names[$nameIndex]
+
+                        if (-not (Test-HostNameHC $name) -and $name -notmatch $placeholder) {
+                            $problems.Add(
+                                "${location}[$index].Hostnames[$nameIndex]: '$name' is not a " +
+                                'valid host name'
+                            )
+                            continue
+                        }
+
+                        $key = $name.ToLowerInvariant()
+
+                        if ($addressOf.ContainsKey($key) -and $addressOf[$key] -ne $address) {
+                            $problems.Add(
+                                "${location}[$index].Hostnames[$nameIndex]: '$name' is " +
+                                "already used for $($addressOf[$key])"
+                            )
+                        }
+                        else {
+                            $addressOf[$key] = $address
+                        }
                     }
                 }
             }

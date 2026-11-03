@@ -15,6 +15,7 @@ function Get-SnapshotScriptsHC {
         CreateFolders            = 'Folders import export.ps1'
         SmbShares                = 'Smb shares import export.ps1'
         NetworkCards             = 'Network cards import export.ps1'
+        HostsFileEntries         = 'Hosts file entries import export.ps1'
         NtpTimeServers           = 'NTP time servers import export.ps1'
         RegistryKeys             = 'Registry keys import export.ps1'
         ScheduledTasks           = 'Scheduled tasks import export.ps1'
@@ -37,6 +38,44 @@ function Resolve-RootPathHC {
     }
 
     return [IO.Path]::GetFullPath((Join-Path $RootFolder $expandedPath))
+}
+
+function Test-HostsIPAddressHC {
+    # A plain IPv4 address or an IPv6 address, as written in a hosts file
+    param(
+        $Value
+    )
+
+    $address = $null
+
+    if (
+        $Value -isnot [string] -or
+        -not [Net.IPAddress]::TryParse($Value, [ref]$address)
+    ) {
+        return $false
+    }
+
+    if ($address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetwork) {
+        # TryParse also accepts shortened forms such as '10.1'
+        return $address.ToString() -ceq $Value
+    }
+
+    $address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6 -and
+    $Value -notmatch '%'
+}
+
+function Test-HostNameHC {
+    # Labels of letters, digits, '-' and '_', separated by dots
+    param(
+        $Value
+    )
+
+    $Value -is [string] -and
+    $Value.Length -le 253 -and
+    $Value -match (
+        '\A[A-Za-z0-9_](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?' +
+        '(?:\.[A-Za-z0-9_](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?)*\z'
+    )
 }
 
 function Get-ExportTaskFolderHC {

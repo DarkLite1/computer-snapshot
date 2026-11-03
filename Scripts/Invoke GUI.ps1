@@ -191,6 +191,7 @@ function Get-SnapshotItemEntriesHC {
         SmbShares = @('Shared folders (SMB)', 'Network shares, share access and NTFS permissions.')
         NetworkCards = @('Network adapters', 'Network adapter, IP address and DNS settings.')
         NtpTimeServers = @('Time synchronization', 'Domain time synchronization or NTP time servers.')
+        HostsFileEntries = @('Hosts file', 'Host names and the IP addresses they point to.')
         RegistryKeys = @('Registry keys', 'Registry keys and values to apply.')
         ScheduledTasks = @('Scheduled tasks', 'Task definitions and enabled states.')
         CopyFilesFolders = @('Copy files and folders', 'Source and destination paths for file copies.')

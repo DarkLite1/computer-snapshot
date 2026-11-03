@@ -10,7 +10,7 @@ BeforeAll {
     $shippedConfigurations = @(Get-ChildItem -LiteralPath (Join-Path $root 'Configurations') -Filter '*.json' -File | ForEach-Object FullName)
     $shippedSharedSections = @(Get-ChildItem -LiteralPath (Join-Path $root 'Shared') -Filter '*.json' -File | ForEach-Object FullName)
     $mapping = @{
-        'Folders' = 'CreateFolders'; 'Copy files folders' = 'CopyFilesFolders'; 'NTP time servers' = 'NtpTimeServers'
+        'Folders' = 'CreateFolders'; 'Copy files folders' = 'CopyFilesFolders'; 'NTP time servers' = 'NtpTimeServers'; 'Hosts file entries' = 'HostsFileEntries'
         'Network cards' = 'NetworkCards'; 'Regional settings' = 'RegionalSettings'; 'Software' = 'Software'
         'User accounts' = 'UserAccounts'; 'User groups' = 'UserGroups'; 'Registry keys' = 'RegistryKeys'
         'Firewall rules' = 'FirewallRules'; 'Scheduled tasks' = 'ScheduledTasks'; 'Smb shares' = 'SmbShares'
@@ -100,6 +100,20 @@ Describe 'Schema contract' {
         & $test @{ IPAddress = '10.20.67.2'; PrefixLength = 40 } | Should -Match 'IPSettings.PrefixLength: expected a number from 1 to 32'
         & $test @{ IPAddress = '10.20.67.2'; PrefixLength = '24' } | Should -Match 'IPSettings.PrefixLength: expected a number from 1 to 32, or \{\{prefix:Description\}\}'
         & $test @{ IPAddress = '10.20.67.2'; PrefixLength = 24; DNSServers = @('dns.contoso.com') } | Should -Match "IPSettings.DNSServers\[0\]: 'dns.contoso.com' is not an IPv4 address"
+    }
+    It 'checks hosts file entries: addresses, host names, Remove and one address per name' {
+        $test = { param([object[]]$entries) @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ HostsFileEntries = $entries } } $TestDrive) -join ';' }
+        & $test @(@{ IPAddress = '10.20.60.47'; Hostnames = @('a', 'a.grouphc.net') }, @{ IPAddress = 'fd00::47'; Hostnames = @('b') }) | Should -BeNullOrEmpty
+        & $test @(@{ IPAddress = '{{ipv4:Address}}'; Hostnames = @('c') }, @{ Action = 'Remove'; Hostnames = @('old') }) | Should -BeNullOrEmpty
+        & $test @(@{ IPAddress = '10.20.60'; Hostnames = @('a') }) | Should -Match "HostsFileEntries\[0\]\.IPAddress: '10.20.60' is not an IPv4 or IPv6 address"
+        & $test @(@{ IPAddress = '10.20.60.47'; Hostnames = @('bad name') }) | Should -Match "Hostnames\[0\]: 'bad name' is not a valid host name"
+        & $test @(@{ IPAddress = '10.20.60.47'; Hostnames = @() }) | Should -Match 'Hostnames: expected at least one host name'
+        & $test @(@{ Action = 'Remove'; IPAddress = '10.20.60.47'; Hostnames = @('a') }) | Should -Match 'IPAddress: not used with Action Remove'
+        & $test @(@{ IPAddress = '10.20.60.47'; Hostnames = @('a') }, @{ IPAddress = '10.20.60.48'; Hostnames = @('A') }) |
+            Should -Match "HostsFileEntries\[1\]\.Hostnames\[0\]: 'A' is already used for 10.20.60.47"
+        & $test @(@{ IPAddress = '10.20.60.47'; Hostnames = @('a') }, @{ Action = 'Remove'; Hostnames = @('a') }) |
+            Should -Match "'a' is already used for 10.20.60.47"
+        & $test @(@{ Action = 'Add'; IPAddress = '10.20.60.47'; Hostnames = @('a') }) | Should -Match "Action: invalid value 'Add'"
     }
     It 'rejects empty array entries but permits empty sections' {
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{}) } } $TestDrive) -join ';' | Should -Match 'Name: required'

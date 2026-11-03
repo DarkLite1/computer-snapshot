@@ -49,6 +49,33 @@ Describe 'Schema contract' {
         $problems = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Instal = @() } } } $TestDrive)
         $problems -join ';' | Should -Match 'Software.Instal: unknown property'
     }
+    It 'accepts native user removal alongside existing account settings' {
+        $document = @{ SchemaVersion = 3; Items = @{ UserAccounts = @(
+                    @{ Name = 'Existing'; Enabled = $true }
+                    @{ Name = 'New'; Action = 'Set'; Password = '{{password:New account password}}' }
+                    @{ Name = 'bob'; Action = 'Remove'; Comment = 'Keep profile files' }
+                ) } }
+        @(Test-ConfigurationHC $document $TestDrive).Count | Should -Be 0
+        if ($PSVersionTable.PSVersion.Major -ge 7) {
+            $document | ConvertTo-Json -Depth 20 | Test-Json -SchemaFile $schemaPath -ErrorAction Stop | Should -BeTrue
+        }
+    }
+    It 'rejects account settings on removal entries and unsafe removal names' {
+        foreach ($property in @('Password', 'FullName', 'Description', 'Enabled', 'PasswordExpires', 'AccountExpires', 'UserMayChangePassword')) {
+            $entry = @{ Name = 'bob'; Action = 'Remove' }
+            $entry[$property] = if ($property -in @('Enabled', 'UserMayChangePassword')) { $false } else { '' }
+            $problems = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @($entry) } } $TestDrive)
+            $problems -join ';' | Should -Match "$property`: not used with Action Remove"
+        }
+        foreach ($name in @('', ' ', '*', 'b?b', 'DOMAIN\bob')) {
+            $problems = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{ Name = $name; Action = 'Remove' }) } } $TestDrive)
+            $problems -join ';' | Should -Match 'removal requires an exact local account name'
+        }
+        foreach ($action in @('Delete', 'remove', $null)) {
+            @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{ Name = 'bob'; Action = $action }) } } $TestDrive).Count |
+                Should -BeGreaterThan 0
+        }
+    }
     It 'names the choice when a task has both or neither of Xml and XmlFile' {
         $task = [ordered]@{ TaskName = 'T'; TaskPath = '\HC\'; Enabled = $true }
 

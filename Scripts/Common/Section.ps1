@@ -78,6 +78,37 @@ function Test-HostNameHC {
     )
 }
 
+function Test-UserAccountEntryHC {
+    param($User)
+
+    $properties = if ($User -is [System.Collections.IDictionary]) {
+        @($User.Keys)
+    }
+    else {
+        @($User.PSObject.Properties.Name)
+    }
+
+    if ($properties -contains 'Action' -and $User.Action -cnotin @('Set', 'Remove')) {
+        "Action: expected Set or Remove"
+    }
+
+    if ($User.Action -eq 'Remove') {
+        if (
+            $User.Name -isnot [string] -or
+            [string]::IsNullOrWhiteSpace($User.Name) -or
+            [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($User.Name) -or
+            $User.Name -match '[\\/]'
+        ) {
+            'Name: removal requires an exact local account name, without wildcards or a domain prefix'
+        }
+        foreach ($property in $properties) {
+            if ($property -notin @('Name', 'Action', 'Comment')) {
+                "${property}: not used with Action Remove; remove it"
+            }
+        }
+    }
+}
+
 function Get-ExportTaskFolderHC {
     # Task folders to export, each as '\Folder\'; '\HC\' when none are given
     param(

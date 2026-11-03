@@ -539,6 +539,13 @@ function Test-ConfigurationHC {
 
         $assets = @()
         switch ($name) {
+            'UserAccounts' {
+                for ($index = 0; $index -lt $data.Count; $index++) {
+                    foreach ($problem in @(Test-UserAccountEntryHC $data[$index])) {
+                        $problems.Add("${location}[$index].$problem")
+                    }
+                }
+            }
             'Software' {
                 foreach ($property in @('Remove', 'Install')) {
                     if (

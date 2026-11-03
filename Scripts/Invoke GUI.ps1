@@ -184,7 +184,7 @@ function Get-SnapshotItemEntriesHC {
     $labels = @{
         StartCustomScriptsBefore = @('Custom scripts (before restore)', 'Run custom scripts before the other sections.')
         RegionalSettings = @('Regional settings', 'Language, culture, home location and time zone.')
-        UserAccounts = @('User accounts', 'Local user accounts and their settings.')
+        UserAccounts = @('User accounts', 'Local user accounts to create, update or remove.')
         UserGroups = @('User groups', 'Local groups and group membership.')
         FirewallRules = @('Firewall rules', 'Windows Firewall rules and their settings.')
         CreateFolders = @('Create folders', 'Folder paths to create on the computer.')

@@ -15,6 +15,9 @@
     - Existing user without a Password: the current password is kept.
     - Password rejected by the password policy: reported as an error; a
       user that was just created for it is removed again.
+    - Action Remove: remove the named local account, keeping profile files.
+      An absent account is a successful no-op. Built-in accounts and the
+      account running the restore cannot be removed.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -34,6 +37,12 @@ param(
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
 #region Windows helpers
+function Get-CurrentUserSidHC {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    try { $identity.User.Value }
+    finally { $identity.Dispose() }
+}
+
 function Set-UserPasswordHC {
     param(
         [Parameter(Mandatory)][string]$UserName,
@@ -96,8 +105,37 @@ else {
     #region Apply section
     $knownUserNames = @(Get-LocalUser | ForEach-Object { $_.Name })
     foreach ($user in $Data) {
+        $isRemove = $user.Action -eq 'Remove'
         try {
             Write-Verbose "User '$($user.Name)'"
+            $problems = @(Test-UserAccountEntryHC $user)
+            if ($problems.Count) { throw ($problems -join '; ') }
+
+            if ($isRemove) {
+                $matchingUsers = @(Get-LocalUser | Where-Object { $_.Name -eq $user.Name })
+                if (-not $matchingUsers.Count) {
+                    $messages += "User account '$($user.Name)' not found, nothing to remove"
+                    continue
+                }
+                if ($matchingUsers.Count -ne 1) { throw 'the name does not identify exactly one local account' }
+                $sid = [string]$matchingUsers[0].SID
+                if ($sid -notmatch '^S-1-5-21-\d+-\d+-\d+-(\d+)$') {
+                    throw 'cannot verify the local account SID; removal refused'
+                }
+                if ([long]$Matches[1] -lt 1000) {
+                    throw 'built-in Windows accounts cannot be removed'
+                }
+                $currentSid = Get-CurrentUserSidHC
+                if (-not $currentSid) { throw 'cannot identify the account running the restore; removal refused' }
+                if ($sid -eq $currentSid) {
+                    throw 'the account running the restore cannot be removed'
+                }
+                Remove-LocalUser -SID $sid -Confirm:$false -ErrorAction Stop
+                $knownUserNames = @($knownUserNames | Where-Object { $_ -ne $user.Name })
+                $messages += "Removed user account '$($user.Name)' (profile files kept)"
+                continue
+            }
+
             $isNewUser = $knownUserNames -notcontains $user.Name
 
             #region Create the user, which requires a password
@@ -106,6 +144,7 @@ else {
                     throw 'a Password is required to create a new user; set one or use a {{password:...}} placeholder'
                 }
                 Set-UserPasswordHC -UserName $user.Name -Password $user.Password -NewUser
+                $knownUserNames += $user.Name
             }
             #endregion
 
@@ -145,7 +184,8 @@ else {
             else { $messages += "Updated user '$($user.Name)', password unchanged$state" }
         }
         catch {
-            $errors += "Failed to create or update user account '$($user.Name)': $($_.Exception.Message)"
+            $operation = if ($isRemove) { 'remove' } else { 'create or update' }
+            $errors += "Failed to $operation user account '$($user.Name)': $($_.Exception.Message)"
         }
     }
     #endregion

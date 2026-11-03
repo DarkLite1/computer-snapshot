@@ -66,7 +66,7 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | ----- | -------------------------- | ----------------------------------------------------------------------- |
 | 1     | `StartCustomScriptsBefore` | Your own PowerShell scripts (from `Files/`) to run before everything else. |
 | 2     | `RegionalSettings`         | System locale, time zone, home location and culture.                    |
-| 3     | `UserAccounts`             | Local user accounts.                                                    |
+| 3     | `UserAccounts`             | Local user accounts to create, update or remove.                         |
 | 4     | `UserGroups`               | Local groups and their members.                                         |
 | 5     | `FirewallRules`            | Windows Defender Firewall rules.                                        |
 | 6     | `CreateFolders`            | Folders to create.                                                      |
@@ -113,6 +113,35 @@ The files are combined in the order you list them:
 - The combined section is checked as a whole, so the same share or user in two files is reported as well.
 
 See [Configurations/Example combined sections.json](Configurations/Example%20combined%20sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares common.json` with the shares of every PC and `Shared\SmbShares kiosk.json` with the extra kiosk shares.
+
+### Removing local user accounts
+
+Use `Action: "Remove"` in `UserAccounts` instead of a custom removal script:
+
+```json
+"UserAccounts": [
+  { "Name": "bob", "Action": "Remove" }
+]
+```
+
+- Without `Action`, or with `Action: "Set"`, the existing create/update
+  behavior is unchanged.
+- Removal accepts only `Name`, `Action` and an optional `Comment`. Do not
+  include a password or other account settings.
+- Use an exact local account name (case-insensitive), not a wildcard,
+  domain-qualified name or SID. Only named accounts are removed.
+- Windows built-in accounts (even renamed ones) and the account running the
+  restore are protected by SID; attempts to remove them are reported as errors.
+- An account that is already absent is reported as nothing to remove.
+  Other failures are reported, and remaining entries are still processed.
+- This deletes the account, **not its Windows profile or files**. Recreating
+  the same name creates a different SID and does not restore its old permissions.
+- Run as administrator. Removal cannot be undone by this tool; review the
+  names before restoring.
+
+See [Examples/UserAccounts.json](Examples/UserAccounts.json) for a mixed
+create/update/removal example. Exports still capture only existing accounts
+for creation or update; they never generate removal actions.
 
 ### Accounts in other Windows languages
 

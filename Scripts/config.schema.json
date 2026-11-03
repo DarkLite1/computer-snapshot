@@ -593,7 +593,7 @@
     },
     "UserAccounts": {
       "type": "array",
-      "description": "Local user accounts.",
+      "description": "Local user accounts to create, update or remove.",
       "items": {
         "type": "object",
         "description": "A local account. Keep sensitive sections in protected Shared files.",
@@ -601,7 +601,12 @@
         "properties": {
           "Name": {
             "type": "string",
-            "description": "Local account name."
+            "description": "Local account name. Removal requires an exact name without wildcards or a domain prefix."
+          },
+          "Action": {
+            "type": "string",
+            "enum": ["Set", "Remove"],
+            "description": "Set (default): create or update the account. Remove: delete only the account, leaving profile files intact. With Remove, only Name, Action and Comment are allowed. Built-in accounts and the account running the restore are protected."
           },
           "FullName": {
             "type": ["string", "null"],

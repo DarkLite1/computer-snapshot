@@ -25,5 +25,10 @@
     "PasswordExpires": null,
     "UserMayChangePassword": true,
     "Password": "{{password:Password for local user 'bswagger'}}"
+  },
+  {
+    "Name": "bob",
+    "Action": "Remove",
+    "Comment": "Remove only this local account; keep its profile files. Built-in accounts and the account running the restore are protected."
   }
 ]

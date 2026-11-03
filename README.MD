@@ -94,6 +94,22 @@ Instead of writing a section inline, you can point to a file. The path is relati
 
 The referenced file contains only that section's data (for example, a JSON array of user accounts). Referenced files can't point to other files.
 
+A section can also be built from **several files**, so you can combine reusable building blocks, for example the shares every PC has plus the shares of one kind of PC:
+
+```json
+"Items": {
+  "SmbShares": [ "Shared\\SmbShares common.json", "Shared\\SmbShares scanner.json" ],
+  "RegistryKeys": [ "Shared\\Registry office.json", "Shared\\Registry kiosk.json" ]
+}
+```
+
+The files are combined in the order you list them:
+
+- Lists are joined: the shares, users, registry entries or installers of all files.
+- Objects are combined property by property, so the lists inside them are joined too, such as `RunAsCurrentUser.RegistryKeys`, `Software.Install` or `CreateFolders.FolderPaths`.
+- A single setting may appear in several files only with the same value. Two different values, such as two time zones in `RegionalSettings`, are reported as an error naming both files, instead of one silently winning.
+- The combined section is checked as a whole, so the same share or user in two files is reported as well.
+
 ### Accounts in other Windows languages
 
 Built-in accounts and groups have a different name in each Windows language: *Everyone* is *Iedereen* in Dutch and *Jeder* in German. So exports store them by their security ID (SID), which is the same everywhere, for example `S-1-1-0` for Everyone and `S-1-5-32-544` for Administrators. A restore turns the SID back into the name used by that computer. This applies to user group names and members, share permissions and folder permissions. You can write SIDs in your own configurations too. Local and domain accounts keep their name, because their SID differs per computer or domain.

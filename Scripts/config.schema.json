@@ -51,7 +51,7 @@
       "additionalProperties": false,
       "properties": {
         "StartCustomScriptsBefore": {
-          "description": "Inline StartCustomScriptsBefore data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline StartCustomScriptsBefore data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline StartCustomScriptsBefore data.",
@@ -61,11 +61,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "RegionalSettings": {
-          "description": "Inline RegionalSettings data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline RegionalSettings data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline RegionalSettings data.",
@@ -75,11 +84,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "UserAccounts": {
-          "description": "Inline UserAccounts data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline UserAccounts data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline UserAccounts data.",
@@ -89,11 +107,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "UserGroups": {
-          "description": "Inline UserGroups data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline UserGroups data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline UserGroups data.",
@@ -103,11 +130,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "FirewallRules": {
-          "description": "Inline FirewallRules data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline FirewallRules data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline FirewallRules data.",
@@ -117,11 +153,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "CreateFolders": {
-          "description": "Inline CreateFolders data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline CreateFolders data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline CreateFolders data.",
@@ -131,11 +176,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "SmbShares": {
-          "description": "Inline SmbShares data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline SmbShares data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline SmbShares data.",
@@ -145,11 +199,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "NetworkCards": {
-          "description": "Inline NetworkCards data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline NetworkCards data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline NetworkCards data.",
@@ -159,11 +222,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "NtpTimeServers": {
-          "description": "Inline NtpTimeServers data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline NtpTimeServers data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline NtpTimeServers data.",
@@ -173,11 +245,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "RegistryKeys": {
-          "description": "Inline RegistryKeys data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline RegistryKeys data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline RegistryKeys data.",
@@ -187,11 +268,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "ScheduledTasks": {
-          "description": "Inline ScheduledTasks data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline ScheduledTasks data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline ScheduledTasks data.",
@@ -201,11 +291,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "CopyFilesFolders": {
-          "description": "Inline CopyFilesFolders data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline CopyFilesFolders data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline CopyFilesFolders data.",
@@ -215,11 +314,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "Software": {
-          "description": "Inline Software data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline Software data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline Software data.",
@@ -229,11 +337,20 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },
         "StartCustomScriptsAfter": {
-          "description": "Inline StartCustomScriptsAfter data, or a root-relative path to a Shared JSON section.",
+          "description": "Inline StartCustomScriptsAfter data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
             {
               "description": "Inline StartCustomScriptsAfter data.",
@@ -243,6 +360,15 @@
               "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
               "minLength": 1,
               "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           ]
         },

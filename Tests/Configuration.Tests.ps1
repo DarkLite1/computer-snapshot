@@ -250,3 +250,62 @@ Describe 'Safe configuration writing' {
         Join-Path $folder 'Missing' | Should -Not -Exist
     }
 }
+Describe 'Sections combined from several files' {
+    BeforeEach {
+        $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -Path "$root\Shared", "$root\Configurations" -ItemType Directory -Force
+        function New-SharedFileHC {
+            param([string]$Name, [string]$Json)
+            $Json | Set-Content -LiteralPath "$root\Shared\$Name" -Encoding UTF8
+        }
+        function Read-TestConfigurationHC {
+            param([string]$ItemsJson)
+            '{ "SchemaVersion": 3, "Items": ' + $ItemsJson + ' }' |
+                Set-Content -LiteralPath "$root\Configurations\Test.json" -Encoding UTF8
+            Read-ConfigurationHC "$root\Configurations\Test.json" $root
+        }
+    }
+    It 'joins the lists of several files in order' {
+        New-SharedFileHC 'Common.json' '[ { "Name": "Data", "Path": "C:\\Data" } ]'
+        New-SharedFileHC 'Scanner.json' '[ { "Name": "Scans", "Path": "D:\\Scans" } ]'
+        $loaded = Read-TestConfigurationHC '{ "SmbShares": [ "Shared\\Common.json", "Shared\\Scanner.json" ] }'
+        $loaded.Problems.Count | Should -Be 0 -Because ($loaded.Problems -join '; ')
+        @($loaded.Items.SmbShares | ForEach-Object { $_.Name }) | Should -Be @('Data', 'Scans')
+        @(Test-ConfigurationHC $loaded $root).Count | Should -Be 0
+    }
+    It 'combines objects and their nested lists' {
+        New-SharedFileHC 'A.json' '{ "Comment": "A", "RunAsCurrentUser": { "RegistryKeys": [ { "Path": "HKLM:\\SOFTWARE\\Vendor", "Name": "A", "Type": "String", "Value": "1" } ] } }'
+        New-SharedFileHC 'B.json' '{ "Comment": "B", "RunAsCurrentUser": { "RegistryKeys": [ { "Path": "HKLM:\\SOFTWARE\\Vendor", "Name": "B", "Type": "String", "Value": "2" } ] }, "RunAsOtherUser": [] }'
+        $loaded = Read-TestConfigurationHC '{ "RegistryKeys": [ "Shared\\A.json", "Shared\\B.json" ] }'
+        $loaded.Problems.Count | Should -Be 0 -Because ($loaded.Problems -join '; ')
+        @($loaded.Items.RegistryKeys.RunAsCurrentUser.RegistryKeys | ForEach-Object { $_.Name }) | Should -Be @('A', 'B')
+        $loaded.Items.RegistryKeys.Comment | Should -Be 'A'
+        @(Test-ConfigurationHC $loaded $root).Count | Should -Be 0
+    }
+    It 'accepts the same single value in several files' {
+        New-SharedFileHC 'A.json' '{ "SyncTimeWithDomain": false, "TimeServerNames": [ "a.example" ] }'
+        New-SharedFileHC 'B.json' '{ "SyncTimeWithDomain": false, "TimeServerNames": [ "b.example" ] }'
+        $loaded = Read-TestConfigurationHC '{ "NtpTimeServers": [ "Shared\\A.json", "Shared\\B.json" ] }'
+        $loaded.Problems.Count | Should -Be 0 -Because ($loaded.Problems -join '; ')
+        $loaded.Items.NtpTimeServers.TimeServerNames | Should -Be @('a.example', 'b.example')
+    }
+    It 'reports a single value that two files set differently' {
+        New-SharedFileHC 'A.json' '{ "WinSystemLocaleName": "nl-BE", "TimeZoneId": "Romance Standard Time", "WinHomeLocationGeoId": 21, "CultureName": "nl-BE" }'
+        New-SharedFileHC 'B.json' '{ "TimeZoneId": "W. Europe Standard Time" }'
+        $loaded = Read-TestConfigurationHC '{ "RegionalSettings": [ "Shared\\A.json", "Shared\\B.json" ] }'
+        $loaded.Problems[0] | Should -BeLike "*'Items.RegionalSettings.TimeZoneId' is ""Romance Standard Time"" in 'Shared\A.json' but ""W. Europe Standard Time"" in 'Shared\B.json'*"
+        $loaded.Items.Keys | Should -Not -Contain 'RegionalSettings'
+    }
+    It 'reports duplicates across files through the normal checks' {
+        New-SharedFileHC 'A.json' '[ { "Name": "Data", "Path": "C:\\Data" } ]'
+        New-SharedFileHC 'B.json' '[ { "Name": "Data", "Path": "E:\\Other" } ]'
+        $loaded = Read-TestConfigurationHC '{ "SmbShares": [ "Shared\\A.json", "Shared\\B.json" ] }'
+        (@(Test-ConfigurationHC $loaded $root) -join ';') | Should -BeLike "*share 'Data' is already configured*"
+    }
+    It 'reports a missing file and a file that refers to other files' {
+        New-SharedFileHC 'Nested.json' '[ "Shared\\A.json" ]'
+        $loaded = Read-TestConfigurationHC '{ "UserAccounts": [ "Shared\\Nested.json" ], "UserGroups": [ "Shared\\Missing.json" ] }'
+        ($loaded.Problems -join ';') | Should -BeLike "*reference 'Shared\Nested.json': nested section references are not supported*"
+        ($loaded.Problems -join ';') | Should -BeLike "*reference 'Shared\Missing.json'*"
+    }
+}

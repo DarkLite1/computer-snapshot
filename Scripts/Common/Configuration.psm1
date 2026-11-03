@@ -56,6 +56,113 @@ function Read-JsonValueHC {
     return , $wrapper.Data
 }
 
+function Test-ReferenceListHC {
+    # A section given as one or more file references instead of inline data
+    param($Data)
+
+    if ($Data -is [string]) {
+        return $true
+    }
+
+    $Data -is [array] -and $Data.Count -gt 0 -and
+    @($Data | Where-Object { $_ -isnot [string] }).Count -eq 0
+}
+
+function Add-SectionOriginHC {
+    # Remember which file set each single value, for conflict messages
+    param($Value, [string]$Path, [string]$Source, [hashtable]$Origins)
+
+    if ($Value -is [array]) {
+        return
+    }
+
+    if (Test-ObjectHC $Value) {
+        foreach ($property in Get-PropertiesHC $Value) {
+            Add-SectionOriginHC $Value.$property "$Path.$property" $Source $Origins
+        }
+
+        return
+    }
+
+    if (-not $Origins.ContainsKey($Path)) {
+        $Origins[$Path] = $Source
+    }
+}
+
+function Merge-SectionDataHC {
+    <#
+    .SYNOPSIS
+        Combine the data of two files for the same section.
+    .DESCRIPTION
+        Lists are joined in file order and objects are combined property by
+        property. A single value that both files set must be equal; when it
+        differs, the files contradict each other, which is an error. Comment
+        properties never conflict, the first one is kept.
+    #>
+    param(
+        $Base,
+        $Addition,
+        [string]$Path,
+        [string]$Source,
+        [hashtable]$Origins
+    )
+
+    if ($null -eq $Base) {
+        Add-SectionOriginHC $Addition $Path $Source $Origins
+        return , $Addition
+    }
+
+    if ($null -eq $Addition) {
+        return , $Base
+    }
+
+    if ($Base -is [array] -or $Addition -is [array]) {
+        if ($Base -isnot [array] -or $Addition -isnot [array]) {
+            throw "'$Path' is a list in one file and not in '$Source'"
+        }
+
+        return , @(@($Base) + @($Addition))
+    }
+
+    if ((Test-ObjectHC $Base) -or (Test-ObjectHC $Addition)) {
+        if (-not ((Test-ObjectHC $Base) -and (Test-ObjectHC $Addition))) {
+            throw "'$Path' is an object in one file and not in '$Source'"
+        }
+
+        $combined = [ordered]@{}
+
+        foreach ($property in Get-PropertiesHC $Base) {
+            $combined[$property] = $Base.$property
+        }
+
+        foreach ($property in Get-PropertiesHC $Addition) {
+            if (-not $combined.Contains($property)) {
+                Add-SectionOriginHC $Addition.$property "$Path.$property" $Source $Origins
+                $combined[$property] = $Addition.$property
+            }
+            elseif ($property -ne 'Comment') {
+                $combined[$property] = Merge-SectionDataHC `
+                    $combined[$property] $Addition.$property `
+                    "$Path.$property" $Source $Origins
+            }
+        }
+
+        return [pscustomobject]$combined
+    }
+
+    $baseJson = ConvertTo-Json -InputObject $Base -Compress
+    $additionJson = ConvertTo-Json -InputObject $Addition -Compress
+
+    if ($baseJson -cne $additionJson) {
+        throw (
+            "'$Path' is $baseJson in '$($Origins[$Path])' but " +
+            "$additionJson in '$Source'; set it in one file only"
+        )
+    }
+
+    $Base
+}
+
 function ConvertTo-LoadedConfigurationHC {
     param(
         $Configuration, 
@@ -184,23 +291,39 @@ function ConvertTo-LoadedConfigurationHC {
         
         $data = $Configuration.Items.$name
         
-        if ($data -is [string]) {
-            $reference = $data
-            try {
-                $referencePath = Resolve-RootPathHC $reference $RootFolder
-                $data = Read-JsonValueHC $referencePath
+        # One file, or a list of files that are combined in order
+        if (Test-ReferenceListHC $data) {
+            $combined = $null
+            $origins = @{}
+            $isValid = $true
+
+            foreach ($reference in @($data)) {
+                try {
+                    $referencePath = Resolve-RootPathHC $reference $RootFolder
+                    $part = Read-JsonValueHC $referencePath
                 
-                if ($data -is [string]) {
-                    throw 'nested section references are not supported' 
+                    if (Test-ReferenceListHC $part) {
+                        throw 'nested section references are not supported' 
+                    }
+
+                    $combined = Merge-SectionDataHC `
+                        $combined $part "Items.$name" $reference $origins
+                }
+                catch {
+                    $problems.Add(
+                        "$Source > Items.${name}: reference '$reference': $_"
+                    )
+                    $isValid = $false
+
+                    break
                 }
             }
-            catch {
-                $problems.Add(
-                    "$Source > Items.${name}: reference '$reference': $_"
-                )
 
+            if (-not $isValid) {
                 continue
             }
+
+            $data = $combined
         }
         $result.Items[$name] = $data
     }

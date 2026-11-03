@@ -17,6 +17,7 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
 4. **To save a PC's setup (Export):**
    - Click **Export**.
    - Choose which sections you want to save (like users, folders, or network settings).
+   - For **Scheduled tasks**, check the Task Scheduler folders to export under **Scheduled task folders** (default `\HC\`, subfolders included, several separated by commas). Entering `\` exports every task on the computer, including the Windows ones; the wizard asks you to confirm that.
    - Give your file a name. _Tip: The wizard suggests a handy default name like `KIOSK01 2026-10-21 142536.json`_.
 
 **💡 Quick Tips for the Wizard:**
@@ -195,7 +196,7 @@ Each entry in `RegistryKeys` has an `Action`; without one, it sets a value.
 
 ### Scheduled tasks
 
-An export captures the tasks in the Task Scheduler folder `\HC\` and its subfolders. To export other folders, use `-ExportOptions` on the command line (see [Command-Line Use](#-command-line-use)).
+An export captures the tasks in the Task Scheduler folder `\HC\` and its subfolders. To export other folders, enter them in the wizard under **Scheduled task folders**, or use `-ExportOptions` on the command line (see [Command-Line Use](#-command-line-use)).
 
 Each task needs its XML definition, in one of two ways:
 

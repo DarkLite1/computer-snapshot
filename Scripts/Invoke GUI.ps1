@@ -143,6 +143,33 @@ function Get-DefaultConfigurationNameHC {
     return $env:COMPUTERNAME + ' ' + (Get-Date -Format 'yyyy-MM-dd HHmmss')
 }
 
+function Get-WizardTaskFolderHC {
+    # Comma-separated wizard input as task folders, the export default when empty
+    param([string]$Text)
+    $folders = @(Get-ExportTaskFolderHC -Options @{ TaskPath = @($Text -split ',') })
+    foreach ($folder in $folders) {
+        foreach ($name in @($folder.Split('\') | Where-Object { $_ })) {
+            if ($name.IndexOfAny([IO.Path]::GetInvalidFileNameChars()) -ge 0) {
+                throw "Task folder '$folder' contains characters that are not allowed in a folder name."
+            }
+        }
+    }
+    return $folders
+}
+
+function Show-WizardQuestionHC {
+    param($Owner, [string]$Text, [string]$Caption)
+    [Windows.Forms.MessageBox]::Show($Owner, $Text, $Caption, 'YesNo', 'Warning', 'Button2')
+}
+
+function Confirm-WizardTaskFolderHC {
+    param([string[]]$Folders, $Owner)
+    if ($Folders -notcontains '\') { return $true }
+    $text = 'The task folder \ exports every scheduled task on this computer, including the hundreds of tasks that Windows itself uses. ' +
+        'Restoring those on another computer can break it.' + [Environment]::NewLine + [Environment]::NewLine + 'Export all scheduled tasks anyway?'
+    return (Show-WizardQuestionHC -Owner $Owner -Text $text -Caption 'Export all scheduled tasks') -eq [Windows.Forms.DialogResult]::Yes
+}
+
 function Get-ConfigurationEntriesHC {
     param([string]$RootFolder)
     foreach ($file in Get-ChildItem -LiteralPath (Join-Path $RootFolder 'Configurations') -Filter '*.json' -File -ErrorAction Stop | Where-Object { $_.Name -notlike '*.v1.json' }) {
@@ -403,6 +430,41 @@ function New-RestoreSelectionFormHC {
     return ,$dialog
 }
 
+function New-ExportTaskFolderPanelHC {
+    param($ItemList)
+    $panel = New-Object Windows.Forms.FlowLayoutPanel
+    $panel.Name = 'ScheduledTaskFolderPanel'
+    $panel.Dock = 'Fill'
+    $panel.WrapContents = $false
+    $label = New-Object Windows.Forms.Label
+    $label.Name = 'ScheduledTaskFoldersLabel'
+    $label.Text = 'Scheduled task folders:'
+    $label.AutoSize = $true
+    $label.Margin = New-Object Windows.Forms.Padding 0, 6, 3, 0
+    $box = New-Object Windows.Forms.TextBox
+    $box.Name = 'ScheduledTaskFolders'
+    $box.AccessibleName = 'Scheduled task folders, separated by commas'
+    $box.Width = 240
+    $box.Text = (Get-ExportTaskFolderHC) -join ', '
+    $hint = New-Object Windows.Forms.Label
+    $hint.Name = 'ScheduledTaskFoldersHint'
+    $hint.Text = 'with subfolders; separate with commas'
+    $hint.Font = New-Object Drawing.Font $box.Font.FontFamily, 9
+    $hint.ForeColor = [Drawing.SystemColors]::GrayText
+    $hint.AutoSize = $true
+    $hint.Margin = New-Object Windows.Forms.Padding 3, 7, 0, 0
+    $panel.Controls.AddRange(@($label, $box, $hint))
+    $folderControls = @($label, $box, $hint)
+    $isChecked = @($ItemList.Items | Where-Object { $_.Tag -eq 'ScheduledTasks' -and $_.Checked }).Count -gt 0
+    foreach ($control in $folderControls) { $control.Enabled = $isChecked }
+    $ItemList.Add_ItemChecked({
+        param($sender, $eventArgs)
+        if ($eventArgs.Item.Tag -ne 'ScheduledTasks') { return }
+        foreach ($control in $folderControls) { $control.Enabled = $eventArgs.Item.Checked }
+    }.GetNewClosure())
+    return ,$panel
+}
+
 function Start-ConfigurationJobHC {
     param(
         [ValidateSet('CreateSnapshot', 'RestoreSnapshot')][string]$Action,
@@ -410,6 +472,7 @@ function Start-ConfigurationJobHC {
         [string]$ConfigurationFile,
         [string]$Name,
         [string[]]$Items,
+        [string[]]$TaskFolders,
         [bool]$OpenReportInBrowser = $true,
         [bool]$RebootComputer = $false,
         [ValidateRange(0, 600)]
@@ -428,6 +491,10 @@ function Start-ConfigurationJobHC {
         $script = Join-Path $RootFolder 'Scripts\Invoke scripts.ps1'
         $itemArguments = ($Items | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
         $command = "& '{0}' -Action CreateSnapshot -ConfigurationFile '{1}' -Items @({2}) -OpenReportInBrowser `${3}" -f $script.Replace("'", "''"), $ConfigurationFile.Replace("'", "''"), $itemArguments, $OpenReportInBrowser.ToString().ToLowerInvariant()
+        if ($TaskFolders.Count -and 'ScheduledTasks' -in $Items) {
+            $folderArguments = ($TaskFolders | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
+            $command += ' -ExportOptions @{ ScheduledTasks = @{ TaskPath = @(' + $folderArguments + ') } }'
+        }
         if ($Force) { $command += ' -Force' }
     }
     else {
@@ -564,11 +631,11 @@ $exportLayout.Dock = 'Fill'
 $exportLayout.Padding = New-Object Windows.Forms.Padding 12
 $exportLayout.ColumnCount = 1
 $null = $exportLayout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Percent), 100))
-$exportLayout.RowCount = 6
+$exportLayout.RowCount = 7
 $null = $exportLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
 foreach ($height in @(30, 38)) { $null = $exportLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), $height)) }
 $null = $exportLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Percent), 100))
-foreach ($height in @(40, 48)) { $null = $exportLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), $height)) }
+foreach ($height in @(38, 40, 48)) { $null = $exportLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), $height)) }
 $exportTab.Controls.Add($exportLayout)
 $exportDescription = New-Object Windows.Forms.Label
 $exportDescription.Text = 'Save selected sections to a JSON file in Configurations. Some sections export editable templates rather than current settings; review the file before restoring it.'
@@ -584,6 +651,7 @@ $nameBox = New-Object Windows.Forms.TextBox
 $nameBox.Dock = 'Fill'
 $nameBox.Text = Get-DefaultConfigurationNameHC
 $itemList = New-SnapshotItemListHC -Entries @(Get-SnapshotItemEntriesHC)
+$taskFolderPanel = New-ExportTaskFolderPanelHC -ItemList $itemList
 $options = New-Object Windows.Forms.FlowLayoutPanel
 $options.Dock = 'Fill'
 $openReport = New-Object Windows.Forms.CheckBox
@@ -605,11 +673,19 @@ $exportButtons.Controls.Add($export)
 $exportLayout.Controls.Add($nameLabel, 0, 1)
 $exportLayout.Controls.Add($nameBox, 0, 2)
 $exportLayout.Controls.Add($itemList, 0, 3)
-$exportLayout.Controls.Add($options, 0, 4)
-$exportLayout.Controls.Add($exportButtons, 0, 5)
+$exportLayout.Controls.Add($taskFolderPanel, 0, 4)
+$exportLayout.Controls.Add($options, 0, 5)
+$exportLayout.Controls.Add($exportButtons, 0, 6)
 $export.Add_Click({
     try {
-        Start-ConfigurationJobHC -Action CreateSnapshot -RootFolder $RootFolder -Name $nameBox.Text -Items @($itemList.CheckedItems | ForEach-Object { [string]$_.Tag }) -OpenReportInBrowser $openReport.Checked -RunElevated:$elevated.Checked
+        $selectedItems = @($itemList.CheckedItems | ForEach-Object { [string]$_.Tag })
+        $jobOptions = @{}
+        if ('ScheduledTasks' -in $selectedItems) {
+            $taskFolders = @(Get-WizardTaskFolderHC -Text $taskFolderPanel.Controls.Find('ScheduledTaskFolders', $false)[0].Text)
+            if (-not (Confirm-WizardTaskFolderHC -Folders $taskFolders -Owner $form)) { return }
+            $jobOptions.TaskFolders = $taskFolders
+        }
+        Start-ConfigurationJobHC -Action CreateSnapshot -RootFolder $RootFolder -Name $nameBox.Text -Items $selectedItems -OpenReportInBrowser $openReport.Checked -RunElevated:$elevated.Checked @jobOptions
     }
     catch { $null = [Windows.Forms.MessageBox]::Show($form, [string]$_, 'Export error', 'OK', 'Error') }
 })

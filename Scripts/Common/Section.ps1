@@ -39,6 +39,27 @@ function Resolve-RootPathHC {
     return [IO.Path]::GetFullPath((Join-Path $RootFolder $expandedPath))
 }
 
+function Get-ExportTaskFolderHC {
+    # Task folders to export, each as '\Folder\'; '\HC\' when none are given
+    param(
+        $Options
+    )
+
+    $folders = @(
+        $Options.TaskPath |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { '\' + ([string]$_).Trim().Trim('\') + '\' } |
+        ForEach-Object { $_ -replace '^\\\\$', '\' } |
+        Select-Object -Unique
+    )
+
+    if (-not $folders.Count) {
+        $folders = @('\HC\')
+    }
+
+    $folders
+}
+
 function Test-EmptySectionHC {
     param(
         $Data

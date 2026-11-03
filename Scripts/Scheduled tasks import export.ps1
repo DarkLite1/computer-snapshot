@@ -48,25 +48,6 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
 
 #region Helpers
-function Get-ExportTaskFolderHC {
-    # Task folders to export, each as '\Folder\'; '\HC\' when none are given
-    param($Options)
-
-    $folders = @(
-        $Options.TaskPath |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-        ForEach-Object { '\' + ([string]$_).Trim().Trim('\') + '\' } |
-        ForEach-Object { $_ -replace '^\\\\$', '\' } |
-        Select-Object -Unique
-    )
-
-    if (-not $folders.Count) {
-        $folders = @('\HC\')
-    }
-
-    $folders
-}
-
 function Get-TaskRunAsHC {
     # RunAsUser and RunAsPassword to export for a task's principal
     param(

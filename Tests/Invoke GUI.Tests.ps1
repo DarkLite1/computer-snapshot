@@ -204,6 +204,70 @@ Describe 'Single-file wizard commands' {
     }
 }
 
+Describe 'Export scheduled task folders' {
+    BeforeAll {
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+    }
+    BeforeEach {
+        Mock Start-Process
+    }
+    It 'passes the folders as export options, quoted so a name cannot break the command' {
+        Start-ConfigurationJobHC -Action CreateSnapshot -RootFolder $TestDrive -Name 'Tasks' -Items ScheduledTasks -TaskFolders '\HC\', "\It's\"
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
+            $parseErrors = $null
+            $null = [Management.Automation.Language.Parser]::ParseInput($command, [ref]$null, [ref]$parseErrors)
+            $command.Contains("-ExportOptions @{ ScheduledTasks = @{ TaskPath = @('\HC\','\It''s\') } }") -and $parseErrors.Count -eq 0
+        }
+    }
+    It 'adds no export options when scheduled tasks are not exported' {
+        Start-ConfigurationJobHC -Action CreateSnapshot -RootFolder $TestDrive -Name 'Users' -Items UserAccounts -TaskFolders '\HC\'
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1])) -notmatch 'ExportOptions'
+        }
+    }
+    It 'reads comma-separated folders, uses the export default when empty and rejects invalid names' {
+        @(Get-WizardTaskFolderHC -Text '') | Should -Be @('\HC\')
+        @(Get-WizardTaskFolderHC -Text ' HC, Vendor\Sub ,, \HC\ ') | Should -Be @('\HC\', '\Vendor\Sub\')
+        @(Get-WizardTaskFolderHC -Text '\') | Should -Be @('\')
+        { Get-WizardTaskFolderHC -Text '\HC\, Ven|dor' } | Should -Throw "*'\Ven|dor\'*not allowed*"
+    }
+    It 'asks for confirmation only for the root folder' {
+        Mock Show-WizardQuestionHC { [Windows.Forms.DialogResult]::No }
+        Confirm-WizardTaskFolderHC -Folders '\HC\', '\Vendor\' | Should -BeTrue
+        Should -Invoke Show-WizardQuestionHC -Times 0 -Exactly
+        Confirm-WizardTaskFolderHC -Folders '\HC\', '\' | Should -BeFalse
+        Mock Show-WizardQuestionHC { [Windows.Forms.DialogResult]::Yes }
+        Confirm-WizardTaskFolderHC -Folders '\' | Should -BeTrue
+        Should -Invoke Show-WizardQuestionHC -Times 2 -Exactly -ParameterFilter { $Text -like '*every scheduled task*' }
+    }
+    It 'shows the export default and is enabled only while Scheduled tasks is checked' {
+        $form = New-Object Windows.Forms.Form
+        try {
+            $form.ClientSize = New-Object Drawing.Size 650, 300
+            $list = New-SnapshotItemListHC -Entries @(Get-SnapshotItemEntriesHC)
+            $panel = New-ExportTaskFolderPanelHC -ItemList $list
+            $list.Dock = 'Top'
+            $panel.Dock = 'Bottom'
+            $form.Controls.AddRange(@($list, $panel))
+            $form.Show()
+            $box = $panel.Controls.Find('ScheduledTaskFolders', $false)[0]
+            $box.Text | Should -BeExactly ((Get-ExportTaskFolderHC) -join ', ')
+            $box.Enabled | Should -BeTrue
+            $tasks = $list.Items | Where-Object Tag -EQ 'ScheduledTasks'
+            $tasks.Checked = $false
+            foreach ($control in $panel.Controls) { $control.Enabled | Should -BeFalse }
+            $tasks.Checked = $true
+            foreach ($control in $panel.Controls) {
+                $control.Enabled | Should -BeTrue
+                $control.Right | Should -BeLessOrEqual $panel.ClientSize.Width
+            }
+        }
+        finally { $form.Dispose() }
+    }
+}
+
 Describe 'Optional wizard elevation' {
     BeforeAll {
         Add-Type -AssemblyName System.Windows.Forms

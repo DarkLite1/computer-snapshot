@@ -4,6 +4,7 @@
   "Description": "Prompted setup example: creates or updates a local account and configures an NTP time server. Requests the account name, password and time-server IPv4 address before applying any settings.",
   "Settings": {
     "RebootComputer": false,
+    "RestartDelaySeconds": 60,
     "OpenReportInBrowser": true,
     "RunElevated": true
   },

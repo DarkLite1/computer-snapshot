@@ -4,6 +4,7 @@
   "Description": "Example PC1: bundled hello-world applications and a reusable user section",
   "Settings": {
     "RebootComputer": false,
+    "RestartDelaySeconds": 60,
     "OpenReportInBrowser": true,
     "RunElevated": false
   },

@@ -148,15 +148,15 @@ Describe 'Single-file wizard commands' {
     It 'passes explicit restore setting choices without adding defaults when omitted' {
         $testFile = Join-Path $TestDrive 'Example.json'
         '{}' | Set-Content -LiteralPath $testFile
-        Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $testFile -Items UserAccounts -RebootComputer $true -OpenReportInBrowser $false
+        Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $testFile -Items UserAccounts -RebootComputer $true -RestartDelaySeconds 300 -OpenReportInBrowser $false
         Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
             $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
-            $command.Contains('-RebootComputer $true') -and $command.Contains('-OpenReportInBrowser $false')
+            $command.Contains('-RebootComputer $true') -and $command.Contains('-RestartDelaySeconds 300') -and $command.Contains('-OpenReportInBrowser $false')
         }
         Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $testFile -Items UserAccounts
         Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
             $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
-            $command -notmatch 'RebootComputer|OpenReportInBrowser'
+            $command -notmatch 'RebootComputer|RestartDelaySeconds|OpenReportInBrowser'
         }
     }
     It 'uses configuration defaults when restore settings are missing and rejects non-Boolean values' {
@@ -165,8 +165,11 @@ Describe 'Single-file wizard commands' {
         $settings = Get-RestoreSettingsHC -ConfigurationFile $testFile
         $settings.RebootComputer | Should -BeFalse
         $settings.OpenReportInBrowser | Should -BeTrue
+        $settings.RestartDelaySeconds | Should -Be 60
         '{"Settings":{"RebootComputer":"false"}}' | Set-Content -LiteralPath $testFile
         { Get-RestoreSettingsHC -ConfigurationFile $testFile } | Should -Throw '*must be a Boolean*'
+        '{"Settings":{"RestartDelaySeconds":601}}' | Set-Content -LiteralPath $testFile
+        { Get-RestoreSettingsHC -ConfigurationFile $testFile } | Should -Throw '*0 to 600*'
     }
     It 'provides readable labels and descriptions for every supported item' {
         $entries = @(Get-SnapshotItemEntriesHC)
@@ -398,6 +401,27 @@ Describe 'Restore selection controls' {
             finally { $dialog.Dispose() }
         }
     }
+    It 'shows the saved restart countdown, enabled only while restart is checked' {
+        $testFile = Join-Path $TestDrive 'Delay.json'
+        @{ SchemaVersion = 3; Settings = @{ RebootComputer = $false; RestartDelaySeconds = 300 }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } |
+            ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $testFile
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Delay' -Entries @(Get-RestoreItemEntriesHC -ConfigurationFile $testFile) -ConfigurationFile $testFile
+        try {
+            $dialog.Show()
+            $reboot = $dialog.Controls.Find('RebootComputer', $true)[0]
+            $delay = $dialog.Controls.Find('RestartDelaySeconds', $true)[0]
+            $delay.Value | Should -Be 300
+            $delay.Minimum | Should -Be 0
+            $delay.Maximum | Should -Be 600
+            $delay.Enabled | Should -BeFalse
+            $reboot.Checked = $true
+            $delay.Enabled | Should -BeTrue
+            $dialog.Controls.Find('RestartDelayLabel', $true)[0].Enabled | Should -BeTrue
+            $reboot.Checked = $false
+            $delay.Enabled | Should -BeFalse
+        }
+        finally { $dialog.Dispose() }
+    }
     It 'toggles item and description clicks but leaves checkbox clicks and disabled rows alone' {
         $entries = @(Get-SnapshotItemEntriesHC -Items UserAccounts, Software)
         $entries[1].Available = $false
@@ -526,7 +550,7 @@ Describe 'Restore selection controls' {
                 $button.Right | Should -BeLessOrEqual $button.Parent.ClientSize.Width
                 $button.Bottom | Should -BeLessOrEqual $button.Parent.ClientSize.Height
             }
-            foreach ($name in @('RebootComputer', 'OpenReportInBrowser')) {
+            foreach ($name in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser')) {
                 $option = $dialog.Controls.Find($name, $true)[0]
                 $option.Visible | Should -BeTrue
                 $option.Right | Should -BeLessOrEqual $option.Parent.ClientSize.Width

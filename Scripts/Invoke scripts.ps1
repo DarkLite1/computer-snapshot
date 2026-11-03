@@ -13,9 +13,12 @@
 .PARAMETER Force
     Allow replacing an existing export configuration.
 .PARAMETER RebootComputer
-    Restart after a restore in which nothing failed, with a 60-second countdown
-    that 'shutdown /a' cancels. Exports never restart. When omitted, restore
+    Restart after a restore in which nothing failed, with a countdown that
+    'shutdown /a' cancels. Exports never restart. When omitted, restore
     uses Settings.RebootComputer.
+.PARAMETER RestartDelaySeconds
+    Countdown before the restart, 0 to 600 seconds. When omitted, restore
+    uses Settings.RestartDelaySeconds (default 60).
 .PARAMETER OpenReportInBrowser
     Open the report. When omitted, restore uses Settings.OpenReportInBrowser.
 .PARAMETER ExportOptions
@@ -31,6 +34,8 @@ param(
     [string[]]$Items,
     [string]$ReportsFolder = '..\Log',
     [bool]$RebootComputer = $false,
+    [ValidateRange(0, 600)]
+    [int]$RestartDelaySeconds = 60,
     [bool]$OpenReportInBrowser = $true,
     [switch]$Force,
     [System.Collections.IDictionary]$ExportOptions,
@@ -49,7 +54,7 @@ $arguments = @{
     Action = $Action; ConfigurationFile = $ConfigurationFile; Items = $Items; RootFolder = $rootFolder
     Script = $resolvedScripts; ReportsFolder = $ReportsFolder; Force = $Force
 }
-foreach ($setting in @('RebootComputer', 'OpenReportInBrowser', 'ExportOptions')) {
+foreach ($setting in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser', 'ExportOptions')) {
     if ($PSBoundParameters.ContainsKey($setting)) { $arguments[$setting] = $PSBoundParameters[$setting] }
 }
 Invoke-ComputerSnapshotHC @arguments

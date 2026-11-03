@@ -210,6 +210,10 @@ function Invoke-ComputerSnapshotHC {
             if (-not $PSBoundParameters.ContainsKey('RebootComputer')) {
                 $RebootComputer = $configuration.Settings.RebootComputer 
             }
+
+            if (-not $PSBoundParameters.ContainsKey('RestartDelaySeconds')) {
+                $RestartDelaySeconds = $configuration.Settings.RestartDelaySeconds
+            }
             
             if (-not $PSBoundParameters.ContainsKey('OpenReportInBrowser')) { 
                 $OpenReportInBrowser = $configuration.Settings.OpenReportInBrowser 
@@ -453,7 +457,12 @@ function Invoke-ComputerSnapshotHC {
         $document = [ordered]@{
             SchemaVersion = 3
             Description   = 'Exported from {0} on {1}' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyy-MM-dd HH:mm')
-            Settings      = [ordered]@{ RebootComputer = $false; OpenReportInBrowser = $true; RunElevated = $false }
+            Settings      = [ordered]@{
+                RebootComputer      = $false
+                RestartDelaySeconds = 60
+                OpenReportInBrowser = $true
+                RunElevated         = $false
+            }
             Items         = $exportItems
         }
 

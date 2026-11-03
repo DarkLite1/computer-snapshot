@@ -239,7 +239,7 @@ function New-SnapshotItemListHC {
 
 function Get-RestoreSettingsHC {
     param([string]$ConfigurationFile)
-    $settings = @{ RebootComputer = $false; OpenReportInBrowser = $true }
+    $settings = @{ RebootComputer = $false; RestartDelaySeconds = 60; OpenReportInBrowser = $true }
     if ($ConfigurationFile) {
         $document = Get-Content -LiteralPath $ConfigurationFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
         foreach ($setting in @('RebootComputer', 'OpenReportInBrowser')) {
@@ -247,6 +247,13 @@ function Get-RestoreSettingsHC {
                 if ($document.Settings.$setting -isnot [bool]) { throw "Settings.${setting} must be a Boolean." }
                 $settings[$setting] = $document.Settings.$setting
             }
+        }
+        if ($document.Settings.PSObject.Properties.Name -contains 'RestartDelaySeconds') {
+            $delay = $document.Settings.RestartDelaySeconds
+            if (($delay -isnot [int] -and $delay -isnot [long]) -or $delay -lt 0 -or $delay -gt 600) {
+                throw 'Settings.RestartDelaySeconds must be a whole number from 0 to 600.'
+            }
+            $settings.RestartDelaySeconds = [int]$delay
         }
     }
     return $settings
@@ -310,12 +317,33 @@ function New-RestoreSelectionFormHC {
     $reboot.Text = 'Restart computer after successful restore'
     $reboot.AutoSize = $true
     $reboot.Checked = $settings.RebootComputer
+    $delayLabel = New-Object Windows.Forms.Label
+    $delayLabel.Name = 'RestartDelayLabel'
+    $delayLabel.Text = 'Countdown (seconds):'
+    $delayLabel.AutoSize = $true
+    $delayLabel.Margin = New-Object Windows.Forms.Padding 0, 6, 0, 0
+    $delayLabel.Enabled = $reboot.Checked
+    $delay = New-Object Windows.Forms.NumericUpDown
+    $delay.Name = 'RestartDelaySeconds'
+    $delay.AccessibleName = 'Restart countdown in seconds'
+    $delay.Minimum = 0
+    $delay.Maximum = 600
+    $delay.Increment = 10
+    $delay.Width = 70
+    $delay.Value = $settings.RestartDelaySeconds
+    $delay.Enabled = $reboot.Checked
+    $delay.Margin = New-Object Windows.Forms.Padding 3, 3, 18, 3
+    $reboot.Add_CheckedChanged({
+        foreach ($name in @('RestartDelayLabel', 'RestartDelaySeconds')) {
+            $this.Parent.Controls.Find($name, $false)[0].Enabled = $this.Checked
+        }
+    })
     $report = New-Object Windows.Forms.CheckBox
     $report.Name = 'OpenReportInBrowser'
     $report.Text = 'Open report in browser'
     $report.AutoSize = $true
     $report.Checked = $settings.OpenReportInBrowser
-    $options.Controls.AddRange(@($reboot, $report))
+    $options.Controls.AddRange(@($reboot, $delayLabel, $delay, $report))
     $layout.Controls.Add($options, 0, 3)
     $buttons = New-Object Windows.Forms.FlowLayoutPanel
     $buttons.Dock = 'Fill'
@@ -384,6 +412,8 @@ function Start-ConfigurationJobHC {
         [string[]]$Items,
         [bool]$OpenReportInBrowser = $true,
         [bool]$RebootComputer = $false,
+        [ValidateRange(0, 600)]
+        [int]$RestartDelaySeconds = 60,
         [switch]$RunElevated,
         [switch]$Force
     )
@@ -413,6 +443,9 @@ function Start-ConfigurationJobHC {
             if ($PSBoundParameters.ContainsKey($setting)) {
                 $command += " -{0} `${1}" -f $setting, $PSBoundParameters[$setting].ToString().ToLowerInvariant()
             }
+        }
+        if ($PSBoundParameters.ContainsKey('RestartDelaySeconds')) {
+            $command += " -RestartDelaySeconds $RestartDelaySeconds"
         }
     }
     $parameters = @{
@@ -515,6 +548,7 @@ $restore.Add_Click({
             $selectedItems = @($selection.Tag)
             $restoreOptions = @{
                 RebootComputer = $selection.Controls.Find('RebootComputer', $true)[0].Checked
+                RestartDelaySeconds = [int]$selection.Controls.Find('RestartDelaySeconds', $true)[0].Value
                 OpenReportInBrowser = $selection.Controls.Find('OpenReportInBrowser', $true)[0].Checked
             }
         }

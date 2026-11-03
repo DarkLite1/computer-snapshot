@@ -354,6 +354,17 @@ Describe 'Single-file execution' {
             @($Results | Where-Object Name -EQ 'Restart computer').Count -eq 1
         }
     }
+    It 'uses the saved restart delay unless the run overrides it' {
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true; RestartDelaySeconds = 300 }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $result = Invoke-ComputerSnapshotHC @params
+        ($result.Results | Where-Object Name -EQ 'Restart computer').Messages[0] | Should -BeLike 'The computer restarts in 300 seconds*'
+        Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter { $DelaySeconds -eq 300 }
+        $params.RestartDelaySeconds = 0
+        $null = Invoke-ComputerSnapshotHC @params
+        Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter { $DelaySeconds -eq 0 }
+    }
     It 'reports a restart that was not done because a section failed' {
         Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false; RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = 'Example' }) } } $path
         $params.Action = 'RestoreSnapshot'

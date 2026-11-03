@@ -176,7 +176,12 @@ function ConvertTo-LoadedConfigurationHC {
     $result = [pscustomobject]@{
         SchemaVersion = 3
         Description   = $Configuration.Description
-        Settings      = [ordered]@{ RebootComputer = $false; OpenReportInBrowser = $true; RunElevated = $false }
+        Settings      = [ordered]@{
+            RebootComputer      = $false
+            RestartDelaySeconds = 60
+            OpenReportInBrowser = $true
+            RunElevated         = $false
+        }
         Items         = [ordered]@{}
         Source        = $Source
         Problems      = $problems
@@ -227,6 +232,22 @@ function ConvertTo-LoadedConfigurationHC {
                 if ($property -ceq 'Comment') {
                     if ($Configuration.Settings.Comment -isnot [string]) { 
                         $problems.Add("$Source > Settings.Comment: expected a string") 
+                    }
+                }
+                elseif ($property -ceq 'RestartDelaySeconds') {
+                    $delay = $Configuration.Settings.RestartDelaySeconds
+
+                    if (
+                        ($delay -isnot [int] -and $delay -isnot [long]) -or
+                        $delay -lt 0 -or $delay -gt 600
+                    ) {
+                        $problems.Add(
+                            "$Source > Settings.RestartDelaySeconds: " +
+                            'expected a whole number from 0 to 600'
+                        )
+                    }
+                    else {
+                        $result.Settings.RestartDelaySeconds = [int]$delay
                     }
                 }
                 elseif (

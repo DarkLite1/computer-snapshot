@@ -75,7 +75,19 @@ Describe 'Version 2 configuration' {
         $loaded = Read-ConfigurationHC $path $TestDrive
         @($loaded.Items.Keys) | Should -Be @('UserAccounts', 'Software')
         $loaded.Settings.RebootComputer | Should -BeFalse
+        $loaded.Settings.RestartDelaySeconds | Should -Be 60
         @(Test-ConfigurationHC $loaded $TestDrive).Count | Should -Be 0
+    }
+    It 'reads the restart delay and rejects values outside 0 to 600' {
+        $configuration.Settings = @{ RestartDelaySeconds = 0 }
+        Write-ConfigurationHC $configuration $path
+        (Read-ConfigurationHC $path $TestDrive).Settings.RestartDelaySeconds | Should -Be 0
+        foreach ($delay in @(-1, 601, '60', 1.5, $true)) {
+            $configuration.Settings = @{ RestartDelaySeconds = $delay }
+            Write-ConfigurationHC $configuration $path
+            (Read-ConfigurationHC $path $TestDrive).Problems -join ';' |
+                Should -Match 'Settings.RestartDelaySeconds: expected a whole number from 0 to 600' -Because "$delay"
+        }
     }
     It 'preserves empty and singleton arrays without a UTF8 BOM' {
         $configuration.Items.UserAccounts = @([pscustomobject]@{ Name = 'Example' })

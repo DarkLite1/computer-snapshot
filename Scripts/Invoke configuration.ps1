@@ -15,6 +15,8 @@
     Restore only these sections. Omit to restore all sections in the configuration.
 .PARAMETER RebootComputer
     Override the saved restart setting for this run only.
+.PARAMETER RestartDelaySeconds
+    Override the saved restart countdown (0 to 600 seconds) for this run only.
 .PARAMETER OpenReportInBrowser
     Override the saved report-opening setting for this run only.
 #>
@@ -27,6 +29,8 @@ param(
     [switch]$SkipConfirmation,
     [string[]]$Items,
     [bool]$RebootComputer,
+    [ValidateRange(0, 600)]
+    [int]$RestartDelaySeconds,
     [bool]$OpenReportInBrowser
 )
 Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
@@ -77,13 +81,16 @@ if ($configuration.Settings.RunElevated -and -not (Test-IsStartedElevatedHC)) {
             $command += " -{0} `${1}" -f $setting, $PSBoundParameters[$setting].ToString().ToLowerInvariant()
         }
     }
+    if ($PSBoundParameters.ContainsKey('RestartDelaySeconds')) {
+        $command += " -RestartDelaySeconds $RestartDelaySeconds"
+    }
     $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
     Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encodedCommand
     return
 }
 $arguments = @{ Action = 'RestoreSnapshot'; ConfigurationFile = $configurationPath }
 if ($null -ne $Items) { $arguments.Items = $Items }
-foreach ($setting in @('RebootComputer', 'OpenReportInBrowser')) {
+foreach ($setting in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser')) {
     if ($PSBoundParameters.ContainsKey($setting)) { $arguments[$setting] = $PSBoundParameters[$setting] }
 }
 Invoke-ScriptHC -Path $StartScript -Arguments $arguments

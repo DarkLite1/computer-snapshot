@@ -55,9 +55,10 @@ Describe 'Configuration launcher' {
     }
     It 'forwards explicit runtime settings without editing the saved configuration' {
         $before = Get-Content -LiteralPath $testConfigurationFile -Raw
-        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation -RebootComputer $false -OpenReportInBrowser $true
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation -RebootComputer $false -RestartDelaySeconds 120 -OpenReportInBrowser $true
         Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
             $Arguments.ContainsKey('RebootComputer') -and $Arguments.RebootComputer -eq $false -and
+            $Arguments.RestartDelaySeconds -eq 120 -and
             $Arguments.ContainsKey('OpenReportInBrowser') -and $Arguments.OpenReportInBrowser -eq $true
         }
         (Get-Content -LiteralPath $testConfigurationFile -Raw) | Should -BeExactly $before
@@ -84,10 +85,11 @@ Describe 'Configuration launcher' {
     It 'preserves selection and runtime settings when relaunching elevated' {
         $document.Settings.RunElevated = $true
         $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
-        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation -Items UserAccounts -RebootComputer $true -OpenReportInBrowser $false
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -SkipConfirmation -Items UserAccounts -RebootComputer $true -RestartDelaySeconds 0 -OpenReportInBrowser $false
         Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
             $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
             $Verb -eq 'RunAs' -and $command.Contains("-Items @('UserAccounts')") -and
+            $command.Contains('-RestartDelaySeconds 0') -and
             $command.Contains('-RebootComputer $true') -and $command.Contains('-OpenReportInBrowser $false')
         }
         Should -Invoke Invoke-ScriptHC -Times 0 -Exactly

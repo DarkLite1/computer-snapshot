@@ -1,7 +1,6 @@
 {
   "SyncTimeWithDomain": true,
-  "TimeServerNames": [
-    "SERVER1.CONTOSO.NET",
-    "SERVER2.CONTOSO.NET"
-  ]
+  "TimeServerNames": ["SERVER1.CONTOSO.NET", "SERVER2.CONTOSO.NET"],
+  "Reliable": false,
+  "Comment": "Set SyncTimeWithDomain to false to use TimeServerNames. Set Reliable to true only on domain controllers and dedicated time servers."
 }

@@ -1,7 +1,5 @@
 {
-  "Remove": [
-    "Notepad++ (64-bit x64)"
-  ],
+  "Remove": ["Notepad++ (64-bit x64)"],
   "Install": [
     {
       "ExecutablePath": "Software\\npp.8.3.3.Installer.x64.exe",
@@ -21,7 +19,9 @@
     },
     {
       "ExecutablePath": "Software\\Firebird-2.1.3.18185_0_x64.exe",
-      "Arguments": "/Silent"
+      "Arguments": "/Silent",
+      "SuccessExitCodes": [0, 1],
+      "Comment": "This installer returns 1 when Firebird is already installed, which is fine. 3010 and 1641 (restart needed) always count as success."
     },
     {
       "ExecutablePath": "Software\\cscript.exe",

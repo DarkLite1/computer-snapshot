@@ -3,5 +3,10 @@
     "Comment": "Place the source in Files and set the absolute destination path.",
     "From": "Files\\Monitor SSD.ps1",
     "To": "C:\\HC\\Monitor SSD.ps1"
+  },
+  {
+    "Comment": "Environment variables such as %ProgramData% are expanded in the destination.",
+    "From": "Files\\Set power settings.ps1",
+    "To": "%ProgramData%\\HC\\Set power settings.ps1"
   }
 ]

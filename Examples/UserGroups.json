@@ -1,7 +1,7 @@
 [
   {
-    "Name": "Administrators",
-    "Description": "",
+    "Comment": "A built-in group by SID: S-1-5-32-544 is Administrators in every Windows language. Its description is left to Windows.",
+    "Name": "S-1-5-32-544",
     "Members": ["PC1\\bswagger", "CONTOSO\\Domain Admins", "CONTOSO\\cnorris"]
   },
   {

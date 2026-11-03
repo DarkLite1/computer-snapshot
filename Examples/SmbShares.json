@@ -1,6 +1,50 @@
 {
-  "Shares": [],
-  "Access": [],
-  "NTFS": [],
-  "Comment": "Export an existing share to capture its SMB and NTFS permissions."
+  "Shares": [
+    {
+      "Name": "Data",
+      "Path": "C:\\Data",
+      "Description": "Shared data"
+    }
+  ],
+  "Access": [
+    {
+      "Name": "Data",
+      "AccountName": "S-1-5-32-544",
+      "AccessControlType": "Allow",
+      "AccessRight": "Full",
+      "Comment": "Administrators, by SID so it works in every Windows language"
+    },
+    {
+      "Name": "Data",
+      "AccountName": "S-1-5-11",
+      "AccessControlType": "Allow",
+      "AccessRight": "Change",
+      "Comment": "Authenticated Users"
+    },
+    {
+      "Name": "Data",
+      "AccountName": "S-1-5-32-546",
+      "AccessControlType": "Deny",
+      "AccessRight": "Full",
+      "Comment": "Guests are denied"
+    }
+  ],
+  "NTFS": [
+    {
+      "Name": "Data",
+      "Owner": "S-1-5-32-544",
+      "AreAccessRulesProtected": false,
+      "Access": [
+        {
+          "IdentityReference": "S-1-5-32-545",
+          "AccessControlType": "Allow",
+          "FileSystemRights": "Modify, Synchronize",
+          "InheritanceFlags": "ContainerInherit, ObjectInherit",
+          "PropagationFlags": "None",
+          "Comment": "Users"
+        }
+      ]
+    }
+  ],
+  "Comment": "Export an existing share to capture its SMB and NTFS permissions. Built-in accounts are stored by SID."
 }

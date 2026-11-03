@@ -1,9 +1,26 @@
 [
   {
-    "Comment": "Replace Xml with the complete XML returned by Export-ScheduledTask.",
+    "Comment": "Inline XML as written by an export. Without RunAsUser the task runs as SYSTEM.",
     "TaskName": "Example",
     "TaskPath": "\\HC\\",
     "Enabled": true,
     "Xml": "<Task xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\" version=\"1.2\"><Triggers/><Principals><Principal id=\"Author\"><UserId>S-1-5-18</UserId><RunLevel>LeastPrivilege</RunLevel></Principal></Principals><Settings><Enabled>true</Enabled></Settings><Actions Context=\"Author\"><Exec><Command>cmd.exe</Command><Arguments>/c exit 0</Arguments></Exec></Actions></Task>"
+  },
+  {
+    "Comment": "XML file exported from Task Scheduler (right-click a task, Export...). Runs as svc-cleanup, whether or not signed in; the password is asked for during the restore.",
+    "TaskName": "Clean up logs",
+    "TaskPath": "\\HC\\",
+    "Enabled": true,
+    "XmlFile": "Files\\Example task.xml",
+    "RunAsUser": "svc-cleanup",
+    "RunAsPassword": "{{password:Password of 'svc-cleanup' for the clean-up task}}"
+  },
+  {
+    "Comment": "A built-in service account by SID: S-1-5-19 is LOCAL SERVICE, in every Windows language. No password needed.",
+    "TaskName": "Collect inventory",
+    "TaskPath": "\\HC\\",
+    "Enabled": false,
+    "XmlFile": "Files\\Example task.xml",
+    "RunAsUser": "S-1-5-19"
   }
 ]

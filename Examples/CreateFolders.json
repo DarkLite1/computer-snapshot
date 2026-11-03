@@ -1,7 +1,8 @@
 {
   "FolderPaths": [
-    "c:\\test\\folder\\A",
-    "c:\\test\\folder\\B",
-    "c:\\test\\folder\\C"
-  ]
+    "C:\\test\\folder\\A",
+    "C:\\test\\folder\\B",
+    "%ProgramData%\\HC\\Logs"
+  ],
+  "Comment": "Full paths; environment variables such as %ProgramData% are expanded."
 }

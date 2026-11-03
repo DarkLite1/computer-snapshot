@@ -1138,6 +1138,10 @@
             "description": "NTP server hostname."
           }
         },
+        "Reliable": {
+          "type": "boolean",
+          "description": "Announce this computer as a reliable time source for other computers (w32tm /reliable:YES). Only for domain controllers and dedicated time servers; defaults to false."
+        },
         "Comment": {
           "type": "string",
           "description": "Technician notes; ignored when applying the configuration."
@@ -1173,39 +1177,9 @@
           "properties": {
             "RegistryKeys": {
               "type": "array",
-              "description": "Values applied in the current user context.",
+              "description": "Registry changes applied in the current user context.",
               "items": {
-                "type": "object",
-                "description": "Registry value to create or update.",
-                "additionalProperties": false,
-                "properties": {
-                  "Path": {
-                    "type": "string",
-                    "description": "Registry provider path, for example HKLM:\\SOFTWARE\\Example."
-                  },
-                  "Name": {
-                    "type": "string",
-                    "description": "Registry value name."
-                  },
-                  "Value": {
-                    "type": "string",
-                    "description": "Registry value data."
-                  },
-                  "Type": {
-                    "type": "string",
-                    "description": "Registry value type, such as DWORD or STRING."
-                  },
-                  "Comment": {
-                    "type": "string",
-                    "description": "Technician notes; ignored when applying the configuration."
-                  }
-                },
-                "required": [
-                  "Path",
-                  "Name",
-                  "Value",
-                  "Type"
-                ]
+                "$ref": "#/$defs/RegistryEntry"
               }
             },
             "Comment": {
@@ -1232,39 +1206,9 @@
               },
               "RegistryKeys": {
                 "type": "array",
-                "description": "Values applied to this user registry hive.",
+                "description": "Registry changes for this user; HKCU paths point to this user's registry.",
                 "items": {
-                  "type": "object",
-                  "description": "Registry value to create or update.",
-                  "additionalProperties": false,
-                  "properties": {
-                    "Path": {
-                      "type": "string",
-                      "description": "Registry provider path, for example HKLM:\\SOFTWARE\\Example."
-                    },
-                    "Name": {
-                      "type": "string",
-                      "description": "Registry value name."
-                    },
-                    "Value": {
-                      "type": "string",
-                      "description": "Registry value data."
-                    },
-                    "Type": {
-                      "type": "string",
-                      "description": "Registry value type, such as DWORD or STRING."
-                    },
-                    "Comment": {
-                      "type": "string",
-                      "description": "Technician notes; ignored when applying the configuration."
-                    }
-                  },
-                  "required": [
-                    "Path",
-                    "Name",
-                    "Value",
-                    "Type"
-                  ]
+                  "$ref": "#/$defs/RegistryEntry"
                 }
               },
               "Comment": {
@@ -1283,6 +1227,71 @@
           "description": "Technician notes; ignored when applying the configuration."
         }
       }
+    },
+    "RegistryEntry": {
+      "type": "object",
+      "description": "A registry change. Action decides what happens; without Action, a value is set.",
+      "additionalProperties": false,
+      "properties": {
+        "Action": {
+          "type": "string",
+          "enum": [
+            "Set",
+            "RemoveValue",
+            "ClearValues",
+            "ClearKey",
+            "RemoveKey"
+          ],
+          "description": "Set (default): create or change a value. RemoveValue: remove one value. ClearValues: remove all values of the key, keep its subkeys. ClearKey: remove all values and subkeys, keep the key. RemoveKey: remove the key with everything in it. ClearValues, ClearKey and RemoveKey are refused for a hive root or a key directly below it."
+        },
+        "Path": {
+          "type": "string",
+          "description": "Registry key, for example HKLM:\\SOFTWARE\\Example, HKCU:\\Software\\Example or HKEY_LOCAL_MACHINE\\SOFTWARE\\Example."
+        },
+        "Name": {
+          "type": "string",
+          "description": "Value name; an empty string is the key's (Default) value. Required for Set and RemoveValue."
+        },
+        "Type": {
+          "type": "string",
+          "enum": [
+            "String",
+            "ExpandString",
+            "MultiString",
+            "Binary",
+            "DWord",
+            "QWord",
+            "STRING",
+            "EXPANDSTRING",
+            "MULTISTRING",
+            "BINARY",
+            "DWORD",
+            "QWORD",
+            "REG_SZ",
+            "REG_EXPAND_SZ",
+            "REG_MULTI_SZ",
+            "REG_BINARY",
+            "REG_DWORD",
+            "REG_QWORD"
+          ],
+          "description": "Value type, required for Set: String, ExpandString, MultiString, Binary, DWord or QWord."
+        },
+        "Value": {
+          "type": [
+            "string",
+            "integer",
+            "array"
+          ],
+          "description": "Value data, required for Set. String and ExpandString: text. MultiString: a list of texts. Binary: hex text such as '01 0A FF' or a list of numbers 0-255. DWord and QWord: a number, or text in decimal ('16') or hexadecimal ('0x10')."
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "required": [
+        "Path"
+      ]
     },
     "ScheduledTasks": {
       "type": "array",

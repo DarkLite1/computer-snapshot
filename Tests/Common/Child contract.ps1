@@ -17,6 +17,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         function Remove-ApplicationHC { param($ApplicationName, $UninstallString) }
         function Start-ScriptHC { param($Path) }
         function Invoke-CustomScriptHC { param($Path, $Arguments) }
+        function Get-RegistryKeyStateHC { param($Path, $Name) }
         function Get-NetFirewallAddressFilter { param([Parameter(ValueFromPipeline)]$InputObject) }
         function Get-NetFirewallPortFilter { param([Parameter(ValueFromPipeline)]$InputObject) }
         function Get-NetFirewallApplicationFilter { param([Parameter(ValueFromPipeline)]$InputObject) }
@@ -89,6 +90,12 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         Mock New-Item { 'command output' }
         Mock Copy-Item
         Mock Get-ItemProperty { [pscustomobject]@{ Example = 'old' } }
+        Mock Get-RegistryKeyStateHC {
+            [pscustomobject]@{
+                KeyExists = $true; ValueNames = @('Example'); SubKeyNames = @()
+                ValueExists = $Name -eq 'Example'; Value = 'old'; Kind = 'String'
+            }
+        }
         Mock New-ItemProperty
         Mock Get-InstalledApplicationsHC
         Mock Remove-ApplicationHC

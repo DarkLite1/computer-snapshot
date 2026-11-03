@@ -6,6 +6,7 @@
 
 . "$PSScriptRoot\Section.ps1"
 . "$PSScriptRoot\Schema.ps1"
+. "$PSScriptRoot\Registry.ps1"
 
 $script:ItemOrder = @((Get-SnapshotScriptsHC).Keys)
 $script:ArrayItems = @(
@@ -335,6 +336,40 @@ function Test-ConfigurationHC {
                         -not (Test-ObjectHC $data[$index].Arguments)
                     ) {
                         $problems.Add("${location}[$index].Arguments: expected an object")
+                    }
+                }
+            }
+            'RegistryKeys' {
+                # Value types, data and actions, before anything is changed
+                $groups = @()
+
+                if ($null -ne $data.RunAsCurrentUser) {
+                    $groups += @{
+                        Location = '.RunAsCurrentUser.RegistryKeys'
+                        Entries  = $data.RunAsCurrentUser.RegistryKeys
+                    }
+                }
+
+                $users = @($data.RunAsOtherUser | Where-Object { $null -ne $_ })
+
+                for ($userIndex = 0; $userIndex -lt $users.Count; $userIndex++) {
+                    $groups += @{
+                        Location = ".RunAsOtherUser[$userIndex].RegistryKeys"
+                        Entries  = $users[$userIndex].RegistryKeys
+                    }
+                }
+
+                foreach ($group in $groups) {
+                    $entries = @($group.Entries | Where-Object { $null -ne $_ })
+
+                    for ($index = 0; $index -lt $entries.Count; $index++) {
+                        foreach (
+                            $problem in @(Get-RegistryEntryProblemHC -Entry $entries[$index])
+                        ) {
+                            $problems.Add(
+                                "${location}$($group.Location)[$index]: $problem"
+                            )
+                        }
                     }
                 }
             }

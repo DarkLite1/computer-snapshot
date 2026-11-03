@@ -3,10 +3,20 @@
 .SYNOPSIS
     Export or import Registry keys as a configuration section.
 .DESCRIPTION
-    Import sets each registry value in RunAsCurrentUser, then the values of
-    each user in RunAsOtherUser. Missing registry keys are created, including
-    missing parent keys. A value that has the right data but the wrong type
-    is updated as well.
+    Import applies each entry in RunAsCurrentUser, then the entries of each
+    user in RunAsOtherUser. An entry's Action decides what happens:
+    - Set (default): create or change a value. Missing keys are created,
+      including parent keys. A value with the right data but the wrong type
+      is corrected; an unchanged value is not rewritten.
+    - RemoveValue: remove one value.
+    - ClearValues: remove all values of a key, keep its subkeys.
+    - ClearKey: remove all values and subkeys of a key, keep the key.
+    - RemoveKey: remove a key with everything in it.
+    Name '' is the key's (Default) value. Types: String, ExpandString,
+    MultiString (a list), Binary (hex such as '01 0A FF' or a list of bytes),
+    DWord and QWord (decimal or 0x hexadecimal). Removing something that does
+    not exist is reported, not an error. ClearValues, ClearKey and RemoveKey
+    are refused for a hive root or a key directly below it.
 
     For another user, HKCU:\ paths point to that user's registry:
     - When the user is signed in, their loaded registry is used directly.
@@ -35,6 +45,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
+. "$PSScriptRoot\Common\Registry.ps1"
 #region Windows helpers
 function New-RegistryKeyHC {
     # Create the key and any missing parent keys, one level at a time.
@@ -54,57 +65,179 @@ function New-RegistryKeyHC {
         if ($key.Handle) { $key.Handle.Close() }
     }
 }
-function Set-RegistryValueHC {
-    # Returns the message for a value that was set or already correct
+function Get-RegistryKeyStateHC {
+    <#
+    .SYNOPSIS
+        Read a key: whether it exists, its value names and subkey names, and
+        optionally one value with its type.
+    .DESCRIPTION
+        ExpandString values are read without expanding %variables%, so they
+        compare with the configured text. The key is closed again, because a
+        loaded user hive cannot be unloaded while a key is open.
+    #>
     param(
         [Parameter(Mandatory)][string]$Path,
-        [Parameter(Mandatory)][string]$Name,
-        [Parameter(Mandatory)][AllowEmptyString()][string]$Value,
-        [Parameter(Mandatory)][string]$Type
+        [AllowEmptyString()][string]$Name
     )
-    $label = "Registry value '$Name' in '$Path'"
-    $newParams = @{ Path = $Path; Name = $Name; Value = $Value; PropertyType = $Type; Force = $true }
+
+    $state = [pscustomobject]@{
+        KeyExists   = $false
+        ValueNames  = @()
+        SubKeyNames = @()
+        ValueExists = $false
+        Value       = $null
+        Kind        = $null
+    }
+
+    $key = Get-Item -LiteralPath $Path -ErrorAction SilentlyContinue
+    if (-not $key) {
+        return $state
+    }
+
     try {
-        $currentValue = (Get-ItemProperty -Path $Path -Name $Name).($Name)
+        $state.KeyExists = $true
+        $state.ValueNames = @($key.GetValueNames())
+        $state.SubKeyNames = @($key.GetSubKeyNames())
+
+        if ($PSBoundParameters.ContainsKey('Name') -and $state.ValueNames -contains $Name) {
+            $state.ValueExists = $true
+            $state.Value = $key.GetValue(
+                $Name, $null,
+                [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+            )
+            $state.Kind = [string]$key.GetValueKind($Name)
+        }
     }
-    catch [System.Management.Automation.ItemNotFoundException] {
-        New-RegistryKeyHC -Path $Path
-        $null = New-ItemProperty @newParams
-        return "$label created, including its registry key"
+    finally {
+        if ($key -is [IDisposable]) { $key.Dispose() }
     }
-    catch [System.Management.Automation.PSArgumentException] {
-        # The key exists, the value does not
-        $null = New-ItemProperty @newParams
-        return "$label created"
+
+    $state
+}
+function Get-PropertyNameHC {
+    # The registry provider calls the (Default) value '(default)'
+    param([AllowEmptyString()][string]$Name)
+    if ($Name -eq '') { '(default)' } else { $Name }
+}
+function Invoke-RegistryEntryHC {
+    # Apply one entry; returns the message, throws on failure
+    param(
+        [Parameter(Mandatory)]$Entry,
+        [Parameter(Mandatory)][string]$Path
+    )
+
+    $action = if ($Entry.Action) { [string]$Entry.Action } else { 'Set' }
+    $name = [string]$Entry.Name
+    $displayName = if ($name -eq '') { '(Default)' } else { $name }
+    $label = "Registry value '$displayName' in '$($Entry.Path)'"
+
+    switch ($action) {
+        'Set' {
+            $type = ConvertTo-RegistryTypeHC -Type ([string]$Entry.Type)
+            $data = ConvertTo-RegistryDataHC -Value $Entry.Value -Type $type
+            $text = Format-RegistryDataHC -Value $data -Type $type
+            $state = Get-RegistryKeyStateHC -Path $Path -Name $name
+            $newParams = @{
+                LiteralPath  = $Path
+                Name         = Get-PropertyNameHC $name
+                Value        = $data
+                PropertyType = $type
+                Force        = $true
+            }
+
+            if (-not $state.KeyExists) {
+                New-RegistryKeyHC -Path $Path
+                $null = New-ItemProperty @newParams
+                return "$label created as $type '$text', including its registry key"
+            }
+            if (-not $state.ValueExists) {
+                $null = New-ItemProperty @newParams
+                return "$label created as $type '$text'"
+            }
+            if ($state.Kind -ne $type) {
+                $null = New-ItemProperty @newParams
+                return "$label updated from type '$($state.Kind)' to $type '$text'"
+            }
+            if (-not (Test-RegistryDataEqualHC -Current $state.Value -Desired $data)) {
+                $null = New-ItemProperty @newParams
+                $old = Format-RegistryDataHC -Value $state.Value -Type $type
+                return "$label updated from '$old' to '$text'"
+            }
+            return "$label is already correct"
+        }
+        'RemoveValue' {
+            $state = Get-RegistryKeyStateHC -Path $Path -Name $name
+            if (-not $state.ValueExists) {
+                return "$label does not exist, nothing to remove"
+            }
+            Remove-ItemProperty -LiteralPath $Path -Name (Get-PropertyNameHC $name)
+            return "Removed registry value '$displayName' from '$($Entry.Path)'"
+        }
+        default {
+            # ClearValues, ClearKey and RemoveKey work on the whole key
+            if (Test-BroadRegistryKeyHC -Path (ConvertTo-RegistryPathHC $Entry.Path)) {
+                throw "refused for a hive root or a key directly below it; use a more specific key"
+            }
+
+            $state = Get-RegistryKeyStateHC -Path $Path
+            if (-not $state.KeyExists) {
+                $verb = if ($action -eq 'RemoveKey') { 'remove' } else { 'clear' }
+                return "Registry key '$($Entry.Path)' does not exist, nothing to $verb"
+            }
+
+            if ($action -eq 'RemoveKey') {
+                Remove-Item -LiteralPath $Path -Recurse -Force
+                return "Removed registry key '$($Entry.Path)' with everything in it"
+            }
+
+            if ($action -eq 'ClearKey') {
+                foreach ($subKeyName in $state.SubKeyNames) {
+                    Remove-Item -LiteralPath "$Path\$subKeyName" -Recurse -Force
+                }
+            }
+            foreach ($valueName in $state.ValueNames) {
+                Remove-ItemProperty -LiteralPath $Path -Name (Get-PropertyNameHC $valueName)
+            }
+
+            if ($action -eq 'ClearKey') {
+                return "Cleared registry key '$($Entry.Path)': removed $($state.ValueNames.Count) value(s) and $($state.SubKeyNames.Count) subkey(s)"
+            }
+            return "Cleared the values of registry key '$($Entry.Path)': removed $($state.ValueNames.Count) value(s), kept its subkeys"
+        }
     }
-    if ($currentValue -ne $Value) {
-        $null = New-ItemProperty @newParams
-        return "$label updated from '$currentValue' to '$Value'"
+}
+function Get-RegistryEntryLabelHC {
+    # What an entry does, for error messages
+    param([Parameter(Mandatory)]$Entry)
+    $name = if ([string]$Entry.Name -eq '') { '(Default)' } else { $Entry.Name }
+    switch ([string]$(if ($Entry.Action) { $Entry.Action } else { 'Set' })) {
+        'Set' { "set registry value '$name' in '$($Entry.Path)' to '$(Format-RegistryDataHC -Value $Entry.Value)' with type '$($Entry.Type)'" }
+        'RemoveValue' { "remove registry value '$name' from '$($Entry.Path)'" }
+        'ClearValues' { "clear the values of registry key '$($Entry.Path)'" }
+        'ClearKey' { "clear registry key '$($Entry.Path)'" }
+        'RemoveKey' { "remove registry key '$($Entry.Path)'" }
+        default { "apply Action '$($Entry.Action)' to '$($Entry.Path)'" }
     }
-    $currentType = [string](Get-Item -Path $Path).GetValueKind($Name)
-    if ($currentType -ne $Type) {
-        $null = New-ItemProperty @newParams
-        return "$label updated from type '$currentType' to '$Type'"
-    }
-    "$label is already correct"
 }
 function Set-RegistryValuesHC {
-    # Set each value independently; HKCU:\ is redirected to $UserRoot when given
+    # Apply each entry independently; HKCU is redirected to $UserRoot when given
     param($RegistryKeys, [string]$UserRoot, [string]$UserLabel)
     # A missing section is $null, and @($null) would loop once over nothing
-    foreach ($key in @($RegistryKeys | Where-Object { $null -ne $_ })) {
-        $path = $key.Path
-        if ($UserRoot -and $path -match '^HKCU:\\?') {
-            $path = $path -replace '^HKCU:\\?', "$UserRoot\"
-        }
+    foreach ($entry in @($RegistryKeys | Where-Object { $null -ne $_ })) {
+        $prefix = if ($UserLabel) { "User '$UserLabel': " } else { '' }
         try {
-            $message = Set-RegistryValueHC -Path $path -Name $key.Name -Value $key.Value -Type $key.Type
-            if ($UserLabel) { $message = "User '$UserLabel': $message" }
-            $messages.Add($message)
+            $problems = @(Get-RegistryEntryProblemHC -Entry $entry)
+            if ($problems.Count) { throw ($problems -join '; ') }
+
+            $path = ConvertTo-RegistryPathHC -Path $entry.Path
+            if ($UserRoot) {
+                $path = $path -replace '^(HKCU:|Registry::HKEY_CURRENT_USER)(?=\\|$)', $UserRoot
+            }
+
+            $messages.Add($prefix + (Invoke-RegistryEntryHC -Entry $entry -Path $path))
         }
         catch {
-            $prefix = if ($UserLabel) { "User '$UserLabel': " } else { '' }
-            $errors.Add("${prefix}Failed to set registry value '$($key.Name)' in '$($key.Path)' to '$($key.Value)' with type '$($key.Type)': $($_.Exception.Message)")
+            $errors.Add("${prefix}Failed to $(Get-RegistryEntryLabelHC -Entry $entry): $($_.Exception.Message)")
         }
     }
 }

@@ -1,14 +1,39 @@
 [
   {
-    "NetworkCategory": "Private",
-    "NetworkCardDescription": "Intel",
-    "NetworkCardName": "LAN OFFICE",
-    "NetworkCardDnsSuffix": "CONTOSO.COM"
+    "Comment": "Found by description; renamed, and given a static address that is asked for during the restore.",
+    "FindBy": { "Description": "Intel" },
+    "Change": {
+      "NewName": "LAN OFFICE",
+      "NetworkCategory": "Private",
+      "DnsSuffix": "CONTOSO.COM",
+      "IPSettings": {
+        "IPAddress": "{{ipv4:IP address of LAN OFFICE}}",
+        "PrefixLength": "{{prefix:Prefix length of LAN OFFICE, such as 24}}",
+        "DefaultGateway": "{{ipv4:Default gateway of LAN OFFICE}}",
+        "DNSServers": ["10.75.38.23", "10.75.38.22"]
+      }
+    }
   },
   {
-    "NetworkCategory": "",
-    "NetworkCardDescription": "Broadcom",
-    "NetworkCardName": "LAN FACTORY",
-    "NetworkCardDnsSuffix": ""
+    "Comment": "Found by its current name; renamed, with a fixed static address.",
+    "FindBy": { "Name": "Ethernet 2" },
+    "Change": {
+      "NewName": "LAN MACHINE",
+      "IPSettings": {
+        "IPAddress": "10.20.67.2",
+        "PrefixLength": 24,
+        "DefaultGateway": "10.20.67.254",
+        "DNSServers": ["10.75.38.23", "10.75.38.22"]
+      }
+    }
+  },
+  {
+    "Comment": "Automatic address and DNS from DHCP; the DNS suffix is cleared.",
+    "FindBy": { "Description": "Broadcom" },
+    "Change": {
+      "NewName": "LAN FACTORY",
+      "DnsSuffix": "",
+      "IPSettings": { "Dhcp": true, "DNSServers": [] }
+    }
   }
 ]

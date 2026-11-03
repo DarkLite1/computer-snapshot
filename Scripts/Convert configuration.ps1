@@ -14,7 +14,8 @@
       converted as well, after renaming it to name.v2.json.
 
     Both versions: Software.Remove changes from a list of names to a list
-    of objects, { "DisplayName": "name" }.
+    of objects, { "DisplayName": "name" }. Version 1: each network card
+    becomes { "FindBy": { "Description": ... }, "Change": { ... } }.
 .PARAMETER OldConfigurationFile
     Configuration to convert.
 .PARAMETER RootFolder
@@ -182,6 +183,34 @@ function Convert-SharedSectionHC {
         (New-Object System.Text.UTF8Encoding $false)
     )
     Write-Host "Converted shared section '$sharedPath'. Original: '$sharedBackup'."
+}
+
+function ConvertTo-NetworkCardHC {
+    # Version 1 card settings become FindBy (by description) and Change
+    param($Card)
+
+    $change = [ordered]@{}
+
+    foreach ($names in @(
+            @('NetworkCardName', 'NewName'),
+            @('NetworkCategory', 'NetworkCategory'),
+            @('NetworkCardDnsSuffix', 'DnsSuffix')
+        )) {
+        if ($Card.PSObject.Properties[$names[0]]) {
+            $change[$names[1]] = $Card.($names[0])
+        }
+    }
+
+    $entry = [ordered]@{
+        FindBy = [ordered]@{ Description = $Card.NetworkCardDescription }
+        Change = $change
+    }
+
+    if ($Card.PSObject.Properties['?']) {
+        $entry.Comment = [string]$Card.'?'
+    }
+
+    [pscustomobject]$entry
 }
 
 function Test-OldShareLayoutHC {
@@ -454,9 +483,16 @@ foreach ($name in $order) {
             }
         }
         { $_ -in @(
-                'UserAccounts', 'UserGroups', 'FirewallRules', 'NetworkCards')
+                'UserAccounts', 'UserGroups', 'FirewallRules')
         } {
             $data = @($data) 
+        }
+        'NetworkCards' {
+            $data = @(
+                foreach ($card in @($data | Where-Object { $null -ne $_ })) {
+                    ConvertTo-NetworkCardHC $card
+                }
+            )
         }
     }
     Convert-CommentsHC $data

@@ -371,6 +371,107 @@ function Read-ConfigurationHC {
     return ConvertTo-LoadedConfigurationHC $configuration $RootFolder $fullPath -Items $Items
 }
 
+function ConvertTo-IPv4NumberHC {
+    # The address as a number, or $null when it is not a plain IPv4 address
+    param($Value)
+
+    $address = $null
+
+    if (
+        $Value -isnot [string] -or
+        -not [Net.IPAddress]::TryParse($Value, [ref]$address) -or
+        $address.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork -or
+        $address.ToString() -cne $Value
+    ) {
+        return $null
+    }
+
+    $bytes = $address.GetAddressBytes()
+    [uint32](
+        ([uint32]$bytes[0] -shl 24) -bor ([uint32]$bytes[1] -shl 16) -bor
+        ([uint32]$bytes[2] -shl 8) -bor [uint32]$bytes[3]
+    )
+}
+
+function Get-IPSettingsProblemHC {
+    <#
+    .SYNOPSIS
+        Problems in NetworkCards IPSettings, each starting with the property.
+    .DESCRIPTION
+        Placeholders are accepted as they are; the values that replace them
+        are checked again after the restore-time input.
+    #>
+    param($Settings)
+
+    $names = @(Get-PropertiesHC $Settings)
+    $ipv4Placeholder = '\A\{\{ipv4:[^{}\r\n]+\}\}\z'
+
+    if ($Settings.Dhcp -eq $true) {
+        foreach ($name in @('IPAddress', 'PrefixLength', 'DefaultGateway')) {
+            if ($names -contains $name) {
+                ".${name}: not used with Dhcp true; remove it, or Dhcp for a static address"
+            }
+        }
+    }
+    else {
+        foreach ($name in @('IPAddress', 'PrefixLength')) {
+            if ($names -notcontains $name) {
+                ".${name}: required for a static address; use { `"Dhcp`": true } for an automatic address"
+            }
+        }
+    }
+
+    $values = @{}
+
+    foreach ($name in @('IPAddress', 'DefaultGateway')) {
+        if ($names -notcontains $name -or $Settings.$name -match $ipv4Placeholder) {
+            continue
+        }
+
+        $values[$name] = ConvertTo-IPv4NumberHC $Settings.$name
+
+        if ($null -eq $values[$name]) {
+            ".${name}: '$($Settings.$name)' is not an IPv4 address such as 192.0.2.10"
+        }
+    }
+
+    $prefix = $Settings.PrefixLength
+
+    if ($names -contains 'PrefixLength') {
+        if ($prefix -is [string]) {
+            if ($prefix -notmatch '\A\{\{prefix:[^{}\r\n]+\}\}\z') {
+                ".PrefixLength: expected a number from 1 to 32, or {{prefix:Description}}"
+            }
+
+            $prefix = $null
+        }
+    }
+
+    if (
+        $null -ne $values.IPAddress -and $null -ne $values.DefaultGateway -and
+        ($prefix -is [int] -or $prefix -is [long]) -and $prefix -ge 1 -and $prefix -le 32
+    ) {
+        $all = [uint64]4294967295
+        $mask = [uint32](($all -shl (32 - [int]$prefix)) -band $all)
+
+        if (($values.IPAddress -band $mask) -ne ($values.DefaultGateway -band $mask)) {
+            ".DefaultGateway: '$($Settings.DefaultGateway)' is not in the subnet of " +
+            "$($Settings.IPAddress)/$prefix"
+        }
+    }
+
+    $servers = @($Settings.DNSServers | Where-Object { $null -ne $_ })
+
+    for ($index = 0; $index -lt $servers.Count; $index++) {
+        if (
+            $servers[$index] -notmatch $ipv4Placeholder -and
+            $null -eq (ConvertTo-IPv4NumberHC $servers[$index])
+        ) {
+            ".DNSServers[$index]: '$($servers[$index])' is not an IPv4 address such as 192.0.2.10"
+        }
+    }
+}
+
 function Test-ConfigurationHC {
     [CmdletBinding()]
     param(
@@ -605,6 +706,20 @@ function Test-ConfigurationHC {
                         $data[$index].Access -isnot [array]
                     ) {
                         $problems.Add("${location}[$index].Access: expected an array")
+                    }
+                }
+            }
+            'NetworkCards' {
+                for ($index = 0; $index -lt $data.Count; $index++) {
+                    if ($null -eq $data[$index].Change.IPSettings) {
+                        continue
+                    }
+
+                    foreach (
+                        $problem in
+                        @(Get-IPSettingsProblemHC -Settings $data[$index].Change.IPSettings)
+                    ) {
+                        $problems.Add("${location}[$index].Change.IPSettings$problem")
                     }
                 }
             }

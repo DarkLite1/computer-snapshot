@@ -46,6 +46,9 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
         Mock Get-DnsClient { [pscustomobject]@{ InterfaceIndex = 1; ConnectionSpecificSuffix = 'old' } }
         Mock Get-NetConnectionProfile { [pscustomobject]@{ InterfaceAlias = 'Old'; InterfaceIndex = 1; NetworkCategory = 'Public' } }
         Mock Rename-NetAdapter
+        Mock Get-NetIPInterface { [pscustomobject]@{ Dhcp = 'Enabled' } }
+        Mock Get-NetIPAddress
+        Mock Get-NetRoute
         Mock Set-DnsClient
         Mock Set-NetConnectionProfile
         Mock Get-TimeServerHC { [pscustomobject]@{ Type = 'NT5DS'; TimeServer = 'server' } }
@@ -145,7 +148,7 @@ Describe '<Name> data contract' -ForEach @(@{ ScriptPath = $ScriptPath; Name = $
             'Folders' { $data = [pscustomobject]@{ FolderPaths = @('C:\Example') }; Mock Test-Path { $false }; $command = 'New-Item' }
             'Copy files folders' { $data = @([pscustomobject]@{ From = 'Files\example.ps1'; To = 'C:\Example\file.ps1' }); $command = 'Copy-Item' }
             'NTP time servers' { $data = [pscustomobject]@{ SyncTimeWithDomain = $true }; $command = 'Restart-Service' }
-            'Network cards' { $data = @([pscustomobject]@{ NetworkCardName = 'New'; NetworkCardDescription = 'Example'; NetworkCategory = 'Private'; NetworkCardDnsSuffix = 'new' }); $command = 'Rename-NetAdapter' }
+            'Network cards' { $data = @([pscustomobject]@{ FindBy = [pscustomobject]@{ Description = 'Example' }; Change = [pscustomobject]@{ NewName = 'New'; NetworkCategory = 'Private'; DnsSuffix = 'new' } }); $command = 'Rename-NetAdapter' }
             'Regional settings' { $data = [pscustomobject]@{ WinSystemLocaleName = 'en-US'; TimeZoneId = 'UTC'; WinHomeLocationGeoId = 21; CultureName = 'en-US' }; $command = 'Start-ScriptHC' }
             'User accounts' { $data = @([pscustomobject]@{ Name = 'Example'; FullName = 'Example'; Description = ''; Enabled = $true; UserMayChangePassword = $true; Password = 'Example-only' }); $command = 'Set-LocalUser' }
             'User groups' { $data = @([pscustomobject]@{ Name = 'Example'; Description = 'Example'; Members = @('Everyone') }); $command = 'Add-LocalGroupMember' }

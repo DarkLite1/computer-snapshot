@@ -71,7 +71,7 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 5     | `FirewallRules`            | Windows Defender Firewall rules.                                        |
 | 6     | `CreateFolders`            | Folders to create.                                                      |
 | 7     | `SmbShares`                | SMB shares, each with its share and NTFS permissions.                   |
-| 8     | `NetworkCards`             | Network adapter names, network profile (category) and DNS suffix.       |
+| 8     | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and IPv4 settings. |
 | 9     | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
 | 10    | `RegistryKeys`             | Registry values to set.                                                 |
 | 11    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
@@ -162,6 +162,55 @@ All paths in a configuration (installers, files to copy, custom scripts, shared 
 - A share without `Access` keeps its current share permissions; a share without `NTFS` keeps the current permissions of its folder.
 - Configured permissions are applied first. Existing share permissions that aren't configured are only removed when every configured one could be applied, so a share never ends up with less access than configured.
 - Each share name may appear only once.
+
+### Network cards and IP settings
+
+Each entry in `NetworkCards` has two parts: `FindBy` says how to find the card, `Change` says what to change on it. Nothing in `FindBy` is ever changed.
+
+```json
+"NetworkCards": [
+  {
+    "FindBy": { "Name": "Ethernet" },
+    "Change": {
+      "NewName": "LAN",
+      "IPSettings": {
+        "IPAddress": "{{ipv4:IP address of this PC}}",
+        "PrefixLength": "{{prefix:Prefix length, such as 24}}",
+        "DefaultGateway": "{{ipv4:Default gateway}}",
+        "DNSServers": ["10.75.38.23", "10.75.38.22"]
+      }
+    }
+  },
+  {
+    "FindBy": { "Description": "Broadcom" },
+    "Change": { "IPSettings": { "Dhcp": true } }
+  }
+]
+```
+
+`FindBy` has exactly one of:
+
+| `FindBy`      | Finds the card                                                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `Description` | by its description, the name in Device Manager: an exact match first, otherwise the one card containing the text. The driver sets the description; it can't be changed. |
+| `Name`        | by its current name, such as `Ethernet`, before any rename; names can differ per computer                                         |
+
+`Change` can hold, applied in this order; anything left out stays as it is:
+
+| `Change`          | Does                                                                     |
+| ----------------- | ------------------------------------------------------------------------ |
+| `NewName`         | renames the card                                                         |
+| `DnsSuffix`       | sets the connection-specific DNS suffix; an empty string clears it        |
+| `NetworkCategory` | sets the network profile, such as `Private` or `Public`                  |
+| `IPSettings`      | sets the IPv4 address, gateway and DNS servers, see below                |
+
+- A static address needs `IPAddress` and `PrefixLength`. It turns DHCP off and replaces all IPv4 addresses and the default gateway of the card. `DefaultGateway` is optional and must be in the same subnet.
+- `{ "Dhcp": true }` makes the address automatic again; static addresses and the gateway are removed, and hand-set DNS servers too unless `DNSServers` is given.
+- `DNSServers` replaces the DNS servers, in order of use. An empty list makes DNS automatic; leaving it out keeps the current DNS servers.
+- Use `{{ipv4:...}}` and `{{prefix:...}}` placeholders to ask for the values during the restore (see [Restore-Time Input](#restore-time-input)).
+- An export finds each card by its description and writes its current name in `NewName`, with its settings: `Dhcp: true`, or its static address, prefix and gateway, plus DNS servers that were set by hand. A card with several IPv4 addresses exports the first one; the report says so.
+
+> Changing the IP address of the card you are connected through, for example over remote desktop, ends that connection. Restore network settings at the computer itself.
 
 ### Registry changes
 
@@ -304,6 +353,7 @@ Use a placeholder instead of a fixed string when a value changes between restore
 | `{{input:Enter the local account name}}`        | Required text input.                                                                |
 | `{{password:Enter the local account password}}` | Required, masked input. Use this form for passwords and other secrets.              |
 | `{{ipv4:Enter the time-server IPv4 address}}`   | Required IPv4 address, such as `192.0.2.10`; invalid addresses cannot be submitted. |
+| `{{prefix:Enter the prefix length}}`            | Required subnet prefix length from 1 to 32, such as `24`; stored as a number.        |
 
 The text after the colon is the field description shown in the popup. The configuration field path is also displayed. For example, a user-account entry can contain:
 
@@ -317,13 +367,13 @@ The text after the colon is the field description shown in the popup. The config
 
 Select the configuration, click **Restore**, review the section checklist, and click **Restore selected**. After any required UAC elevation, a popup requests each value. **Continue** accepts a valid answer; **Cancel**, Escape, or closing any input popup cancels the entire restore before any sections run. All answers are collected and the resolved configuration is validated before applying settings. Windows may still reject an otherwise valid answer, for example because of password policy.
 
-Placeholders work in string values inside `Items`, including nested objects, arrays, and referenced shared sections. Only selected sections prompt. An identical placeholder (including its type and description) asks once and reuses the answer within that restore; use different descriptions to request independent values. Comments, metadata, settings, property names and section-reference filenames are not input fields. Do not use placeholders for numbers or booleans, or embed them within larger strings. Answers are used literally, not evaluated as PowerShell or expanded as further placeholders.
+Placeholders work in string values inside `Items`, including nested objects, arrays, and referenced shared sections. Only selected sections prompt. An identical placeholder (including its type and description) asks once and reuses the answer within that restore; use different descriptions to request independent values. Comments, metadata, settings, property names and section-reference filenames are not input fields. Do not use placeholders for other numbers or booleans, or embed them within larger strings; `{{prefix:...}}` is the only placeholder that gives a number. Answers are used literally, not evaluated as PowerShell or expanded as further placeholders.
 
 **Exported user accounts:** Windows never reveals passwords, so an export writes `{{password:Password for local user 'name'}}` for each local user. Restoring the export asks for each password, and sets it on the user, also on a user that already exists. Accounts that Windows manages itself (Guest, DefaultAccount, WDAGUtilityAccount) get an empty password instead and keep their current one. To keep a user's current password, or for an unattended restore, replace the placeholder with an empty string; a user that doesn't exist yet needs a password to be created.
 
 Command-line restores use the same popups and require an interactive Windows desktop. Browsing configurations and exporting do not prompt. For unattended restores, provide ordinary configuration values instead.
 
-See [Configurations/Example prompted setup.json](Configurations/Example%20prompted%20setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. This example does not set a network adapter's static IP address, which the current `NetworkCards` section does not support.
+See [Configurations/Example prompted setup.json](Configurations/Example%20prompted%20setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [Network cards and IP settings](#network-cards-and-ip-settings).
 
 **Password handling:** Answers are kept in memory for the current run. The original configuration and shared files are not rewritten, and answers are not included in the wizard's process-launch arguments or a resolved temporary JSON file. Password placeholders mask typing and redact exact matches from the tool's generated results, HTML reports and captured PowerShell child output. This is not encrypted storage: the restore scripts receive plain strings in memory, and custom scripts or external programs can independently log, persist or transform them. Only run trusted scripts and use `password` placeholders for sensitive values. Ordinary `input` answers are not redacted.
 

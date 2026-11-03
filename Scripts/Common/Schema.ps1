@@ -135,6 +135,24 @@ function Test-ShapeHC {
                         "${Location}: use either $list, not both"
                     }
                 }
+                elseif (
+                    $matches -eq 0 -and
+                    @($Schema.$keyword | Where-Object { $_.type }).Count -eq @($Schema.$keyword).Count
+                ) {
+                    # Alternatives by type: explain the one of the value's type
+                    $sameType = @(
+                        $Schema.$keyword | Where-Object {
+                            @(Test-ShapeHC $Value ([pscustomobject]@{ type = $_.type }) $Definitions $Location).Count -eq 0
+                        }
+                    )
+
+                    if ($sameType.Count -eq 1) {
+                        Test-ShapeHC $Value $sameType[0] $Definitions $Location
+                    }
+                    else {
+                        "${Location}: expected $(@($Schema.$keyword | ForEach-Object { $_.type }) -join ' or ')"
+                    }
+                }
                 else {
                     "${Location}: missing required properties or invalid section shape" 
                 }

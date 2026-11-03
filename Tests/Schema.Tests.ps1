@@ -78,6 +78,29 @@ Describe 'Schema contract' {
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Install = @(@{ ExecutablePath = 'C:\Windows\notepad.exe'; TimeoutMinutes = 0 }) } } } $TestDrive) -join ';' |
             Should -Match 'Install\[0\]\.TimeoutMinutes: expected a number from 1 to 1440'
     }
+    It 'finds a network card by exactly one of FindBy.Description and FindBy.Name' {
+        $test = { param($card) @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ NetworkCards = @($card) } } $TestDrive) -join ';' }
+        & $test @{ FindBy = @{}; Change = @{ NewName = 'LAN' } } | Should -Match 'NetworkCards\[0\]\.FindBy: needs Description or Name'
+        & $test @{ FindBy = @{ Description = 'Intel'; Name = 'Ethernet' }; Change = @{} } |
+            Should -Match 'NetworkCards\[0\]\.FindBy: use either Description or Name, not both'
+        & $test @{ FindBy = @{ Name = 'Ethernet' }; Change = @{ Description = 'New' } } | Should -Match 'Change\.Description: unknown property'
+        & $test @{ Change = @{ NewName = 'LAN' } } | Should -Match 'NetworkCards\[0\]\.FindBy: required property is missing'
+        & $test @{ FindBy = @{ Name = 'Ethernet' }; Change = @{ NewName = 'LAN'; DnsSuffix = '' } } | Should -BeNullOrEmpty
+    }
+    It 'checks IP settings, accepting placeholders before the restore asks for them' {
+        $test = { param($settings) @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ NetworkCards = @(@{ FindBy = @{ Name = 'Ethernet' }; Change = @{ IPSettings = $settings } }) } } $TestDrive) -join ';' }
+        & $test @{ IPAddress = '10.20.67.2'; PrefixLength = 24; DefaultGateway = '10.20.67.254'; DNSServers = @('10.75.38.23') } | Should -BeNullOrEmpty
+        & $test @{ IPAddress = '{{ipv4:Address}}'; PrefixLength = '{{prefix:Prefix}}'; DefaultGateway = '{{ipv4:Gateway}}'; DNSServers = @('{{ipv4:DNS}}') } | Should -BeNullOrEmpty
+        & $test @{ Dhcp = $true; DNSServers = @() } | Should -BeNullOrEmpty
+        & $test @{ IPAddress = '10.20.67.2' } | Should -Match 'IPSettings.PrefixLength: required for a static address'
+        & $test @{ Dhcp = $true; IPAddress = '10.20.67.2' } | Should -Match 'IPSettings.IPAddress: not used with Dhcp true'
+        & $test @{ IPAddress = '10.20.67.300'; PrefixLength = 24 } | Should -Match "IPSettings.IPAddress: '10.20.67.300' is not an IPv4 address"
+        & $test @{ IPAddress = '10.20.67.2'; PrefixLength = 24; DefaultGateway = '10.20.68.1' } |
+            Should -Match "IPSettings.DefaultGateway: '10.20.68.1' is not in the subnet of 10.20.67.2/24"
+        & $test @{ IPAddress = '10.20.67.2'; PrefixLength = 40 } | Should -Match 'IPSettings.PrefixLength: expected a number from 1 to 32'
+        & $test @{ IPAddress = '10.20.67.2'; PrefixLength = '24' } | Should -Match 'IPSettings.PrefixLength: expected a number from 1 to 32, or \{\{prefix:Description\}\}'
+        & $test @{ IPAddress = '10.20.67.2'; PrefixLength = 24; DNSServers = @('dns.contoso.com') } | Should -Match "IPSettings.DNSServers\[0\]: 'dns.contoso.com' is not an IPv4 address"
+    }
     It 'rejects empty array entries but permits empty sections' {
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{}) } } $TestDrive) -join ';' | Should -Match 'Name: required'
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ CreateFolders = @{}; ScheduledTasks = @() } } $TestDrive).Count | Should -Be 0

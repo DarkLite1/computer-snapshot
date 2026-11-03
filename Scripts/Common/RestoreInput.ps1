@@ -9,7 +9,7 @@ function Get-RestoreInputFieldsHC {
     )
          
     if ($Data -is [string]) {
-        $match = [regex]::Match($Data, '\A\{\{(?<Kind>input|password|ipv4):(?<Description>[^{}\r\n]+)\}\}\z')
+        $match = [regex]::Match($Data, '\A\{\{(?<Kind>input|password|ipv4|prefix):(?<Description>[^{}\r\n]+)\}\}\z')
         
         if (
             $match.Success -and
@@ -26,9 +26,9 @@ function Get-RestoreInputFieldsHC {
         }
         elseif (
             $Data.StartsWith('{{') -or 
-            $Data -match '\{\{(?:input|password|ipv4):'
+            $Data -match '\{\{(?:input|password|ipv4|prefix):'
         ) {
-            throw "${Path}: use a complete {{input:Description}}, {{password:Description}} or {{ipv4:Description}} string."
+            throw "${Path}: use a complete {{input:Description}}, {{password:Description}}, {{ipv4:Description}} or {{prefix:Description}} string."
         }
 
         return
@@ -86,6 +86,11 @@ function Test-RestoreInputValueHC {
             [Net.IPAddress]::TryParse($Value, [ref]$address) -and
             $address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetwork -and $address.ToString() -ceq $Value
         )
+    }
+
+    if ($Kind -eq 'prefix') {
+        # A whole number written plainly, such as 24
+        return $Value -match '\A(?:[1-9]|[12][0-9]|3[0-2])\z'
     }
 
     return $true
@@ -171,6 +176,7 @@ function New-RestoreInputFormHC {
             $owner.Controls.Find('ConfirmInput', $true)[0].Enabled = $valid
             $owner.Controls.Find('InputValidation', $true)[0].Text = if ($valid) { '' }
             elseif ([string]::IsNullOrWhiteSpace($this.Text)) { 'A value is required.' }
+            elseif ($owner.Tag.Kind -eq 'prefix') { 'Enter a prefix length from 1 to 32, such as 24.' }
             else { 'Enter an IPv4 address such as 192.0.2.10.' }
         })
     $dialog.ActiveControl = $inputBox
@@ -235,14 +241,22 @@ function Resolve-RestoreInputHC {
     }
 
     foreach ($field in $fields) {
+        # A prefix length is a number in the configuration
+        $answer = if ($field.Kind -eq 'prefix') {
+            [int]$answers[$field.Placeholder]
+        }
+        else {
+            $answers[$field.Placeholder]
+        }
+
         if (
             $field.Container -is [System.Collections.IDictionary] -or 
             $field.Container -is [array]
         ) {
-            $field.Container[$field.Key] = $answers[$field.Placeholder]
+            $field.Container[$field.Key] = $answer
         }
         else {
-            $field.Container.($field.Key) = $answers[$field.Placeholder] 
+            $field.Container.($field.Key) = $answer
         }
     }
 

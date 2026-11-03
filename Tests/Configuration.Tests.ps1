@@ -47,6 +47,19 @@ Describe 'Restore input placeholders' {
         { Resolve-RestoreInputHC -Items $items -ReadValue { 'invalid-address' } } | Should -Throw '*supplied input is empty or invalid*'
         Protect-RestoreInputTextHC -Text 'Failed: test-secret' -SecretValues @('test-secret') | Should -Be 'Failed: [redacted]'
     }
+    It 'asks for a prefix length from 1 to 32 and stores it as a number' {
+        foreach ($value in @('', '0', '33', '024', '24.0', ' 24', 'abc')) {
+            Test-RestoreInputValueHC -Kind prefix -Value $value | Should -BeFalse -Because "'$value'"
+        }
+        foreach ($value in @('1', '24', '32')) {
+            Test-RestoreInputValueHC -Kind prefix -Value $value | Should -BeTrue
+        }
+        $items = '{"NetworkCards":[{"InterfaceAlias":"Ethernet","IPSettings":{"IPAddress":"{{ipv4:Address}}","PrefixLength":"{{prefix:Prefix length}}"}}]}' | ConvertFrom-Json
+        $null = Resolve-RestoreInputHC -Items $items -ReadValue { param($field) if ($field.Kind -eq 'prefix') { '24' } else { '10.20.67.2' } }
+        $items.NetworkCards[0].IPSettings.PrefixLength | Should -BeOfType [int]
+        $items.NetworkCards[0].IPSettings.PrefixLength | Should -Be 24
+        { Resolve-RestoreInputHC -Items @{ A = @{ P = '{{prefix:P}}' } } -ReadValue { '40' } } | Should -Throw '*supplied input is empty or invalid*'
+    }
     It 'redacts the encoded forms in which a secret is commonly repeated' {
         $secret = "P&ss<w0rd>'x"
         $forms = @(

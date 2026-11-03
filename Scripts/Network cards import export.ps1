@@ -3,13 +3,27 @@
 .SYNOPSIS
     Export or import Network cards as a configuration section.
 .DESCRIPTION
-    Import finds the network card for each entry by NetworkCardDescription:
-    a card whose description matches exactly is used first, otherwise the
-    one card whose description contains the text. Then it renames the card,
-    sets its DNS suffix and its network category, in that order. When a step
-    fails, the remaining steps for that card are skipped. Entries that match
-    no card or more than one card are reported. Each problem is reported in
-    Errors and the remaining cards are still processed.
+    Each entry has two parts: FindBy finds the card, Change says what to
+    change on it. FindBy has exactly one of:
+    - Description: a card whose description matches exactly is used first,
+      otherwise the one card whose description contains the text. The
+      description comes from the driver and cannot be changed.
+    - Name: the card with this current name, such as 'Ethernet'.
+    Change renames the card (NewName), sets its DnsSuffix, NetworkCategory
+    and IPSettings, in that order. When a step fails, the remaining steps
+    for that card are skipped. Entries that match no card or more than one
+    card are reported. Each problem is reported in Errors and the remaining
+    cards are still processed.
+
+    IPSettings either makes the card use DHCP ({ Dhcp = $true }), or gives it
+    one static IPAddress with PrefixLength, an optional DefaultGateway and
+    optional DNSServers. A static address replaces all IPv4 addresses and the
+    default gateway of the card. DNSServers replaces the DNS servers; an empty
+    list makes DNS automatic again and omitting it leaves DNS unchanged.
+
+    Export finds each card by its description and writes its current name
+    and settings in Change, including its IPv4 settings: Dhcp true, or its
+    first static address with gateway, and DNS servers that were set by hand.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -51,6 +65,147 @@ function Find-NetAdapterHC {
     }
     $partial[0]
 }
+function Find-CardHC {
+    # The card of a configuration entry, by FindBy.Description or FindBy.Name
+    param($FindBy)
+    $hasDescription = -not [string]::IsNullOrWhiteSpace($FindBy.Description)
+    $hasName = -not [string]::IsNullOrWhiteSpace($FindBy.Name)
+    if ($hasDescription -and $hasName) {
+        throw 'FindBy has both Description and Name; use one of them'
+    }
+    if ($hasDescription) {
+        return Find-NetAdapterHC -Description $FindBy.Description
+    }
+    if (-not $hasName) {
+        throw 'FindBy needs Description or Name to find the network card'
+    }
+    $named = @($netAdapters | Where-Object { $_.Name -eq $FindBy.Name })
+    if (-not $named.Count) {
+        throw "no network card found with Name '$($FindBy.Name)'; names: $(($netAdapters | ForEach-Object { $_.Name }) -join ', ')"
+    }
+    $named[0]
+}
+function Get-IPv4StateHC {
+    # Current IPv4 settings of a card
+    param([Parameter(Mandatory)]$Adapter)
+    $interface = Get-NetIPInterface -InterfaceIndex $Adapter.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+    if (-not $interface) { return $null }
+    $addresses = @(
+        Get-NetIPAddress -InterfaceIndex $Adapter.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object { $_.PrefixOrigin -ne 'WellKnown' }
+    )
+    $routes = @(
+        Get-NetRoute -InterfaceIndex $Adapter.InterfaceIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue
+    )
+    # NameServer holds only DNS servers set by hand, not those from DHCP
+    $dnsServers = @()
+    if ($Adapter.InterfaceGuid) {
+        $key = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\$($Adapter.InterfaceGuid)"
+        $nameServer = (Get-ItemProperty -LiteralPath $key -Name NameServer -ErrorAction SilentlyContinue).NameServer
+        $dnsServers = @([string]$nameServer -split '[,\s]+' | Where-Object { $_ })
+    }
+    [pscustomobject]@{
+        Dhcp       = [string]$interface.Dhcp -eq 'Enabled'
+        Addresses  = $addresses
+        Routes     = $routes
+        DnsServers = $dnsServers
+    }
+}
+function Set-IPv4SettingsHC {
+    # Returns the messages of the changes; nothing when already correct
+    param(
+        [Parameter(Mandatory)]$Adapter,
+        [Parameter(Mandatory)]$Settings,
+        [Parameter(Mandatory)][string]$Label
+    )
+    $index = $Adapter.InterfaceIndex
+    $state = Get-IPv4StateHC -Adapter $Adapter
+    if (-not $state) { throw 'the card has no IPv4 settings' }
+    $names = @($Settings.PSObject.Properties.Name)
+    if ($Settings -is [System.Collections.IDictionary]) { $names = @($Settings.Keys) }
+    $dnsChanged = $false
+
+    if ($Settings.Dhcp -eq $true) {
+        if (-not $state.Dhcp) {
+            if ($state.Addresses.Count) {
+                Remove-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4 -Confirm:$false
+            }
+            if ($state.Routes.Count) {
+                Remove-NetRoute -InterfaceIndex $index -DestinationPrefix '0.0.0.0/0' -Confirm:$false
+            }
+            Set-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4 -Dhcp Enabled
+            "Network card $Label now gets its IPv4 address from DHCP"
+            if ($names -notcontains 'DNSServers' -and $state.DnsServers.Count) {
+                Set-DnsClientServerAddress -InterfaceIndex $index -ResetServerAddresses
+                $dnsChanged = $true
+                "Network card $Label now gets its DNS servers from DHCP"
+            }
+        }
+    }
+    else {
+        $address = [string]$Settings.IPAddress
+        $prefix = [int]$Settings.PrefixLength
+        $gateway = [string]$Settings.DefaultGateway
+        $isCorrect = (
+            -not $state.Dhcp -and
+            $state.Addresses.Count -eq 1 -and
+            $state.Addresses[0].IPAddress -eq $address -and
+            [int]$state.Addresses[0].PrefixLength -eq $prefix -and
+            (@($state.Routes | ForEach-Object { $_.NextHop }) -join ',') -eq $gateway
+        )
+        if (-not $isCorrect) {
+            if ($state.Dhcp) {
+                Set-NetIPInterface -InterfaceIndex $index -AddressFamily IPv4 -Dhcp Disabled
+            }
+            # Read again: turning DHCP off can already remove its address
+            $state = Get-IPv4StateHC -Adapter $Adapter
+            if ($state.Addresses.Count) {
+                Remove-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4 -Confirm:$false
+            }
+            if ($state.Routes.Count) {
+                Remove-NetRoute -InterfaceIndex $index -DestinationPrefix '0.0.0.0/0' -Confirm:$false
+            }
+            $newAddress = @{ InterfaceIndex = $index; AddressFamily = 'IPv4'; IPAddress = $address; PrefixLength = $prefix }
+            if ($gateway) { $newAddress.DefaultGateway = $gateway }
+            $null = New-NetIPAddress @newAddress
+            $text = "Network card $Label now has the static IPv4 address $address/$prefix"
+            if ($gateway) { $text += " with default gateway $gateway" }
+            $text
+        }
+    }
+
+    if (-not $dnsChanged -and $names -contains 'DNSServers') {
+        $servers = @($Settings.DNSServers | Where-Object { $_ })
+        if (($servers -join ',') -ne ($state.DnsServers -join ',')) {
+            if ($servers.Count) {
+                Set-DnsClientServerAddress -InterfaceIndex $index -ServerAddresses $servers
+                "Network card $Label now uses the DNS servers $($servers -join ', ')"
+            }
+            else {
+                Set-DnsClientServerAddress -InterfaceIndex $index -ResetServerAddresses
+                "Network card $Label now gets its DNS servers automatically"
+            }
+        }
+    }
+}
+function Get-IPv4SettingsHC {
+    # IPSettings to export for a card, or $null without IPv4
+    param([Parameter(Mandatory)]$Adapter)
+    $state = Get-IPv4StateHC -Adapter $Adapter
+    if (-not $state) { return $null }
+    $settings = [ordered]@{}
+    if ($state.Dhcp -or -not $state.Addresses.Count) {
+        $settings.Dhcp = $true
+    }
+    else {
+        $settings.IPAddress = [string]$state.Addresses[0].IPAddress
+        $settings.PrefixLength = [int]$state.Addresses[0].PrefixLength
+        $gateway = @($state.Routes | ForEach-Object { [string]$_.NextHop } | Where-Object { $_ -and $_ -ne '0.0.0.0' })
+        if ($gateway.Count) { $settings.DefaultGateway = $gateway[0] }
+    }
+    if ($state.DnsServers.Count) { $settings.DNSServers = @($state.DnsServers) }
+    $settings
+}
 #endregion
 $exportData = $null
 $messages = @()
@@ -66,11 +221,22 @@ if ($Action -eq 'Export') {
     #region Capture section
     $cardsToExport = foreach ($adapter in $netAdapters) {
         $networkCategory = ($netConnectionProfiles | Where-Object { $_.InterfaceAlias -eq $adapter.Name }).NetworkCategory
-        @{
-            NetworkCardName        = $adapter.Name
-            NetworkCardDescription = $adapter.InterfaceDescription
-            NetworkCategory        = [String]$networkCategory
-            NetworkCardDnsSuffix   = ($dnsClients | Where-Object { $_.InterfaceIndex -eq $adapter.InterfaceIndex }).ConnectionSpecificSuffix
+        $change = [ordered]@{
+            NewName         = $adapter.Name
+            NetworkCategory = [String]$networkCategory
+            DnsSuffix       = ($dnsClients | Where-Object { $_.InterfaceIndex -eq $adapter.InterfaceIndex }).ConnectionSpecificSuffix
+        }
+        $ipSettings = Get-IPv4SettingsHC -Adapter $adapter
+        if ($ipSettings) {
+            $change.IPSettings = $ipSettings
+            $addressCount = @((Get-IPv4StateHC -Adapter $adapter).Addresses).Count
+            if ($ipSettings.IPAddress -and $addressCount -gt 1) {
+                $messages += "Network card '$($adapter.Name)' has $addressCount IPv4 addresses; only $($ipSettings.IPAddress) was exported"
+            }
+        }
+        [ordered]@{
+            FindBy = [ordered]@{ Description = $adapter.InterfaceDescription }
+            Change = $change
         }
     }
     if (-not $cardsToExport) {
@@ -79,47 +245,56 @@ if ($Action -eq 'Export') {
     }
     $exportData = @($cardsToExport)
     #endregion
-    $messages = @('Exported Network cards')
+    $messages = @('Exported Network cards') + @($messages)
 }
 else {
     #region Apply section
     foreach ($card in @($Data)) {
-        $label = if ($card.NetworkCardName) { "'$($card.NetworkCardName)'" } else { "with description '$($card.NetworkCardDescription)'" }
+        $change = $card.Change
+        $label = if ($change.NewName) { "'$($change.NewName)'" }
+        elseif ($card.FindBy.Name) { "'$($card.FindBy.Name)'" }
+        else { "with description '$($card.FindBy.Description)'" }
         try {
-            if ([string]::IsNullOrWhiteSpace($card.NetworkCardDescription)) {
-                throw 'the field NetworkCardDescription is required to find the network card'
-            }
-            $adapter = Find-NetAdapterHC -Description $card.NetworkCardDescription
+            $adapter = Find-CardHC -FindBy $card.FindBy
             $changes = 0
 
             #region Rename network card
-            if ($card.NetworkCardName -and $adapter.Name -ne $card.NetworkCardName) {
-                Rename-NetAdapter -Name $adapter.Name -NewName $card.NetworkCardName
-                $messages += "Renamed network card '$($adapter.InterfaceDescription)' from '$($adapter.Name)' to '$($card.NetworkCardName)'"
+            if ($change.NewName -and $adapter.Name -ne $change.NewName) {
+                Rename-NetAdapter -Name $adapter.Name -NewName $change.NewName
+                $messages += "Renamed network card '$($adapter.InterfaceDescription)' from '$($adapter.Name)' to '$($change.NewName)'"
                 $changes++
             }
             #endregion
 
             #region Set DNS suffix, an empty string clears it and null leaves it unchanged
             $dnsClient = $dnsClients | Where-Object { $_.InterfaceIndex -eq $adapter.InterfaceIndex }
-            if ($null -ne $card.NetworkCardDnsSuffix -and [string]$dnsClient.ConnectionSpecificSuffix -ne $card.NetworkCardDnsSuffix) {
-                Set-DnsClient -InterfaceIndex $adapter.InterfaceIndex -ConnectionSpecificSuffix $card.NetworkCardDnsSuffix
-                $messages += "Changed DNS suffix of network card $label from '$($dnsClient.ConnectionSpecificSuffix)' to '$($card.NetworkCardDnsSuffix)'"
+            if ($null -ne $change.DnsSuffix -and [string]$dnsClient.ConnectionSpecificSuffix -ne $change.DnsSuffix) {
+                Set-DnsClient -InterfaceIndex $adapter.InterfaceIndex -ConnectionSpecificSuffix $change.DnsSuffix
+                $messages += "Changed DNS suffix of network card $label from '$($dnsClient.ConnectionSpecificSuffix)' to '$($change.DnsSuffix)'"
                 $changes++
             }
             #endregion
 
             #region Set network category
-            if ($card.NetworkCategory) {
+            if ($change.NetworkCategory) {
                 $adapterProfiles = @($netConnectionProfiles | Where-Object { $_.InterfaceIndex -eq $adapter.InterfaceIndex })
                 if (-not $adapterProfiles.Count) {
                     # Windows only has a network category for a connected network
-                    $messages += "Network card $label has no network connection, its network category '$($card.NetworkCategory)' was not set"
+                    $messages += "Network card $label has no network connection, its network category '$($change.NetworkCategory)' was not set"
                     $changes++
                 }
-                foreach ($profile in @($adapterProfiles | Where-Object { $_.NetworkCategory -ne $card.NetworkCategory })) {
-                    Set-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -NetworkCategory $card.NetworkCategory
-                    $messages += "Changed network category of network card $label from '$($profile.NetworkCategory)' to '$($card.NetworkCategory)'"
+                foreach ($profile in @($adapterProfiles | Where-Object { $_.NetworkCategory -ne $change.NetworkCategory })) {
+                    Set-NetConnectionProfile -InterfaceIndex $profile.InterfaceIndex -NetworkCategory $change.NetworkCategory
+                    $messages += "Changed network category of network card $label from '$($profile.NetworkCategory)' to '$($change.NetworkCategory)'"
+                    $changes++
+                }
+            }
+            #endregion
+
+            #region Set IPv4 settings
+            if ($null -ne $change.IPSettings) {
+                foreach ($message in @(Set-IPv4SettingsHC -Adapter $adapter -Settings $change.IPSettings -Label $label)) {
+                    $messages += $message
                     $changes++
                 }
             }

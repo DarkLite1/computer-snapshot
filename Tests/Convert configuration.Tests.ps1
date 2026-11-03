@@ -47,6 +47,23 @@ Describe 'One-time configuration conversion' {
         $loaded.Items.ScheduledTasks[0].Xml.Trim() | Should -Be '<Task/>'
         "$legacyRoot\ScheduledTasks\1 - Example.xml" | Should -Exist
     }
+    It 'splits version 1 network cards into FindBy and Change' {
+        $legacyRoot = Join-Path $TestDrive 'LegacyNetwork'
+        $null = New-Item -Path "$legacyRoot\NetworkCards" -ItemType Directory -Force
+        '[{"?":"Office","NetworkCardName":"LAN","NetworkCardDescription":"Intel","NetworkCategory":"Private","NetworkCardDnsSuffix":"contoso.com"}]' |
+            Set-Content -LiteralPath "$legacyRoot\NetworkCards\NetworkCards.json"
+        $oldPath = Join-Path $TestDrive 'Configurations\Network.json'
+        @{ StartScript = @{ SnapshotFolder = $legacyRoot; Snapshot = @{ NetworkCards = $true } } } |
+            ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $oldPath
+        $result = & $testScript -OldConfigurationFile $oldPath -RootFolder $TestDrive 6>$null
+        $result.Problems.Count | Should -Be 0 -Because ($result.Problems -join '; ')
+        $card = (Read-ConfigurationHC $result.Path $TestDrive).Items.NetworkCards[0]
+        $card.Comment | Should -Be 'Office'
+        $card.FindBy.Description | Should -Be 'Intel'
+        $card.Change.NewName | Should -Be 'LAN'
+        $card.Change.NetworkCategory | Should -Be 'Private'
+        $card.Change.DnsSuffix | Should -Be 'contoso.com'
+    }
     It 'converts a version-2 configuration in place and moves share permissions into each share' {
         $folder = Join-Path $TestDrive 'Version2'
         $null = New-Item -Path "$folder\Configurations", "$folder\Shared" -ItemType Directory -Force

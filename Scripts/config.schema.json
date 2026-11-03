@@ -969,38 +969,119 @@
     },
     "NetworkCards": {
       "type": "array",
-      "description": "Network adapters.",
+      "description": "Network adapters. Each entry finds one card with FindBy and changes it as described in Change.",
       "items": {
         "type": "object",
-        "description": "Network adapter settings.",
+        "description": "One network card: how to find it, and what to change.",
         "additionalProperties": false,
         "properties": {
-          "NetworkCardName": {
-            "type": "string",
-            "description": "Desired adapter name; empty leaves the name unchanged."
+          "FindBy": {
+            "type": "object",
+            "description": "How to find the card; nothing here is changed. Use exactly one of Description and Name.",
+            "additionalProperties": false,
+            "properties": {
+              "Description": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The card's description (Device Manager name), which comes from the driver: a card with exactly this description is used first, otherwise the one card whose description contains this text."
+              },
+              "Name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The card's current name, such as 'Ethernet', before any rename. Names can differ per computer."
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "oneOf": [
+              {
+                "required": ["Description"]
+              },
+              {
+                "required": ["Name"]
+              }
+            ]
           },
-          "NetworkCardDescription": {
-            "type": "string",
-            "description": "Adapter description to match: a card with exactly this description is used first, otherwise the one card whose description contains this text."
-          },
-          "NetworkCategory": {
-            "type": "string",
-            "description": "Desired connection profile; empty leaves it unchanged."
-          },
-          "NetworkCardDnsSuffix": {
-            "type": ["string", "null"],
-            "description": "Connection-specific DNS suffix. An empty string clears it; null or omission leaves it unchanged."
+          "Change": {
+            "type": "object",
+            "description": "What to change on the card. Each setting that is left out stays as it is.",
+            "additionalProperties": false,
+            "properties": {
+              "NewName": {
+                "type": "string",
+                "description": "New name for the card; empty or omitted keeps the current name."
+              },
+              "NetworkCategory": {
+                "type": "string",
+                "description": "Network profile, such as Private or Public; empty or omitted leaves it unchanged."
+              },
+              "DnsSuffix": {
+                "type": ["string", "null"],
+                "description": "Connection-specific DNS suffix. An empty string clears it; null or omission leaves it unchanged."
+              },
+              "IPSettings": {
+                "description": "IPv4 settings: { \"Dhcp\": true }, or a static IPAddress with PrefixLength. Omit to leave them unchanged.",
+                "$ref": "#/$defs/NetworkIPSettings"
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            }
           },
           "Comment": {
             "type": "string",
             "description": "Technician notes; ignored when applying the configuration."
           }
         },
-        "required": [
-          "NetworkCardName",
-          "NetworkCardDescription",
-          "NetworkCategory"
-        ]
+        "required": ["FindBy", "Change"]
+      }
+    },
+    "NetworkIPSettings": {
+      "type": "object",
+      "description": "IPv4 settings. Either { \"Dhcp\": true } for an automatic address, or a static IPAddress with PrefixLength. Omit to leave the IP settings unchanged.",
+      "additionalProperties": false,
+      "properties": {
+        "Dhcp": {
+          "type": "boolean",
+          "description": "true: get the address from DHCP; the static addresses and default gateway are removed. Leave out for a static address."
+        },
+        "IPAddress": {
+          "type": "string",
+          "description": "Static IPv4 address, such as 10.20.67.2, or {{ipv4:Description}} to ask for it. Replaces all IPv4 addresses of the card."
+        },
+        "PrefixLength": {
+          "description": "Subnet prefix length from 1 to 32, such as 24 for 255.255.255.0, or {{prefix:Description}} to ask for it.",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            {
+              "type": "string",
+              "pattern": "^\\{\\{prefix:[^{}\\r\\n]+\\}\\}$"
+            }
+          ]
+        },
+        "DefaultGateway": {
+          "type": "string",
+          "description": "Default gateway in the same subnet, or {{ipv4:Description}}. Omit for no default gateway."
+        },
+        "DNSServers": {
+          "type": "array",
+          "description": "DNS servers in order of use. An empty list makes DNS automatic again; omit to leave DNS unchanged.",
+          "items": {
+            "type": "string",
+            "description": "DNS server IPv4 address, or {{ipv4:Description}}."
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
       }
     },
     "NtpTimeServers": {

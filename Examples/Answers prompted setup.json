@@ -1,0 +1,8 @@
+{
+  "Comment": "Partial answers for Configurations\\Example prompted setup.json. The password remains null so interactive runs ask for it. Fill it locally for an unattended full restore; do not commit real passwords.",
+  "Answers": {
+    "{{input:Enter the local account name to create or update}}": "kiosk",
+    "{{password:Enter the password for this local account}}": null,
+    "{{ipv4:Enter the IPv4 address of your NTP time server}}": "192.0.2.10"
+  }
+}

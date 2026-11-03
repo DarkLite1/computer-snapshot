@@ -19,6 +19,12 @@
     Override the saved restart countdown (0 to 600 seconds) for this run only.
 .PARAMETER OpenReportInBrowser
     Override the saved report-opening setting for this run only.
+.PARAMETER AnswerFile
+    JSON answers keyed by complete placeholders. Missing answers are prompted
+    for unless Unattended is set. Relative paths use the USB root.
+.PARAMETER Unattended
+    Skip confirmation, fail on missing answers, do not open the report browser,
+    and fail instead of requesting UAC. Requires an explicit ConfigurationFile.
 #>
 [CmdletBinding()]
 param(
@@ -31,7 +37,9 @@ param(
     [bool]$RebootComputer,
     [ValidateRange(0, 600)]
     [int]$RestartDelaySeconds,
-    [bool]$OpenReportInBrowser
+    [bool]$OpenReportInBrowser,
+    [string]$AnswerFile,
+    [switch]$Unattended
 )
 Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
 . "$PSScriptRoot\Common\Section.ps1"
@@ -48,6 +56,7 @@ function Invoke-ScriptHC {
 $rootFolder = Split-Path $PSScriptRoot -Parent
 if (-not (Test-Path -LiteralPath $StartScript -PathType Leaf)) { throw "Start script '$StartScript' not found" }
 if (-not $ConfigurationFile) {
+    if ($Unattended) { throw 'Unattended restore requires ConfigurationFile; the configuration picker will not be shown.' }
     if (-not $ConfigurationsFolder) { $ConfigurationsFolder = Join-Path $rootFolder 'Configurations' }
     $entries = @(foreach ($file in Get-ChildItem -LiteralPath $ConfigurationsFolder -Filter '*.json' -File -ErrorAction Stop | Where-Object { $_.Name -notlike '*.v1.json' }) {
             try { $description = (Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop).Description }
@@ -60,17 +69,22 @@ if (-not $ConfigurationFile) {
     $ConfigurationFile = $selected.Path
 }
 $configurationPath = Resolve-RootPathHC $ConfigurationFile $rootFolder
+if ($PSBoundParameters.ContainsKey('AnswerFile')) {
+    if ([string]::IsNullOrWhiteSpace($AnswerFile)) { throw 'AnswerFile must not be empty.' }
+    $AnswerFile = Resolve-RootPathHC $AnswerFile $rootFolder
+}
 $configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $rootFolder -Items $Items
 $inputFields = @(Get-RestoreInputFieldsHC -Data $configuration.Items)
 $problems = @(if ($inputFields.Count) { $configuration.Problems } else { Test-ConfigurationHC $configuration $rootFolder })
 if ($problems.Count) { throw ($problems -join [Environment]::NewLine) }
 if (
-    -not $SkipConfirmation -and
+    -not $SkipConfirmation -and -not $Unattended -and
     (Read-Host "Restore '$configurationPath'? (y/n)") -ne 'y'
 ) {
     return
 }
 if ($configuration.Settings.RunElevated -and -not (Test-IsStartedElevatedHC)) {
+    if ($Unattended) { throw 'Unattended restore requires administrator rights for this configuration. Start PowerShell as administrator first; UAC will not be requested.' }
     $command = "& '{0}' -ConfigurationFile '{1}' -StartScript '{2}' -SkipConfirmation" -f $PSCommandPath.Replace("'", "''"), $configurationPath.Replace("'", "''"), $StartScript.Replace("'", "''")
     if ($null -ne $Items) {
         $itemArguments = ($Items | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
@@ -84,13 +98,17 @@ if ($configuration.Settings.RunElevated -and -not (Test-IsStartedElevatedHC)) {
     if ($PSBoundParameters.ContainsKey('RestartDelaySeconds')) {
         $command += " -RestartDelaySeconds $RestartDelaySeconds"
     }
+    if ($PSBoundParameters.ContainsKey('AnswerFile')) {
+        $command += " -AnswerFile '" + $AnswerFile.Replace("'", "''") + "'"
+    }
     $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
     Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encodedCommand
     return
 }
 $arguments = @{ Action = 'RestoreSnapshot'; ConfigurationFile = $configurationPath }
 if ($null -ne $Items) { $arguments.Items = $Items }
-foreach ($setting in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser')) {
+if ($PSBoundParameters.ContainsKey('AnswerFile')) { $arguments.AnswerFile = $AnswerFile }
+foreach ($setting in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser', 'Unattended')) {
     if ($PSBoundParameters.ContainsKey($setting)) { $arguments[$setting] = $PSBoundParameters[$setting] }
 }
 Invoke-ScriptHC -Path $StartScript -Arguments $arguments

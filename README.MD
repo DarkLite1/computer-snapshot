@@ -13,6 +13,9 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
 3. **To set up a PC (Restore):**
    - Select a saved configuration and click **Restore**.
    - Check the boxes next to the settings you want to apply.
+   - Optionally choose an **Answer file**, or click **Create template...** to
+     generate one for the checked sections. **Unattended** fails on missing
+     answers instead of showing input popups; see [Answer files](#answer-files-and-unattended-restores).
    - Click **Restore selected**. _(Note: If you change your mind, click Cancel to leave the computer unchanged)._
 4. **To save a PC's setup (Export):**
    - Click **Export**.
@@ -46,6 +49,8 @@ Your USB stick has a specific layout to keep everything organized. Here are the 
 - **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers.
 - **`Log/`**: Check here for your execution reports.
 - **`Examples/`**: Ready-made sample data for every section. Copy what you need into your own configuration.
+- **`Answers/`**: Optional local answer files for individual PCs. Create this
+  folder when needed; Git ignores it because answers can contain passwords.
 - **`Scripts/`**: The tool itself. You normally don't need to touch anything here.
 - **`Tests/`**: Automated Pester tests for developers (see [Running the Tests](#-running-the-tests)).
 - **`Snapshots/`**: Legacy version-1 sample data, kept only for testing the configuration converter.
@@ -449,7 +454,7 @@ The text after the colon is the field description shown in the popup. The config
 }
 ```
 
-Select the configuration, click **Restore**, review the section checklist, and click **Restore selected**. After any required UAC elevation, a popup requests each value. **Continue** accepts a valid answer; **Cancel**, Escape, or closing any input popup cancels the entire restore before any sections run. All answers are collected and the resolved configuration is validated before applying settings. Windows may still reject an otherwise valid answer, for example because of password policy.
+Select the configuration, click **Restore**, review the section checklist, and click **Restore selected**. In interactive mode, after any required UAC elevation, a popup requests each value not supplied by an answer file. **Continue** accepts a valid answer; **Cancel**, Escape, or closing any input popup cancels the entire restore before any sections run. All answers are collected and the resolved configuration is validated before applying settings. Windows may still reject an otherwise valid answer, for example because of password policy.
 
 Placeholders work in string values inside `Items`, including nested objects, arrays, and referenced shared sections. Only selected sections prompt. An identical placeholder (including its type and description) asks once and reuses the answer within that restore; use different descriptions to request independent values. Comments, metadata, settings, property names and section-reference filenames are not input fields. Do not use placeholders for other numbers or booleans, or embed them within larger strings; `{{prefix:...}}` is the only placeholder that gives a number. Answers are used literally, not evaluated as PowerShell or expanded as further placeholders.
 
@@ -468,13 +473,139 @@ $ArgumentList = '--kiosk http://{{ipv4:IP address of the terminal server}}:1353/
 
 `{{input:...}}`, `{{ipv4:...}}` and `{{prefix:...}}` work in files. `{{password:...}}` is refused, because the password would be stored in plain text on the computer. `FillPlaceholders` works for a single file, not for a folder.
 
-**Exported user accounts:** Windows never reveals passwords, so an export writes `{{password:Password for local user 'name'}}` for each local user. Restoring the export asks for each password, and sets it on the user, also on a user that already exists. Accounts that Windows manages itself (Guest, DefaultAccount, WDAGUtilityAccount) get an empty password instead and keep their current one. To keep a user's current password, or for an unattended restore, replace the placeholder with an empty string; a user that doesn't exist yet needs a password to be created.
+**Exported user accounts:** Windows never reveals passwords, so an export writes `{{password:Password for local user 'name'}}` for each local user. Restoring the export asks for each password (unless supplied in an answer file), and sets it on the user, also on a user that already exists. Accounts that Windows manages itself (Guest, DefaultAccount, WDAGUtilityAccount) get an empty password instead and keep their current one. To keep an existing user's password, replace its placeholder in the configuration with an empty string; a user that doesn't exist yet needs a password to be created.
 
-Command-line restores use the same popups and require an interactive Windows desktop. Browsing configurations and exporting do not prompt. For unattended restores, provide ordinary configuration values instead.
+Interactive command-line restores use the same popups for missing answers and require an interactive Windows desktop. Browsing configurations and exporting do not ask for placeholder values. Use `-Unattended` to forbid input popups.
 
 See [Configurations/Example prompted setup.json](Configurations/Example%20prompted%20setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [Network cards and IP settings](#network-cards-and-ip-settings).
 
 **Password handling:** Answers are kept in memory for the current run. The original configuration and shared files are not rewritten, and answers are not included in the wizard's process-launch arguments or a resolved temporary JSON file. Password placeholders mask typing and redact exact matches from the tool's generated results, HTML reports and captured PowerShell child output. This is not encrypted storage: the restore scripts receive plain strings in memory, and custom scripts or external programs can independently log, persist or transform them. Only run trusted scripts and use `password` placeholders for sensitive values. Ordinary `input` answers are not redacted.
+
+### Answer files and unattended restores
+
+Keep a configuration as a reusable template and supply per-computer values in a
+separate JSON file. `-AnswerFile` supplies values; `-Unattended` determines
+whether missing values may prompt:
+
+| Answer file | `-Unattended` | Behavior |
+| --- | --- | --- |
+| Supplied | No | Use its answers; prompt for missing answers. |
+| Supplied | Yes | Fail before any sections run if any required answer is missing. |
+| Not supplied | No | Prompt for all required answers. |
+| Not supplied | Yes | Proceed only if the selected sections and their template files require no answers. |
+
+An answer file contains an `Answers` object, with an optional `Comment`.
+Keys are **complete, case-sensitive placeholders**, including the braces,
+type and description. Values are strings; write a prefix as `"24"`, not `24`.
+`null` means **not supplied** and is useful in a generated template. Empty
+strings and invalid values are errors, not requests to prompt. Malformed files,
+duplicate keys, unknown top-level properties and invalid supplied answers
+always fail before any sections run, even in interactive mode.
+
+```json
+{
+  "Answers": {
+    "{{input:Enter the local account name to create or update}}": "kiosk",
+    "{{password:Enter the password for this local account}}": null,
+    "{{ipv4:Enter the IPv4 address of your NTP time server}}": "192.0.2.10"
+  }
+}
+```
+
+This is the bundled [partial answer example](Examples/Answers%20prompted%20setup.json)
+for [Example prompted setup](Configurations/Example%20prompted%20setup.json).
+It supplies a name and a documentation-only NTP address, and leaves the password
+to be entered interactively. **Change the address to your real NTP server**
+before using it. It is not a complete unattended answer file.
+
+Identical placeholders share one answer across the selected configuration,
+its shared sections and copied files using `FillPlaceholders`. Valid extra
+answers for unselected sections are ignored, so one answer file can be reused
+with different `-Items` selections. Every supplied answer is still checked
+for its type and format. Answers are literal data, never PowerShell code.
+
+#### Generate an answer template
+
+From the tool's root folder:
+
+```powershell
+New-Item -Path '.\Answers' -ItemType Directory -Force | Out-Null
+& '.\Scripts\New answer file.ps1' `
+    -ConfigurationFile 'Configurations\Example prompted setup.json' `
+    -AnswerFile 'Answers\KIOSK01.json'
+```
+
+The generator writes each distinct placeholder with `null`, without applying
+settings or asking for answers. It includes shared sections and copied text
+templates with `FillPlaceholders`. Those source files must exist at fixed
+paths so the generator can inspect them. Add `-Items UserAccounts` to generate
+only that section's answers. The destination directory must exist. Existing
+answer files are protected unless you explicitly add `-Force`; that replaces
+their contents with a new empty template.
+
+Edit the generated file locally, replacing each required `null` with a string.
+The configuration and all source files stay unchanged.
+
+#### Interactive restore with partial answers
+
+```powershell
+& '.\Scripts\Invoke configuration.ps1' `
+    -ConfigurationFile 'Configurations\Example prompted setup.json' `
+    -AnswerFile 'Examples\Answers prompted setup.json'
+```
+
+This still asks for confirmation, and asks for the missing password after any
+required elevation. Use `-SkipConfirmation` to skip only the initial confirmation.
+
+#### Unattended restore
+
+Start PowerShell as administrator first when the configuration requires it.
+After filling in your local answer file:
+
+```powershell
+$result = & '.\Scripts\Invoke configuration.ps1' `
+    -ConfigurationFile 'Configurations\Example prompted setup.json' `
+    -AnswerFile 'Answers\KIOSK01.json' `
+    -Unattended
+
+if (-not $result.Success) { exit 1 }
+```
+
+`-Unattended` skips confirmation and requires an explicit configuration path;
+it never shows the configuration picker. It suppresses browser opening even
+if `OpenReportInBrowser` is true. When `Settings.RunElevated` is true and the
+process is not elevated, it fails with instructions rather than requesting
+UAC. Restart settings still apply; use `-RebootComputer $false` to override them.
+A validation failure throws before any section runs, and the executor writes a
+failure report. Section failures are reported through `Success: false`, as in
+other restores; check that result in automation as shown above.
+
+`Invoke scripts.ps1 -Action RestoreSnapshot` also accepts `-AnswerFile` and
+`-Unattended`; these options are rejected on export. Both configuration and
+answer-file relative paths are resolved from the tool's root, not the current
+working directory. When launching PowerShell from Task Scheduler or another
+program, also use PowerShell's `-NoProfile -NonInteractive` options and an
+already elevated account. Custom scripts and installers must themselves be
+configured to run silently; these switches cannot prevent their own UI.
+
+#### Wizard
+
+The **Restore** section-selection window includes:
+
+- **Answer file** and **Browse...** to select an existing JSON file. Leave it
+  blank for the existing interactive behavior.
+- **Create template...** to save an empty answer file for the currently checked
+  sections without starting a restore. Edit its `null` values externally.
+- **Unattended: fail on missing answers (no prompts)**. This also unchecks and
+  disables **Open report in browser**. Restart the wizard as administrator
+  first if the configuration requests elevation.
+
+> **Passwords in answer files are plain text.** Keep real files in the
+> Git-ignored `Answers` folder, restrict filesystem access, and protect any USB
+> copies. Git ignoring is not encryption or access control. Only the file path
+> is passed to the restore process; password answers receive the same report
+> redaction as prompted passwords. The bundled example deliberately contains
+> no password.
 
 ## 💻 Command-Line Use
 

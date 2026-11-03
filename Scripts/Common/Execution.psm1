@@ -161,8 +161,13 @@ function Invoke-ComputerSnapshotHC {
         [int]$RestartDelaySeconds = 60,
         # Per section, options that a child script receives as Data on export
         [System.Collections.IDictionary]$ExportOptions,
+        [string]$AnswerFile,
+        [switch]$Unattended,
         [switch]$Force
     )
+    if ($Action -ne 'RestoreSnapshot' -and ($PSBoundParameters.ContainsKey('AnswerFile') -or $Unattended)) {
+        throw 'AnswerFile and Unattended are restore-only options.'
+    }
     $configurationPath = Resolve-RootPathHC $ConfigurationFile $RootFolder
 
     if (
@@ -194,10 +199,19 @@ function Invoke-ComputerSnapshotHC {
             if ($configuration.Problems.Count) {
                 throw ($configuration.Problems -join [Environment]::NewLine) 
             }
-                
+            if ($Unattended -and $configuration.Settings.RunElevated -and -not (Test-ElevatedHC)) {
+                throw 'Unattended restore requires administrator rights for this configuration. Start PowerShell as administrator first; UAC will not be requested.'
+            }
+            $answers = $null
+            if ($PSBoundParameters.ContainsKey('AnswerFile')) {
+                if ([string]::IsNullOrWhiteSpace($AnswerFile)) { throw 'AnswerFile must not be empty.' }
+                $answers = Read-RestoreAnswerFileHC -Path (Resolve-RootPathHC $AnswerFile $RootFolder)
+            }
             $inputResult = Resolve-RestoreInputHC `
                 -Items $configuration.Items `
                 -RootFolder $RootFolder `
+                -Answers $answers `
+                -Unattended:$Unattended `
                 -ReadValue { param($field) Read-RestoreInputHC -Field $field }
 
             $secretValues = $inputResult.SecretValues
@@ -238,6 +252,7 @@ function Invoke-ComputerSnapshotHC {
             if (-not $PSBoundParameters.ContainsKey('OpenReportInBrowser')) { 
                 $OpenReportInBrowser = $configuration.Settings.OpenReportInBrowser 
             }
+            if ($Unattended) { $OpenReportInBrowser = $false }
 
             $Items = @($configuration.Items.Keys)
         }

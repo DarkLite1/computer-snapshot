@@ -130,6 +130,29 @@ Describe 'Single-file wizard commands' {
             [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1])) -like '*Invoke configuration.ps1*-ConfigurationFile*Example.json*'
         }
     }
+        It 'passes a quoted answer-file path and unattended mode without putting answers in the command' {
+            $file = Join-Path $TestDrive 'answer-configuration.json'
+            '{"SchemaVersion":3,"Items":{"UserAccounts":[]}}' | Set-Content -LiteralPath $file
+            $answerFile = Join-Path $TestDrive "kiosk's answers.json"
+            '{"Answers":{"{{password:Password}}":"PRIVATE-ANSWER"}}' | Set-Content -LiteralPath $answerFile
+            Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $file -AnswerFile $answerFile -Unattended
+            Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+                $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
+                $command.Contains("kiosk''s answers.json'") -and $command.Contains(' -AnswerFile ') -and
+                $command.Contains(' -Unattended') -and $command -notmatch 'PRIVATE-ANSWER' -and
+                $ArgumentList -contains '-NonInteractive' -and -not $Verb
+            }
+        }
+        It 'refuses a missing answer file or an unattended UAC requirement before launching' {
+            $file = Join-Path $TestDrive 'elevated-answer-configuration.json'
+            '{"SchemaVersion":3,"Settings":{"RunElevated":true},"Items":{"UserAccounts":[]}}' | Set-Content -LiteralPath $file
+            Mock Test-WizardElevatedHC { $false }
+            { Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $file -AnswerFile 'missing.answers.json' } |
+                Should -Throw '*not found*'
+            { Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $file -Unattended } |
+                Should -Throw '*administrator rights*'
+            Should -Invoke Start-Process -Times 0 -Exactly
+        }
     It 'passes checked restore keys to the configuration launcher' {
         $testFile = Join-Path $TestDrive 'Example.json'
         '{}' | Set-Content -LiteralPath $testFile
@@ -339,6 +362,36 @@ Describe 'Restore selection controls' {
     BeforeAll {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
+    }
+    It 'shows answer-file and template controls and makes unattended mode disable browser opening' {
+        $file = Join-Path $TestDrive 'answer-controls.json'
+        '{"SchemaVersion":3,"Items":{"UserAccounts":[]},"Settings":{"OpenReportInBrowser":true}}' | Set-Content -LiteralPath $file
+        $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Answers' -ConfigurationFile $file -RootFolder $TestDrive -Entries @(Get-SnapshotItemEntriesHC)
+        try {
+            $dialog.Show()
+            $path = $dialog.Controls.Find('AnswerFile', $true)[0]
+            $path.Text | Should -Be ''
+            $dialog.Controls.Find('BrowseAnswerFile', $true)[0].Enabled | Should -BeTrue
+            $dialog.Controls.Find('CreateAnswerTemplate', $true)[0].Enabled | Should -BeTrue
+            $dialog.Controls.Find('AnswerFileGuidance', $true)[0].Text | Should -Match 'Invalid answers always fail'
+            $unattended = $dialog.Controls.Find('Unattended', $true)[0]
+            $report = $dialog.Controls.Find('OpenReportInBrowser', $true)[0]
+            $unattended.Checked | Should -BeFalse
+            $report.Checked | Should -BeTrue
+            $unattended.Checked = $true
+            $report.Checked | Should -BeFalse
+            $report.Enabled | Should -BeFalse
+            $unattended.Checked = $false
+            $report.Enabled | Should -BeTrue
+            $report.Checked | Should -BeTrue
+            foreach ($name in @('AnswerFile', 'BrowseAnswerFile', 'CreateAnswerTemplate', 'Unattended', 'AnswerFileGuidance')) {
+                $control = $dialog.Controls.Find($name, $true)[0]
+                $control.Visible | Should -BeTrue
+                $control.Right | Should -BeLessOrEqual $control.Parent.ClientSize.Width
+                $control.Bottom | Should -BeLessOrEqual $control.Parent.ClientSize.Height
+            }
+        }
+        finally { $dialog.Dispose() }
     }
     It 'emphasizes the primary restore action and neutralizes it while disabled' {
         $dialog = New-RestoreSelectionFormHC -ConfigurationName 'Primary action' -Entries @(Get-SnapshotItemEntriesHC -Items UserAccounts)
@@ -618,7 +671,7 @@ Describe 'Restore selection controls' {
                 $button.Right | Should -BeLessOrEqual $button.Parent.ClientSize.Width
                 $button.Bottom | Should -BeLessOrEqual $button.Parent.ClientSize.Height
             }
-            foreach ($name in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser')) {
+            foreach ($name in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser', 'AnswerFile', 'BrowseAnswerFile', 'CreateAnswerTemplate', 'Unattended', 'AnswerFileGuidance')) {
                 $option = $dialog.Controls.Find($name, $true)[0]
                 $option.Visible | Should -BeTrue
                 $option.Right | Should -BeLessOrEqual $option.Parent.ClientSize.Width

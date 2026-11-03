@@ -114,4 +114,39 @@ Describe 'Configuration launcher' {
             $command.Contains(' -SkipConfirmation') -and -not $command.Contains(' -Confirm')
         }
     }
+    It 'passes the answer-file path and unattended flag without asking for confirmation' {
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -AnswerFile "Answers\kiosk's answers.json" -Unattended
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
+            $Arguments.Unattended -and $Arguments.AnswerFile -like "*\Answers\kiosk's answers.json"
+        }
+        Should -Invoke Read-Host -Times 0 -Exactly
+        Should -Invoke Read-RestoreInputHC -Times 0 -Exactly
+    }
+    It 'passes only the quoted answer-file path through elevation, not file contents' {
+        $document.Settings.RunElevated = $true
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -AnswerFile "Answers\kiosk's answers.json" -SkipConfirmation
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
+            $command.Contains("\Answers\kiosk''s answers.json'") -and $command.Contains(' -AnswerFile ')
+        }
+    }
+    It 'never displays a picker or UAC prompt in unattended mode' {
+        { . $testScript -StartScript $testStartScript -Unattended } | Should -Throw '*requires ConfigurationFile*'
+        $document.Settings.RunElevated = $true
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        { . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Unattended } | Should -Throw '*administrator rights*'
+        Should -Invoke Out-GridView -Times 0 -Exactly
+        Should -Invoke Start-Process -Times 0 -Exactly
+        Should -Invoke Read-Host -Times 0 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
+    }
+    It 'runs an elevation-requesting configuration unattended when already elevated' {
+        $document.Settings.RunElevated = $true
+        $document | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        Mock Test-IsStartedElevatedHC { $true }
+        . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -Unattended
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter { $Arguments.Unattended }
+        Should -Invoke Start-Process -Times 0 -Exactly
+    }
 }

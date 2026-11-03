@@ -264,6 +264,134 @@ Describe 'Single-file execution' {
             ($Results | ConvertTo-Json -Depth 10) -notmatch 'Test-secret' -and ($Results | ConvertTo-Json -Depth 10) -match '\[redacted\]'
         }
     }
+    It 'uses answer files for selected shared sections, redacts secrets and suppresses browser opening unattended' {
+        $sharedPath = Join-Path $TestDrive 'answer-users.json'
+        '[{"Name":"{{input:Account}}","Password":"{{password:Password}}"}]' | Set-Content -LiteralPath $sharedPath
+        $answerPath = Join-Path $TestDrive 'answers.json'
+        '{"Answers":{"{{input:Account}}":"Example","{{password:Password}}":"File-secret!42","{{input:Unselected}}":"Unused"}}' | Set-Content -LiteralPath $answerPath
+        Write-ConfigurationHC @{
+            SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $true }
+            Items = @{ UserAccounts = 'answer-users.json'; Software = 'missing-unselected.json' }
+        } $path
+        $before = @(Get-Content -LiteralPath $path, $sharedPath, $answerPath -Raw)
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.AnswerFile = 'answers.json'
+        $params.Unattended = $true
+        $params.OpenReportInBrowser = $true
+        Mock Invoke-ChildScriptHC -ModuleName Execution {
+            $Data[0].Name | Should -Be 'Example'
+            $Data[0].Password | Should -Be 'File-secret!42'
+            [pscustomobject]@{ Data = $null; Messages = [string[]]@('Applied File-secret!42'); Errors = [string[]]@() }
+        }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeTrue
+        $result.Results[0].Messages | Should -Be @('Applied [redacted]')
+        Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Start-Process -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter {
+            ($Results | ConvertTo-Json -Depth 10) -notmatch 'File-secret'
+        }
+        @(Get-Content -LiteralPath $path, $sharedPath, $answerPath -Raw) | Should -Be $before
+    }
+    It 'prompts only for answers missing from a partial file during an interactive restore' {
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{ Name = '{{input:Account}}'; Password = '{{password:Password}}' }) } } $path
+        $answerPath = Join-Path $TestDrive 'partial.answers.json'
+        '{"Answers":{"{{input:Account}}":"Example","{{password:Password}}":null}}' | Set-Content -LiteralPath $answerPath
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.AnswerFile = $answerPath
+        Mock Read-RestoreInputHC -ModuleName Execution { 'Prompt-secret!42' }
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+        Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter { $Field.Kind -eq 'password' }
+    }
+    It 'fails unattended on missing answers before any child or restart, with no prompts' {
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ RebootComputer = $true }; Items = @{ UserAccounts = @(@{ Name = '{{input:Account}}' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.Unattended = $true
+        { Invoke-ComputerSnapshotHC @params } | Should -Throw '*validation failed*No items executed*'
+        Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter {
+            $Results[0].Messages -match 'missing answers'
+        }
+    }
+    It 'rejects invalid supplied answers before prompting for any other field' {
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{ Name = '{{input:Account}}' }) } } $path
+        $answerPath = Join-Path $TestDrive 'invalid.answers.json'
+        '{"Answers":{"{{ipv4:Server}}":"INVALID-PRIVATE-VALUE"}}' | Set-Content -LiteralPath $answerPath
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.AnswerFile = $answerPath
+        { Invoke-ComputerSnapshotHC @params } | Should -Throw '*validation failed*'
+        Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter {
+            ($Results | ConvertTo-Json -Depth 10) -notmatch 'PRIVATE-VALUE'
+        }
+    }
+    It 'passes file-template answers to the copy section during unattended restores' {
+        $source = Join-Path $TestDrive 'answer-template.txt'
+        'host={{ipv4:Server}}' | Set-Content -LiteralPath $source
+        $answerPath = Join-Path $TestDrive 'file-template.answers.json'
+        '{"Answers":{"{{ipv4:Server}}":"192.0.2.10"}}' | Set-Content -LiteralPath $answerPath
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items = @{ CopyFilesFolders = @(@{ From = $source; To = 'C:\Example\template.txt'; FillPlaceholders = $true }) }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('CopyFilesFolders')
+        $params.Script = [ordered]@{ CopyFilesFolders = $scriptPath }
+        $params.AnswerFile = $answerPath
+        $params.Unattended = $true
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter {
+            $Data[0].PlaceholderValues['{{ipv4:Server}}'] -eq '192.0.2.10'
+        }
+        Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 0 -Exactly
+    }
+    It 'runs unattended without an answer file when no placeholders are present' {
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{ Name = 'Existing' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.Unattended = $true
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+        Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 0 -Exactly
+    }
+    It 'fails unattended when the configuration requires elevation, without prompting or launching' {
+        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ RunElevated = $true }; Items = @{ UserAccounts = @(@{ Name = '{{input:Account}}' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.Unattended = $true
+        Mock Test-ElevatedHC -ModuleName Execution { $false }
+        { Invoke-ComputerSnapshotHC @params } | Should -Throw '*validation failed*'
+        Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
+        Should -Invoke Start-Process -ModuleName Execution -Times 0 -Exactly
+    }
+    It 'redacts file-supplied passwords from resolved-configuration validation failures' {
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Install = @(@{ ExecutablePath = '{{password:Path}}' }) } } } $path
+        $answerPath = Join-Path $TestDrive 'secret.answers.json'
+        '{"Answers":{"{{password:Path}}":"File-secret!42"}}' | Set-Content -LiteralPath $answerPath
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('Software')
+        $params.AnswerFile = $answerPath
+        $params.Unattended = $true
+        { Invoke-ComputerSnapshotHC @params } | Should -Throw '*validation failed*'
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution -Times 1 -Exactly -ParameterFilter {
+            ($Results | ConvertTo-Json -Depth 10) -notmatch 'File-secret' -and ($Results | ConvertTo-Json -Depth 10) -match '\[redacted\]'
+        }
+    }
+    It 'rejects restore-only answer options on export' {
+        $params.AnswerFile = 'answers.json'
+        { Invoke-ComputerSnapshotHC @params } | Should -Throw '*restore-only*'
+        $params.Remove('AnswerFile')
+        $params.Unattended = $true
+        { Invoke-ComputerSnapshotHC @params } | Should -Throw '*restore-only*'
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
+    }
     It 'rejects an empty or unavailable restore selection' {
         Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @() } } $path
         $params.Action = 'RestoreSnapshot'

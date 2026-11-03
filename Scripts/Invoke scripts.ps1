@@ -24,6 +24,12 @@
 .PARAMETER ExportOptions
     Export only: options per section, for example
     @{ ScheduledTasks = @{ TaskPath = '\HC\', '\Vendor\' } }.
+.PARAMETER AnswerFile
+    Restore only: JSON answers keyed by complete placeholders. Missing answers
+    are prompted for unless Unattended is set. Relative paths use the USB root.
+.PARAMETER Unattended
+    Restore only: fail on missing answers, suppress browser opening, and fail
+    if configured elevation is required instead of requesting UAC.
 .PARAMETER Script
     Item-to-script map; intended for testing and controlled customization.
 #>
@@ -39,6 +45,8 @@ param(
     [bool]$OpenReportInBrowser = $true,
     [switch]$Force,
     [System.Collections.IDictionary]$ExportOptions,
+    [string]$AnswerFile,
+    [switch]$Unattended,
     [System.Collections.IDictionary]$Script
 )
 Import-Module "$PSScriptRoot\Common\Execution.psm1" -Force
@@ -54,7 +62,7 @@ $arguments = @{
     Action = $Action; ConfigurationFile = $ConfigurationFile; Items = $Items; RootFolder = $rootFolder
     Script = $resolvedScripts; ReportsFolder = $ReportsFolder; Force = $Force
 }
-foreach ($setting in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser', 'ExportOptions')) {
+foreach ($setting in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser', 'ExportOptions', 'AnswerFile', 'Unattended')) {
     if ($PSBoundParameters.ContainsKey($setting)) { $arguments[$setting] = $PSBoundParameters[$setting] }
 }
 Invoke-ComputerSnapshotHC @arguments

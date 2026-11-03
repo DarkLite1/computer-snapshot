@@ -109,7 +109,8 @@ function Get-FileInputFieldsHC {
     # Placeholders in the files that CopyFilesFolders fills in while copying
     param(
         $Items,
-        [Parameter(Mandatory)][string]$RootFolder
+        [Parameter(Mandatory)][string]$RootFolder,
+        [switch]$RequireSources
     )
 
     $entries = @($Items.CopyFilesFolders | Where-Object { $null -ne $_ })
@@ -123,6 +124,9 @@ function Get-FileInputFieldsHC {
         $file = Resolve-RootPathHC -Path $entries[$index].From -RootFolder $RootFolder
 
         if (-not [IO.File]::Exists($file)) {
+            if ($RequireSources) {
+                throw "Cannot discover file placeholders: '$file' does not exist. Use an existing, fixed source path for FillPlaceholders."
+            }
             continue
         }
 
@@ -268,12 +272,118 @@ function Read-RestoreInputHC {
     }
 }
 
+function Read-RestoreAnswerFileHC {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $text = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
+    if ($PSVersionTable.PSVersion.Major -lt 7) {
+        Add-Type -AssemblyName System.Web.Extensions -ErrorAction Stop
+        Add-Type -AssemblyName System.Runtime.Serialization -ErrorAction Stop
+        $parser = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+    }
+    $reader = $null
+    try {
+        # The XML JSON reader alone accepts some truncated documents.
+        if ($PSVersionTable.PSVersion.Major -ge 7) {
+            $null = ConvertFrom-Json -InputObject $text -AsHashtable -ErrorAction Stop
+        }
+        else {
+            $null = $parser.DeserializeObject($text)
+        }
+        # Preserve case-sensitive keys and duplicates on both PowerShell versions.
+        $reader = [System.Runtime.Serialization.Json.JsonReaderWriterFactory]::CreateJsonReader(
+            [Text.Encoding]::UTF8.GetBytes($text), [System.Xml.XmlDictionaryReaderQuotas]::Max
+        )
+        $document = New-Object System.Xml.XmlDocument
+        $document.Load($reader)
+    }
+    catch {
+        # JSON parser errors can repeat the file contents, including passwords.
+        throw "Answer file '$Path' is not valid JSON."
+    }
+    finally { if ($null -ne $reader) { $reader.Dispose() } }
+    $root = $document.DocumentElement
+    $answerNodes = @($root.ChildNodes | Where-Object { $_.LocalName -ceq 'Answers' -and $_.NamespaceURI -eq '' })
+    $comments = @($root.ChildNodes | Where-Object { $_.LocalName -ceq 'Comment' -and $_.NamespaceURI -eq '' })
+    if (
+        $root.GetAttribute('type') -ne 'object' -or $answerNodes.Count -ne 1 -or
+        $answerNodes[0].GetAttribute('type') -ne 'object' -or $comments.Count -gt 1 -or
+        @($comments | Where-Object { $_.GetAttribute('type') -notin @('string', 'null') }).Count -or
+        $root.ChildNodes.Count -ne (1 + $comments.Count)
+    ) {
+        throw "Answer file '$Path' must contain an Answers object and an optional Comment."
+    }
+
+    $answers = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)
+    $keys = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    foreach ($node in $answerNodes[0].ChildNodes) {
+        $key = if ($node.HasAttribute('item')) { $node.GetAttribute('item') } else { $node.LocalName }
+        $field = @(Get-RestoreInputFieldsHC -Data $key)
+        if ($field.Count -ne 1) {
+            throw "Answer file '$Path': every answer key must be a complete placeholder."
+        }
+        if (-not $keys.Add($key)) { throw "Answer file '$Path': duplicate answer key '$key'." }
+        if ($node.GetAttribute('type') -eq 'null') { continue }
+        if (
+            $node.GetAttribute('type') -ne 'string' -or
+            -not (Test-RestoreInputValueHC -Kind $field[0].Kind -Value $node.InnerText)
+        ) {
+            throw "Answer file '$Path': the answer for '$key' must be a nonempty, valid $($field[0].Kind) string."
+        }
+        $answers.Add($key, $node.InnerText)
+    }
+    return ,$answers
+}
+
+function New-RestoreAnswerFileHC {
+    param(
+        [Parameter(Mandatory)][string]$ConfigurationFile,
+        [Parameter(Mandatory)][string]$AnswerFile,
+        [Parameter(Mandatory)][string]$RootFolder,
+        [string[]]$Items,
+        [switch]$Force
+    )
+
+    $configurationPath = Resolve-RootPathHC $ConfigurationFile $RootFolder
+    $answerPath = Resolve-RootPathHC $AnswerFile $RootFolder
+    if ($configurationPath -eq $answerPath) { throw 'The answer file must not replace the configuration template.' }
+    if ((Test-Path -LiteralPath $answerPath) -and -not $Force) {
+        throw "Answer file '$answerPath' already exists. Use -Force to replace it."
+    }
+    $configuration = Read-ConfigurationHC -Path $configurationPath -RootFolder $RootFolder -Items $Items
+    if ($configuration.Problems.Count) { throw ($configuration.Problems -join [Environment]::NewLine) }
+    $fields = @(Get-RestoreInputFieldsHC -Data $configuration.Items)
+    $fields += @(Get-FileInputFieldsHC -Items $configuration.Items -RootFolder $RootFolder -RequireSources)
+    $answers = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
+    foreach ($field in $fields) {
+        if (-not $answers.ContainsKey($field.Placeholder)) { $answers.Add($field.Placeholder, $null) }
+    }
+    $json = [ordered]@{
+        Comment = 'Replace null with a string answer. Null means missing. Password answers are stored in plain text; protect this file.'
+        Answers = $answers
+    } | ConvertTo-Json -Depth 10
+    $tempPath = Join-Path (Split-Path $answerPath -Parent) ('.answers-{0}.tmp' -f [guid]::NewGuid().ToString('N'))
+    try {
+        [IO.File]::WriteAllText($tempPath, $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false))
+        if ($Force -and [IO.File]::Exists($answerPath)) {
+            [IO.File]::Replace($tempPath, $answerPath, [NullString]::Value)
+        }
+        else { [IO.File]::Move($tempPath, $answerPath) }
+    }
+    finally {
+        if ([IO.File]::Exists($tempPath)) { Remove-Item -LiteralPath $tempPath -Force -ErrorAction Stop }
+    }
+    $answerPath
+}
+
 function Resolve-RestoreInputHC {
     param(
         $Items,
         [Parameter(Mandatory)][scriptblock]$ReadValue,
         # Also ask for the placeholders in files that are filled while copying
-        [string]$RootFolder
+        [string]$RootFolder,
+        [System.Collections.IDictionary]$Answers,
+        [switch]$Unattended
     )
 
     $fields = @(Get-RestoreInputFieldsHC -Data $Items)
@@ -281,15 +391,34 @@ function Resolve-RestoreInputHC {
     if ($RootFolder) {
         $fields += @(Get-FileInputFieldsHC -Items $Items -RootFolder $RootFolder)
     }
+    $suppliedAnswers = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
+    if ($null -ne $Answers) {
+        foreach ($key in $Answers.Keys) { $suppliedAnswers.Add($key, $Answers[$key]) }
+    }
     $answers = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)
     $secrets = New-Object 'System.Collections.Generic.List[string]'
+
+    if ($Unattended) {
+        $missing = @($fields | Where-Object {
+            -not $suppliedAnswers.ContainsKey($_.Placeholder) -or
+            $null -eq $suppliedAnswers[$_.Placeholder]
+        } | Select-Object -ExpandProperty Placeholder -Unique)
+        if ($missing.Count) {
+            throw "Unattended restore is missing answers for: $($missing -join ', '). No items executed."
+        }
+    }
     
     foreach ($field in $fields) {
         if ($answers.ContainsKey($field.Placeholder)) { 
             continue 
         }
 
-        $value = & $ReadValue $field
+        $value = if ($suppliedAnswers.ContainsKey($field.Placeholder) -and $null -ne $suppliedAnswers[$field.Placeholder]) {
+            $suppliedAnswers[$field.Placeholder]
+        }
+        else {
+            & $ReadValue $field
+        }
         
         if ($null -eq $value) {
             throw [OperationCanceledException]::new('Restore cancelled. No items executed.') 

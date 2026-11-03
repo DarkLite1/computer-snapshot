@@ -14,6 +14,7 @@ param(
 )
 
 . "$PSScriptRoot\Common\Section.ps1"
+. "$PSScriptRoot\Common\RestoreInput.ps1"
 
 #region Command construction
 function Test-WizardElevatedHC {
@@ -287,8 +288,101 @@ function Get-RestoreSettingsHC {
     return $settings
 }
 
+function New-RestoreAnswersPanelHC {
+    param([string]$ConfigurationFile, [string]$RootFolder)
+    $panel = New-Object Windows.Forms.TableLayoutPanel
+    $panel.Name = 'RestoreAnswers'
+    $panel.Dock = 'Fill'
+    $panel.AutoSize = $true
+    $panel.ColumnCount = 3
+    $panel.RowCount = 4
+    $null = $panel.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Percent), 100))
+    $null = $panel.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Absolute), 100))
+    $null = $panel.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Absolute), 150))
+    foreach ($row in 0..3) { $null = $panel.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize))) }
+    $label = New-Object Windows.Forms.Label
+    $label.Text = 'Answer file (optional JSON):'
+    $label.AutoSize = $true
+    $label.Dock = 'Fill'
+    $panel.Controls.Add($label, 0, 0)
+    $panel.SetColumnSpan($label, 3)
+    $path = New-Object Windows.Forms.TextBox
+    $path.Name = 'AnswerFile'
+    $path.AccessibleName = 'Answer file path'
+    $path.Dock = 'Fill'
+    $panel.Controls.Add($path, 0, 1)
+    $browse = New-Object Windows.Forms.Button
+    $browse.Name = 'BrowseAnswerFile'
+    $browse.Text = 'Browse...'
+    $browse.Dock = 'Fill'
+    $browse.Tag = $RootFolder
+    $browse.Add_Click({
+        $picker = New-Object Windows.Forms.OpenFileDialog
+        try {
+            $picker.Filter = 'JSON answer files (*.json)|*.json'
+            $picker.InitialDirectory = $this.Tag
+            if ($picker.ShowDialog($this.FindForm()) -eq [Windows.Forms.DialogResult]::OK) {
+                $this.Parent.Controls.Find('AnswerFile', $true)[0].Text = $picker.FileName
+            }
+        }
+        finally { $picker.Dispose() }
+    })
+    $panel.Controls.Add($browse, 1, 1)
+    $create = New-Object Windows.Forms.Button
+    $create.Name = 'CreateAnswerTemplate'
+    $create.Text = 'Create template...'
+    $create.Dock = 'Fill'
+    $create.Enabled = -not [string]::IsNullOrWhiteSpace($ConfigurationFile)
+    $create.Tag = @{ ConfigurationFile = $ConfigurationFile; RootFolder = $RootFolder }
+    $create.Add_Click({
+        $owner = $this.FindForm()
+        $selected = @($owner.Controls.Find('SnapshotItems', $true)[0].CheckedItems | ForEach-Object { [string]$_.Tag })
+        $picker = New-Object Windows.Forms.SaveFileDialog
+        try {
+            if (-not $selected.Count) { throw 'Select at least one section before creating an answer template.' }
+            $picker.Filter = 'JSON answer files (*.json)|*.json'
+            $picker.InitialDirectory = $this.Tag.RootFolder
+            $picker.FileName = [IO.Path]::GetFileNameWithoutExtension($this.Tag.ConfigurationFile) + '.answers.json'
+            $picker.OverwritePrompt = $true
+            if ($picker.ShowDialog($owner) -ne [Windows.Forms.DialogResult]::OK) { return }
+            Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
+            $arguments = $this.Tag
+            $answerPath = New-RestoreAnswerFileHC @arguments -AnswerFile $picker.FileName -Items $selected -Force
+            $this.Parent.Controls.Find('AnswerFile', $true)[0].Text = $answerPath
+            $null = [Windows.Forms.MessageBox]::Show($owner, 'Template created. Edit its null values in a text editor before restoring. Password answers are plain text; protect this file.', 'Answer template', 'OK', 'Information')
+        }
+        catch { $null = [Windows.Forms.MessageBox]::Show($owner, [string]$_, 'Answer template error', 'OK', 'Error') }
+        finally { $picker.Dispose() }
+    })
+    $panel.Controls.Add($create, 2, 1)
+    $unattended = New-Object Windows.Forms.CheckBox
+    $unattended.Name = 'Unattended'
+    $unattended.Text = 'Unattended: fail on missing answers (no prompts)'
+    $unattended.AutoSize = $true
+    $unattended.Add_CheckedChanged({
+        $report = $this.FindForm().Controls.Find('OpenReportInBrowser', $true)[0]
+        if ($this.Checked) {
+            $report.Tag = $report.Checked
+            $report.Checked = $false
+        }
+        else { $report.Checked = [bool]$report.Tag }
+        $report.Enabled = -not $this.Checked
+    })
+    $panel.Controls.Add($unattended, 0, 2)
+    $panel.SetColumnSpan($unattended, 3)
+    $hint = New-Object Windows.Forms.Label
+    $hint.Name = 'AnswerFileGuidance'
+    $hint.Text = 'Missing answers prompt unless Unattended is checked. Invalid answers always fail. Unattended disables browser opening and will not request UAC. Password answers are plain text.'
+    $hint.AutoSize = $true
+    $hint.Dock = 'Fill'
+    $hint.Font = New-Object Drawing.Font 'Segoe UI', 9
+    $panel.Controls.Add($hint, 0, 3)
+    $panel.SetColumnSpan($hint, 3)
+    return ,$panel
+}
+
 function New-RestoreSelectionFormHC {
-    param([string]$ConfigurationName, [object[]]$Entries, [string]$ConfigurationFile)
+    param([string]$ConfigurationName, [object[]]$Entries, [string]$ConfigurationFile, [string]$RootFolder = (Split-Path $PSScriptRoot -Parent))
     $settings = Get-RestoreSettingsHC -ConfigurationFile $ConfigurationFile
     $configurationDescription = 'No description provided.'
     if ($ConfigurationFile) {
@@ -297,8 +391,8 @@ function New-RestoreSelectionFormHC {
     }
     $dialog = New-Object Windows.Forms.Form
     $dialog.Text = "Restore - $ConfigurationName"
-    $dialog.ClientSize = New-Object Drawing.Size 800, 500
-    $dialog.MinimumSize = New-Object Drawing.Size 650, 400
+    $dialog.ClientSize = New-Object Drawing.Size 800, 650
+    $dialog.MinimumSize = New-Object Drawing.Size 650, 550
     $dialog.StartPosition = 'CenterParent'
     $dialog.Font = New-Object Drawing.Font 'Segoe UI', 10
     $dialog.ShowInTaskbar = $false
@@ -307,10 +401,11 @@ function New-RestoreSelectionFormHC {
     $layout.Padding = New-Object Windows.Forms.Padding 12
     $layout.ColumnCount = 1
     $null = $layout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle ([Windows.Forms.SizeType]::Percent), 100))
-    $layout.RowCount = 5
+    $layout.RowCount = 6
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Percent), 100))
+    $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::AutoSize)))
     $null = $layout.RowStyles.Add((New-Object Windows.Forms.RowStyle ([Windows.Forms.SizeType]::Absolute), 48))
     $dialog.Controls.Add($layout)
@@ -337,6 +432,8 @@ function New-RestoreSelectionFormHC {
     $layout.Controls.Add($description, 0, 1)
     $list = New-SnapshotItemListHC -Entries $Entries
     $layout.Controls.Add($list, 0, 2)
+    $answerPanel = New-RestoreAnswersPanelHC -ConfigurationFile $ConfigurationFile -RootFolder $RootFolder
+    $layout.Controls.Add($answerPanel, 0, 3)
     $options = New-Object Windows.Forms.FlowLayoutPanel
     $options.Dock = 'Fill'
     $options.AutoSize = $true
@@ -372,7 +469,7 @@ function New-RestoreSelectionFormHC {
     $report.AutoSize = $true
     $report.Checked = $settings.OpenReportInBrowser
     $options.Controls.AddRange(@($reboot, $delayLabel, $delay, $report))
-    $layout.Controls.Add($options, 0, 3)
+    $layout.Controls.Add($options, 0, 4)
     $buttons = New-Object Windows.Forms.FlowLayoutPanel
     $buttons.Dock = 'Fill'
     $buttons.FlowDirection = 'RightToLeft'
@@ -408,7 +505,7 @@ function New-RestoreSelectionFormHC {
         }
     })
     $buttons.Controls.AddRange(@($confirm, $cancel, $clear, $all))
-    $layout.Controls.Add($buttons, 0, 4)
+    $layout.Controls.Add($buttons, 0, 5)
     $list.Add_ItemChecked({
         $owner = $this.FindForm()
         $owner.Controls.Find('RestoreSelected', $true)[0].Enabled = $this.CheckedItems.Count -gt 0
@@ -478,10 +575,13 @@ function Start-ConfigurationJobHC {
         [bool]$RebootComputer = $false,
         [ValidateRange(0, 600)]
         [int]$RestartDelaySeconds = 60,
+        [string]$AnswerFile,
+        [switch]$Unattended,
         [switch]$RunElevated,
         [switch]$Force
     )
     if ($Action -eq 'CreateSnapshot') {
+        if ($AnswerFile -or $Unattended) { throw 'AnswerFile and Unattended are restore-only options.' }
         if ([string]::IsNullOrWhiteSpace($Name) -or $Name.IndexOfAny([IO.Path]::GetInvalidFileNameChars()) -ge 0 -or $Name -in @('.', '..')) {
             throw 'Enter a configuration file name without directory separators or invalid filename characters.'
         }
@@ -515,12 +615,25 @@ function Start-ConfigurationJobHC {
         if ($PSBoundParameters.ContainsKey('RestartDelaySeconds')) {
             $command += " -RestartDelaySeconds $RestartDelaySeconds"
         }
+        if (-not [string]::IsNullOrWhiteSpace($AnswerFile)) {
+            $answerPath = Resolve-RootPathHC $AnswerFile $RootFolder
+            if (-not (Test-Path -LiteralPath $answerPath -PathType Leaf)) { throw "Answer file '$answerPath' not found." }
+            $command += " -AnswerFile '" + $answerPath.Replace("'", "''") + "'"
+        }
+        if ($Unattended) {
+            $command += ' -Unattended'
+            $document = Get-Content -LiteralPath $ConfigurationFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if (($RunElevated -or $document.Settings.RunElevated) -and -not (Test-WizardElevatedHC)) {
+                throw 'Unattended restore requires administrator rights for this configuration. Restart the wizard as administrator first.'
+            }
+        }
     }
     $parameters = @{
         FilePath = 'powershell.exe'
         ArgumentList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command)))
     }
-    if ($RunElevated) { $parameters.Verb = 'RunAs' }
+    if ($Unattended) { $parameters.ArgumentList = @('-NonInteractive') + $parameters.ArgumentList }
+    if ($RunElevated -and -not $Unattended) { $parameters.Verb = 'RunAs' }
     Start-Process @parameters
 }
 #endregion
@@ -610,7 +723,7 @@ $restore.Add_Click({
     $selected = $configurations.SelectedItems[0]
     try {
         $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $selected.Tag)
-        $selection = New-RestoreSelectionFormHC -ConfigurationName $selected.Text -Entries $entries -ConfigurationFile $selected.Tag
+        $selection = New-RestoreSelectionFormHC -ConfigurationName $selected.Text -Entries $entries -ConfigurationFile $selected.Tag -RootFolder $RootFolder
         try {
             if ($selection.ShowDialog($form) -ne [Windows.Forms.DialogResult]::OK) { return }
             $selectedItems = @($selection.Tag)
@@ -618,6 +731,8 @@ $restore.Add_Click({
                 RebootComputer = $selection.Controls.Find('RebootComputer', $true)[0].Checked
                 RestartDelaySeconds = [int]$selection.Controls.Find('RestartDelaySeconds', $true)[0].Value
                 OpenReportInBrowser = $selection.Controls.Find('OpenReportInBrowser', $true)[0].Checked
+                AnswerFile = $selection.Controls.Find('AnswerFile', $true)[0].Text
+                Unattended = $selection.Controls.Find('Unattended', $true)[0].Checked
             }
         }
         finally { $selection.Dispose() }

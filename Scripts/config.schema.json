@@ -1246,8 +1246,42 @@
           "type": "array",
           "description": "Applications to remove first.",
           "items": {
-            "type": "string",
-            "description": "Installed application display name to uninstall."
+            "type": "object",
+            "description": "Application to uninstall, found by its display name in Programs and Features.",
+            "additionalProperties": false,
+            "properties": {
+              "DisplayName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Display name in Programs and Features. * matches any text, for example 'Vendor Tool*'; every match is removed."
+              },
+              "UninstallArguments": {
+                "type": "string",
+                "description": "Arguments added to the application's own uninstall command (UninstallString), for example /S or /VERYSILENT /NORESTART. Use either UninstallArguments or UninstallCommand."
+              },
+              "UninstallCommand": {
+                "type": "string",
+                "description": "Command to run instead of the uninstall command in the registry; it runs once, also when several applications match. Use either UninstallArguments or UninstallCommand."
+              },
+              "SuccessExitCodes": {
+                "type": "array",
+                "description": "Exit codes that mean the removal succeeded; defaults to [0]. 3010 and 1641 always mean success with a restart needed.",
+                "minItems": 1,
+                "items": {
+                  "type": "integer",
+                  "description": "An exit code that means success."
+                }
+              },
+              "AllowMultiple": {
+                "type": "boolean",
+                "description": "Allow DisplayName to match more than 5 applications. Without it, such a removal is refused to protect against a too broad pattern."
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "required": ["DisplayName"]
           }
         },
         "Install": {

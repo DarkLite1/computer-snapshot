@@ -260,6 +260,24 @@ Installers in `Software` → `Install` work the same way. `0` means success, and
 ]
 ```
 
+### Removing software
+
+Each entry in `Software` → `Remove` names an application as it appears in Programs and Features. Removals run before the installers.
+
+```json
+"Remove": [
+  { "DisplayName": "7-Zip 23.01 (x64)" },
+  { "DisplayName": "Vendor Tool*", "UninstallArguments": "/S" },
+  { "DisplayName": "Old Agent", "UninstallCommand": "\"C:\\Program Files\\Old Agent\\uninstall.exe\" /quiet", "SuccessExitCodes": [0, 1] }
+]
+```
+
+- `*` in `DisplayName` matches any text, so `Vendor Tool*` removes every version. Every matching application is removed, also when the same name is installed twice (32 and 64 bit). A name that matches more than 5 applications is refused, so a pattern that is too broad removes nothing; set `"AllowMultiple": true` when that many is intended.
+- Without other settings, the application's quiet uninstall command from the registry is used. Windows Installer (MSI) uninstalls are made silent. Other uninstallers without a quiet command may show a window and wait for a click.
+- `UninstallArguments` are added to the application's own uninstall command, to make it silent: `/S` for most NSIS uninstallers, `/VERYSILENT /NORESTART` for Inno Setup.
+- `UninstallCommand` replaces the uninstall command completely. It runs once, also when several applications match.
+- Exit codes work as for installers: `0`, `3010` and `1641` mean success, others can be listed in `SuccessExitCodes`.
+
 ### Editing with autocomplete
 
 Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works.

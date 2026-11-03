@@ -9,12 +9,17 @@
     handled independently: a failure is reported in Errors and the remaining
     ones still run.
 
+    - DisplayName may contain * to match any text; every matching application
+      is removed. More than 5 matches are refused unless AllowMultiple is set.
     - Removal uses the application's quiet uninstall command when it has one.
       Windows Installer (MsiExec) commands are made silent and always uninstall
       (/X); other uninstallers without a quiet command may show a window.
+      UninstallArguments are added to the application's own UninstallString,
+      UninstallCommand replaces it.
     - Exit codes 0, 3010 and 1641 mean success; 3010 and 1641 mean that a
-      restart is needed to complete the change. An installer that uses other
-      success codes lists them in SuccessExitCodes, for example [0, 1].
+      restart is needed to complete the change. A removal or installer that
+      uses other success codes lists them in SuccessExitCodes, for example
+      [0, 1].
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -44,10 +49,28 @@ function Get-InstalledApplicationsHC {
             Where-Object { $_.DisplayName } |
             Select-Object DisplayName, DisplayVersion, Publisher, UninstallString, QuietUninstallString
     }
-    @($applications) | Sort-Object DisplayName -Unique
+    # The same name can be installed twice, for example 32 and 64 bit
+    @($applications) | Sort-Object DisplayName, UninstallString -Unique
+}
+function Test-DisplayNameHC {
+    # Only * is a wildcard; [ ] and ? in names are literal
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$Pattern
+    )
+    $escaped = [WildcardPattern]::Escape($Pattern).Replace('`*', '*')
+    $Name -like $escaped
 }
 function Get-UninstallCommandHC {
-    param([Parameter(Mandatory)]$Application)
+    param(
+        [Parameter(Mandatory)]$Application,
+        [string]$Arguments
+    )
+    if ($Arguments) {
+        $command = [string]$Application.UninstallString
+        if (-not $command) { return $null }
+        return "$command $Arguments"
+    }
     if ($Application.QuietUninstallString) { return $Application.QuietUninstallString }
     $command = [string]$Application.UninstallString
     if ($command -match '(?i)^\s*"?([^"]*\\)?msiexec(\.exe)?"?\s') {
@@ -122,25 +145,106 @@ else {
     Set-Location -LiteralPath $RootFolder
     try {
         #region Remove applications
-        foreach ($applicationName in @($Data.Remove | Where-Object { $_ })) {
+        foreach ($removal in @($Data.Remove | Where-Object { $null -ne $_ })) {
+            $pattern = [string]$removal.DisplayName
+            $successExitCodes = @(
+                $removal.SuccessExitCodes |
+                Where-Object { $null -ne $_ } |
+                ForEach-Object { [int]$_ }
+            )
+
+            if (-not $successExitCodes.Count) {
+                $successExitCodes = @(0)
+            }
+
             try {
-                $installed = @(Get-InstalledApplicationsHC | Where-Object { $_.DisplayName -eq $applicationName })
+                $installed = @(
+                    Get-InstalledApplicationsHC |
+                    Where-Object { Test-DisplayNameHC -Name $_.DisplayName -Pattern $pattern }
+                )
+
                 if (-not $installed.Count) {
-                    $messages += "Application '$applicationName' is not installed, nothing to remove"
+                    $messages += "Application '$pattern' is not installed, nothing to remove"
                     continue
                 }
-                $command = Get-UninstallCommandHC -Application $installed[0]
-                if (-not $command) { throw 'no uninstall command found in the registry' }
-                $exitCode = Remove-ApplicationHC -ApplicationName $applicationName -UninstallString $command
-                $result = Get-ExitCodeResultHC -ExitCode $exitCode -What 'the uninstall'
-                if ($result -ne 'restart' -and @(Get-InstalledApplicationsHC | Where-Object { $_.DisplayName -eq $applicationName }).Count) {
-                    throw "the application is still installed after the uninstall (exit code $exitCode)"
+
+                if ($installed.Count -gt 5 -and -not $removal.AllowMultiple) {
+                    throw (
+                        "'$pattern' matches $($installed.Count) applications; " +
+                        'nothing was removed. Use a narrower DisplayName, ' +
+                        'or set AllowMultiple to remove them all'
+                    )
                 }
-                if ($result -eq 'restart') { $messages += "Removed application '$applicationName', a restart is needed to complete the removal" }
-                else { $messages += "Removed application '$applicationName'" }
             }
             catch {
-                $errors += "Failed to remove application '$applicationName': $($_.Exception.Message)"
+                $errors += "Failed to remove application '$pattern': $($_.Exception.Message)"
+                continue
+            }
+
+            # UninstallCommand runs once for all matches
+            $targets = New-Object 'System.Collections.Generic.List[object]'
+
+            if ($removal.UninstallCommand) {
+                $targets.Add($installed)
+            }
+            else {
+                foreach ($application in $installed) {
+                    $targets.Add(@($application))
+                }
+            }
+
+            foreach ($target in $targets) {
+                $applicationName = (@($target.DisplayName) | Select-Object -Unique) -join "', '"
+
+                try {
+                    $command = if ($removal.UninstallCommand) {
+                        [string]$removal.UninstallCommand
+                    }
+                    else {
+                        Get-UninstallCommandHC `
+                            -Application $target[0] `
+                            -Arguments $removal.UninstallArguments
+                    }
+
+                    if (-not $command) {
+                        throw 'no uninstall command found in the registry'
+                    }
+
+                    $exitCode = Remove-ApplicationHC `
+                        -ApplicationName $applicationName -UninstallString $command
+
+                    $result = Get-ExitCodeResultHC `
+                        -ExitCode $exitCode -What 'the uninstall' `
+                        -SuccessExitCodes $successExitCodes
+
+                    # Same name and command: a second install with the same
+                    # name, such as the 32-bit one, is a different application
+                    $remaining = @(
+                        Get-InstalledApplicationsHC | Where-Object {
+                            $current = $_
+                            @(
+                                $target | Where-Object {
+                                    $_.DisplayName -eq $current.DisplayName -and
+                                    $_.UninstallString -eq $current.UninstallString
+                                }
+                            ).Count
+                        }
+                    )
+
+                    if ($result -ne 'restart' -and $remaining.Count) {
+                        throw "the application is still installed after the uninstall (exit code $exitCode)"
+                    }
+
+                    if ($result -eq 'restart') {
+                        $messages += "Removed application '$applicationName', a restart is needed to complete the removal"
+                    }
+                    else {
+                        $messages += "Removed application '$applicationName'"
+                    }
+                }
+                catch {
+                    $errors += "Failed to remove application '$applicationName': $($_.Exception.Message)"
+                }
             }
         }
         #endregion

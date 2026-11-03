@@ -87,6 +87,24 @@ Describe 'One-time configuration conversion' {
         ($loaded.Items.SmbShares | Where-Object { $_.Name -eq 'Scans' }).Access[0].AccountName | Should -Be 'S-1-5-11'
         { & $testScript -OldConfigurationFile $path -RootFolder $folder } | Should -Throw '*already a version-3 configuration*'
     }
+    It 'turns Software.Remove names into objects, inline and in a shared file' {
+        $folder = Join-Path $TestDrive 'Version2Software'
+        $null = New-Item -Path "$folder\Configurations", "$folder\Shared" -ItemType Directory -Force
+        '{ "Remove": ["Shared App"], "Install": [] }' | Set-Content -LiteralPath "$folder\Shared\Software.json" -Encoding UTF8
+        '{ "SchemaVersion": 2, "Items": { "Software": { "Remove": ["Old App", "Other App"] } } }' |
+            Set-Content -LiteralPath "$folder\Configurations\Inline.json" -Encoding UTF8
+        '{ "SchemaVersion": 2, "Items": { "Software": "Shared\\Software.json" } }' |
+            Set-Content -LiteralPath "$folder\Configurations\Shared.json" -Encoding UTF8
+        foreach ($name in @('Inline', 'Shared')) {
+            $result = & $testScript -OldConfigurationFile "$folder\Configurations\$name.json" -RootFolder $folder 6>$null
+            $result.Problems.Count | Should -Be 0 -Because ($result.Problems -join '; ')
+        }
+        $inline = Read-ConfigurationHC "$folder\Configurations\Inline.json" $folder
+        @($inline.Items.Software.Remove.DisplayName) | Should -Be @('Old App', 'Other App')
+        $shared = Read-ConfigurationHC "$folder\Configurations\Shared.json" $folder
+        @($shared.Items.Software.Remove.DisplayName) | Should -Be @('Shared App')
+        "$folder\Shared\Software.v2.json" | Should -Exist
+    }
     It 'converts a shared SmbShares file that a version-2 configuration refers to' {
         $folder = Join-Path $TestDrive 'Version2Shared'
         $null = New-Item -Path "$folder\Configurations", "$folder\Shared" -ItemType Directory -Force

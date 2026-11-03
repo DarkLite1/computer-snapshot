@@ -12,6 +12,9 @@
       Access and NTFS, linked by share name) to one entry per share with
       its own Access and NTFS. A shared section file it refers to is
       converted as well, after renaming it to name.v2.json.
+
+    Both versions: Software.Remove changes from a list of names to a list
+    of objects, { "DisplayName": "name" }.
 .PARAMETER OldConfigurationFile
     Configuration to convert.
 .PARAMETER RootFolder
@@ -123,6 +126,64 @@ function ConvertTo-ShareListHC {
     )
 }
 
+function Test-OldSoftwareLayoutHC {
+    # Software with application names in Remove instead of objects
+    param($Data)
+
+    $null -ne $Data -and $Data -isnot [array] -and $Data -isnot [string] -and
+    @($Data.Remove | Where-Object { $_ -is [string] }).Count -gt 0
+}
+
+function ConvertTo-SoftwareHC {
+    # Each name in Remove becomes { "DisplayName": "name" }
+    param($Data)
+
+    $Data.Remove = @(
+        foreach ($entry in @($Data.Remove | Where-Object { $null -ne $_ })) {
+            if ($entry -is [string]) {
+                [pscustomobject]@{ DisplayName = $entry }
+            }
+            else {
+                $entry
+            }
+        }
+    )
+
+    $Data
+}
+
+function Convert-SharedSectionHC {
+    # Convert a shared section file once, keeping the original as name.v2.json
+    param(
+        [Parameter(Mandatory)][string]$Reference,
+        [Parameter(Mandatory)][scriptblock]$IsOld,
+        [Parameter(Mandatory)][scriptblock]$Convert
+    )
+
+    $sharedPath = Resolve-RootPathHC $Reference $RootFolder
+    $sharedData = Read-SectionExampleHC $sharedPath
+
+    if (-not (& $IsOld $sharedData)) {
+        return
+    }
+
+    $sharedFile = Get-Item -LiteralPath $sharedPath
+    $sharedBackup = Join-Path $sharedFile.DirectoryName ($sharedFile.BaseName + '.v2.json')
+
+    if (Test-Path -LiteralPath $sharedBackup) {
+        throw "Backup '$sharedBackup' already exists"
+    }
+
+    $converted = & $Convert $sharedData
+    Rename-Item -LiteralPath $sharedPath -NewName (Split-Path $sharedBackup -Leaf) -ErrorAction Stop
+    [IO.File]::WriteAllText(
+        $sharedPath,
+        (ConvertTo-Json -InputObject $converted -Depth 20) + [Environment]::NewLine,
+        (New-Object System.Text.UTF8Encoding $false)
+    )
+    Write-Host "Converted shared section '$sharedPath'. Original: '$sharedBackup'."
+}
+
 function Test-OldShareLayoutHC {
     # The version-2 layout: an object, normally with Shares, Access and NTFS
     # lists; an empty object {} is converted to an empty list as well
@@ -200,29 +261,28 @@ if ($old.SchemaVersion -eq 2) {
 
     if ($sharesData -is [string]) {
         # A shared section file, converted once for every configuration
-        $sharedPath = Resolve-RootPathHC $sharesData $RootFolder
-        $sharedData = Read-SectionExampleHC $sharedPath
-
-        if (Test-OldShareLayoutHC $sharedData) {
-            $sharedFile = Get-Item -LiteralPath $sharedPath
-            $sharedBackup = Join-Path $sharedFile.DirectoryName ($sharedFile.BaseName + '.v2.json')
-
-            if (Test-Path -LiteralPath $sharedBackup) {
-                throw "Backup '$sharedBackup' already exists"
-            }
-
-            $converted = ConvertTo-ShareListHC -OldShares $sharedData -Problems $problems
-            Rename-Item -LiteralPath $sharedPath -NewName (Split-Path $sharedBackup -Leaf) -ErrorAction Stop
-            [IO.File]::WriteAllText(
-                $sharedPath,
-                (ConvertTo-Json -InputObject $converted -Depth 20) + [Environment]::NewLine,
-                (New-Object System.Text.UTF8Encoding $false)
-            )
-            Write-Host "Converted shared section '$sharedPath'. Original: '$sharedBackup'."
+        Convert-SharedSectionHC `
+            -Reference $sharesData `
+            -IsOld { param($Data) Test-OldShareLayoutHC $Data } `
+            -Convert {
+            param($Data)
+            ConvertTo-ShareListHC -OldShares $Data -Problems $problems
         }
     }
     elseif (Test-OldShareLayoutHC $sharesData) {
         $old.Items.SmbShares = ConvertTo-ShareListHC -OldShares $sharesData -Problems $problems
+    }
+
+    $softwareData = $old.Items.Software
+
+    if ($softwareData -is [string]) {
+        Convert-SharedSectionHC `
+            -Reference $softwareData `
+            -IsOld { param($Data) Test-OldSoftwareLayoutHC $Data } `
+            -Convert { param($Data) ConvertTo-SoftwareHC $Data }
+    }
+    elseif (Test-OldSoftwareLayoutHC $softwareData) {
+        $old.Items.Software = ConvertTo-SoftwareHC $softwareData
     }
 
     Rename-Item -LiteralPath $oldPath -NewName (Split-Path $backupPath -Leaf) -ErrorAction Stop
@@ -302,6 +362,9 @@ foreach ($name in $order) {
     switch ($name) {
         'Software' {
             $data = $data.SoftwarePackages
+            if (Test-OldSoftwareLayoutHC $data) {
+                $data = ConvertTo-SoftwareHC $data
+            }
             foreach ($package in $data.Install) {
                 $source = Resolve-RootPathHC $package.ExecutablePath $folder
                 

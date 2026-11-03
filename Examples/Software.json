@@ -1,5 +1,20 @@
 {
-  "Remove": ["Notepad++ (64-bit x64)"],
+  "Remove": [
+    {
+      "DisplayName": "Notepad++ (64-bit x64)"
+    },
+    {
+      "DisplayName": "Example Vendor Tool*",
+      "UninstallArguments": "/S",
+      "Comment": "* matches any text, so every version is removed. /S makes this uninstaller silent; it is added to the uninstall command in the registry."
+    },
+    {
+      "DisplayName": "Example Old Agent",
+      "UninstallCommand": "\"C:\\Program Files\\Example Old Agent\\uninstall.exe\" /quiet",
+      "SuccessExitCodes": [0, 1],
+      "Comment": "UninstallCommand replaces the uninstall command in the registry."
+    }
+  ],
   "Install": [
     {
       "ExecutablePath": "Software\\npp.8.3.3.Installer.x64.exe",

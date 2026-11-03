@@ -446,14 +446,31 @@ function Test-ConfigurationHC {
                         $problems.Add("${location}.${property}: expected an array")
                     }
                 }
-                for ($index = 0; $index -lt @($data.Install).Count; $index++) {
-                    if ($null -ne $data.Install[$index]) {
-                        $assets += @{ 
-                            Value    = $data.Install[$index].ExecutablePath 
-                            Property = "Install[$index].ExecutablePath" 
-                            Leaf     = $true 
-                        } 
+
+                $removals = @($data.Remove | Where-Object { $null -ne $_ })
+
+                for ($index = 0; $index -lt $removals.Count; $index++) {
+                    $removalProperties = @(Get-PropertiesHC $removals[$index])
+
+                    if (
+                        $removalProperties -contains 'UninstallArguments' -and
+                        $removalProperties -contains 'UninstallCommand'
+                    ) {
+                        $problems.Add(
+                            "${location}.Remove[$index]: use either " +
+                            'UninstallArguments or UninstallCommand, not both'
+                        )
                     }
+                }
+
+                $installs = @($data.Install | Where-Object { $null -ne $_ })
+
+                for ($index = 0; $index -lt $installs.Count; $index++) {
+                    $assets += @{ 
+                        Value    = $installs[$index].ExecutablePath 
+                        Property = "Install[$index].ExecutablePath" 
+                        Leaf     = $true 
+                    } 
                 }
             }
             'CopyFilesFolders' {

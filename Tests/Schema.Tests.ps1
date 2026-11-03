@@ -58,6 +58,15 @@ Describe 'Schema contract' {
         $problems = @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ ScheduledTasks = @($both) } } $TestDrive)
         $problems -join ';' | Should -Match 'ScheduledTasks\[0\]: use either Xml or XmlFile, not both'
     }
+    It 'requires objects in Software.Remove and only one of UninstallArguments and UninstallCommand' {
+        @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Remove = @('Old App') } } } $TestDrive) -join ';' |
+            Should -Match 'Software.Remove\[0\]: expected object'
+        $removal = @{ DisplayName = 'Old App'; UninstallArguments = '/S'; UninstallCommand = 'x.exe' }
+        @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Remove = @($removal) } } } $TestDrive) -join ';' |
+            Should -Match 'Software.Remove\[0\]: use either UninstallArguments or UninstallCommand, not both'
+        $removal.Remove('UninstallCommand')
+        @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Remove = @($removal) } } } $TestDrive).Count | Should -Be 0
+    }
     It 'rejects empty array entries but permits empty sections' {
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{}) } } $TestDrive) -join ';' | Should -Match 'Name: required'
         @(Test-ConfigurationHC @{ SchemaVersion = 3; Items = @{ CreateFolders = @{}; ScheduledTasks = @() } } $TestDrive).Count | Should -Be 0

@@ -197,6 +197,7 @@ function Invoke-ComputerSnapshotHC {
                 
             $inputResult = Resolve-RestoreInputHC `
                 -Items $configuration.Items `
+                -RootFolder $RootFolder `
                 -ReadValue { param($field) Read-RestoreInputHC -Field $field }
 
             $secretValues = $inputResult.SecretValues
@@ -206,6 +207,25 @@ function Invoke-ComputerSnapshotHC {
                     -Configuration $configuration `
                     -RootFolder $RootFolder
             )
+
+            # The copy fills in the placeholders of these files with the answers
+            foreach (
+                $copy in
+                @($configuration.Items.CopyFilesFolders | Where-Object { $null -ne $_ })
+            ) {
+                if ($copy.FillPlaceholders -ne $true) {
+                    continue
+                }
+
+                if ($copy -is [System.Collections.IDictionary]) {
+                    $copy.PlaceholderValues = $inputResult.Values
+                }
+                else {
+                    $copy | Add-Member `
+                        -NotePropertyName PlaceholderValues `
+                        -NotePropertyValue $inputResult.Values -Force
+                }
+            }
 
             if (-not $PSBoundParameters.ContainsKey('RebootComputer')) {
                 $RebootComputer = $configuration.Settings.RebootComputer 

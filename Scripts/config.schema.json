@@ -1369,6 +1369,10 @@
             "type": "string",
             "description": "Absolute destination file or folder path."
           },
+          "FillPlaceholders": {
+            "type": "boolean",
+            "description": "true: From is a text file whose {{input:...}}, {{ipv4:...}} and {{prefix:...}} placeholders are asked for at the start of the restore and filled in on the copy. {{password:...}} is not allowed in a file."
+          },
           "Comment": {
             "type": "string",
             "description": "Technician notes; ignored when applying the configuration."

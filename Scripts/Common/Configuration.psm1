@@ -580,7 +580,8 @@ function Test-ConfigurationHC {
                     $assets += @{
                         Value    = $data[$index].From 
                         Property = "[$index].From" 
-                        Leaf     = $false 
+                        # Placeholders can only be filled in a file
+                        Leaf     = $data[$index].FillPlaceholders -eq $true
                     }
 
                     if ([string]::IsNullOrWhiteSpace($data[$index].To)) { 

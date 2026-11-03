@@ -60,6 +60,29 @@ Describe 'Restore input placeholders' {
         $items.NetworkCards[0].IPSettings.PrefixLength | Should -Be 24
         { Resolve-RestoreInputHC -Items @{ A = @{ P = '{{prefix:P}}' } } -ReadValue { '40' } } | Should -Throw '*supplied input is empty or invalid*'
     }
+    It 'asks for placeholders inside files that are filled in while copying, once per placeholder' {
+        $null = New-Item -Path "$TestDrive\Files" -ItemType Directory -Force
+        "http://{{ipv4:Server}}:1353/?ref={{input:Reference}}`r`nagain {{ipv4:Server}}" | Set-Content -LiteralPath "$TestDrive\Files\Start.ps1"
+        $items = @{
+            CopyFilesFolders = @(@{ From = 'Files\Start.ps1'; To = 'C:\HC\Start.ps1'; FillPlaceholders = $true })
+            HostsFileEntries = @(@{ IPAddress = '{{ipv4:Server}}'; Hostnames = @('server') })
+        }
+        $script:asked = @()
+        $result = Resolve-RestoreInputHC -Items $items -RootFolder $TestDrive -ReadValue {
+            param($field)
+            $script:asked += $field.Placeholder
+            if ($field.Kind -eq 'ipv4') { '10.20.60.47' } else { 'TRM_01' }
+        }
+        $asked | Should -Be @('{{ipv4:Server}}', '{{input:Reference}}')
+        $result.Values['{{input:Reference}}'] | Should -Be 'TRM_01'
+        $items.HostsFileEntries[0].IPAddress | Should -Be '10.20.60.47'
+        $items.CopyFilesFolders[0].From | Should -Be 'Files\Start.ps1'
+    }
+    It 'refuses a password placeholder or an incomplete placeholder in a file' {
+        { Get-TextInputFieldsHC -Text 'pw={{password:Secret}}' -Path 'File' } | Should -Throw '*not allowed in a file*plain text*'
+        { Get-TextInputFieldsHC -Text 'ip={{ipv4:Server' -Path 'File' } | Should -Throw '*complete*'
+        @(Get-TextInputFieldsHC -Text 'no placeholders' -Path 'File').Count | Should -Be 0
+    }
     It 'redacts the encoded forms in which a secret is commonly repeated' {
         $secret = "P&ss<w0rd>'x"
         $forms = @(

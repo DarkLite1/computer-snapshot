@@ -219,6 +219,28 @@ Describe 'Single-file execution' {
         Should -Invoke Start-ComputerRestartHC -ModuleName Execution -Times 0 -Exactly
         Should -Invoke Start-Process -ModuleName Execution -Times 0 -Exactly
     }
+    It 'gives the answers for placeholders in a copied file to the copy, and asks before any child runs' {
+        $null = New-Item -Path "$TestDrive\Files" -ItemType Directory -Force
+        'url=http://{{ipv4:Terminal server}}:1353' | Set-Content -LiteralPath "$TestDrive\Files\Start.ps1"
+        Write-ConfigurationHC @{
+            SchemaVersion = 3; Settings = @{ OpenReportInBrowser = $false }
+            Items = @{ CopyFilesFolders = @(@{ From = 'Files\Start.ps1'; To = 'C:\HC\Start.ps1'; FillPlaceholders = $true }) }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('CopyFilesFolders')
+        $params.Script = [ordered]@{ CopyFilesFolders = $scriptPath }
+        Mock Read-RestoreInputHC -ModuleName Execution {
+            Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
+            '10.20.60.47'
+        }
+        Mock Invoke-ChildScriptHC -ModuleName Execution {
+            $Data[0].PlaceholderValues['{{ipv4:Terminal server}}'] | Should -Be '10.20.60.47'
+            [pscustomobject]@{ Data = $null; Messages = [string[]]@('Copied'); Errors = [string[]]@() }
+        }
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+        Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 1 -Exactly
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 1 -Exactly
+    }
     It 'redacts prompted passwords from child failure results and reports' {
         Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{ Name = 'Example'; Password = '{{password:Password}}' }) } } $path
         $params.Action = 'RestoreSnapshot'

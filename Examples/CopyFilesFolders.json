@@ -8,5 +8,11 @@
     "Comment": "Environment variables such as %ProgramData% are expanded in the destination.",
     "From": "Files\\Set power settings.ps1",
     "To": "%ProgramData%\\HC\\Set power settings.ps1"
+  },
+  {
+    "Comment": "The file contains {{ipv4:...}} placeholders; they are asked for at the start of the restore and filled in on the copy.",
+    "From": "Files\\Start terminal.ps1",
+    "To": "C:\\HC\\Start terminal.ps1",
+    "FillPlaceholders": true
   }
 ]

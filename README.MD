@@ -390,6 +390,21 @@ Select the configuration, click **Restore**, review the section checklist, and c
 
 Placeholders work in string values inside `Items`, including nested objects, arrays, and referenced shared sections. Only selected sections prompt. An identical placeholder (including its type and description) asks once and reuses the answer within that restore; use different descriptions to request independent values. Comments, metadata, settings, property names and section-reference filenames are not input fields. Do not use placeholders for other numbers or booleans, or embed them within larger strings; `{{prefix:...}}` is the only placeholder that gives a number. Answers are used literally, not evaluated as PowerShell or expanded as further placeholders.
 
+**Placeholders inside a copied file:** a script or other text file on the USB stick can contain placeholders anywhere in its text, also in the middle of a line. Copy it with `CopyFilesFolders` and `"FillPlaceholders": true`; the placeholders are asked for at the start of the restore, together with the others, and the copy on the computer gets the answers. The file on the USB stick stays as it is, and the copy keeps the file's encoding.
+
+```powershell
+# Files\Start terminal.ps1 on the USB stick
+$ArgumentList = '--kiosk http://{{ipv4:IP address of the terminal server}}:1353/terminal/?reference=TRM_AISE_01'
+```
+
+```json
+"CopyFilesFolders": [
+  { "From": "Files\\Start terminal.ps1", "To": "C:\\HC\\Start terminal.ps1", "FillPlaceholders": true }
+]
+```
+
+`{{input:...}}`, `{{ipv4:...}}` and `{{prefix:...}}` work in files. `{{password:...}}` is refused, because the password would be stored in plain text on the computer. `FillPlaceholders` works for a single file, not for a folder.
+
 **Exported user accounts:** Windows never reveals passwords, so an export writes `{{password:Password for local user 'name'}}` for each local user. Restoring the export asks for each password, and sets it on the user, also on a user that already exists. Accounts that Windows manages itself (Guest, DefaultAccount, WDAGUtilityAccount) get an empty password instead and keep their current one. To keep a user's current password, or for an unattended restore, replace the placeholder with an empty string; a user that doesn't exist yet needs a password to be created.
 
 Command-line restores use the same popups and require an interactive Windows desktop. Browsing configurations and exporting do not prompt. For unattended restores, provide ordinary configuration values instead.

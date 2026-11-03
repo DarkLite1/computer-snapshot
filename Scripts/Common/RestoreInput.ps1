@@ -69,6 +69,69 @@ function Get-RestoreInputFieldsHC {
     }
 }
 
+function Get-TextInputFieldsHC {
+    # Placeholders anywhere in the text of a file; passwords are refused
+    param(
+        [string]$Text,
+        [string]$Path
+    )
+
+    $complete = [regex]::Matches(
+        $Text, '\{\{(?<Kind>input|password|ipv4|prefix):(?<Description>[^{}\r\n]+)\}\}'
+    )
+    $started = [regex]::Matches($Text, '\{\{(?:input|password|ipv4|prefix):')
+
+    if ($started.Count -ne $complete.Count) {
+        throw "${Path}: use complete {{input:Description}}, {{ipv4:Description}} or {{prefix:Description}} placeholders."
+    }
+
+    foreach ($match in $complete) {
+        if ($match.Groups['Kind'].Value -eq 'password') {
+            throw "${Path}: {{password:...}} is not allowed in a file, because the password would be stored in plain text on the computer."
+        }
+
+        if ([string]::IsNullOrWhiteSpace($match.Groups['Description'].Value)) {
+            throw "${Path}: a placeholder needs a description."
+        }
+
+        [pscustomobject]@{
+            Path        = $Path
+            Placeholder = $match.Value
+            Kind        = $match.Groups['Kind'].Value
+            Description = $match.Groups['Description'].Value.Trim()
+            Container   = $null
+            Key         = $null
+        }
+    }
+}
+
+function Get-FileInputFieldsHC {
+    # Placeholders in the files that CopyFilesFolders fills in while copying
+    param(
+        $Items,
+        [Parameter(Mandatory)][string]$RootFolder
+    )
+
+    $entries = @($Items.CopyFilesFolders | Where-Object { $null -ne $_ })
+
+    for ($index = 0; $index -lt $entries.Count; $index++) {
+        if ($entries[$index].FillPlaceholders -ne $true -or $entries[$index].From -isnot [string]) {
+            continue
+        }
+
+        # A missing file is reported by the configuration check
+        $file = Resolve-RootPathHC -Path $entries[$index].From -RootFolder $RootFolder
+
+        if (-not [IO.File]::Exists($file)) {
+            continue
+        }
+
+        Get-TextInputFieldsHC `
+            -Text ([IO.File]::ReadAllText($file)) `
+            -Path "Items.CopyFilesFolders[$index].From '$($entries[$index].From)'"
+    }
+}
+
 function Test-RestoreInputValueHC {
     param(
         [string]$Kind,
@@ -208,10 +271,16 @@ function Read-RestoreInputHC {
 function Resolve-RestoreInputHC {
     param(
         $Items,
-        [Parameter(Mandatory)][scriptblock]$ReadValue
+        [Parameter(Mandatory)][scriptblock]$ReadValue,
+        # Also ask for the placeholders in files that are filled while copying
+        [string]$RootFolder
     )
 
     $fields = @(Get-RestoreInputFieldsHC -Data $Items)
+
+    if ($RootFolder) {
+        $fields += @(Get-FileInputFieldsHC -Items $Items -RootFolder $RootFolder)
+    }
     $answers = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)
     $secrets = New-Object 'System.Collections.Generic.List[string]'
     
@@ -241,6 +310,11 @@ function Resolve-RestoreInputHC {
     }
 
     foreach ($field in $fields) {
+        # Placeholders in files are filled in by the copy, not here
+        if ($null -eq $field.Container) {
+            continue
+        }
+
         # A prefix length is a number in the configuration
         $answer = if ($field.Kind -eq 'prefix') {
             [int]$answers[$field.Placeholder]
@@ -262,6 +336,8 @@ function Resolve-RestoreInputHC {
 
     [pscustomobject]@{ 
         SecretValues = $secrets.ToArray() 
+        # Every answer by its placeholder, for placeholders in files
+        Values       = $answers
     }
 }
 

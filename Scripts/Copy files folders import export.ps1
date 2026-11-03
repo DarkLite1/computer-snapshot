@@ -14,6 +14,11 @@
     cannot be copied, the other files are still copied and every failed file
     is reported. Each problem is reported in Errors and the remaining entries
     are still copied.
+
+    With FillPlaceholders, a text file is copied with its {{input:...}},
+    {{ipv4:...}} and {{prefix:...}} placeholders replaced by the answers given
+    at the start of the restore, in PlaceholderValues. The file keeps its
+    encoding.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -37,6 +42,68 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
 
 #region Helpers
+function Copy-FilledFileHC {
+    # Copy a text file with its placeholders filled in, in its own encoding;
+    # returns the number of placeholders filled in
+    param(
+        [Parameter(Mandatory)][string]$Source,
+        [Parameter(Mandatory)][string]$Destination,
+        $Values
+    )
+
+    $bytes = [IO.File]::ReadAllBytes($Source)
+
+    $encoding = if (
+        $bytes.Length -ge 3 -and
+        $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+    ) {
+        New-Object System.Text.UTF8Encoding $true
+    }
+    elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+        [Text.Encoding]::Unicode
+    }
+    elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+        [Text.Encoding]::BigEndianUnicode
+    }
+    else {
+        try {
+            $null = (New-Object System.Text.UTF8Encoding $false, $true).GetString($bytes)
+            New-Object System.Text.UTF8Encoding $false
+        }
+        catch {
+            # Not UTF-8 without a byte order mark: the Windows code page
+            [Text.Encoding]::GetEncoding(
+                [Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage
+            )
+        }
+    }
+
+    $skip = $encoding.GetPreamble().Length
+    $text = $encoding.GetString($bytes, $skip, $bytes.Length - $skip)
+    $pattern = '\{\{(?:input|ipv4|prefix):[^{}\r\n]+\}\}'
+    $placeholders = @([regex]::Matches($text, $pattern) | ForEach-Object { $_.Value })
+    $missing = @(
+        $placeholders | Select-Object -Unique |
+        Where-Object { -not ($Values -and $Values.ContainsKey($_)) }
+    )
+
+    if ($missing.Count) {
+        throw "no answer for the placeholder(s) $($missing -join ', ')"
+    }
+
+    foreach ($placeholder in @($placeholders | Select-Object -Unique)) {
+        $text = $text.Replace($placeholder, [string]$Values[$placeholder])
+    }
+
+    if ([IO.File]::Exists($Destination)) {
+        $file = Get-Item -LiteralPath $Destination -Force
+        $file.IsReadOnly = $false
+    }
+
+    [IO.File]::WriteAllText($Destination, $text, $encoding)
+    $placeholders.Count
+}
+
 function Copy-FolderContentHC {
     # Copy file by file, so every failure is caught and the other files are
     # still copied. Copy-Item -Recurse cannot do this reliably: Windows
@@ -124,6 +191,10 @@ else {
             }
 
             if ($fromItem.PSIsContainer) {
+                if ($item.FillPlaceholders -eq $true) {
+                    throw 'FillPlaceholders only works for a file, not for a folder'
+                }
+
                 $null = New-Item -Path $to -ItemType Directory -Force
                 $failures = New-Object 'System.Collections.Generic.List[string]'
 
@@ -151,8 +222,18 @@ else {
                     $null = New-Item -Path $parent -ItemType Directory -Force 
                 }
 
-                Copy-Item -LiteralPath $from -Destination $to -Force
-                $what = "file '$($item.From)'"
+                if ($item.FillPlaceholders -eq $true) {
+                    $count = Copy-FilledFileHC `
+                        -Source $from `
+                        -Destination $to `
+                        -Values $item.PlaceholderValues
+
+                    $what = "file '$($item.From)' with $count placeholder(s) filled in"
+                }
+                else {
+                    Copy-Item -LiteralPath $from -Destination $to -Force
+                    $what = "file '$($item.From)'"
+                }
             }
 
             if (-not (Test-Path -LiteralPath $to)) { 

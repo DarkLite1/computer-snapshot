@@ -56,16 +56,12 @@ function Test-AdministrativeShareHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import Smb shares: section is empty, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 if ($Action -eq 'Export') {
@@ -162,7 +158,7 @@ if ($Action -eq 'Export') {
                     }
                 }
                 catch {
-                    $errors += (
+                    $errors.Add(
                         'Failed to read the NTFS permissions of share ' +
                         "'$($share.Name)' on '$($share.Path)': " +
                         "$($_.Exception.Message)"
@@ -178,7 +174,7 @@ if ($Action -eq 'Export') {
     )
     #endregion
 
-    $messages = @('Exported Smb shares')
+    $messages.Insert(0, 'Exported Smb shares')
 }
 else {
     #region Apply section
@@ -186,7 +182,7 @@ else {
     foreach ($share in @($Data | Where-Object { $null -ne $_ })) {
         if (Test-AdministrativeShareHC $share.Name) {
             Write-Verbose "Share '$($share.Name)': administrative, skip"
-            $messages += (
+            $messages.Add(
                 "Skipped share '$($share.Name)': " +
                 'administrative shares are managed by Windows'
             )
@@ -230,18 +226,18 @@ else {
             Write-Verbose "Share '$($share.Name)': update settings"
             $null = Set-SmbShare @setShareParams
             if ($isNewShare) {
-                $messages += (
+                $messages.Add(
                     "Created share '$($share.Name)' on '$($share.Path)'"
                 )
             }
             else {
-                $messages += (
+                $messages.Add(
                     "Updated share '$($share.Name)' on '$($share.Path)'"
                 )
             }
         }
         catch {
-            $errors += (
+            $errors.Add(
                 "Failed to create or update share '$($share.Name)': " +
                 "$($_.Exception.Message)"
             )
@@ -276,7 +272,7 @@ else {
                             Force       = $true
                         }
                         $null = Block-SmbShareAccess @blockParams
-                        $messages += (
+                        $messages.Add(
                             "Share '$($share.Name)': " +
                             "denied access for '$accountName'"
                         )
@@ -289,7 +285,7 @@ else {
                             Force       = $true
                         }
                         $null = Grant-SmbShareAccess @grantParams
-                        $messages += (
+                        $messages.Add(
                             "Share '$($share.Name)': granted " +
                             "'$($ace.AccessRight)' access to '$accountName'"
                         )
@@ -297,7 +293,7 @@ else {
                 }
                 catch {
                     $accessFailed = $true
-                    $errors += (
+                    $errors.Add(
                         'Failed to set share permission ' +
                         "'$($ace.AccessControlType) $($ace.AccessRight)' " +
                         "for '$($ace.AccountName)' on share " +
@@ -306,7 +302,7 @@ else {
                 }
             }
             if ($accessFailed) {
-                $errors += (
+                $errors.Add(
                     "Share '$($share.Name)': existing share permissions " +
                     'that are not in the configuration were kept, because ' +
                     'not all configured permissions could be applied'
@@ -340,13 +336,13 @@ else {
                         else {
                             $null = Revoke-SmbShareAccess @removeParams
                         }
-                        $messages += (
+                        $messages.Add(
                             "Share '$($share.Name)': removed share " +
                             "permission for '$($current.AccountName)'"
                         )
                     }
                     catch {
-                        $errors += (
+                        $errors.Add(
                             'Failed to remove the share permission of ' +
                             "'$($current.AccountName)' on share " +
                             "'$($share.Name)': $($_.Exception.Message)"
@@ -403,7 +399,7 @@ else {
                     }
                 }
                 if ($ntfsProblems.Count) {
-                    $errors += $ntfsProblems
+                    $errors.AddRange([string[]]@($ntfsProblems))
                     throw (
                         'the current NTFS permissions were kept, because ' +
                         'not all configured permissions could be prepared'
@@ -428,7 +424,7 @@ else {
                         )
                     }
                     catch {
-                        $errors += (
+                        $errors.Add(
                             "Failed to set owner '$($aclImport.Owner)' on " +
                             "share '$($share.Name)', the current owner was " +
                             "kept: $($_.Exception.Message)"
@@ -437,13 +433,13 @@ else {
                 }
                 Write-Verbose "Write ACL on '$($share.Path)'"
                 Set-Acl -LiteralPath $share.Path -AclObject $acl
-                $messages += (
+                $messages.Add(
                     "Share '$($share.Name)': set $(@($rules).Count) " +
                     "NTFS permission(s) on '$($share.Path)'"
                 )
             }
             catch {
-                $errors += (
+                $errors.Add(
                     'Failed to set the NTFS permissions on ' +
                     "'$($share.Path)' for share '$($share.Name)': " +
                     "$($_.Exception.Message)"
@@ -461,8 +457,9 @@ else {
     #endregion
 }
 
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

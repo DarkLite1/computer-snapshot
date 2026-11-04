@@ -135,16 +135,12 @@ function Set-UserPasswordHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import User accounts: section is empty, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 if ($Action -eq 'Export') {
@@ -171,7 +167,8 @@ if ($Action -eq 'Export') {
         PasswordExpires, UserMayChangePassword, $password
     )
     #endregion
-    $messages = @(
+    $messages.Insert(
+        0,
         'Exported User accounts; restoring this export asks for the ' +
         'password of each user'
     )
@@ -196,7 +193,7 @@ else {
                     $currentUsers | Where-Object { $_.Name -eq $user.Name }
                 )
                 if (-not $matchingUsers.Count) {
-                    $messages += (
+                    $messages.Add(
                         "User account '$($user.Name)' not found, " +
                         'nothing to remove'
                     )
@@ -233,7 +230,7 @@ else {
                 $knownUserNames = @(
                     $knownUserNames | Where-Object { $_ -ne $user.Name }
                 )
-                $messages += (
+                $messages.Add(
                     "Removed user account '$($user.Name)' (profile files kept)"
                 )
                 continue
@@ -317,15 +314,15 @@ else {
             elseif ($user.Enabled) { ' (enabled)' }
             else { ' (disabled)' }
             if ($isNewUser) {
-                $messages += "Created user '$($user.Name)'$state"
+                $messages.Add("Created user '$($user.Name)'$state")
             }
             elseif ($user.Password) {
-                $messages += (
+                $messages.Add(
                     "Updated user '$($user.Name)' and its password$state"
                 )
             }
             else {
-                $messages += (
+                $messages.Add(
                     "Updated user '$($user.Name)', password unchanged$state"
                 )
             }
@@ -333,7 +330,7 @@ else {
         catch {
             $operation = if ($isRemove) { 'remove' }
             else { 'create or update' }
-            $errors += (
+            $errors.Add(
                 "Failed to $operation user account '$($user.Name)': " +
                 "$($_.Exception.Message)"
             )
@@ -342,8 +339,9 @@ else {
     #endregion
 }
 
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

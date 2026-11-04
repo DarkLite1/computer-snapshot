@@ -55,15 +55,11 @@ function Assert-FolderPathHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import Folders: empty section, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 if ($Action -eq 'Export') {
@@ -74,7 +70,7 @@ if ($Action -eq 'Export') {
     )
     #endregion
 
-    $messages = @('Exported Folders')
+    $messages.Insert(0, 'Exported Folders')
 }
 else {
     #region Apply section
@@ -93,16 +89,16 @@ else {
             Assert-FolderPathHC $folder
             if (Test-Path -LiteralPath $folder -PathType Container) {
                 Write-Verbose "Folder $label exists, skip"
-                $messages += "Folder $label already exists"
+                $messages.Add("Folder $label already exists")
             }
             else {
                 Write-Verbose "Folder ${label}: create"
                 $null = New-Item -Path $folder -ItemType Directory
-                $messages += "Created folder $label"
+                $messages.Add("Created folder $label")
             }
         }
         catch {
-            $errors += (
+            $errors.Add(
                 "Failed to create folder '$path': $($_.Exception.Message)"
             )
         }
@@ -110,8 +106,9 @@ else {
     #endregion
 }
 
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

@@ -5,6 +5,36 @@ BeforeAll {
     . "$PSScriptRoot\..\..\Scripts\Common\Section.ps1"
 }
 
+Describe 'New-SectionResultHC' {
+    It 'returns string arrays for lists, one message and nothing' {
+        $messages = New-Object 'System.Collections.Generic.List[string]'
+        $messages.Add('one')
+        $messages.Add('two')
+
+        $result = New-SectionResultHC -Messages $messages
+        $single = New-SectionResultHC -Messages 'only'
+        $empty = New-SectionResultHC -Messages $null -Errors $null
+
+        $result.Messages | Should -Be @('one', 'two')
+        $result.Messages.GetType() | Should -Be ([string[]])
+        $result.Errors.GetType() | Should -Be ([string[]])
+        $result.Errors.Count | Should -Be 0
+        $single.Messages.GetType() | Should -Be ([string[]])
+        $single.Messages | Should -Be @('only')
+        $empty.Messages.GetType() | Should -Be ([string[]])
+        $empty.Errors.GetType() | Should -Be ([string[]])
+        $empty.Data | Should -BeNullOrEmpty
+    }
+    It 'keeps the shape of the data' {
+        $data = @([ordered]@{ Name = 'only' })
+
+        $result = New-SectionResultHC -Data $data
+
+        $result.Data.GetType().IsArray | Should -BeTrue
+        $result.Data.Count | Should -Be 1
+    }
+}
+
 Describe 'Test-ElevatedHC' {
     It 'tells whether the current process runs as administrator' {
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()

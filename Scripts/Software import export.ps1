@@ -522,15 +522,11 @@ function Get-ExitCodeResultHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import Software: empty section, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 if ($Action -eq 'Export') {
@@ -541,7 +537,7 @@ if ($Action -eq 'Export') {
     )
     #endregion
 
-    $messages = @('Exported Software')
+    $messages.Insert(0, 'Exported Software')
 }
 else {
     #region Apply section
@@ -580,7 +576,7 @@ else {
 
                 if (-not $installed.Count) {
                     Write-Verbose "Application '$pattern': not installed, skip"
-                    $messages += (
+                    $messages.Add(
                         "Application '$pattern' is not installed, " +
                         'nothing to remove'
                     )
@@ -601,7 +597,7 @@ else {
                 }
             }
             catch {
-                $errors += (
+                $errors.Add(
                     "Failed to remove application '$pattern': " +
                     "$($_.Exception.Message)"
                 )
@@ -682,14 +678,14 @@ else {
                     }
 
                     if ($result -eq 'restart') {
-                        $messages += (
+                        $messages.Add(
                             "Removed application '$applicationName', " +
                             'a restart is needed to complete the removal' +
                             $leftRunning
                         )
                     }
                     else {
-                        $messages += (
+                        $messages.Add(
                             "Removed application '$applicationName'" +
                             $leftRunning
                         )
@@ -697,7 +693,7 @@ else {
                 }
                 catch {
                     Write-Verbose "Application '$applicationName': failed"
-                    $errors += (
+                    $errors.Add(
                         "Failed to remove application '$applicationName': " +
                         "$($_.Exception.Message)"
                     )
@@ -771,23 +767,23 @@ else {
                 $result = Get-ExitCodeResultHC @resultParams
 
                 if ($result -eq 'restart') {
-                    $messages += (
+                    $messages.Add(
                         "Installed $label, a restart is needed to complete " +
                         "the installation$leftRunning"
                     )
                 }
                 elseif ($exitCode) {
-                    $messages += (
+                    $messages.Add(
                         "Installed $label (exit code $exitCode)$leftRunning"
                     )
                 }
                 else {
-                    $messages += "Installed $label$leftRunning"
+                    $messages.Add("Installed $label$leftRunning")
                 }
             }
             catch {
                 Write-Verbose "Install ${label}: failed"
-                $errors += (
+                $errors.Add(
                     "Failed to install ${label}: $($_.Exception.Message)"
                 )
             }
@@ -802,8 +798,9 @@ Write-Verbose (
     "Software: $(@($messages).Count) message(s), " +
     "$(@($errors).Count) error(s)"
 )
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

@@ -40,15 +40,11 @@ Function Start-ScriptHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import Regional settings: empty section, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 $NewAccountsScript = Join-Path $PSScriptRoot (
@@ -66,7 +62,7 @@ if ($Action -eq 'Export') {
     }
     #endregion
 
-    $messages = @('Exported Regional settings')
+    $messages.Insert(0, 'Exported Regional settings')
 }
 else {
     #region Apply section
@@ -78,7 +74,7 @@ else {
         'CultureName' | Where-Object { -not $Data.$_ }
     )
     if ($missing.Count) {
-        $errors += (
+        $errors.Add(
             'Nothing was changed, these required fields are missing: ' +
             "$($missing -join ', ')"
         )
@@ -93,18 +89,18 @@ else {
                     "'$($Data.WinSystemLocaleName)'"
                 )
                 Set-WinSystemLocale -SystemLocale $Data.WinSystemLocaleName
-                $messages += (
+                $messages.Add(
                     "Changed the system locale from '$old' to " +
                     "'$($Data.WinSystemLocaleName)', this takes effect " +
                     'after the computer is restarted'
                 )
             }
             else {
-                $messages += "System locale '$old' is already correct"
+                $messages.Add("System locale '$old' is already correct")
             }
         }
         catch {
-            $errors += (
+            $errors.Add(
                 'Failed to set the system locale to ' +
                 "'$($Data.WinSystemLocaleName)': $($_.Exception.Message)"
             )
@@ -119,17 +115,17 @@ else {
                     "Time zone '$old': change to '$($Data.TimeZoneId)'"
                 )
                 Set-TimeZone -Id $Data.TimeZoneId
-                $messages += (
+                $messages.Add(
                     "Changed the time zone from '$old' to " +
                     "'$($Data.TimeZoneId)'"
                 )
             }
             else {
-                $messages += "Time zone '$old' is already correct"
+                $messages.Add("Time zone '$old' is already correct")
             }
         }
         catch {
-            $errors += (
+            $errors.Add(
                 "Failed to set the time zone to '$($Data.TimeZoneId)': " +
                 "$($_.Exception.Message)"
             )
@@ -145,14 +141,14 @@ else {
                     "'$($Data.WinHomeLocationGeoId)'"
                 )
                 Set-WinHomeLocation -GeoId $Data.WinHomeLocationGeoId
-                $messages += (
+                $messages.Add(
                     'Changed the country or region from ' +
                     "'$($old.GeoId) - $($old.HomeLocation)' to " +
                     "'$($Data.WinHomeLocationGeoId)'"
                 )
             }
             else {
-                $messages += (
+                $messages.Add(
                     'Country or region ' +
                     "'$($old.GeoId) - $($old.HomeLocation)' " +
                     'is already correct'
@@ -160,7 +156,7 @@ else {
             }
         }
         catch {
-            $errors += (
+            $errors.Add(
                 'Failed to set the country or region to ' +
                 "'$($Data.WinHomeLocationGeoId)': $($_.Exception.Message)"
             )
@@ -176,17 +172,17 @@ else {
                     "'$($Data.CultureName)'"
                 )
                 Set-Culture -CultureInfo $Data.CultureName
-                $messages += (
+                $messages.Add(
                     "Changed the regional format from '$old' to " +
                     "'$($Data.CultureName)'"
                 )
             }
             else {
-                $messages += "Regional format '$old' is already correct"
+                $messages.Add("Regional format '$old' is already correct")
             }
         }
         catch {
-            $errors += (
+            $errors.Add(
                 'Failed to set the regional format to ' +
                 "'$($Data.CultureName)': $($_.Exception.Message)"
             )
@@ -196,10 +192,12 @@ else {
         #region Copy the current user's settings to accounts created later
         try {
             Write-Verbose 'Apply the regional settings to new accounts'
-            $messages += @(Start-ScriptHC -Path $NewAccountsScript)
+            $messages.AddRange(
+                [string[]]@(Start-ScriptHC -Path $NewAccountsScript)
+            )
         }
         catch {
-            $errors += (
+            $errors.Add(
                 'Failed to apply the regional settings to new accounts: ' +
                 "$($_.Exception.Message)"
             )
@@ -209,8 +207,9 @@ else {
     #endregion
 }
 
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

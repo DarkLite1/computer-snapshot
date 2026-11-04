@@ -594,15 +594,11 @@ function Get-IPv4SettingsHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import Network cards: empty section, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 $netAdapters = @(Get-NetAdapter)
@@ -649,13 +645,13 @@ if ($Action -eq 'Export') {
             $change.IPSettings = $ipSettings
             if ($ipSettings.IPAddress) {
                 $addresses = @($state.Addresses)
-                $messages += (
+                $messages.Add(
                     "Network card '$($adapter.Name)' has the static IPv4 " +
                     "address $($addresses[0].IPAddress); it was exported as " +
                     'a placeholder, so the restore asks for the address'
                 )
                 if ($addresses.Count -gt 1) {
-                    $messages += (
+                    $messages.Add(
                         "Network card '$($adapter.Name)' has " +
                         "$($addresses.Count) IPv4 addresses; only " +
                         "$($addresses[0].IPAddress) was exported"
@@ -679,7 +675,7 @@ if ($Action -eq 'Export') {
     $exportData = @($cardsToExport)
     #endregion
 
-    $messages = @('Exported Network cards') + @($messages)
+    $messages.Insert(0, 'Exported Network cards')
 }
 else {
     #region Apply section
@@ -704,7 +700,7 @@ else {
             if ($change.NewName -and $adapter.Name -ne $change.NewName) {
                 Write-Verbose "Network card $($label): rename"
                 Rename-NetAdapter -Name $adapter.Name -NewName $change.NewName
-                $messages += (
+                $messages.Add(
                     'Renamed network card ' +
                     "'$($adapter.InterfaceDescription)' from " +
                     "'$($adapter.Name)' to '$($change.NewName)'"
@@ -727,7 +723,7 @@ else {
                     ConnectionSpecificSuffix = $change.DnsSuffix
                 }
                 Set-DnsClient @dnsClientParams
-                $messages += (
+                $messages.Add(
                     "Changed DNS suffix of network card $label from " +
                     "'$($dnsClient.ConnectionSpecificSuffix)' to " +
                     "'$($change.DnsSuffix)'"
@@ -749,7 +745,7 @@ else {
                         "Network card $($label): no connection, " +
                         'skip network category'
                     )
-                    $messages += (
+                    $messages.Add(
                         "Network card $label has no network connection, " +
                         "its network category '$($change.NetworkCategory)' " +
                         'was not set'
@@ -770,7 +766,7 @@ else {
                         NetworkCategory = $change.NetworkCategory
                     }
                     Set-NetConnectionProfile @profileParams
-                    $messages += (
+                    $messages.Add(
                         'Changed network category of network card ' +
                         "$label from '$($profile.NetworkCategory)' to " +
                         "'$($change.NetworkCategory)'"
@@ -788,7 +784,7 @@ else {
                     Label    = $label
                 }
                 foreach ($message in @(Set-IPv4SettingsHC @ipParams)) {
-                    $messages += $message
+                    $messages.Add($message)
                     $changes++
                 }
             }
@@ -796,12 +792,12 @@ else {
 
             if (-not $changes) {
                 Write-Verbose "Network card $($label): already correct"
-                $messages += "Network card $label is already correct"
+                $messages.Add("Network card $label is already correct")
             }
         }
         catch {
             Write-Verbose "Network card $($label): failed"
-            $errors += (
+            $errors.Add(
                 "Failed to configure network card ${label}: " +
                 "$($_.Exception.Message)"
             )
@@ -814,8 +810,9 @@ Write-Verbose (
     "Network cards: $(@($messages).Count) message(s), " +
     "$(@($errors).Count) error(s)"
 )
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

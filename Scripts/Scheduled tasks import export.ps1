@@ -109,16 +109,12 @@ function Get-TaskXmlHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import scheduled tasks: section is empty, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 if ($Action -eq 'Export') {
@@ -168,7 +164,7 @@ if ($Action -eq 'Export') {
                     -not $runAs.Contains('RunAsUser') -and
                     $task.Principal.GroupId
                 ) {
-                    $messages += (
+                    $messages.Add(
                         "Task '$($task.TaskPath)$($task.TaskName)' runs " +
                         "for group '$($task.Principal.GroupId)', which " +
                         'cannot be exported; it is restored to run as ' +
@@ -179,7 +175,7 @@ if ($Action -eq 'Export') {
                 [pscustomobject]$exportTask
             }
             catch {
-                $errors += (
+                $errors.Add(
                     "Failed to export scheduled task " +
                     "'$($task.TaskPath)$($task.TaskName)': " +
                     $_.Exception.Message
@@ -189,10 +185,11 @@ if ($Action -eq 'Export') {
     )
     #endregion
 
-    $messages = @(
+    $messages.Insert(
+        0,
         "Exported $($exportData.Count) scheduled task(s) from the task " +
         "folder(s) '$($folders -join "', '")'"
-    ) + @($messages)
+    )
 }
 else {
     #region Apply section
@@ -271,13 +268,13 @@ else {
                 'Created'
             }
 
-            $messages += (
+            $messages.Add(
                 "$verb scheduled task '$fullName'$source " +
                 "($state, runs as $runAs)"
             )
         }
         catch {
-            $errors += (
+            $errors.Add(
                 "Failed to register scheduled task '$fullName': " +
                 $_.Exception.Message
             )
@@ -286,8 +283,9 @@ else {
     #endregion
 }
 
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

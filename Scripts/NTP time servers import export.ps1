@@ -92,15 +92,11 @@ Function Set-SynchronizeTimeWithDomainHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import NTP time servers: empty section, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 if ($Action -eq 'Export') {
@@ -116,16 +112,16 @@ if ($Action -eq 'Export') {
                 ForEach-Object { $_.Trim() }
             )
         }
-        $messages = @('Exported NTP time servers')
+        $messages.Insert(0, 'Exported NTP time servers')
         if ($timeServers.Type -notin @('NT5DS', 'NTP')) {
-            $messages += (
+            $messages.Add(
                 "The time service type is '$($timeServers.Type)'; " +
                 'a restore synchronizes with the exported time servers only'
             )
         }
     }
     catch {
-        $errors += (
+        $errors.Add(
             'Failed to read the time service settings: ' +
             "$($_.Exception.Message)"
         )
@@ -140,11 +136,11 @@ else {
         if ($Data.SyncTimeWithDomain) {
             Write-Verbose 'Sync time with the domain'
             Set-SynchronizeTimeWithDomainHC
-            $messages += (
+            $messages.Add(
                 'Configured the time service to synchronize with the domain'
             )
             if (@($Data.TimeServerNames | Where-Object { $_ }).Count) {
-                $messages += 'Custom time server names are disregarded'
+                $messages.Add('Custom time server names are disregarded')
             }
         }
         else {
@@ -161,7 +157,7 @@ else {
             }
             Write-Verbose "Sync time with servers '$timeServerNames'"
             Set-SynchronizeTimeWithServerHC -ComputerName $timeServerNames
-            $messages += (
+            $messages.Add(
                 'Configured the time service to synchronize with ' +
                 "'$($timeServerNames -join ' ')'"
             )
@@ -175,23 +171,24 @@ else {
         Write-Verbose 'Synchronize the time now'
         $null = Invoke-TimeServiceHC -Arguments '/resync'
         if ($Data.SyncTimeWithDomain) {
-            $messages += 'Time synchronized with the domain'
+            $messages.Add('Time synchronized with the domain')
         }
         else {
-            $messages += (
+            $messages.Add(
                 'Time synchronized with custom time servers ' +
                 "'$($timeServerNames -join ' ')'"
             )
         }
     }
     catch {
-        $errors += "Failed to ${step}: $($_.Exception.Message)"
+        $errors.Add("Failed to ${step}: $($_.Exception.Message)")
     }
     #endregion
 }
 
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

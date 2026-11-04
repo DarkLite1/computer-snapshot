@@ -182,6 +182,26 @@ function Test-EmptySectionHC {
     ).Count -eq 0
 }
 
+function New-SectionResultHC {
+    <#
+    .SYNOPSIS
+        The one object a section script returns: Data (export only), and
+        Messages and Errors as string arrays.
+    #>
+    param(
+        $Data,
+        [AllowNull()][string[]]$Messages = @(),
+        [AllowNull()][string[]]$Errors = @()
+    )
+    if ($null -eq $Messages) { $Messages = @() }
+    if ($null -eq $Errors) { $Errors = @() }
+    [pscustomobject]@{
+        Data     = $Data
+        Messages = $Messages
+        Errors   = $Errors
+    }
+}
+
 function Read-SectionExampleHC {
     param(
         [Parameter(Mandatory)][string]$Path

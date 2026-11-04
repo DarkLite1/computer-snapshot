@@ -101,16 +101,12 @@ function Test-ErrorKindHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import User groups: section is empty, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 if ($Action -eq 'Export') {
@@ -139,7 +135,7 @@ if ($Action -eq 'Export') {
                     $members = @(Get-GroupMemberAdsiHC -GroupName $group.Name)
                 }
                 catch {
-                    $errors += (
+                    $errors.Add(
                         'Failed to read the members of group ' +
                         "'$($group.Name)': $localGroupMemberError; " +
                         'reading them through ADSI failed too: ' +
@@ -150,7 +146,7 @@ if ($Action -eq 'Export') {
             }
 
             foreach ($orphan in @($members | Where-Object { -not $_.Name })) {
-                $messages += (
+                $messages.Add(
                     "Group '$($group.Name)': skipped member " +
                     "'$($orphan.SID)', an account that cannot be resolved " +
                     '(deleted, or its domain is unreachable)'
@@ -193,7 +189,7 @@ if ($Action -eq 'Export') {
     )
     #endregion
 
-    $messages = @('Exported User groups') + @($messages)
+    $messages.Insert(0, 'Exported User groups')
 }
 else {
     #region Apply section
@@ -238,7 +234,7 @@ else {
                         SID         = ''
                     }
                 }
-                $messages += "Created group '$($group.Name)'"
+                $messages.Add("Created group '$($group.Name)'")
             }
             elseif (
                 $hasDescription -and
@@ -251,14 +247,14 @@ else {
                     Description = $group.Description
                 }
                 Set-LocalGroupDescriptionHC @descriptionParams
-                $messages += "Updated the description of group '$groupName'"
+                $messages.Add("Updated the description of group '$groupName'")
             }
             else {
-                $messages += "Group '$groupName' already exists and is correct"
+                $messages.Add("Group '$groupName' already exists and is correct")
             }
         }
         catch {
-            $errors += (
+            $errors.Add(
                 "Failed to create or update group '$groupName': " +
                 "$($_.Exception.Message)"
             )
@@ -278,32 +274,32 @@ else {
                 $accountName = Convert-AccountNameHC $member
                 Add-LocalGroupMember -Group $groupName -Member $accountName
                 if ($accountName -ne $member) {
-                    $messages += (
+                    $messages.Add(
                         "Added account '$member' as '$accountName' to " +
                         "group '$($groupName)'"
                     )
                 }
                 else {
-                    $messages += (
+                    $messages.Add(
                         "Added account '$member' to group '$($groupName)'"
                     )
                 }
             }
             catch {
                 if (Test-ErrorKindHC $_ 'MemberExists') {
-                    $messages += (
+                    $messages.Add(
                         "Account '$member' is already a member of group " +
                         "'$($groupName)'"
                     )
                 }
                 elseif (Test-ErrorKindHC $_ 'PrincipalNotFound') {
-                    $errors += (
+                    $errors.Add(
                         "Failed to add account '$member' to group " +
                         "'$($groupName)': account not found"
                     )
                 }
                 else {
-                    $errors += (
+                    $errors.Add(
                         "Failed to add account '$member' to group " +
                         "'$($groupName)': $($_.Exception.Message)"
                     )
@@ -315,8 +311,9 @@ else {
     #endregion
 }
 
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

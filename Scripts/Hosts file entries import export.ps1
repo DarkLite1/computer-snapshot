@@ -121,16 +121,12 @@ function Write-HostsFileHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import hosts file entries: empty section, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 $hostsPath = Get-HostsFilePathHC
@@ -184,7 +180,9 @@ if ($Action -eq 'Export') {
     )
     #endregion
 
-    $messages = @("Exported $($exportData.Count) hosts file address(es)")
+    $messages.Insert(
+        0, "Exported $($exportData.Count) hosts file address(es)"
+    )
 }
 else {
     #region Apply section
@@ -255,14 +253,14 @@ else {
                     $changed = $true
 
                     if ($isRemove) {
-                        $messages += (
+                        $messages.Add(
                             "Removed host name '$name' (pointed to " +
                             "$($entry.IPAddress)) from the hosts file"
                         )
                         $found = $true
                     }
                     else {
-                        $messages += (
+                        $messages.Add(
                             "Host name '$name' pointed to " +
                             "$($entry.IPAddress); it now points to " +
                             "$($item.IPAddress)"
@@ -271,7 +269,7 @@ else {
                 }
 
                 if ($isRemove -and -not $found) {
-                    $messages += (
+                    $messages.Add(
                         "Host name '$name' is not in the hosts file, " +
                         'nothing to remove'
                     )
@@ -280,7 +278,7 @@ else {
                     $missing.Add($name)
                 }
                 elseif (-not $isRemove) {
-                    $messages += (
+                    $messages.Add(
                         "Host name '$name' already points to " +
                         "$($item.IPAddress)"
                     )
@@ -304,7 +302,7 @@ else {
                     $moved = "Host name '$name' pointed to *"
 
                     if (-not ($messages -like $moved)) {
-                        $messages += (
+                        $messages.Add(
                             "Added host name '$name' for $($item.IPAddress)"
                         )
                     }
@@ -312,7 +310,7 @@ else {
             }
         }
         catch {
-            $errors += (
+            $errors.Add(
                 "Failed to apply hosts file entry ${label}: " +
                 "$($_.Exception.Message)"
             )
@@ -343,7 +341,7 @@ else {
             Clear-DnsClientCache
         }
         catch {
-            $errors += (
+            $errors.Add(
                 "Failed to write the hosts file '$hostsPath': " +
                 "$($_.Exception.Message)"
             )
@@ -355,8 +353,9 @@ else {
     #endregion
 }
 
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

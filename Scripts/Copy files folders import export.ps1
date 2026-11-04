@@ -176,16 +176,12 @@ function Copy-FolderContentHC {
 #endregion
 
 $exportData = $null
-$messages = @()
-$errors = @()
+$messages = New-Object 'System.Collections.Generic.List[string]'
+$errors = New-Object 'System.Collections.Generic.List[string]'
 
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
     Write-Verbose 'Import Copy files folders: section is empty, nothing to do'
-    return [pscustomobject]@{
-        Data     = $null
-        Messages = [string[]]@('Nothing to do')
-        Errors   = [string[]]@()
-    }
+    return New-SectionResultHC -Messages 'Nothing to do'
 }
 
 if ($Action -eq 'Export') {
@@ -196,7 +192,7 @@ if ($Action -eq 'Export') {
     )
     #endregion
 
-    $messages = @('Exported Copy files folders')
+    $messages.Insert(0, 'Exported Copy files folders')
 }
 else {
     #region Apply section
@@ -299,10 +295,10 @@ else {
                 throw "'$to' was not created"
             }
 
-            $messages += "Copied $what to '$to'"
+            $messages.Add("Copied $what to '$to'")
         }
         catch {
-            $errors += (
+            $errors.Add(
                 "Failed to copy '$($item.From)' to '$($item.To)': " +
                 "$($_.Exception.Message)"
             )
@@ -311,8 +307,9 @@ else {
     #endregion
 }
 
-[pscustomobject]@{
+$resultParams = @{
     Data     = $exportData
-    Messages = [string[]]$messages
-    Errors   = [string[]]$errors
+    Messages = $messages
+    Errors   = $errors
 }
+New-SectionResultHC @resultParams

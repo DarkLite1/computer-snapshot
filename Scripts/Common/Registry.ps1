@@ -132,7 +132,10 @@ function ConvertTo-RegistryDataHC {
     switch ($Type) {
         { $_ -in @('String', 'ExpandString') } {
             if ($Value -is [array]) {
-                throw "a $Type value is a single text, not a list; use MultiString"
+                throw (
+                    "a $Type value is a single text, not a list; " +
+                    'use MultiString'
+                )
             }
 
             return [string]$Value
@@ -314,7 +317,11 @@ function Get-RegistryEntryProblemHC {
             if ($names -contains 'Type') {
                 try {
                     $type = ConvertTo-RegistryTypeHC -Type ([string]$Entry.Type)
-                    $null = ConvertTo-RegistryDataHC -Value $Entry.Value -Type $type
+                    $dataParams = @{
+                        Value = $Entry.Value
+                        Type  = $type
+                    }
+                    $null = ConvertTo-RegistryDataHC @dataParams
                 }
                 catch {
                     $_.Exception.Message
@@ -327,7 +334,9 @@ function Get-RegistryEntryProblemHC {
             }
         }
         default {
-            if (Test-BroadRegistryKeyHC -Path (ConvertTo-RegistryPathHC $Entry.Path)) {
+            $registryPath = ConvertTo-RegistryPathHC $Entry.Path
+
+            if (Test-BroadRegistryKeyHC -Path $registryPath) {
                 (
                     "Action $action is refused for '$($Entry.Path)', a hive " +
                     'root or a key directly below it; use a more specific key'

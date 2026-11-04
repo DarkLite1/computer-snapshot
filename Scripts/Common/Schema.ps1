@@ -2,22 +2,23 @@
 
 <#
 .SYNOPSIS
-    Validate the JSON-schema keywords used by the bundled configuration contract.
+    Validate the JSON-schema keywords used by the bundled configuration
+    contract.
 #>
 
 function Test-ShapeHC {
     param(
         $Value,
-        $Schema, 
-        $Definitions, 
+        $Schema,
+        $Definitions,
         [string]$Location
     )
-         
+
     if ($Schema.'$ref') {
         $name = $Schema.'$ref' -replace '^#/\$defs/', ''
-        
+
         Test-ShapeHC $Value $Definitions.$name $Definitions $Location
-        
+
         return
     }
 
@@ -26,74 +27,77 @@ function Test-ShapeHC {
 
         foreach ($type in @($Schema.type)) {
             switch ($type) {
-                'null' { 
-                    if ($null -eq $Value) { 
-                        $matches = $true 
-                    } 
+                'null' {
+                    if ($null -eq $Value) {
+                        $matches = $true
+                    }
                 }
                 'object' {
-                    if (Test-ObjectHC $Value) { 
-                        $matches = $true 
-                    } 
+                    if (Test-ObjectHC $Value) {
+                        $matches = $true
+                    }
                 }
                 'array' {
                     if ($Value -is [array]) {
-                        $matches = $true 
-                    } 
+                        $matches = $true
+                    }
                 }
                 'string' {
-                    if ($Value -is [string] -or $Value -is [datetime]) { 
-                        $matches = $true 
-                    } 
+                    if ($Value -is [string] -or $Value -is [datetime]) {
+                        $matches = $true
+                    }
                 }
                 'boolean' {
                     if ($Value -is [bool]) {
-                        $matches = $true 
-                    } 
+                        $matches = $true
+                    }
                 }
                 'integer' {
                     if (
-                        $Value -is [int] -or 
-                        $Value -is [long] -or 
-                        $Value -is [uint32] -or 
+                        $Value -is [int] -or
+                        $Value -is [long] -or
+                        $Value -is [uint32] -or
                         $Value -is [uint64]
                     ) {
-                        $matches = $true 
-                    } 
+                        $matches = $true
+                    }
                 }
             }
         }
 
         if (-not $matches) {
-            "${Location}: expected $(@($Schema.type) -join ' or ')" 
-            return 
+            "${Location}: expected $(@($Schema.type) -join ' or ')"
+            return
         }
     }
 
     if ($null -ne $Schema.const -and $Value -ne $Schema.const) {
-        "${Location}: expected $($Schema.const)" 
+        "${Location}: expected $($Schema.const)"
     }
-         
+
     if ($Schema.enum -and $Value -notin $Schema.enum) {
-        "${Location}: invalid value '$Value'" 
+        "${Location}: invalid value '$Value'"
     }
-         
+
     if (
         $null -ne $Schema.minLength -and $Value.Length -lt $Schema.minLength
-    ) { 
-        "${Location}: string is empty" 
+    ) {
+        "${Location}: string is empty"
     }
 
     $isNumber = $Value -is [int] -or $Value -is [long] -or $Value -is [double]
 
     if (
-        $isNumber -and 
+        $isNumber -and
         (
             ($null -ne $Schema.minimum -and $Value -lt $Schema.minimum) -or
             ($null -ne $Schema.maximum -and $Value -gt $Schema.maximum)
         )
     ) {
-        "${Location}: expected a number from $($Schema.minimum) to $($Schema.maximum)"
+        (
+            "${Location}: expected a number from " +
+            "$($Schema.minimum) to $($Schema.maximum)"
+        )
     }
 
     foreach ($keyword in @('oneOf', 'anyOf')) {
@@ -101,14 +105,16 @@ function Test-ShapeHC {
             $matches = 0
             foreach ($alternative in $Schema.$keyword) {
                 if (
-                    @(Test-ShapeHC $Value $alternative $Definitions $Location).Count -eq 0
-                ) { 
-                    $matches++ 
+                    @(
+                        Test-ShapeHC $Value $alternative $Definitions $Location
+                    ).Count -eq 0
+                ) {
+                    $matches++
                 }
             }
             if (
                 $matches -eq 0 -or ($keyword -eq 'oneOf' -and $matches -ne 1)
-            ) { 
+            ) {
                 # Alternatives that only name one required property each
                 $choices = [System.Collections.Generic.List[string]]::new()
 
@@ -137,12 +143,20 @@ function Test-ShapeHC {
                 }
                 elseif (
                     $matches -eq 0 -and
-                    @($Schema.$keyword | Where-Object { $_.type }).Count -eq @($Schema.$keyword).Count
+                    @($Schema.$keyword | Where-Object { $_.type }).Count -eq
+                    @($Schema.$keyword).Count
                 ) {
                     # Alternatives by type: explain the one of the value's type
                     $sameType = @(
                         $Schema.$keyword | Where-Object {
-                            @(Test-ShapeHC $Value ([pscustomobject]@{ type = $_.type }) $Definitions $Location).Count -eq 0
+                            $typeOnly = [pscustomobject]@{ type = $_.type }
+                            $shapeParams = @{
+                                Value       = $Value
+                                Schema      = $typeOnly
+                                Definitions = $Definitions
+                                Location    = $Location
+                            }
+                            @(Test-ShapeHC @shapeParams).Count -eq 0
                         }
                     )
 
@@ -150,11 +164,15 @@ function Test-ShapeHC {
                         Test-ShapeHC $Value $sameType[0] $Definitions $Location
                     }
                     else {
-                        "${Location}: expected $(@($Schema.$keyword | ForEach-Object { $_.type }) -join ' or ')"
+                        $types = $Schema.$keyword | ForEach-Object { $_.type }
+                        "${Location}: expected $(@($types) -join ' or ')"
                     }
                 }
                 else {
-                    "${Location}: missing required properties or invalid section shape" 
+                    (
+                        "${Location}: missing required properties " +
+                        'or invalid section shape'
+                    )
                 }
             }
         }
@@ -164,21 +182,27 @@ function Test-ShapeHC {
         $names = @(Get-PropertiesHC $Value)
 
         if (
-            $null -ne $Schema.maxProperties -and 
+            $null -ne $Schema.maxProperties -and
             $names.Count -gt $Schema.maxProperties
-        ) { 
-            "${Location}: too many properties" 
+        ) {
+            "${Location}: too many properties"
         }
 
         foreach ($required in $Schema.required) {
             if ($names -cnotcontains $required) {
-                "${Location}.${required}: required property is missing" 
+                "${Location}.${required}: required property is missing"
             }
         }
 
         foreach ($name in $names) {
             if ((Get-PropertiesHC $Schema.properties) -ccontains $name) {
-                Test-ShapeHC $Value.$name $Schema.properties.$name $Definitions "${Location}.${name}"
+                $shapeParams = @{
+                    Value       = $Value.$name
+                    Schema      = $Schema.properties.$name
+                    Definitions = $Definitions
+                    Location    = "${Location}.${name}"
+                }
+                Test-ShapeHC @shapeParams
             }
             else {
                 $patternMatched = $false
@@ -187,21 +211,35 @@ function Test-ShapeHC {
                     Get-PropertiesHC $Schema.patternProperties
                 ) {
                     if ($name -match $pattern) {
-                        $patternMatched = $true 
+                        $patternMatched = $true
 
-                        Test-ShapeHC $Value.$name $Schema.patternProperties.$pattern $Definitions "${Location}.${name}" 
+                        $shapeParams = @{
+                            Value       = $Value.$name
+                            Schema      = $Schema.patternProperties.$pattern
+                            Definitions = $Definitions
+                            Location    = "${Location}.${name}"
+                        }
+                        Test-ShapeHC @shapeParams
                     }
                 }
                 if (
-                    -not $patternMatched -and 
+                    -not $patternMatched -and
                     $Schema.additionalProperties -eq $false
-                ) { "${Location}.${name}: unknown property" }
+                ) {
+                    "${Location}.${name}: unknown property"
+                }
             }
         }
     }
     elseif ($Value -is [array] -and $Schema.items) {
         for ($index = 0; $index -lt $Value.Count; $index++) {
-            Test-ShapeHC $Value[$index] $Schema.items $Definitions "${Location}[$index]"
+            $shapeParams = @{
+                Value       = $Value[$index]
+                Schema      = $Schema.items
+                Definitions = $Definitions
+                Location    = "${Location}[$index]"
+            }
+            Test-ShapeHC @shapeParams
         }
     }
 }

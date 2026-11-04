@@ -3,11 +3,13 @@
 .SYNOPSIS
     Create or restore a single-file computer configuration.
 .PARAMETER Action
-    CreateSnapshot exports selected items. RestoreSnapshot validates and applies a configuration.
+    CreateSnapshot exports selected items. RestoreSnapshot validates and
+    applies a configuration.
 .PARAMETER ConfigurationFile
     JSON file to read or write. Relative paths are resolved from the USB root.
 .PARAMETER Items
-    Sections to export or restore. Defaults to all supported export items or all sections in the restore configuration.
+    Sections to export or restore. Defaults to all supported export items or
+    all sections in the restore configuration.
 .PARAMETER ReportsFolder
     Report folder, relative to this script when not absolute.
 .PARAMETER Force
@@ -35,7 +37,9 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('CreateSnapshot', 'RestoreSnapshot')][string]$Action,
+    [Parameter(Mandatory)]
+    [ValidateSet('CreateSnapshot', 'RestoreSnapshot')]
+    [string]$Action,
     [Parameter(Mandatory)][string]$ConfigurationFile,
     [string[]]$Items,
     [string]$ReportsFolder = '..\Log',
@@ -51,18 +55,51 @@ param(
 )
 Import-Module "$PSScriptRoot\Common\Execution.psm1" -Force
 . "$PSScriptRoot\Common\Section.ps1"
-if (-not $PSBoundParameters.ContainsKey('Script')) { $Script = Get-SnapshotScriptsHC }
+
+if (-not $PSBoundParameters.ContainsKey('Script')) {
+    $Script = Get-SnapshotScriptsHC
+}
 $rootFolder = Split-Path $PSScriptRoot -Parent
+
+#region Resolve script and report paths relative to this script
 $resolvedScripts = [ordered]@{}
 foreach ($name in $Script.Keys) {
-    $resolvedScripts[$name] = if ([IO.Path]::IsPathRooted($Script[$name])) { $Script[$name] } else { [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $Script[$name])) }
+    $resolvedScripts[$name] = if ([IO.Path]::IsPathRooted($Script[$name])) {
+        $Script[$name]
+    }
+    else {
+        [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $Script[$name]))
+    }
 }
-if (-not [IO.Path]::IsPathRooted($ReportsFolder)) { $ReportsFolder = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $ReportsFolder)) }
+if (-not [IO.Path]::IsPathRooted($ReportsFolder)) {
+    $ReportsFolder = [IO.Path]::GetFullPath(
+        (Join-Path $PSScriptRoot $ReportsFolder)
+    )
+}
+Write-Verbose "Reports folder '$ReportsFolder'"
+#endregion
+
 $arguments = @{
-    Action = $Action; ConfigurationFile = $ConfigurationFile; Items = $Items; RootFolder = $rootFolder
-    Script = $resolvedScripts; ReportsFolder = $ReportsFolder; Force = $Force
+    Action            = $Action
+    ConfigurationFile = $ConfigurationFile
+    Items             = $Items
+    RootFolder        = $rootFolder
+    Script            = $resolvedScripts
+    ReportsFolder     = $ReportsFolder
+    Force             = $Force
 }
-foreach ($setting in @('RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser', 'ExportOptions', 'AnswerFile', 'Unattended')) {
-    if ($PSBoundParameters.ContainsKey($setting)) { $arguments[$setting] = $PSBoundParameters[$setting] }
+
+# Only pass the settings the caller provided, the configuration file
+# provides the defaults for the others
+$optionalSettings = @(
+    'RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser',
+    'ExportOptions', 'AnswerFile', 'Unattended'
+)
+foreach ($setting in $optionalSettings) {
+    if ($PSBoundParameters.ContainsKey($setting)) {
+        $arguments[$setting] = $PSBoundParameters[$setting]
+    }
 }
+
+Write-Verbose "$Action with configuration '$ConfigurationFile'"
 Invoke-ComputerSnapshotHC @arguments

@@ -4,27 +4,28 @@
 .SYNOPSIS
     Export or import Copy files folders as a configuration section.
 .DESCRIPTION
-    Import copies each From item, relative to the USB root unless it is a full
-    path, to its To path:
+    Import copies each From item, relative to the USB root unless it is a
+    full path, to its To path:
     - A file is copied to the To file path; missing folders are created.
     - A folder's contents, including hidden files and subfolders, are copied
       into the To folder.
     Existing files at the destination are overwritten, also when they are
-    read-only; other files at the destination are left alone. When some files
-    cannot be copied, the other files are still copied and every failed file
-    is reported. Each problem is reported in Errors and the remaining entries
-    are still copied.
+    read-only; other files at the destination are left alone. When some
+    files cannot be copied, the other files are still copied and every
+    failed file is reported. Each problem is reported in Errors and the
+    remaining entries are still copied.
 
     With FillPlaceholders, a text file is copied with its {{input:...}},
-    {{ipv4:...}} and {{prefix:...}} placeholders replaced by the answers given
-    at the start of the restore, in PlaceholderValues. The file keeps its
-    encoding.
+    {{ipv4:...}} and {{prefix:...}} placeholders replaced by the answers
+    given at the start of the restore, in PlaceholderValues. The file keeps
+    its encoding.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
     Resolved section data. An empty section performs no operations.
 .PARAMETER RootFolder
-    Absolute USB root for asset paths. No configuration files are written here.
+    Absolute USB root for asset paths. No configuration files are written
+    here.
 .OUTPUTS
     Exactly one object: Data (export only), a string array of Messages and a
     string array of Errors.
@@ -59,29 +60,38 @@ function Copy-FilledFileHC {
     ) {
         New-Object System.Text.UTF8Encoding $true
     }
-    elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+    elseif (
+        $bytes.Length -ge 2 -and
+        $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE
+    ) {
         [Text.Encoding]::Unicode
     }
-    elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+    elseif (
+        $bytes.Length -ge 2 -and
+        $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF
+    ) {
         [Text.Encoding]::BigEndianUnicode
     }
     else {
         try {
-            $null = (New-Object System.Text.UTF8Encoding $false, $true).GetString($bytes)
+            $strictUtf8 = New-Object System.Text.UTF8Encoding $false, $true
+            $null = $strictUtf8.GetString($bytes)
             New-Object System.Text.UTF8Encoding $false
         }
         catch {
             # Not UTF-8 without a byte order mark: the Windows code page
-            [Text.Encoding]::GetEncoding(
-                [Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage
-            )
+            $textInfo = [Globalization.CultureInfo]::CurrentCulture.TextInfo
+            [Text.Encoding]::GetEncoding($textInfo.ANSICodePage)
         }
     }
+    Write-Verbose "File '$Source': encoding '$($encoding.WebName)'"
 
     $skip = $encoding.GetPreamble().Length
     $text = $encoding.GetString($bytes, $skip, $bytes.Length - $skip)
     $pattern = '\{\{(?:input|ipv4|prefix):[^{}\r\n]+\}\}'
-    $placeholders = @([regex]::Matches($text, $pattern) | ForEach-Object { $_.Value })
+    $placeholders = @(
+        [regex]::Matches($text, $pattern) | ForEach-Object { $_.Value }
+    )
     $missing = @(
         $placeholders | Select-Object -Unique |
         Where-Object { -not ($Values -and $Values.ContainsKey($_)) }
@@ -115,8 +125,9 @@ function Copy-FolderContentHC {
         [Parameter(Mandatory)][AllowEmptyCollection()]
         [System.Collections.Generic.List[string]]$Failures
     )
-    try { 
-        $children = @(Get-ChildItem -LiteralPath $Source -Force) 
+
+    try {
+        $children = @(Get-ChildItem -LiteralPath $Source -Force)
     }
     catch {
         $Failures.Add("'$Source': $($_.Exception.Message)")
@@ -127,22 +138,36 @@ function Copy-FolderContentHC {
         $target = Join-Path -Path $Destination -ChildPath $child.Name
 
         if ($child.PSIsContainer) {
-            try { 
-                $null = New-Item -Path $target -ItemType Directory -Force 
+            try {
+                $null = New-Item -Path $target -ItemType Directory -Force
             }
             catch {
-                $Failures.Add("'$($child.FullName)': $($_.Exception.Message)")
+                $Failures.Add(
+                    "'$($child.FullName)': $($_.Exception.Message)"
+                )
                 continue
             }
 
-            Copy-FolderContentHC -Source $child.FullName -Destination $target -Failures $Failures
+            $copyParams = @{
+                Source      = $child.FullName
+                Destination = $target
+                Failures    = $Failures
+            }
+            Copy-FolderContentHC @copyParams
         }
         else {
-            try { 
-                Copy-Item -LiteralPath $child.FullName -Destination $target -Force
+            try {
+                $copyParams = @{
+                    LiteralPath = $child.FullName
+                    Destination = $target
+                    Force       = $true
+                }
+                Copy-Item @copyParams
             }
-            catch { 
-                $Failures.Add("'$($child.FullName)': $($_.Exception.Message)") 
+            catch {
+                $Failures.Add(
+                    "'$($child.FullName)': $($_.Exception.Message)"
+                )
             }
         }
     }
@@ -154,63 +179,82 @@ $messages = @()
 $errors = @()
 
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
-    return [pscustomobject]@{ 
+    Write-Verbose 'Import Copy files folders: section is empty, nothing to do'
+    return [pscustomobject]@{
         Data     = $null
-        Messages = [string[]]@('Nothing to do') 
-        Errors   = [string[]]@() 
+        Messages = [string[]]@('Nothing to do')
+        Errors   = [string[]]@()
     }
 }
 
 if ($Action -eq 'Export') {
     #region Capture section
-    $exportData = Read-SectionExampleHC "$PSScriptRoot\..\Examples\CopyFilesFolders.json"
+    Write-Verbose 'Export Copy files folders: use the example configuration'
+    $exportData = Read-SectionExampleHC (
+        "$PSScriptRoot\..\Examples\CopyFilesFolders.json"
+    )
     #endregion
+
     $messages = @('Exported Copy files folders')
 }
 else {
     #region Apply section
+    Write-Verbose 'Import Copy files folders'
     foreach ($item in @($Data | Where-Object { $null -ne $_ })) {
         try {
             if (-not $item.From) {
-                throw "the field 'From' is required" 
+                throw "the field 'From' is required"
             }
-            
-            if (-not $item.To) { 
-                throw "the field 'To' is required" 
+
+            if (-not $item.To) {
+                throw "the field 'To' is required"
             }
-                
+
             $from = Resolve-RootPathHC -Path $item.From -RootFolder $RootFolder
             # %ProgramData%\Vendor becomes C:\ProgramData\Vendor
             $to = Expand-PathVariableHC -Path $item.To
-            $fromItem = Get-Item `
-                -LiteralPath $from -Force `
-                -ErrorAction SilentlyContinue
+            Write-Verbose "Copy '$from' to '$to'"
+            $getItemParams = @{
+                LiteralPath = $from
+                Force       = $true
+                ErrorAction = 'SilentlyContinue'
+            }
+            $fromItem = Get-Item @getItemParams
 
             if (-not $fromItem) {
-                throw "file or folder '$from' not found" 
+                throw "file or folder '$from' not found"
             }
 
             if ($fromItem.PSIsContainer) {
                 if ($item.FillPlaceholders -eq $true) {
-                    throw 'FillPlaceholders only works for a file, not for a folder'
+                    throw (
+                        'FillPlaceholders only works for a file, ' +
+                        'not for a folder'
+                    )
                 }
 
                 $null = New-Item -Path $to -ItemType Directory -Force
                 $failures = New-Object 'System.Collections.Generic.List[string]'
 
-                Copy-FolderContentHC `
-                    -Source $from `
-                    -Destination $to `
-                    -Failures $failures
+                Write-Verbose "Copy the contents of folder '$from'"
+                $copyParams = @{
+                    Source      = $from
+                    Destination = $to
+                    Failures    = $failures
+                }
+                Copy-FolderContentHC @copyParams
 
                 if ($failures.Count) {
                     $details = @($failures | Select-Object -First 5)
 
-                    if ($failures.Count -gt 5) { 
-                        $details += "and $($failures.Count - 5) more" 
+                    if ($failures.Count -gt 5) {
+                        $details += "and $($failures.Count - 5) more"
                     }
 
-                    throw "$($failures.Count) item(s) could not be copied, the others were copied: $($details -join '; ')"
+                    throw (
+                        "$($failures.Count) item(s) could not be copied, " +
+                        "the others were copied: $($details -join '; ')"
+                    )
                 }
 
                 $what = "the contents of folder '$($item.From)'"
@@ -218,17 +262,23 @@ else {
             else {
                 $parent = Split-Path -Path $to -Parent
 
-                if ($parent) { 
-                    $null = New-Item -Path $parent -ItemType Directory -Force 
+                if ($parent) {
+                    $null = New-Item -Path $parent -ItemType Directory -Force
                 }
 
                 if ($item.FillPlaceholders -eq $true) {
-                    $count = Copy-FilledFileHC `
-                        -Source $from `
-                        -Destination $to `
-                        -Values $item.PlaceholderValues
+                    Write-Verbose "Copy file '$from' with placeholders filled"
+                    $copyParams = @{
+                        Source      = $from
+                        Destination = $to
+                        Values      = $item.PlaceholderValues
+                    }
+                    $count = Copy-FilledFileHC @copyParams
 
-                    $what = "file '$($item.From)' with $count placeholder(s) filled in"
+                    $what = (
+                        "file '$($item.From)' with $count " +
+                        'placeholder(s) filled in'
+                    )
                 }
                 else {
                     Copy-Item -LiteralPath $from -Destination $to -Force
@@ -236,21 +286,24 @@ else {
                 }
             }
 
-            if (-not (Test-Path -LiteralPath $to)) { 
-                throw "'$to' was not created" 
+            if (-not (Test-Path -LiteralPath $to)) {
+                throw "'$to' was not created"
             }
 
             $messages += "Copied $what to '$to'"
         }
         catch {
-            $errors += "Failed to copy '$($item.From)' to '$($item.To)': $($_.Exception.Message)"
+            $errors += (
+                "Failed to copy '$($item.From)' to '$($item.To)': " +
+                "$($_.Exception.Message)"
+            )
         }
     }
     #endregion
 }
 
-[pscustomobject]@{ 
+[pscustomobject]@{
     Data     = $exportData
     Messages = [string[]]$messages
-    Errors   = [string[]]$errors 
+    Errors   = [string[]]$errors
 }

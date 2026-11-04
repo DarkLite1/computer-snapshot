@@ -113,6 +113,7 @@ $messages = @()
 $errors = @()
 
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    Write-Verbose 'Import scheduled tasks: section is empty, nothing to do'
     return [pscustomobject]@{
         Data     = $null
         Messages = [string[]]@('Nothing to do')
@@ -123,21 +124,32 @@ if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
 if ($Action -eq 'Export') {
     #region Capture section
     $folders = @(Get-ExportTaskFolderHC -Options $Data)
+    Write-Verbose "Export scheduled tasks in '$($folders -join "', '")'"
 
     # A folder that does not exist has no tasks to export; nested folders
     # can return the same task twice
     $tasks = @(
         foreach ($folder in $folders) {
-            Get-ScheduledTask `
-                -TaskPath "$folder*" -ErrorAction SilentlyContinue
+            $getTaskParams = @{
+                TaskPath    = "$folder*"
+                ErrorAction = 'SilentlyContinue'
+            }
+            Get-ScheduledTask @getTaskParams
         }
     ) | Sort-Object -Property TaskPath, TaskName -Unique
+    Write-Verbose "Found $(@($tasks).Count) scheduled task(s)"
 
     $exportData = @(
         foreach ($task in @($tasks)) {
             try {
-                $xml = Export-ScheduledTask `
-                    -TaskName $task.TaskName -TaskPath $task.TaskPath
+                Write-Verbose (
+                    "Task '$($task.TaskPath)$($task.TaskName)': export"
+                )
+                $exportTaskParams = @{
+                    TaskName = $task.TaskName
+                    TaskPath = $task.TaskPath
+                }
+                $xml = Export-ScheduledTask @exportTaskParams
 
                 $exportTask = [ordered]@{
                     TaskName = $task.TaskName
@@ -184,17 +196,20 @@ if ($Action -eq 'Export') {
 }
 else {
     #region Apply section
+    Write-Verbose 'Import scheduled tasks'
     foreach ($task in @($Data | Where-Object { $null -ne $_ })) {
         $fullName = "$($task.TaskPath)$($task.TaskName)"
+        Write-Verbose "Task '$fullName': register"
 
         try {
             $xml = Get-TaskXmlHC -Task $task -RootFolder $RootFolder
 
-            $exists = [bool](
-                Get-ScheduledTask `
-                    -TaskName $task.TaskName -TaskPath $task.TaskPath `
-                    -ErrorAction SilentlyContinue
-            )
+            $getTaskParams = @{
+                TaskName    = $task.TaskName
+                TaskPath    = $task.TaskPath
+                ErrorAction = 'SilentlyContinue'
+            }
+            $exists = [bool](Get-ScheduledTask @getTaskParams)
 
             $registerParams = @{
                 Xml      = $xml
@@ -214,8 +229,9 @@ else {
 
             if ($task.RunAsUser) {
                 # SIDs and the exported computer's accounts get local names
-                $registerParams.User = Convert-AccountNameHC `
-                    -Name $task.RunAsUser
+                $registerParams.User = Convert-AccountNameHC -Name (
+                    $task.RunAsUser
+                )
                 $runAs = "'$($registerParams.User)'"
 
                 if ($task.RunAsPassword) {
@@ -224,18 +240,22 @@ else {
                 }
             }
 
+            Write-Verbose "Task '$fullName': exists '$exists', runs as $runAs"
             $null = Register-ScheduledTask @registerParams
 
+            $taskParams = @{
+                TaskPath = $task.TaskPath
+                TaskName = $task.TaskName
+            }
             if ($task.Enabled) {
                 $state = 'enabled'
-                $null = Enable-ScheduledTask `
-                    -TaskPath $task.TaskPath -TaskName $task.TaskName
+                $null = Enable-ScheduledTask @taskParams
             }
             else {
                 $state = 'disabled'
-                $null = Disable-ScheduledTask `
-                    -TaskPath $task.TaskPath -TaskName $task.TaskName
+                $null = Disable-ScheduledTask @taskParams
             }
+            Write-Verbose "Task '$fullName': $state"
 
             $source = if ($task.XmlFile) {
                 " from '$($task.XmlFile)'"

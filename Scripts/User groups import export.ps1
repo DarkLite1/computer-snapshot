@@ -18,7 +18,8 @@
 .PARAMETER Data
     Resolved section data. An empty section performs no operations.
 .PARAMETER RootFolder
-    Absolute USB root for asset paths. No configuration files are written here.
+    Absolute USB root for asset paths. No configuration files are written
+    here.
 .OUTPUTS
     Exactly one object: Data (export only), a string array of Messages and a
     string array of Errors.
@@ -31,6 +32,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
+
 #region Windows helpers
 function Get-GroupMemberAdsiHC {
     <#
@@ -70,7 +72,7 @@ function Get-GroupMemberAdsiHC {
 
 function Set-LocalGroupDescriptionHC {
     # Set-LocalGroup cannot set an empty description
-    # https://stackoverflow.com/questions/69041644/how-to-set-the-description-of-a-local-group-to-blank
+    # https://stackoverflow.com/questions/69041644
     param(
         [Parameter(Mandatory)][string]$Name,
         [string]$Description
@@ -84,46 +86,75 @@ function Set-LocalGroupDescriptionHC {
         $group.SetInfo()
     }
 }
+
 function Test-ErrorKindHC {
-    # Match by exception name and error id: the LocalAccounts exception types
-    # only exist once that module is loaded, and PowerShell 7 may deserialize them
-    param([Parameter(Mandatory)]$ErrorRecord, [Parameter(Mandatory)][string]$Kind)
+    # Match by exception name and error id: the LocalAccounts exception
+    # types only exist once that module is loaded, and PowerShell 7 may
+    # deserialize them
+    param(
+        [Parameter(Mandatory)]$ErrorRecord,
+        [Parameter(Mandatory)][string]$Kind
+    )
     $ErrorRecord.Exception.GetType().Name -eq "${Kind}Exception" -or
     $ErrorRecord.FullyQualifiedErrorId -like "$Kind,*"
 }
 #endregion
+
 $exportData = $null
 $messages = @()
 $errors = @()
+
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
-    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do'); Errors = [string[]]@() }
+    Write-Verbose 'Import User groups: section is empty, nothing to do'
+    return [pscustomobject]@{
+        Data     = $null
+        Messages = [string[]]@('Nothing to do')
+        Errors   = [string[]]@()
+    }
 }
+
 if ($Action -eq 'Export') {
     #region Capture section
+    Write-Verbose 'Export User groups'
     $exportData = @(
         foreach ($group in @(Get-LocalGroup)) {
             Write-Verbose "Group '$($group.Name)'"
             try {
                 $members = @(
                     Get-LocalGroupMember -Name $group.Name | ForEach-Object {
-                        [pscustomobject]@{ Name = $_.Name; SID = [string]$_.SID }
+                        [pscustomobject]@{
+                            Name = $_.Name
+                            SID  = [string]$_.SID
+                        }
                     }
                 )
             }
             catch {
                 # Usually an orphaned member: ADSI can still read the others
                 $localGroupMemberError = $_.Exception.Message
+                Write-Verbose (
+                    "Group '$($group.Name)': read the members through ADSI"
+                )
                 try {
                     $members = @(Get-GroupMemberAdsiHC -GroupName $group.Name)
                 }
                 catch {
-                    $errors += "Failed to read the members of group '$($group.Name)': $localGroupMemberError; reading them through ADSI failed too: $($_.Exception.Message)"
+                    $errors += (
+                        'Failed to read the members of group ' +
+                        "'$($group.Name)': $localGroupMemberError; " +
+                        'reading them through ADSI failed too: ' +
+                        "$($_.Exception.Message)"
+                    )
                     continue
                 }
             }
 
             foreach ($orphan in @($members | Where-Object { -not $_.Name })) {
-                $messages += "Group '$($group.Name)': skipped member '$($orphan.SID)', an account that cannot be resolved (deleted, or its domain is unreachable)"
+                $messages += (
+                    "Group '$($group.Name)': skipped member " +
+                    "'$($orphan.SID)', an account that cannot be resolved " +
+                    '(deleted, or its domain is unreachable)'
+                )
             }
 
             # Built-in members such as Everyone are exported by SID
@@ -132,14 +163,22 @@ if ($Action -eq 'Export') {
                     ConvertTo-PortableAccountNameHC -Name $_.Name -Sid $_.SID
                 }
             )
-            $groupName = ConvertTo-PortableAccountNameHC -Name $group.Name -Sid ([string]$group.SID)
+            $portableParams = @{
+                Name = $group.Name
+                Sid  = [string]$group.SID
+            }
+            $groupName = ConvertTo-PortableAccountNameHC @portableParams
             if ($groupName -ne $group.Name) {
                 # A built-in group: its name and description depend on the
                 # Windows language, so it is stored by SID and its
                 # description is left to Windows
+                Write-Verbose "Group '$($group.Name)': built-in, store by SID"
                 [ordered]@{
                     Name    = $groupName
-                    Comment = "Built-in group '$($group.Name)', stored by SID so it works in every Windows language"
+                    Comment = (
+                        "Built-in group '$($group.Name)', stored by SID so " +
+                        'it works in every Windows language'
+                    )
                     Members = $memberNames
                 }
             }
@@ -153,14 +192,18 @@ if ($Action -eq 'Export') {
         }
     )
     #endregion
+
     $messages = @('Exported User groups') + @($messages)
 }
 else {
     #region Apply section
+    Write-Verbose 'Import User groups'
     $knownGroups = @(Get-LocalGroup)
     foreach ($group in $Data) {
         Write-Verbose "Group '$($group.Name)'"
-        $properties = @($group.PSObject.Properties | ForEach-Object { $_.Name })
+        $properties = @(
+            $group.PSObject.Properties | ForEach-Object { $_.Name }
+        )
         $hasDescription = $properties -contains 'Description'
 
         #region Create the group or update its description
@@ -168,20 +211,36 @@ else {
         try {
             $isSid = $group.Name -match '^S-1-\d+(-\d+)+$'
             $existingGroup = $knownGroups | Where-Object {
-                $_.Name -eq $group.Name -or ($isSid -and [string]$_.SID -eq $group.Name)
+                $_.Name -eq $group.Name -or
+                ($isSid -and [string]$_.SID -eq $group.Name)
             } | Select-Object -First 1
             if ($existingGroup) { $groupName = $existingGroup.Name }
             if (-not $existingGroup -and $isSid) {
-                throw "there is no group with SID '$($group.Name)' on '$env:COMPUTERNAME'"
+                throw (
+                    "there is no group with SID '$($group.Name)' on " +
+                    "'$env:COMPUTERNAME'"
+                )
             }
             if (-not $existingGroup) {
+                Write-Verbose "Group '$($group.Name)': create"
                 $newGroupParams = @{ Name = $group.Name }
-                if ($group.Description) { $newGroupParams.Description = $group.Description }
+                if ($group.Description) {
+                    $newGroupParams.Description = $group.Description
+                }
                 $null = New-LocalGroup @newGroupParams
                 $messages += "Created group '$($group.Name)'"
             }
-            elseif ($hasDescription -and [string]$group.Description -ne [string]$existingGroup.Description) {
-                Set-LocalGroupDescriptionHC -Name $groupName -Description $group.Description
+            elseif (
+                $hasDescription -and
+                [string]$group.Description -ne
+                [string]$existingGroup.Description
+            ) {
+                Write-Verbose "Group '$groupName': update description"
+                $descriptionParams = @{
+                    Name        = $groupName
+                    Description = $group.Description
+                }
+                Set-LocalGroupDescriptionHC @descriptionParams
                 $messages += "Updated the description of group '$groupName'"
             }
             else {
@@ -189,33 +248,55 @@ else {
             }
         }
         catch {
-            $errors += "Failed to create or update group '$groupName': $($_.Exception.Message)"
+            $errors += (
+                "Failed to create or update group '$groupName': " +
+                "$($_.Exception.Message)"
+            )
             # Without the group, adding members can only fail
             continue
         }
         #endregion
 
         #region Add members, one at a time
-        foreach ($member in @($group.Members | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+        $members = @(
+            $group.Members |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
+        Write-Verbose "Group '$groupName': add $($members.Count) member(s)"
+        foreach ($member in $members) {
             try {
                 $accountName = Convert-AccountNameHC $member
                 Add-LocalGroupMember -Group $groupName -Member $accountName
                 if ($accountName -ne $member) {
-                    $messages += "Added account '$member' as '$accountName' to group '$($groupName)'"
+                    $messages += (
+                        "Added account '$member' as '$accountName' to " +
+                        "group '$($groupName)'"
+                    )
                 }
                 else {
-                    $messages += "Added account '$member' to group '$($groupName)'"
+                    $messages += (
+                        "Added account '$member' to group '$($groupName)'"
+                    )
                 }
             }
             catch {
                 if (Test-ErrorKindHC $_ 'MemberExists') {
-                    $messages += "Account '$member' is already a member of group '$($groupName)'"
+                    $messages += (
+                        "Account '$member' is already a member of group " +
+                        "'$($groupName)'"
+                    )
                 }
                 elseif (Test-ErrorKindHC $_ 'PrincipalNotFound') {
-                    $errors += "Failed to add account '$member' to group '$($groupName)': account not found"
+                    $errors += (
+                        "Failed to add account '$member' to group " +
+                        "'$($groupName)': account not found"
+                    )
                 }
                 else {
-                    $errors += "Failed to add account '$member' to group '$($groupName)': $($_.Exception.Message)"
+                    $errors += (
+                        "Failed to add account '$member' to group " +
+                        "'$($groupName)': $($_.Exception.Message)"
+                    )
                 }
             }
         }
@@ -223,4 +304,9 @@ else {
     }
     #endregion
 }
-[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages; Errors = [string[]]$errors }
+
+[pscustomobject]@{
+    Data     = $exportData
+    Messages = [string[]]$messages
+    Errors   = [string[]]$errors
+}

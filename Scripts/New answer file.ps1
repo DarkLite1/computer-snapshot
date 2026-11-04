@@ -26,4 +26,7 @@ param(
 Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
 . "$PSScriptRoot\Common\Section.ps1"
 . "$PSScriptRoot\Common\RestoreInput.ps1"
-New-RestoreAnswerFileHC @PSBoundParameters -RootFolder (Split-Path $PSScriptRoot -Parent)
+
+$rootFolder = Split-Path $PSScriptRoot -Parent
+Write-Verbose "Create answer file '$AnswerFile' for '$ConfigurationFile'"
+New-RestoreAnswerFileHC @PSBoundParameters -RootFolder $rootFolder

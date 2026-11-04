@@ -27,7 +27,8 @@ Describe 'Account names' {
             Convert-AccountNameHC -Name 'CONTOSO\ghost' |
                 Should -Be 'CONTOSO\ghost'
         }
-        It 'keeps names without a prefix, built-in and this computer''s accounts' {
+        It ('keeps names without a prefix, built-in and ' +
+            'this computer''s accounts') {
             foreach ($name in @(
                     'Everyone'
                     'BUILTIN\Users'
@@ -41,20 +42,31 @@ Describe 'Account names' {
         }
     }
     Context 'Accounts stored by SID' {
-        It 'exports a built-in account by SID and a local or domain account by name' {
-            ConvertTo-PortableAccountNameHC -Name 'NT AUTHORITY\Iedereen' -Sid 'S-1-1-0' |
-                Should -Be 'S-1-1-0'
-            ConvertTo-PortableAccountNameHC -Name 'PC1\bob' -Sid 'S-1-5-21-1-2-3-1001' |
-                Should -Be 'PC1\bob'
+        It ('exports a built-in account by SID and a local or domain ' +
+            'account by name') {
+            $params = @{
+                Name = 'NT AUTHORITY\Iedereen'
+                Sid  = 'S-1-1-0'
+            }
+            ConvertTo-PortableAccountNameHC @params | Should -Be 'S-1-1-0'
+
+            $params = @{
+                Name = 'PC1\bob'
+                Sid  = 'S-1-5-21-1-2-3-1001'
+            }
+            ConvertTo-PortableAccountNameHC @params | Should -Be 'PC1\bob'
+
             ConvertTo-PortableAccountNameHC -Name 'NoSuchAccount8f3a' |
                 Should -Be 'NoSuchAccount8f3a'
         }
         It 'turns a SID into the account name of this Windows language' {
-            $everyone = ([System.Security.Principal.SecurityIdentifier]'S-1-1-0').Translate(
+            $sid = [System.Security.Principal.SecurityIdentifier]'S-1-1-0'
+            $everyone = $sid.Translate(
                 [System.Security.Principal.NTAccount]
             ).Value
             Convert-AccountNameHC -Name 'S-1-1-0' | Should -Be $everyone
-            ConvertTo-PortableAccountNameHC -Name $everyone | Should -Be 'S-1-1-0'
+            ConvertTo-PortableAccountNameHC -Name $everyone |
+                Should -Be 'S-1-1-0'
         }
         It 'keeps a SID that this computer does not know' {
             Convert-AccountNameHC -Name 'S-1-5-21-1-2-3-99999' |
@@ -64,7 +76,8 @@ Describe 'Account names' {
     Context 'Test-AccountExistsHC' {
         It 'resolves real accounts and rejects unknown ones' {
             # Well-known names differ per Windows language, so use the SID
-            $everyone = ([System.Security.Principal.SecurityIdentifier]'S-1-1-0').Translate(
+            $sid = [System.Security.Principal.SecurityIdentifier]'S-1-1-0'
+            $everyone = $sid.Translate(
                 [System.Security.Principal.NTAccount]
             ).Value
             Test-AccountExistsHC -Name $everyone | Should -BeTrue

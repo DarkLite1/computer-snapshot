@@ -100,6 +100,7 @@ $messages = New-Object 'System.Collections.Generic.List[string]'
 $errors = New-Object 'System.Collections.Generic.List[string]'
 
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
+    Write-Verbose 'Start custom scripts: empty section, nothing to do'
     return [pscustomobject]@{
         Data     = $null
         Messages = [string[]]@('Nothing to do')
@@ -109,6 +110,7 @@ if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
 
 if ($Action -eq 'Export') {
     #region Capture section
+    Write-Verbose 'Export start custom scripts: nothing to export'
     # Custom scripts cannot be read from a computer. An example would run
     # on restore when nobody edits the export, and this script serves both
     # the Before and After sections, so the example would even run twice.
@@ -121,6 +123,7 @@ if ($Action -eq 'Export') {
 }
 else {
     #region Apply section
+    Write-Verbose 'Import start custom scripts'
     foreach ($item in @($Data | Where-Object { $null -ne $_ })) {
         $name = $item.Path
         $scriptErrors = New-Object 'System.Collections.Generic.List[string]'
@@ -140,6 +143,7 @@ else {
             $arguments = ConvertTo-ArgumentsHC $item.Arguments
             $successExitCodes = Get-SuccessExitCodesHC -Item $item
 
+            Write-Verbose "Script '$path': run"
             $global:LASTEXITCODE = 0
 
             & {
@@ -169,6 +173,7 @@ else {
             }
 
             $exitCode = [int]$global:LASTEXITCODE
+            Write-Verbose "Script '$path': exit code $exitCode"
 
             if ($successExitCodes -notcontains $exitCode) {
                 $scriptErrors.Add(

@@ -15,10 +15,10 @@
       of every signed-in user. A per-user uninstaller runs as the account
       that runs the restore, which some uninstallers do not support.
     - Removal uses the application's quiet uninstall command when it has one.
-      Windows Installer (MsiExec) commands are made silent and always uninstall
-      (/X); other uninstallers without a quiet command may show a window.
-      UninstallArguments are added to the application's own UninstallString,
-      UninstallCommand replaces it.
+      Windows Installer (MsiExec) commands are made silent and always
+      uninstall (/X); other uninstallers without a quiet command may show a
+      window. UninstallArguments are added to the application's own
+      UninstallString, UninstallCommand replaces it.
     - Exit codes 0, 3010 and 1641 mean success; 3010 and 1641 mean that a
       restart is needed to complete the change. A removal or installer that
       uses other success codes lists them in SuccessExitCodes, for example
@@ -43,7 +43,8 @@
 .PARAMETER Data
     Resolved section data. An empty section performs no operations.
 .PARAMETER RootFolder
-    Absolute USB root for asset paths. No configuration files are written here.
+    Absolute USB root for asset paths. No configuration files are written
+    here.
 .OUTPUTS
     Exactly one object: Data (export only), a string array of Messages and a
     string array of Errors.
@@ -56,18 +57,25 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
+
 #region Windows helpers
 function Get-UninstallKeyPathHC {
     # Machine-wide uninstall keys, then those of every signed-in user
+    $uninstallKey = 'Microsoft\Windows\CurrentVersion\Uninstall\*'
+
     foreach ($path in @(
-            'HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
-            'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
+            "HKLM:\Software\Wow6432Node\$uninstallKey"
+            "HKLM:\Software\$uninstallKey"
         )) {
         [pscustomobject]@{ Path = $path; User = $null }
     }
 
+    $getHiveParams = @{
+        LiteralPath = 'Registry::HKEY_USERS'
+        ErrorAction = 'SilentlyContinue'
+    }
     $hives = @(
-        Get-ChildItem -LiteralPath 'Registry::HKEY_USERS' -ErrorAction SilentlyContinue |
+        Get-ChildItem @getHiveParams |
         Where-Object { $_.PSChildName -match '^S-1-5-21-[\d-]+$' }
     )
 
@@ -83,22 +91,30 @@ function Get-UninstallKeyPathHC {
         }
 
         [pscustomobject]@{
-            Path = "Registry::HKEY_USERS\$sid\Software\Microsoft\Windows\CurrentVersion\Uninstall\*"
+            Path = "Registry::HKEY_USERS\$sid\Software\$uninstallKey"
             User = $user
         }
     }
 }
+
 function Get-InstalledApplicationsHC {
     # Unreadable uninstall entries are skipped instead of failing the lookup
     $applications = foreach ($key in @(Get-UninstallKeyPathHC)) {
         Get-ItemProperty -Path $key.Path -ErrorAction SilentlyContinue |
             Where-Object { $_.DisplayName } |
-            Select-Object DisplayName, DisplayVersion, Publisher, UninstallString, QuietUninstallString,
-            @{ Name = 'User'; Expression = { $key.User } }
+            Select-Object -Property @(
+                'DisplayName'
+                'DisplayVersion'
+                'Publisher'
+                'UninstallString'
+                'QuietUninstallString'
+                @{ Name = 'User'; Expression = { $key.User } }
+            )
     }
     # The same name can be installed twice, for example 32 and 64 bit
     @($applications) | Sort-Object DisplayName, User, UninstallString -Unique
 }
+
 function Test-SameApplicationHC {
     # Name, user and command: the 32-bit install of the same name differs
     param($Application, [object[]]$Target)
@@ -110,33 +126,43 @@ function Test-SameApplicationHC {
         }
     ).Count -gt 0
 }
+
 function Wait-ApplicationRemovedHC {
     # Some uninstallers finish in a process they start without waiting for it
     param(
         [Parameter(Mandatory)][object[]]$Target,
         [int]$TimeoutSeconds = 60
     )
+    Write-Verbose (
+        "Wait up to $TimeoutSeconds seconds until the application is removed"
+    )
     $attempts = [Math]::Max(1, [Math]::Ceiling($TimeoutSeconds / 2))
     for ($attempt = 0; $attempt -le $attempts; $attempt++) {
         $remaining = @(
             Get-InstalledApplicationsHC |
-            Where-Object { Test-SameApplicationHC -Application $_ -Target $Target }
+            Where-Object {
+                Test-SameApplicationHC -Application $_ -Target $Target
+            }
         )
         if (-not $remaining.Count) { return $true }
         if ($attempt -lt $attempts) { Start-Sleep -Seconds 2 }
     }
+    Write-Verbose 'The application is still installed'
     $false
 }
+
 function Get-GraceSecondsHC {
     # Seconds to wait for the processes an installer started, after the
     # installer itself has exited; a function so tests can shorten it
     60
 }
+
 function Test-SameCreationTimeHC {
     # Windows reports the creation time of a process to the microsecond
     param([datetime]$First, [datetime]$Second)
     [Math]::Abs(($First - $Second).Ticks) -lt 10
 }
+
 function Stop-TreeProcessHC {
     <#
     .SYNOPSIS
@@ -162,6 +188,7 @@ function Stop-TreeProcessHC {
     try {
         $null = $process.Handle
         if (Test-SameCreationTimeHC $process.StartTime $CreationDate) {
+            Write-Verbose "Stop process ID $ProcessId"
             $process.Kill()
         }
     }
@@ -172,6 +199,7 @@ function Stop-TreeProcessHC {
         $process.Dispose()
     }
 }
+
 function Wait-ProcessTreeHC {
     <#
     .SYNOPSIS
@@ -183,10 +211,10 @@ function Wait-ProcessTreeHC {
         When it does not exit in time, it and every process it started are
         stopped and it throws.
 
-        After it exited, the processes it started get GraceSeconds to finish,
-        so setup steps in a child process can complete. Processes still
-        running then, such as the installed application, a tray tool or an
-        updater, are left alone and returned in LeftRunning.
+        After it exited, the processes it started get GraceSeconds to
+        finish, so setup steps in a child process can complete. Processes
+        still running then, such as the installed application, a tray tool
+        or an updater, are left alone and returned in LeftRunning.
 
         With WaitForAllProcesses, every process started gets TimeoutSeconds
         as well, and they are all stopped when one is still running then.
@@ -206,6 +234,10 @@ function Wait-ProcessTreeHC {
         [switch]$WaitForAllProcesses,
         [int]$GraceSeconds = (Get-GraceSecondsHC)
     )
+    Write-Verbose (
+        "Wait for $What, process ID $($Process.Id), " +
+        "timeout $TimeoutSeconds seconds"
+    )
     # Reading the handle keeps the exit code available after the exit
     $null = $Process.Handle
     $since = $Process.StartTime.AddSeconds(-1)
@@ -221,10 +253,14 @@ function Wait-ProcessTreeHC {
     $tree = New-Object 'System.Collections.Generic.Dictionary[int,datetime]'
     $tree[$Process.Id] = $Process.StartTime
 
+    $cimParams = @{
+        ClassName = 'Win32_Process'
+        Property  = 'ProcessId', 'ParentProcessId', 'CreationDate', 'Name'
+    }
+
     while ($true) {
         $all = @(
-            Get-CimInstance -ClassName Win32_Process `
-                -Property ProcessId, ParentProcessId, CreationDate, Name |
+            Get-CimInstance @cimParams |
             Where-Object { $_.CreationDate -ge $since }
         )
         $live = @{}
@@ -257,10 +293,12 @@ function Wait-ProcessTreeHC {
 
                 # The parent exited and its ID now belongs to another
                 # process; only processes started before that are its own
+                $parentStart = $tree[$parentId]
+                $liveStart = $live[$parentId]
                 if (
                     $live.ContainsKey($parentId) -and
-                    -not (Test-SameCreationTimeHC $tree[$parentId] $live[$parentId]) -and
-                    $created -ge $live[$parentId]
+                    -not (Test-SameCreationTimeHC $parentStart $liveStart) -and
+                    $created -ge $liveStart
                 ) {
                     continue
                 }
@@ -274,8 +312,9 @@ function Wait-ProcessTreeHC {
         # the installer itself
         $running = @(
             $all | Where-Object {
-                $tree.ContainsKey([int]$_.ProcessId) -and
-                (Test-SameCreationTimeHC $tree[[int]$_.ProcessId] $_.CreationDate) -and
+                $itemId = [int]$_.ProcessId
+                $tree.ContainsKey($itemId) -and
+                (Test-SameCreationTimeHC $tree[$itemId] $_.CreationDate) -and
                 $_.Name -ne 'conhost.exe'
             }
         )
@@ -303,6 +342,10 @@ function Wait-ProcessTreeHC {
 
         if ($mainExited -and -not $WaitForAllProcesses) {
             if (-not $graceDeadline) {
+                Write-Verbose (
+                    "$What exited, wait up to $GraceSeconds seconds for " +
+                    "$($running.Count) process(es) it started"
+                )
                 $graceDeadline = (Get-Date).AddSeconds($GraceSeconds)
             }
             if ((Get-Date) -ge $graceDeadline) {
@@ -317,12 +360,19 @@ function Wait-ProcessTreeHC {
             }
         }
         elseif ((Get-Date) -ge $deadline) {
+            Write-Verbose (
+                "$What timed out, stop $($running.Count) process(es)"
+            )
             foreach ($item in $running) {
-                Stop-TreeProcessHC -ProcessId $item.ProcessId `
-                    -CreationDate $item.CreationDate
+                $stopParams = @{
+                    ProcessId    = $item.ProcessId
+                    CreationDate = $item.CreationDate
+                }
+                Stop-TreeProcessHC @stopParams
             }
             throw (
-                "$What did not finish within $([Math]::Round($TimeoutSeconds / 60, 2)) " +
+                "$What did not finish within " +
+                "$([Math]::Round($TimeoutSeconds / 60, 2)) " +
                 'minute(s) and was stopped'
             )
         }
@@ -341,7 +391,9 @@ function Wait-ProcessTreeHC {
         ExitCode    = [int]$Process.ExitCode
         LeftRunning = [string[]]@()
     }
-}function Get-LeftRunningTextHC {
+}
+
+function Get-LeftRunningTextHC {
     # '; 'a.exe' started by the installer is still running and was left alone'
     param(
         [string[]]$Names,
@@ -352,14 +404,28 @@ function Wait-ProcessTreeHC {
     }
     $list = "'" + ($Names -join "', '") + "'"
     if ($Names.Count -eq 1) {
-        return "; $list started by the $StartedBy is still running and was left alone"
+        return (
+            "; $list started by the $StartedBy is still running " +
+            'and was left alone'
+        )
     }
-    "; $list started by the $StartedBy are still running and were left alone"
-}function Get-TimeoutSecondsHC {
+    (
+        "; $list started by the $StartedBy are still running " +
+        'and were left alone'
+    )
+}
+
+function Get-TimeoutSecondsHC {
     param($Entry)
-    $minutes = if ($null -ne $Entry.TimeoutMinutes) { [int]$Entry.TimeoutMinutes } else { 15 }
+    $minutes = if ($null -ne $Entry.TimeoutMinutes) {
+        [int]$Entry.TimeoutMinutes
+    }
+    else {
+        15
+    }
     $minutes * 60
 }
+
 function Test-DisplayNameHC {
     # Only * is a wildcard; [ ] and ? in names are literal
     param(
@@ -369,6 +435,7 @@ function Test-DisplayNameHC {
     $escaped = [WildcardPattern]::Escape($Pattern).Replace('`*', '*')
     $Name -like $escaped
 }
+
 function Get-UninstallCommandHC {
     param(
         [Parameter(Mandatory)]$Application,
@@ -379,7 +446,9 @@ function Get-UninstallCommandHC {
         if (-not $command) { return $null }
         return "$command $Arguments"
     }
-    if ($Application.QuietUninstallString) { return $Application.QuietUninstallString }
+    if ($Application.QuietUninstallString) {
+        return $Application.QuietUninstallString
+    }
     $command = [string]$Application.UninstallString
     if ($command -match '(?i)^\s*"?([^"]*\\)?msiexec(\.exe)?"?\s') {
         # MsiExec /I installs or repairs; /X uninstalls
@@ -389,6 +458,7 @@ function Get-UninstallCommandHC {
     }
     $command
 }
+
 function Remove-ApplicationHC {
     # Returns the exit code of the uninstall command and the processes it
     # started that were left running
@@ -398,15 +468,28 @@ function Remove-ApplicationHC {
         [int]$TimeoutSeconds = 900,
         [switch]$WaitForAllProcesses
     )
-    Write-Verbose "Remove application '$ApplicationName' with '$UninstallString'"
+    Write-Verbose (
+        "Remove application '$ApplicationName' with '$UninstallString'"
+    )
     # /S: cmd only removes the outer quotes, the command keeps its own
-    $process = Start-Process -FilePath "$env:SystemRoot\System32\cmd.exe" `
-        -ArgumentList "/D /S /C `"$UninstallString`"" -NoNewWindow -PassThru
+    $startParams = @{
+        FilePath     = "$env:SystemRoot\System32\cmd.exe"
+        ArgumentList = "/D /S /C `"$UninstallString`""
+        NoNewWindow  = $true
+        PassThru     = $true
+    }
+    $process = Start-Process @startParams
     # The uninstaller is the first process cmd.exe starts
-    Wait-ProcessTreeHC -Process $process -TimeoutSeconds $TimeoutSeconds `
-        -What 'the uninstall' -FirstChildIsMain `
-        -WaitForAllProcesses:($WaitForAllProcesses)
+    $waitParams = @{
+        Process             = $process
+        TimeoutSeconds      = $TimeoutSeconds
+        What                = 'the uninstall'
+        FirstChildIsMain    = $true
+        WaitForAllProcesses = $WaitForAllProcesses
+    }
+    Wait-ProcessTreeHC @waitParams
 }
+
 function Get-ExitCodeResultHC {
     <#
     .SYNOPSIS
@@ -437,27 +520,41 @@ function Get-ExitCodeResultHC {
     )
 }
 #endregion
+
 $exportData = $null
 $messages = @()
 $errors = @()
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
-    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do'); Errors = [string[]]@() }
+    Write-Verbose 'Import Software: empty section, nothing to do'
+    return [pscustomobject]@{
+        Data     = $null
+        Messages = [string[]]@('Nothing to do')
+        Errors   = [string[]]@()
+    }
 }
 
 if ($Action -eq 'Export') {
     #region Capture section
-    $exportData = Read-SectionExampleHC "$PSScriptRoot\..\Examples\Software.json"
+    Write-Verbose 'Export Software'
+    $exportData = Read-SectionExampleHC (
+        "$PSScriptRoot\..\Examples\Software.json"
+    )
     #endregion
+
     $messages = @('Exported Software')
 }
 else {
     #region Apply section
+    Write-Verbose "Import Software from root folder '$RootFolder'"
     $workPath = Get-Location
     # Installer arguments may contain paths relative to the USB root
     Set-Location -LiteralPath $RootFolder
     try {
         #region Remove applications
-        foreach ($removal in @($Data.Remove | Where-Object { $null -ne $_ })) {
+        $removals = @($Data.Remove | Where-Object { $null -ne $_ })
+        Write-Verbose "Remove $($removals.Count) application(s)"
+
+        foreach ($removal in $removals) {
             $pattern = [string]$removal.DisplayName
             $successExitCodes = @(
                 $removal.SuccessExitCodes |
@@ -472,24 +569,42 @@ else {
             try {
                 $installed = @(
                     Get-InstalledApplicationsHC |
-                    Where-Object { Test-DisplayNameHC -Name $_.DisplayName -Pattern $pattern }
+                    Where-Object {
+                        $nameParams = @{
+                            Name    = $_.DisplayName
+                            Pattern = $pattern
+                        }
+                        Test-DisplayNameHC @nameParams
+                    }
                 )
 
                 if (-not $installed.Count) {
-                    $messages += "Application '$pattern' is not installed, nothing to remove"
+                    Write-Verbose "Application '$pattern': not installed, skip"
+                    $messages += (
+                        "Application '$pattern' is not installed, " +
+                        'nothing to remove'
+                    )
                     continue
                 }
 
+                Write-Verbose (
+                    "Application '$pattern': $($installed.Count) match(es)"
+                )
+
                 if ($installed.Count -gt 5 -and -not $removal.AllowMultiple) {
                     throw (
-                        "'$pattern' matches $($installed.Count) applications; " +
+                        "'$pattern' matches $($installed.Count) " +
+                        'applications; ' +
                         'nothing was removed. Use a narrower DisplayName, ' +
                         'or set AllowMultiple to remove them all'
                     )
                 }
             }
             catch {
-                $errors += "Failed to remove application '$pattern': $($_.Exception.Message)"
+                $errors += (
+                    "Failed to remove application '$pattern': " +
+                    "$($_.Exception.Message)"
+                )
                 continue
             }
 
@@ -506,8 +621,12 @@ else {
             }
 
             foreach ($target in $targets) {
-                $applicationName = (@($target.DisplayName) | Select-Object -Unique) -join "', '"
-                $users = @($target.User | Where-Object { $_ } | Select-Object -Unique)
+                $applicationName = (
+                    @($target.DisplayName) | Select-Object -Unique
+                ) -join "', '"
+                $users = @(
+                    $target.User | Where-Object { $_ } | Select-Object -Unique
+                )
 
                 if ($users.Count) {
                     $applicationName += "' for user '$($users -join "', '")"
@@ -518,69 +637,122 @@ else {
                         [string]$removal.UninstallCommand
                     }
                     else {
-                        Get-UninstallCommandHC `
-                            -Application $target[0] `
-                            -Arguments $removal.UninstallArguments
+                        $commandParams = @{
+                            Application = $target[0]
+                            Arguments   = $removal.UninstallArguments
+                        }
+                        Get-UninstallCommandHC @commandParams
                     }
 
                     if (-not $command) {
                         throw 'no uninstall command found in the registry'
                     }
 
-                    $uninstall = Remove-ApplicationHC `
-                        -ApplicationName $applicationName -UninstallString $command `
-                        -TimeoutSeconds (Get-TimeoutSecondsHC $removal) `
-                        -WaitForAllProcesses:($removal.WaitForAllProcesses -eq $true)
+                    $removeParams = @{
+                        ApplicationName     = $applicationName
+                        UninstallString     = $command
+                        TimeoutSeconds      = (Get-TimeoutSecondsHC $removal)
+                        WaitForAllProcesses = (
+                            $removal.WaitForAllProcesses -eq $true
+                        )
+                    }
+                    $uninstall = Remove-ApplicationHC @removeParams
                     $exitCode = $uninstall.ExitCode
-                    $leftRunning = Get-LeftRunningTextHC `
-                        -Names $uninstall.LeftRunning -StartedBy 'uninstaller'
+                    $leftRunningParams = @{
+                        Names     = $uninstall.LeftRunning
+                        StartedBy = 'uninstaller'
+                    }
+                    $leftRunning = Get-LeftRunningTextHC @leftRunningParams
 
-                    $result = Get-ExitCodeResultHC `
-                        -ExitCode $exitCode -What 'the uninstall' `
-                        -SuccessExitCodes $successExitCodes
+                    $resultParams = @{
+                        ExitCode         = $exitCode
+                        What             = 'the uninstall'
+                        SuccessExitCodes = $successExitCodes
+                    }
+                    $result = Get-ExitCodeResultHC @resultParams
 
                     if (
                         $result -ne 'restart' -and
                         -not (Wait-ApplicationRemovedHC -Target $target)
                     ) {
-                        throw "the application is still installed 60 seconds after the uninstall (exit code $exitCode)"
+                        throw (
+                            'the application is still installed 60 seconds ' +
+                            "after the uninstall (exit code $exitCode)"
+                        )
                     }
 
                     if ($result -eq 'restart') {
-                        $messages += "Removed application '$applicationName', a restart is needed to complete the removal$leftRunning"
+                        $messages += (
+                            "Removed application '$applicationName', " +
+                            'a restart is needed to complete the removal' +
+                            $leftRunning
+                        )
                     }
                     else {
-                        $messages += "Removed application '$applicationName'$leftRunning"
+                        $messages += (
+                            "Removed application '$applicationName'" +
+                            $leftRunning
+                        )
                     }
                 }
                 catch {
-                    $errors += "Failed to remove application '$applicationName': $($_.Exception.Message)"
+                    Write-Verbose "Application '$applicationName': failed"
+                    $errors += (
+                        "Failed to remove application '$applicationName': " +
+                        "$($_.Exception.Message)"
+                    )
                 }
             }
         }
         #endregion
 
         #region Install applications
-        foreach ($application in @($Data.Install | Where-Object { $null -ne $_ })) {
+        $installs = @($Data.Install | Where-Object { $null -ne $_ })
+        Write-Verbose "Install $($installs.Count) application(s)"
+
+        foreach ($application in $installs) {
             $label = "'$($application.ExecutablePath)'"
-            if ($application.Arguments) { $label += " with arguments '$($application.Arguments)'" }
+            if ($application.Arguments) {
+                $label += " with arguments '$($application.Arguments)'"
+            }
             try {
-                if (-not $application.ExecutablePath) { throw "the property 'ExecutablePath' is required" }
-                $executablePath = Resolve-RootPathHC -Path $application.ExecutablePath -RootFolder $RootFolder
-                if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
+                if (-not $application.ExecutablePath) {
+                    throw "the property 'ExecutablePath' is required"
+                }
+                $resolveParams = @{
+                    Path       = $application.ExecutablePath
+                    RootFolder = $RootFolder
+                }
+                $executablePath = Resolve-RootPathHC @resolveParams
+                $isFile = Test-Path -LiteralPath $executablePath -PathType Leaf
+                if (-not $isFile) {
                     throw "the file '$executablePath' does not exist"
                 }
                 Write-Verbose "Install executable '$executablePath'"
-                $startParams = @{ FilePath = $executablePath; NoNewWindow = $true; PassThru = $true }
-                if ($application.Arguments) { $startParams.ArgumentList = $application.Arguments }
+                $startParams = @{
+                    FilePath    = $executablePath
+                    NoNewWindow = $true
+                    PassThru    = $true
+                }
+                if ($application.Arguments) {
+                    $startParams.ArgumentList = $application.Arguments
+                }
                 $process = Start-Process @startParams
-                $installation = Wait-ProcessTreeHC `
-                    -Process $process -What 'the installation' `
-                    -TimeoutSeconds (Get-TimeoutSecondsHC $application) `
-                    -WaitForAllProcesses:($application.WaitForAllProcesses -eq $true)
+                $waitParams = @{
+                    Process             = $process
+                    What                = 'the installation'
+                    TimeoutSeconds      = (Get-TimeoutSecondsHC $application)
+                    WaitForAllProcesses = (
+                        $application.WaitForAllProcesses -eq $true
+                    )
+                }
+                $installation = Wait-ProcessTreeHC @waitParams
                 $exitCode = $installation.ExitCode
-                $leftRunning = Get-LeftRunningTextHC `
-                    -Names $installation.LeftRunning -StartedBy 'installer'
+                $leftRunningParams = @{
+                    Names     = $installation.LeftRunning
+                    StartedBy = 'installer'
+                }
+                $leftRunning = Get-LeftRunningTextHC @leftRunningParams
                 $successExitCodes = @(
                     $application.SuccessExitCodes |
                     Where-Object { $null -ne $_ } |
@@ -591,22 +763,33 @@ else {
                     $successExitCodes = @(0)
                 }
 
-                $result = Get-ExitCodeResultHC `
-                    -ExitCode $exitCode -What 'the installation' `
-                    -SuccessExitCodes $successExitCodes
+                $resultParams = @{
+                    ExitCode         = $exitCode
+                    What             = 'the installation'
+                    SuccessExitCodes = $successExitCodes
+                }
+                $result = Get-ExitCodeResultHC @resultParams
 
                 if ($result -eq 'restart') {
-                    $messages += "Installed $label, a restart is needed to complete the installation$leftRunning"
+                    $messages += (
+                        "Installed $label, a restart is needed to complete " +
+                        "the installation$leftRunning"
+                    )
                 }
                 elseif ($exitCode) {
-                    $messages += "Installed $label (exit code $exitCode)$leftRunning"
+                    $messages += (
+                        "Installed $label (exit code $exitCode)$leftRunning"
+                    )
                 }
                 else {
                     $messages += "Installed $label$leftRunning"
                 }
             }
             catch {
-                $errors += "Failed to install ${label}: $($_.Exception.Message)"
+                Write-Verbose "Install ${label}: failed"
+                $errors += (
+                    "Failed to install ${label}: $($_.Exception.Message)"
+                )
             }
         }
         #endregion
@@ -614,4 +797,13 @@ else {
     finally { Set-Location -LiteralPath $workPath.Path }
     #endregion
 }
-[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages; Errors = [string[]]$errors }
+
+Write-Verbose (
+    "Software: $(@($messages).Count) message(s), " +
+    "$(@($errors).Count) error(s)"
+)
+[pscustomobject]@{
+    Data     = $exportData
+    Messages = [string[]]$messages
+    Errors   = [string[]]$errors
+}

@@ -26,81 +26,109 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
+
 #region Windows helpers
 Function Export-FirewallRulesHC {
-        
-        Param(
-            [String]$Name = '*', 
-            [String]$PolicyStore = 'ActiveStore', 
-            [Switch]$Inbound, 
-            [Switch]$Outbound, 
-            [Switch]$Enabled, 
-            [Switch]$Disabled, 
-            [Switch]$Block, 
-            [Switch]$Allow
+    Param(
+        [String]$Name = '*',
+        [String]$PolicyStore = 'ActiveStore',
+        [Switch]$Inbound,
+        [Switch]$Outbound,
+        [Switch]$Enabled,
+        [Switch]$Disabled,
+        [Switch]$Block,
+        [Switch]$Allow
+    )
+
+    Function ConvertTo-BooleanHC {
+        Param (
+            $Value
         )
-        
-        Function ConvertTo-BooleanHC {
-            Param (
-                $Value
-            )
-            if ($Value -is [Boolean]) {
-                $Value
+        if ($Value -is [Boolean]) {
+            $Value
+        }
+        else {
+            if (($Value -eq 'True') -or ($Value -eq '1')) {
+                $true
             }
             else {
-                if (($Value -eq 'True') -or ($Value -eq '1')) { 
-                    $true 
-                }
-                else {
-                    $false 
-                }
+                $false
             }
         }
-        Function ConvertTo-StringArrayHC {
-            Param(
-                $StringArray
+    }
+
+    Function ConvertTo-StringArrayHC {
+        Param(
+            $StringArray
+        )
+        $Result = ''
+        if ($StringArray) {
+            Foreach ($Value In $StringArray) {
+                if ($Result -ne '') { $Result += ',' }
+                $Result += $Value
+            }
+        }
+        $Result
+    }
+
+    Try {
+        #region Filter rules
+        $Direction = '*'
+        if ($Inbound -And !$Outbound) { $Direction = 'Inbound' }
+        if (!$Inbound -And $Outbound) { $Direction = 'Outbound' }
+
+        $RuleState = '*'
+        if ($Enabled -And !$Disabled) { $RuleState = 'True' }
+        if (!$Enabled -And $Disabled) { $RuleState = 'False' }
+
+        $Action = '*'
+        if ($Allow -And !$Block) { $Action = 'Allow' }
+        if (!$Allow -And $Block) { $Action = 'Block' }
+        #endregion
+
+        #region Get firewall rules
+        Write-Verbose "Get firewall rules from '$PolicyStore'"
+
+        $params = @{
+            DisplayName = $Name
+            PolicyStore = $PolicyStore
+        }
+        $firewallRules = Get-NetFirewallRule @params | Where-Object {
+            $_.Direction -like $Direction -and
+            $_.Enabled -like $RuleState -and
+            $_.Action -like $Action
+        }
+        #endregion
+
+        #region Create firewall rule details for export
+        $firewallRuleSet = ForEach ($rule In $firewallRules) {
+            Write-Verbose (
+                "Firewall rule `"$($rule.DisplayName)`" ($($rule.Name))"
             )
-            $Result = ''
-            if ($StringArray) {
-                Foreach ($Value In $StringArray) {
-                    if ($Result -ne '') { $Result += ',' }
-                    $Result += $Value
-                }
-            }
-            $Result
-        }
-        
-        Try {
-            #region Filter rules
-            $Direction = '*'
-            if ($Inbound -And !$Outbound) { $Direction = 'Inbound' }
-            if (!$Inbound -And $Outbound) { $Direction = 'Outbound' }
-        
-            $RuleState = '*'
-            if ($Enabled -And !$Disabled) { $RuleState = 'True' }
-            if (!$Enabled -And $Disabled) { $RuleState = 'False' }
-        
-            $Action = '*'
-            if ($Allow -And !$Block) { $Action = 'Allow' }
-            if (!$Allow -And $Block) { $Action = 'Block' }
-            #endregion
-        
-            #region Get firewall rules
-            $firewallRules = Get-NetFirewallRule -DisplayName $Name -PolicyStore $PolicyStore | Where-Object { $_.Direction -like $Direction -and $_.Enabled -like $RuleState -and $_.Action -like $Action }
-            #endregion
-                
-            #region Create firewall rule details for export
-            $firewallRuleSet = ForEach ($rule In $firewallRules) {
-                Write-Verbose "Firewall rule `"$($rule.DisplayName)`" ($($rule.Name))"
-                try {
+            try {
                 $AddressFilter = $rule | Get-NetFirewallAddressFilter
                 $PortFilter = $rule | Get-NetFirewallPortFilter
                 $ApplicationFilter = $rule | Get-NetFirewallApplicationFilter
                 $ServiceFilter = $rule | Get-NetFirewallServiceFilter
                 $InterfaceFilter = $rule | Get-NetFirewallInterfaceFilter
-                $InterfaceTypeFilter = $rule | Get-NetFirewallInterfaceTypeFilter
+                $InterfaceTypeFilter = (
+                    $rule | Get-NetFirewallInterfaceTypeFilter
+                )
                 $SecurityFilter = $rule | Get-NetFirewallSecurityFilter
-        
+
+                # Replace known folders in the program path with their
+                # environment variable
+                $sysPattern = "$($ENV:SystemRoot.Replace("\","\\"))\\"
+                $x86Folder = ${ENV:ProgramFiles(x86)}.Replace("\", "\\")
+                $x86Folder = $x86Folder.Replace("(", "\(").Replace(")", "\)")
+                $x86Pattern = "$x86Folder\\"
+                $pfPattern = "$($ENV:ProgramFiles.Replace("\","\\"))\\"
+
+                $prog = $ApplicationFilter.Program
+                $prog = $prog -Replace $sysPattern, "%SystemRoot%\"
+                $prog = $prog -Replace $x86Pattern, "%ProgramFiles(x86)%\"
+                $prog = $prog -Replace $pfPattern, "%ProgramFiles%\"
+
                 [Ordered]@{
                     Name                = $rule.Name
                     DisplayName         = $rule.DisplayName
@@ -110,205 +138,308 @@ Function Export-FirewallRulesHC {
                     Enabled             = ConvertTo-BooleanHC $rule.Enabled
                     Profile             = [String]$rule.Profile -replace ' '
                     Protocol            = $PortFilter.Protocol
-                    LocalPort           = ConvertTo-StringArrayHC $PortFilter.LocalPort
-                    RemotePort          = ConvertTo-StringArrayHC $PortFilter.RemotePort
-                    IcmpType            = ConvertTo-StringArrayHC $PortFilter.IcmpType
+                    LocalPort           = ConvertTo-StringArrayHC (
+                        $PortFilter.LocalPort
+                    )
+                    RemotePort          = ConvertTo-StringArrayHC (
+                        $PortFilter.RemotePort
+                    )
+                    IcmpType            = ConvertTo-StringArrayHC (
+                        $PortFilter.IcmpType
+                    )
                     DynamicTarget       = [String]$PortFilter.DynamicTarget
                     Group               = $rule.Group
                     Platform            = ConvertTo-StringArrayHC $rule.Platform
                     EdgeTraversalPolicy = [String]$rule.EdgeTraversalPolicy
-                    LooseSourceMapping  = ConvertTo-BooleanHC $rule.LooseSourceMapping
-                    LocalOnlyMapping    = ConvertTo-BooleanHC $rule.LocalOnlyMapping
+                    LooseSourceMapping  = ConvertTo-BooleanHC (
+                        $rule.LooseSourceMapping
+                    )
+                    LocalOnlyMapping    = ConvertTo-BooleanHC (
+                        $rule.LocalOnlyMapping
+                    )
                     Owner               = $rule.Owner
-                    LocalAddress        = ConvertTo-StringArrayHC $AddressFilter.LocalAddress
-                    RemoteAddress       = ConvertTo-StringArrayHC $AddressFilter.RemoteAddress
-                    Program             = $ApplicationFilter.Program -Replace "$($ENV:SystemRoot.Replace("\","\\"))\\", "%SystemRoot%\" -Replace "$(${ENV:ProgramFiles(x86)}.Replace("\","\\").Replace("(","\(").Replace(")","\)"))\\", "%ProgramFiles(x86)%\" -Replace "$($ENV:ProgramFiles.Replace("\","\\"))\\", "%ProgramFiles%\"
+                    LocalAddress        = ConvertTo-StringArrayHC (
+                        $AddressFilter.LocalAddress
+                    )
+                    RemoteAddress       = ConvertTo-StringArrayHC (
+                        $AddressFilter.RemoteAddress
+                    )
+                    Program             = $prog
                     Package             = $ApplicationFilter.Package
                     Service             = $ServiceFilter.Service
-                    InterfaceAlias      = ConvertTo-StringArrayHC $InterfaceFilter.InterfaceAlias
-                    InterfaceType       = [String]$InterfaceTypeFilter.InterfaceType
+                    InterfaceAlias      = ConvertTo-StringArrayHC (
+                        $InterfaceFilter.InterfaceAlias
+                    )
+                    InterfaceType       = (
+                        [String]$InterfaceTypeFilter.InterfaceType
+                    )
                     LocalUser           = $SecurityFilter.LocalUser
                     RemoteUser          = $SecurityFilter.RemoteUser
                     RemoteMachine       = $SecurityFilter.RemoteMachine
-                    Authentication      = [String]$SecurityFilter.Authentication
+                    Authentication      = (
+                        [String]$SecurityFilter.Authentication
+                    )
                     Encryption          = [String]$SecurityFilter.Encryption
-                    OverrideBlockRules  = ConvertTo-BooleanHC $SecurityFilter.OverrideBlockRules
-                }
-                }
-                catch {
-                    $errors.Add("Failed to export firewall rule '$($rule.DisplayName)' ($($rule.Name)): $($_.Exception.Message)")
+                    OverrideBlockRules  = ConvertTo-BooleanHC (
+                        $SecurityFilter.OverrideBlockRules
+                    )
                 }
             }
-            #endregion
-        
-            return @($firewallRuleSet)
+            catch {
+                $errors.Add(
+                    'Failed to export firewall rule ' +
+                    "'$($rule.DisplayName)' ($($rule.Name)): " +
+                    "$($_.Exception.Message)"
+                )
+            }
         }
-        Catch {
-            throw "Failed to export the firewall rules: $_"
+        #endregion
+
+        return @($firewallRuleSet)
+    }
+    Catch {
+        throw "Failed to export the firewall rules: $_"
+    }
+}
+
+Function Import-FirewallRulesHC {
+    Param(
+        [Parameter(Mandatory)]
+        $Data,
+        [String]$PolicyStore = 'PersistentStore'
+    )
+
+    Function ConvertTo-StringArrayHC {
+        Param (
+            [String]$List,
+            [String]$DefaultValue = 'Any'
+        )
+        if (![String]::IsNullOrEmpty($List)) {
+            return ($List -split ',')
+        }
+        else {
+            return $DefaultValue
         }
     }
-Function Import-FirewallRulesHC {
-        
-        
-        Param(
-            [Parameter(Mandatory)]
-            $Data, 
-            [String]$PolicyStore = 'PersistentStore'
+
+    Function ConvertTo-BooleanHC {
+        Param (
+            $Value
         )
-        
-        Function ConvertTo-StringArrayHC {
-            Param (
-                [String]$List, 
-                [String]$DefaultValue = 'Any'
-            )
-            if (![String]::IsNullOrEmpty($List)) {
-                return ($List -split ',')
+        if ($Value -is [Boolean]) {
+            $Value
+        }
+        else {
+            if (($Value -eq 'True') -or ($Value -eq '1')) {
+                $true
             }
             else {
-                return $DefaultValue 
+                $false
             }
         }
-        Function ConvertTo-BooleanHC {
-            Param (
-                $Value
-            )
-            if ($Value -is [Boolean]) {
-                $Value
-            }
-            else {
-                if (($Value -eq 'True') -or ($Value -eq '1')) { 
-                    $true 
+    }
+
+    Try {
+        $firewallRules = $Data
+
+        ForEach ($rule In $firewallRules) {
+            $newRuleParams = @{
+                Name                = $rule.Name
+                DisplayName         = $rule.DisplayName
+                Description         = $rule.Description
+                Group               = $rule.Group
+                Enabled             = if (
+                    ConvertTo-BooleanHC $rule.Enabled
+                ) {
+                    # only accepts a string not a boolean
+                    'true'
                 }
                 else {
-                    $false 
+                    'false'
+                }
+                Profile             = $rule.Profile
+                Direction           = $rule.Direction
+                Action              = $rule.Action
+                EdgeTraversalPolicy = $rule.EdgeTraversalPolicy
+                LooseSourceMapping  = ConvertTo-BooleanHC (
+                    $rule.LooseSourceMapping
+                )
+                LocalOnlyMapping    = ConvertTo-BooleanHC $rule.LocalOnlyMapping
+                LocalAddress        = ConvertTo-StringArrayHC $rule.LocalAddress
+                RemoteAddress       = ConvertTo-StringArrayHC (
+                    $rule.RemoteAddress
+                )
+                Protocol            = $rule.Protocol
+                LocalPort           = ConvertTo-StringArrayHC $rule.LocalPort
+                RemotePort          = ConvertTo-StringArrayHC $rule.RemotePort
+                IcmpType            = ConvertTo-StringArrayHC $rule.IcmpType
+                DynamicTarget       = $rule.DynamicTarget
+                Program             = $rule.Program
+                Service             = $rule.Service
+                InterfaceAlias      = ConvertTo-StringArrayHC (
+                    $rule.InterfaceAlias
+                )
+                InterfaceType       = $rule.InterfaceType
+                LocalUser           = $rule.LocalUser
+                RemoteUser          = $rule.RemoteUser
+                RemoteMachine       = $rule.RemoteMachine
+                Authentication      = $rule.Authentication
+                Encryption          = $rule.Encryption
+                OverrideBlockRules  = ConvertTo-BooleanHC (
+                    $rule.OverrideBlockRules
+                )
+            }
+            if ($rule.Platform) {
+                $newRuleParams.Platform = ConvertTo-StringArrayHC (
+                    $rule.Platform
+                )
+            }
+            if ($rule.Owner) {
+                $newRuleParams.Owner = $rule.Owner
+            }
+            if ($rule.Package) {
+                $newRuleParams.Package = $rule.Package
+            }
+
+            # Empty or missing settings use the Windows default; passing
+            # $null to an enumeration parameter such as Profile or Direction
+            # fails
+            foreach ($key in @($newRuleParams.Keys)) {
+                $value = $newRuleParams[$key]
+                if (
+                    $null -eq $value -or
+                    ($value -is [string] -and $value -eq '')
+                ) {
+                    $newRuleParams.Remove($key)
                 }
             }
-        }
-        
-        Try {
-            
-            $firewallRules = $Data
-        
-            ForEach ($rule In $firewallRules) {
-                $newRuleParams = @{
-                    Name                = $rule.Name
-                    DisplayName         = $rule.DisplayName
-                    Description         = $rule.Description
-                    Group               = $rule.Group
-                    Enabled             = if (
-                        ConvertTo-BooleanHC $rule.Enabled
-                    ) {
-                        # only accepts a string not a boolean
-                        'true'
+
+            Try {
+                Write-Verbose (
+                    "Create firewall rule '$($rule.DisplayName)' " +
+                    "'($($rule.Name))'"
+                )
+
+                #region Move an existing rule aside, so it can be restored
+                $backupName = $null
+                if ($rule.Name) {
+                    $params = @{
+                        Name        = $rule.Name
+                        PolicyStore = $PolicyStore
+                        ErrorAction = 'Ignore'
                     }
-                    else {
-                        'false'
+                    $existingRule = @(Get-NetFirewallRule @params)
+                    if ($existingRule.Count) {
+                        $backupName = '{0}.backup-{1}' -f $rule.Name, (
+                            [guid]::NewGuid().ToString('N')
+                        )
+                        Write-Verbose (
+                            "Rename existing rule '$($rule.Name)' " +
+                            "to '$backupName'"
+                        )
+                        $existingRule |
+                            Rename-NetFirewallRule -NewName $backupName
                     }
-                    Profile             = $rule.Profile
-                    Direction           = $rule.Direction
-                    Action              = $rule.Action
-                    EdgeTraversalPolicy = $rule.EdgeTraversalPolicy
-                    LooseSourceMapping  = ConvertTo-BooleanHC $rule.LooseSourceMapping
-                    LocalOnlyMapping    = ConvertTo-BooleanHC $rule.LocalOnlyMapping
-                    LocalAddress        = ConvertTo-StringArrayHC $rule.LocalAddress
-                    RemoteAddress       = ConvertTo-StringArrayHC $rule.RemoteAddress
-                    Protocol            = $rule.Protocol
-                    LocalPort           = ConvertTo-StringArrayHC $rule.LocalPort
-                    RemotePort          = ConvertTo-StringArrayHC $rule.RemotePort
-                    IcmpType            = ConvertTo-StringArrayHC $rule.IcmpType
-                    DynamicTarget       = $rule.DynamicTarget
-                    Program             = $rule.Program
-                    Service             = $rule.Service
-                    InterfaceAlias      = ConvertTo-StringArrayHC $rule.InterfaceAlias
-                    InterfaceType       = $rule.InterfaceType
-                    LocalUser           = $rule.LocalUser
-                    RemoteUser          = $rule.RemoteUser
-                    RemoteMachine       = $rule.RemoteMachine
-                    Authentication      = $rule.Authentication
-                    Encryption          = $rule.Encryption
-                    OverrideBlockRules  = ConvertTo-BooleanHC $rule.OverrideBlockRules
                 }
-                if ($rule.Platform) { 
-                    $newRuleParams.Platform = ConvertTo-StringArrayHC $rule.Platform
+                #endregion
+
+                try {
+                    $newRuleParams.PolicyStore = $PolicyStore
+                    $null = New-NetFirewallRule @newRuleParams
                 }
-                if ($rule.Owner) { 
-                    $newRuleParams.Owner = $rule.Owner 
-                }
-                if ($rule.Package) {
-                    $newRuleParams.Package = $rule.Package 
-                }
-                # Empty or missing settings use the Windows default; passing $null
-                # to an enumeration parameter such as Profile or Direction fails
-                foreach ($key in @($newRuleParams.Keys)) {
-                    $value = $newRuleParams[$key]
-                    if ($null -eq $value -or ($value -is [string] -and $value -eq '')) {
-                        $newRuleParams.Remove($key)
+                catch {
+                    $createError = $_
+                    if ($backupName) {
+                        Write-Verbose (
+                            "Restore existing rule '$($rule.Name)' " +
+                            "from '$backupName'"
+                        )
+                        try {
+                            $params = @{
+                                Name        = $backupName
+                                PolicyStore = $PolicyStore
+                            }
+                            Get-NetFirewallRule @params |
+                                Rename-NetFirewallRule -NewName $rule.Name
+                        }
+                        catch {
+                            throw (
+                                "$($createError.Exception.Message); " +
+                                'the existing rule could not be restored ' +
+                                "and is kept as '$backupName': " +
+                                "$($_.Exception.Message)"
+                            )
+                        }
                     }
+                    throw $createError
                 }
 
-                Try {
-                    Write-Verbose "Create firewall rule '$($rule.DisplayName)' '($($rule.Name))'"
-                    #region Move an existing rule aside, so it can be restored on failure
-                    $backupName = $null
-                    if ($rule.Name) {
-                        $existingRule = @(Get-NetFirewallRule -Name $rule.Name -PolicyStore $PolicyStore -ErrorAction Ignore)
-                        if ($existingRule.Count) {
-                            $backupName = '{0}.backup-{1}' -f $rule.Name, [guid]::NewGuid().ToString('N')
-                            $existingRule | Rename-NetFirewallRule -NewName $backupName
-                        }
+                if ($backupName) {
+                    Write-Verbose "Remove backup rule '$backupName'"
+                    $params = @{
+                        Name        = $backupName
+                        PolicyStore = $PolicyStore
                     }
-                    #endregion
-                    try {
-                        $null = New-NetFirewallRule @newRuleParams -PolicyStore $PolicyStore
-                    }
-                    catch {
-                        $createError = $_
-                        if ($backupName) {
-                            try {
-                                Get-NetFirewallRule -Name $backupName -PolicyStore $PolicyStore |
-                                    Rename-NetFirewallRule -NewName $rule.Name
-                            }
-                            catch {
-                                throw "$($createError.Exception.Message); the existing rule could not be restored and is kept as '$backupName': $($_.Exception.Message)"
-                            }
-                        }
-                        throw $createError
-                    }
-                    if ($backupName) {
-                        Get-NetFirewallRule -Name $backupName -PolicyStore $PolicyStore | Remove-NetFirewallRule
-                        $messages.Add("Replaced firewall rule '$($rule.DisplayName)' ($($rule.Name))")
-                    }
-                    else {
-                        $messages.Add("Created firewall rule '$($rule.DisplayName)' ($($rule.Name))")
-                    }
+                    Get-NetFirewallRule @params | Remove-NetFirewallRule
+                    $messages.Add(
+                        "Replaced firewall rule '$($rule.DisplayName)' " +
+                        "($($rule.Name))"
+                    )
                 }
-                Catch {
-                    $errors.Add("Failed to create firewall rule '$($rule.DisplayName)' ($($rule.Name)): $($_.Exception.Message)")
+                else {
+                    $messages.Add(
+                        "Created firewall rule '$($rule.DisplayName)' " +
+                        "($($rule.Name))"
+                    )
                 }
             }
-        }
-        Catch {
-            throw "Failed to import the firewall rules: $_"
+            Catch {
+                $errors.Add(
+                    'Failed to create firewall rule ' +
+                    "'$($rule.DisplayName)' ($($rule.Name)): " +
+                    "$($_.Exception.Message)"
+                )
+            }
         }
     }
+    Catch {
+        throw "Failed to import the firewall rules: $_"
+    }
+}
 #endregion
+
 $exportData = $null
+
 # Lists, so the helper functions can add to them from their own scope
 $messages = New-Object 'System.Collections.Generic.List[string]'
 $errors = New-Object 'System.Collections.Generic.List[string]'
+
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
-    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do'); Errors = [string[]]@() }
+    Write-Verbose 'Import Firewall rules: empty section, nothing to do'
+    return [pscustomobject]@{
+        Data     = $null
+        Messages = [string[]]@('Nothing to do')
+        Errors   = [string[]]@()
+    }
 }
 
 if ($Action -eq 'Export') {
     #region Capture section
+    Write-Verbose 'Export Firewall rules'
     $exportData = @(Export-FirewallRulesHC)
     #endregion
+
     $messages.Add('Exported Firewall rules')
 }
 else {
     #region Apply section
+    Write-Verbose 'Import Firewall rules'
     Import-FirewallRulesHC -Data $Data
     #endregion
 }
-[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages; Errors = [string[]]$errors }
+
+[pscustomobject]@{
+    Data     = $exportData
+    Messages = [string[]]$messages
+    Errors   = [string[]]$errors
+}

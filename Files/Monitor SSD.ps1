@@ -23,66 +23,67 @@ Begin {
     Function Send-MailHC {
         <#
     .SYNOPSIS
-        Send an e-mail message as anonymous, when allowed by the SMTP-Relay 
+        Send an e-mail message as anonymous, when allowed by the SMTP-Relay
         server.
 
     .DESCRIPTION
-        This function sends out a preformatted HTML e-mail by only providing 
-        the recipient, subject and body. The e-mail formatting is optimized for 
-        MS Outlook. 
+        This function sends out a preformatted HTML e-mail by only providing
+        the recipient, subject and body. The e-mail formatting is optimized for
+        MS Outlook.
 
     .PARAMETER From
-        The sender address, by preference this is an existing mailbox so we get 
+        The sender address, by preference this is an existing mailbox so we get
         the bounce back mail in case of failure. But the From address does not
-        need to exist if SMTP-relay is enabled on the network for the local 
+        need to exist if SMTP-relay is enabled on the network for the local
         computer.
 
     .PARAMETER To
         The e-mail address of the recipient(s) you wish to e-mail.
 
     .PARAMETER Bcc
-        The e-mail address of the recipient(s) you wish to e-mail in Blind 
-        Carbon Copy. Other users will not see the e-mail address of users in 
+        The e-mail address of the recipient(s) you wish to e-mail in Blind
+        Carbon Copy. Other users will not see the e-mail address of users in
         the 'Bcc' field.
 
     .PARAMETER Cc
-        The e-mail address of the recipient(s) you wish to e-mail in Carbon 
+        The e-mail address of the recipient(s) you wish to e-mail in Carbon
         Copy.
 
     .PARAMETER From
-        The address from which the mail is sent. Enter a name (optional) and 
-        e-mail address, such as "Name <someone@example.com>". If not specified, 
-        the default value will be the script name or 'Test' when the script 
+        The address from which the mail is sent. Enter a name (optional) and
+        e-mail address, such as "Name <someone@example.com>". If not specified,
+        the default value will be the script name or 'Test' when the script
         name is unknown.
 
     .PARAMETER Subject
         The Subject-header used in the e-mail.
 
     .PARAMETER Message
-        The message you want to send will appear by default in a paragraph 
-        '<p>My message</p>'. If you want to have a title/header too, you can 
+        The message you want to send will appear by default in a paragraph
+        '<p>My message</p>'. If you want to have a title/header too, you can
         use: -Message "<h3>Header one:<\h3>", "My message"
 
     .PARAMETER Priority
-        Specifies the priority of the e-mail message. Valid values are 
-        'Normal', 'High', and 'Low'. If not specified, the default value is 
+        Specifies the priority of the e-mail message. Valid values are
+        'Normal', 'High', and 'Low'. If not specified, the default value is
         'Normal'.
 
     .PARAMETER Attachments
-        Specifies the path and file names of files to be attached to the e-mail 
+        Specifies the path and file names of files to be attached to the e-mail
         message.
 
     .EXAMPLE
-        "The world will change tomorrow." | 
+        "The world will change tomorrow." |
         Send-MailHC -To 'Bob@domain.net' -Subject 'Notification'
-        
-        Sends an e-mail to Bob with the subject "Notification' and the body "The world will change tomorrow.".
+
+        Sends an e-mail to Bob with the subject "Notification' and the body
+        "The world will change tomorrow.".
  #>
 
         [CmdLetBinding()]
         Param (
             [Parameter(Mandatory)]
-            [String]$SMTPserver,    
+            [String]$SMTPserver,
             [Parameter(Mandatory)]
             [String]$Header,
             [Parameter(Mandatory, Position = 0)]
@@ -122,7 +123,8 @@ Begin {
                         }
                         Copy-Item $a -Destination $TmpFolder
 
-                        $null = $Attachment.Add("$TmpFolder\$(Split-Path $a -Leaf)")
+                        $fileName = Split-Path $a -Leaf
+                        $null = $Attachment.Add("$TmpFolder\$fileName")
                     }
                     else {
                         $null = $Attachment.Add($a)
@@ -158,13 +160,18 @@ Begin {
 <!DOCTYPE html>
 <html><head><style type="text/css">
 body {font-family:verdana;background-color:white;}
-h1 {background-color:black;color:white;margin-bottom:10px;text-indent:10px;page-break-before: always;}
-h2 {background-color:lightGrey;margin-bottom:10px;text-indent:10px;page-break-before: always;}
-h3 {background-color:lightGrey;margin-bottom:10px;font-size:16px;text-indent:10px;page-break-before: always;}
+h1 {background-color:black;color:white;margin-bottom:10px;text-indent:10px;
+    page-break-before: always;}
+h2 {background-color:lightGrey;margin-bottom:10px;text-indent:10px;
+    page-break-before: always;}
+h3 {background-color:lightGrey;margin-bottom:10px;font-size:16px;
+    text-indent:10px;page-break-before: always;}
 p {font-size: 14px;margin-left:10px;}
 p.italic {font-style: italic;font-size: 12px;}
-table {font-size:14px;border-collapse:collapse;border:1px none;padding:3px;text-align:left;padding-right:10px;margin-left:10px;}
-td, th {font-size:14px;border-collapse:collapse;border:1px none;padding:3px;text-align:left;padding-right:10px}
+table {font-size:14px;border-collapse:collapse;border:1px none;padding:3px;
+    text-align:left;padding-right:10px;margin-left:10px;}
+td, th {font-size:14px;border-collapse:collapse;border:1px none;padding:3px;
+    text-align:left;padding-right:10px}
 li {font-size: 14px;}
 base {target="_blank"}
 </style></head><body>
@@ -174,10 +181,15 @@ $Messages
 <h2>About</h2>
 <table>
 <colgroup><col/><col/></colgroup>
-$(if($global:PSCommandPath){"<tr><th>PSCommandPath</th><td>$global:PSCommandPath</td></tr>"})
+$(if ($global:PSCommandPath) {
+    "<tr><th>PSCommandPath</th><td>$global:PSCommandPath</td></tr>"
+})
 <tr><th>Host</th><td>$($host.Name)</td></tr>
 <tr><th>ComputerName</th><td>$env:COMPUTERNAME</td></tr>
-<tr><th>Whoami</th><td>$(if($env:USERDNSDOMAIN){"$env:USERDNSDOMAIN\"};"$env:USERNAME")</td></tr>
+<tr><th>Whoami</th><td>$(
+    if ($env:USERDNSDOMAIN) { "$env:USERDNSDOMAIN\" }
+    "$env:USERNAME"
+)</td></tr>
 </table>
 </body></html>
 "@
@@ -199,14 +211,15 @@ $(if($global:PSCommandPath){"<tr><th>PSCommandPath</th><td>$global:PSCommandPath
 
                 #region Remove empty params
                 $list = New-Object System.Collections.ArrayList($null)
-                foreach ($h in $EmailParams.Keys) { 
-                    if ($($EmailParams.Item($h)) -eq $null) { 
-                        $null = $list.Add($h) 
-                    } 
+                foreach ($h in $EmailParams.Keys) {
+                    if ($($EmailParams.Item($h)) -eq $null) {
+                        $null = $list.Add($h)
+                    }
                 }
                 foreach ($h in $list) { $EmailParams.Remove($h) }
                 #endregion
 
+                Write-Verbose "Send mail '$Subject' to '$To'"
                 Send-MailMessage @EmailParams
                 Write-Verbose "Mail sent to '$To'"
             }
@@ -231,7 +244,9 @@ $(if($global:PSCommandPath){"<tr><th>PSCommandPath</th><td>$global:PSCommandPath
 }
 
 Process {
+    Write-Verbose 'Check the state of the physical disks'
     $physicalDisks = Foreach ($disk in Get-PhysicalDisk) {
+        Write-Verbose "Disk '$($disk.Model)'"
         $reliabilityCounter = $disk | Get-StorageReliabilityCounter
 
         [PSCustomObject]@{
@@ -252,11 +267,12 @@ Process {
         }
     }
 
-    $failingDisks = $physicalDisks | Where-Object { 
-       ($_.OperationalStatus -ne 'OK') -or ($_.HealthStatus -ne 'Healthy')
+    $failingDisks = $physicalDisks | Where-Object {
+        ($_.OperationalStatus -ne 'OK') -or ($_.HealthStatus -ne 'Healthy')
     }
 
     if ($failingDisks) {
+        Write-Verbose "Failing disks: $(@($failingDisks).Count)"
         $htmlStyle = @"
 <style>
     #overviewTable {
@@ -371,20 +387,24 @@ Process {
 "@        
         }
 
+        $separator = '<hr style="width:50%;text-align:left;margin-left:0">'
         $mailParams = @{
-            SmtpServer = $SmtpServer 
+            SmtpServer = $SmtpServer
             Header     = 'Monitor hard drive'
             Priority   = 'High'
-            To         = $MailTo 
-            Subject    = 'Failure eminent' 
+            To         = $MailTo
+            Subject    = 'Failure eminent'
             Message    = @"
 $htmlStyle
 <p><b>Failing hard drive$(if($failingDisks.count -gt 1){'s'}):</b></p>
 $(
-    $htmlTableFailingDrives -join '<hr style="width:50%;text-align:left;margin-left:0">'
+    $htmlTableFailingDrives -join $separator
 )
 "@
         }
         Send-MailHC @mailParams
+    }
+    else {
+        Write-Verbose 'All disks are healthy'
     }
 }

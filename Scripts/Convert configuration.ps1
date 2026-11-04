@@ -27,21 +27,29 @@ Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
 . "$PSScriptRoot\Common\Section.ps1"
 
 function Convert-CommentsHC {
+    # Rename the version 1 '?' comment property to Comment, recursively
     param($Value)
-    if ($Value -is [array]) { 
-        foreach ($entry in $Value) { Convert-CommentsHC $entry } 
+
+    if ($Value -is [array]) {
+        foreach ($entry in $Value) { Convert-CommentsHC $entry }
     }
     elseif (
-        $null -ne $Value -and $Value.GetType() -eq 
+        $null -ne $Value -and $Value.GetType() -eq
         [System.Management.Automation.PSCustomObject]
     ) {
         if ($Value.PSObject.Properties['?']) {
             $comment = [string]$Value.'?'
             $Value.PSObject.Properties.Remove('?')
-            $Value | Add-Member -NotePropertyName Comment -NotePropertyValue $comment -Force
+
+            $params = @{
+                NotePropertyName  = 'Comment'
+                NotePropertyValue = $comment
+                Force             = $true
+            }
+            $Value | Add-Member @params
         }
         foreach ($property in $Value.PSObject.Properties) {
-            Convert-CommentsHC $property.Value 
+            Convert-CommentsHC $property.Value
         }
     }
 }
@@ -88,7 +96,9 @@ function ConvertTo-ShareListHC {
             }
 
             $shareAccess = @(
-                $access | Where-Object { [string]$_.Name -eq [string]$share.Name }
+                $access | Where-Object {
+                    [string]$_.Name -eq [string]$share.Name
+                }
             )
 
             if ($shareAccess.Count) {
@@ -106,7 +116,9 @@ function ConvertTo-ShareListHC {
             }
 
             $shareNtfs = @(
-                $ntfs | Where-Object { [string]$_.Name -eq [string]$share.Name }
+                $ntfs | Where-Object {
+                    [string]$_.Name -eq [string]$share.Name
+                }
             ) | Select-Object -First 1
 
             if ($shareNtfs) {
@@ -179,50 +191,71 @@ function ConvertTo-NetworkCardHC {
 
 function Get-RootRelativePathHC {
     param([string]$Path)
+
     $prefix = $RootFolder.TrimEnd('\', '/') + '\'
     if ($Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
-        return $Path.Substring($prefix.Length) 
+        return $Path.Substring($prefix.Length)
     }
     return $Path
 }
 
 function Copy-LegacyAssetHC {
+    # Copy a file or folder from the old snapshot folder to its new place
+    # and return the path relative to the root folder
     param([string]$Source, [string]$DestinationFolder)
-    
-    if (-not (Test-Path -LiteralPath $Source)) { 
-        throw "Legacy asset '$Source' not found" 
+
+    if (-not (Test-Path -LiteralPath $Source)) {
+        throw "Legacy asset '$Source' not found"
     }
-    
+
     $destination = Join-Path $DestinationFolder (Split-Path $Source -Leaf)
-    
-    if ([string]::Equals($Source, $destination, [StringComparison]::OrdinalIgnoreCase)) { 
-        return Get-RootRelativePathHC $destination 
+
+    if (
+        [string]::Equals(
+            $Source, $destination, [StringComparison]::OrdinalIgnoreCase
+        )
+    ) {
+        Write-Verbose "Asset '$Source' already in place"
+        return Get-RootRelativePathHC $destination
     }
-    
+
     if (Test-Path -LiteralPath $destination) {
         if (
-            (Test-Path -LiteralPath $Source -PathType Leaf) -and 
+            (Test-Path -LiteralPath $Source -PathType Leaf) -and
             (Test-Path -LiteralPath $destination -PathType Leaf) -and
-            (Get-FileHash -LiteralPath $Source).Hash -eq (Get-FileHash -LiteralPath $destination).Hash
+            (Get-FileHash -LiteralPath $Source).Hash -eq
+            (Get-FileHash -LiteralPath $destination).Hash
         ) {
+            Write-Verbose "Asset '$destination' exists with same contents"
             return Get-RootRelativePathHC $destination
         }
-        throw "Asset destination '$destination' already exists with different contents; nothing overwritten"
+        throw (
+            "Asset destination '$destination' already exists with " +
+            'different contents; nothing overwritten'
+        )
     }
 
     $null = New-Item -Path $DestinationFolder -ItemType Directory -Force
-    
-    Copy-Item `
-        -LiteralPath $Source `
-        -Destination $destination `
-        -Recurse -ErrorAction Stop
-    
+
+    Write-Verbose "Copy asset '$Source' to '$destination'"
+
+    $params = @{
+        LiteralPath = $Source
+        Destination = $destination
+        Recurse     = $true
+        ErrorAction = 'Stop'
+    }
+    Copy-Item @params
+
     return Get-RootRelativePathHC $destination
 }
 
 $RootFolder = [IO.Path]::GetFullPath($RootFolder)
 $oldPath = Resolve-RootPathHC $OldConfigurationFile $RootFolder
 $oldFile = Get-Item -LiteralPath $oldPath -ErrorAction Stop
+
+Write-Verbose "Convert configuration '$oldPath'"
+
 $old = Read-SectionExampleHC $oldPath
 
 if ($old.SchemaVersion -eq 3) {
@@ -232,72 +265,90 @@ if ($old.SchemaVersion -eq 3) {
 if (-not $old.StartScript) {
     throw 'Expected an old StartScript-format (version 1) configuration.'
 }
+
 $outputFolder = Join-Path $RootFolder 'Configurations'
 $outputPath = Join-Path $outputFolder $oldFile.Name
-$backupPath = Join-Path $oldFile.DirectoryName ($oldFile.BaseName + '.v1.json')
+$backupPath = Join-Path $oldFile.DirectoryName (
+    $oldFile.BaseName + '.v1.json'
+)
 
 if (Test-Path -LiteralPath $backupPath) {
-    throw "Backup '$backupPath' already exists" 
+    throw "Backup '$backupPath' already exists"
 }
 
 if (
-    (Test-Path -LiteralPath $outputPath) -and 
-    -not [string]::Equals($outputPath, $oldPath, [StringComparison]::OrdinalIgnoreCase)
+    (Test-Path -LiteralPath $outputPath) -and
+    -not [string]::Equals(
+        $outputPath, $oldPath, [StringComparison]::OrdinalIgnoreCase
+    )
 ) {
     throw "Output '$outputPath' already exists"
 }
 
-$legacyRoot = Resolve-RootPathHC `
-    $old.StartScript.SnapshotFolder `
-(Join-Path $RootFolder 'Scripts\Invoke scripts')
+$legacyRoot = Resolve-RootPathHC $old.StartScript.SnapshotFolder (
+    Join-Path $RootFolder 'Scripts\Invoke scripts'
+)
+
+Write-Verbose "Old snapshot folder '$legacyRoot'"
 
 $itemFiles = @{
-    RegionalSettings = 'RegionalSettings.json' 
-    UserAccounts     = 'UserAccounts.json' 
+    RegionalSettings = 'RegionalSettings.json'
+    UserAccounts     = 'UserAccounts.json'
     UserGroups       = 'Groups.json'
-    FirewallRules    = 'FirewallRules.json' 
-    CreateFolders    = 'CreateFolders.json' 
+    FirewallRules    = 'FirewallRules.json'
+    CreateFolders    = 'CreateFolders.json'
     NetworkCards     = 'NetworkCards.json'
     NtpTimeServers   = 'ntpServers.json'
-    RegistryKeys     = 'registryKeys.json' 
-    CopyFilesFolders = 'CopyFilesFolders.json' 
+    RegistryKeys     = 'registryKeys.json'
+    CopyFilesFolders = 'CopyFilesFolders.json'
     Software         = 'Software.json'
 }
 
 $order = @((Get-SnapshotScriptsHC).Keys)
 foreach ($property in $old.StartScript.Snapshot.PSObject.Properties) {
-    if ($property.Value -and $property.Name -notin $order) { 
-        throw "Unknown old snapshot item '$($property.Name)'" 
+    if ($property.Value -and $property.Name -notin $order) {
+        throw "Unknown old snapshot item '$($property.Name)'"
     }
 }
 
 $items = [ordered]@{}
 foreach ($name in $order) {
-    if (-not $old.StartScript.Snapshot.$name) { continue }
+    if (-not $old.StartScript.Snapshot.$name) {
+        Write-Verbose "Item '$name': not enabled, skip"
+        continue
+    }
+
+    Write-Verbose "Item '$name': convert"
 
     $folder = Join-Path $legacyRoot $name
     $data = $null
-    
-    if ($itemFiles.ContainsKey($name)) { 
-        $data = Read-SectionExampleHC (Join-Path $folder $itemFiles[$name]) 
+
+    if ($itemFiles.ContainsKey($name)) {
+        $data = Read-SectionExampleHC (Join-Path $folder $itemFiles[$name])
     }
 
     switch ($name) {
         'Software' {
             $data = $data.SoftwarePackages
             if (Test-OldSoftwareLayoutHC $data) {
+                Write-Verbose 'Software: convert old Remove list'
                 $data = ConvertTo-SoftwareHC $data
             }
             foreach ($package in $data.Install) {
                 $source = Resolve-RootPathHC $package.ExecutablePath $folder
-                
+
                 if (
-                    $source.StartsWith(($folder.TrimEnd('\') + '\'), [StringComparison]::OrdinalIgnoreCase)
+                    $source.StartsWith(
+                        ($folder.TrimEnd('\') + '\'),
+                        [StringComparison]::OrdinalIgnoreCase
+                    )
                 ) {
-                    $package.ExecutablePath = Copy-LegacyAssetHC $source (Join-Path $RootFolder 'Software')
+                    $package.ExecutablePath = Copy-LegacyAssetHC $source (
+                        Join-Path $RootFolder 'Software'
+                    )
                 }
-                else { 
-                    $package.ExecutablePath = Get-RootRelativePathHC $source 
+                else {
+                    $package.ExecutablePath = Get-RootRelativePathHC $source
                 }
             }
         }
@@ -306,17 +357,22 @@ foreach ($name in $order) {
             foreach ($entry in $data) {
                 $source = Resolve-RootPathHC $entry.From $folder
 
-                $entry.From = Copy-LegacyAssetHC $source (Join-Path $RootFolder "Files\$($oldFile.BaseName)")
+                $entry.From = Copy-LegacyAssetHC $source (
+                    Join-Path $RootFolder "Files\$($oldFile.BaseName)"
+                )
             }
         }
         { $_ -in @('StartCustomScriptsBefore', 'StartCustomScriptsAfter') } {
             $data = @(
                 foreach (
-                    $file in 
-                    Get-ChildItem -LiteralPath $folder -Filter '*.ps1' -File | Sort-Object Name
+                    $file in
+                    Get-ChildItem -LiteralPath $folder -Filter '*.ps1' -File |
+                    Sort-Object Name
                 ) {
-                    [pscustomobject]@{ 
-                        Path = Copy-LegacyAssetHC $file.FullName (Join-Path $RootFolder "Files\$($oldFile.BaseName)") 
+                    [pscustomobject]@{
+                        Path = Copy-LegacyAssetHC $file.FullName (
+                            Join-Path $RootFolder "Files\$($oldFile.BaseName)"
+                        )
                     }
                 }
             )
@@ -325,28 +381,37 @@ foreach ($name in $order) {
             $data = @(
                 foreach (
                     $file in
-                    Get-ChildItem -LiteralPath $folder -Filter '*.xml' -File | Where-Object { $_.Name -notlike '* - Definition.xml' }
+                    Get-ChildItem -LiteralPath $folder -Filter '*.xml' -File |
+                    Where-Object { $_.Name -notlike '* - Definition.xml' }
                 ) {
                     $task = Import-Clixml -LiteralPath $file.FullName
-                    $enabled = if ($null -ne $task.Settings.Enabled) { 
-                        [bool]$task.Settings.Enabled 
+                    $enabled = if ($null -ne $task.Settings.Enabled) {
+                        [bool]$task.Settings.Enabled
                     }
-                    else { 
-                        $task.State -ne 'Disabled' 
+                    else {
+                        $task.State -ne 'Disabled'
                     }
 
+                    $xmlPath = Join-Path $folder (
+                        $file.BaseName + ' - Definition.xml'
+                    )
+
                     [pscustomobject]@{
-                        TaskName = $task.TaskName 
-                        TaskPath = $task.TaskPath 
+                        TaskName = $task.TaskName
+                        TaskPath = $task.TaskPath
                         Enabled  = $enabled
-                        Xml      = [IO.File]::ReadAllText((Join-Path $folder ($file.BaseName + ' - Definition.xml')))
+                        Xml      = [IO.File]::ReadAllText($xmlPath)
                     }
                 }
             )
         }
         'SmbShares' {
-            $shareData = Read-SectionExampleHC (Join-Path $folder 'SmbShares.json')
-            $accessData = Read-SectionExampleHC (Join-Path $folder 'SmbSharesAccess.json')
+            $shareData = Read-SectionExampleHC (
+                Join-Path $folder 'SmbShares.json'
+            )
+            $accessData = Read-SectionExampleHC (
+                Join-Path $folder 'SmbSharesAccess.json'
+            )
 
             $oldShares = [pscustomobject]@{
                 Shares = @($shareData)
@@ -354,24 +419,37 @@ foreach ($name in $order) {
                 NTFS   = @()
             }
 
-            if (Test-Path -LiteralPath (Join-Path $folder 'NTFS')) {
+            $ntfsFolder = Join-Path $folder 'NTFS'
+
+            if (Test-Path -LiteralPath $ntfsFolder) {
+                $childParams = @{
+                    LiteralPath = $ntfsFolder
+                    Filter      = '*.json'
+                    File        = $true
+                }
                 $oldShares.NTFS = @(
-                    foreach (
-                        $file in 
-                        Get-ChildItem -LiteralPath (Join-Path $folder 'NTFS') -Filter '*.json' -File
-                    ) {
+                    foreach ($file in Get-ChildItem @childParams) {
                         $permissions = Read-SectionExampleHC $file.FullName
-                        $permissions | Add-Member `
-                            -NotePropertyName Name `
-                            -NotePropertyValue $file.BaseName `
-                            -Force
+
+                        $params = @{
+                            NotePropertyName  = 'Name'
+                            NotePropertyValue = $file.BaseName
+                            Force             = $true
+                        }
+                        $permissions | Add-Member @params
                         $permissions
                     }
                 )
             }
 
-            $shareProblems = New-Object 'System.Collections.Generic.List[string]'
-            $data = ConvertTo-ShareListHC -OldShares $oldShares -Problems $shareProblems
+            $shareProblems = New-Object (
+                'System.Collections.Generic.List[string]'
+            )
+            $params = @{
+                OldShares = $oldShares
+                Problems  = $shareProblems
+            }
+            $data = ConvertTo-ShareListHC @params
             foreach ($problem in $shareProblems) {
                 Write-Warning $problem
             }
@@ -379,7 +457,7 @@ foreach ($name in $order) {
         { $_ -in @(
                 'UserAccounts', 'UserGroups', 'FirewallRules')
         } {
-            $data = @($data) 
+            $data = @($data)
         }
         'NetworkCards' {
             $data = @(
@@ -393,8 +471,8 @@ foreach ($name in $order) {
     $items[$name] = $data
 }
 
-if ($items.Count -eq 0) { 
-    throw 'The old configuration has no enabled items.' 
+if ($items.Count -eq 0) {
+    throw 'The old configuration has no enabled items.'
 }
 
 $document = [ordered]@{
@@ -405,10 +483,10 @@ $document = [ordered]@{
         OpenReportInBrowser = if (
             $null -ne $old.StartScript.OpenReportInBrowser
         ) {
-            [bool]$old.StartScript.OpenReportInBrowser 
+            [bool]$old.StartScript.OpenReportInBrowser
         }
-        else { 
-            $true 
+        else {
+            $true
         }
         RunElevated         = [bool]$old.RunInElevatedPowerShellSession
     }
@@ -417,19 +495,35 @@ $document = [ordered]@{
 
 $null = New-Item -Path $outputFolder -ItemType Directory -Force
 
-Rename-Item -LiteralPath $oldPath -NewName (Split-Path $backupPath -Leaf) -ErrorAction Stop
+Write-Verbose "Rename original to '$backupPath'"
+
+$params = @{
+    LiteralPath = $oldPath
+    NewName     = Split-Path $backupPath -Leaf
+    ErrorAction = 'Stop'
+}
+Rename-Item @params
+
+Write-Verbose "Write configuration '$outputPath'"
 
 Write-ConfigurationHC -Configuration $document -Path $outputPath
-$problems = @(Test-ConfigurationHC (Read-ConfigurationHC $outputPath $RootFolder) $RootFolder)
+$problems = @(
+    Test-ConfigurationHC (
+        Read-ConfigurationHC $outputPath $RootFolder
+    ) $RootFolder
+)
 
-foreach ($problem in $problems) { 
-    Write-Warning $problem 
+foreach ($problem in $problems) {
+    Write-Warning $problem
 }
 
-Write-Host "Converted to '$outputPath'. Validation problems: $($problems.Count). Original: '$backupPath'."
+Write-Host (
+    "Converted to '$outputPath'. " +
+    "Validation problems: $($problems.Count). Original: '$backupPath'."
+)
 
-[pscustomobject]@{ 
+[pscustomobject]@{
     Path     = $outputPath
     Original = $backupPath
-    Problems = $problems 
+    Problems = $problems
 }

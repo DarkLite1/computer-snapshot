@@ -30,11 +30,11 @@ function Resolve-RootPathHC {
         [Parameter(Mandatory)][string]$Path,
         [Parameter(Mandatory)][string]$RootFolder
     )
-         
+
     $expandedPath = [Environment]::ExpandEnvironmentVariables($Path)
 
     if ([IO.Path]::IsPathRooted($expandedPath)) {
-        return $expandedPath 
+        return $expandedPath
     }
 
     return [IO.Path]::GetFullPath((Join-Path $RootFolder $expandedPath))
@@ -88,7 +88,10 @@ function Test-UserAccountEntryHC {
         @($User.PSObject.Properties.Name)
     }
 
-    if ($properties -contains 'Action' -and $User.Action -cnotin @('Set', 'Remove')) {
+    if (
+        $properties -contains 'Action' -and
+        $User.Action -cnotin @('Set', 'Remove')
+    ) {
         "Action: expected Set or Remove"
     }
 
@@ -96,10 +99,15 @@ function Test-UserAccountEntryHC {
         if (
             $User.Name -isnot [string] -or
             [string]::IsNullOrWhiteSpace($User.Name) -or
-            [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($User.Name) -or
+            [Management.Automation.WildcardPattern]::ContainsWildcardCharacters(
+                $User.Name
+            ) -or
             $User.Name -match '[\\/]'
         ) {
-            'Name: removal requires an exact local account name, without wildcards or a domain prefix'
+            (
+                'Name: removal requires an exact local account name, ' +
+                'without wildcards or a domain prefix'
+            )
         }
         foreach ($property in $properties) {
             if ($property -notin @('Name', 'Action', 'Comment')) {
@@ -134,19 +142,19 @@ function Test-EmptySectionHC {
     param(
         $Data
     )
-        
+
     if ($null -eq $Data) {
-        return $true 
-    }
-        
-    if ($Data -is [System.Collections.IDictionary]) { 
-        return @(
-            $Data.Keys | Where-Object { $_ -ne 'Comment' }
-        ).Count -eq 0 
+        return $true
     }
 
-    if ($Data -is [array]) { 
-        return $Data.Count -eq 0 
+    if ($Data -is [System.Collections.IDictionary]) {
+        return @(
+            $Data.Keys | Where-Object { $_ -ne 'Comment' }
+        ).Count -eq 0
+    }
+
+    if ($Data -is [array]) {
+        return $Data.Count -eq 0
     }
 
     return @(
@@ -158,15 +166,18 @@ function Read-SectionExampleHC {
     param(
         [Parameter(Mandatory)][string]$Path
     )
-        
-    $text = Get-Content `
-        -LiteralPath $Path -Raw -Encoding UTF8 `
-        -ErrorAction Stop
-    
-    $wrapper = ConvertFrom-Json `
-        -InputObject ('{"Data":' + $text + '}') `
-        -ErrorAction Stop
-        
+
+    $contentParams = @{
+        LiteralPath = $Path
+        Raw         = $true
+        Encoding    = 'UTF8'
+        ErrorAction = 'Stop'
+    }
+    $text = Get-Content @contentParams
+
+    $json = '{"Data":' + $text + '}'
+    $wrapper = ConvertFrom-Json -InputObject $json -ErrorAction Stop
+
     return , $wrapper.Data
 }
 
@@ -247,7 +258,9 @@ function Convert-AccountNameHC {
     # A SID, as exported for built-in accounts: use this computer's name
     if ($Name -match '^S-1-\d+(-\d+)+$') {
         try {
-            return ([System.Security.Principal.SecurityIdentifier]$Name).Translate(
+            $sid = [System.Security.Principal.SecurityIdentifier]$Name
+
+            return $sid.Translate(
                 [System.Security.Principal.NTAccount]
             ).Value
         }
@@ -277,6 +290,7 @@ function Convert-AccountNameHC {
     $localName = "$env:COMPUTERNAME\$accountName"
 
     if (Test-AccountExistsHC -Name $localName) {
+        Write-Verbose "Account '$Name' mapped to '$localName'"
         return $localName
     }
 

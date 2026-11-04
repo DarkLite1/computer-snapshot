@@ -5,19 +5,34 @@ BeforeAll {
     . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
     . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
 }
+
 Describe 'Restore input placeholders' {
-    It 'resolves nested string values once and preserves other value types and arrays' {
-        $items = '{"UserAccounts":[{"Name":"{{input:Account name}}","Password":"{{password:Account password}}","Enabled":false}],"UserGroups":[],"NetworkCards":[{"Address":"{{ipv4:IPv4 address}}"}],"CreateFolders":{"FolderPaths":["{{input:Account name}}"],"Comment":"{{input:Ignored}}"},"Number":24,"Nothing":null}' | ConvertFrom-Json
+    It ('resolves nested string values once and preserves other value ' +
+        'types and arrays') {
+        $items = (
+            '{"UserAccounts":[{"Name":"{{input:Account name}}",' +
+            '"Password":"{{password:Account password}}","Enabled":false}],' +
+            '"UserGroups":[],' +
+            '"NetworkCards":[{"Address":"{{ipv4:IPv4 address}}"}],' +
+            '"CreateFolders":{"FolderPaths":["{{input:Account name}}"],' +
+            '"Comment":"{{input:Ignored}}"},"Number":24,"Nothing":null}'
+        ) | ConvertFrom-Json
         $script:requests = @()
         $result = Resolve-RestoreInputHC -Items $items -ReadValue {
             param($field)
             $script:requests += $field.Path
-            switch ($field.Kind) { 'input' { 'Example' }; 'password' { 'Test-only password!"\$' }; 'ipv4' { '192.0.2.10' } }
+            switch ($field.Kind) {
+                'input' { 'Example' }
+                'password' { 'Test-only password!"\$' }
+                'ipv4' { '192.0.2.10' }
+            }
         }
+
         $requests.Count | Should -Be 3
         $items.UserAccounts[0].Name | Should -Be 'Example'
         $items.CreateFolders.FolderPaths[0] | Should -Be 'Example'
-        $items.UserAccounts[0].Password | Should -BeExactly 'Test-only password!"\$'
+        $items.UserAccounts[0].Password |
+            Should -BeExactly 'Test-only password!"\$'
         $items.NetworkCards[0].Address | Should -Be '192.0.2.10'
         $items.UserAccounts.GetType().IsArray | Should -BeTrue
         $items.UserGroups.Count | Should -Be 0
@@ -28,60 +43,123 @@ Describe 'Restore input placeholders' {
         $result.SecretValues | Should -Be @('Test-only password!"\$')
     }
     It 'leaves placeholders unchanged when any input is cancelled' {
-        $items = @{ UserAccounts = @(@{ Name = '{{input:Name}}'; Password = '{{password:Password}}' }) }
-        { Resolve-RestoreInputHC -Items $items -ReadValue { param($field) if ($field.Kind -eq 'input') { 'Example' } } } | Should -Throw '*cancelled*'
+        $items = @{
+            UserAccounts = @(
+                @{ Name = '{{input:Name}}'; Password = '{{password:Password}}' }
+            )
+        }
+        {
+            Resolve-RestoreInputHC -Items $items -ReadValue {
+                param($field)
+                if ($field.Kind -eq 'input') { 'Example' }
+            }
+        } | Should -Throw '*cancelled*'
         $items.UserAccounts[0].Name | Should -Be '{{input:Name}}'
         $items.UserAccounts[0].Password | Should -Be '{{password:Password}}'
     }
     It 'rejects malformed or embedded placeholders before requesting values' {
-        foreach ($placeholder in @('{{input: }}', '{{unknown:Name}}', 'prefix {{input:Name}}')) {
-            { Get-RestoreInputFieldsHC -Data @{ UserAccounts = @(@{ Name = $placeholder }) } } | Should -Throw '*complete*'
+        $placeholders = @(
+            '{{input: }}', '{{unknown:Name}}', 'prefix {{input:Name}}'
+        )
+        foreach ($placeholder in $placeholders) {
+            {
+                Get-RestoreInputFieldsHC -Data @{
+                    UserAccounts = @(@{ Name = $placeholder })
+                }
+            } | Should -Throw '*complete*'
         }
     }
-    It 'validates required values and canonical IPv4 addresses without exposing the value' {
+    It ('validates required values and canonical IPv4 addresses without ' +
+        'exposing the value') {
         foreach ($value in @('', ' ', '999.1.1.1', '127.1', '::1')) {
             Test-RestoreInputValueHC -Kind ipv4 -Value $value | Should -BeFalse
         }
         Test-RestoreInputValueHC -Kind ipv4 -Value '192.0.2.10' | Should -BeTrue
+
         $items = @{ NetworkCards = @(@{ Address = '{{ipv4:Address}}' }) }
-        { Resolve-RestoreInputHC -Items $items -ReadValue { 'invalid-address' } } | Should -Throw '*supplied input is empty or invalid*'
-        Protect-RestoreInputTextHC -Text 'Failed: test-secret' -SecretValues @('test-secret') | Should -Be 'Failed: [redacted]'
+        {
+            Resolve-RestoreInputHC -Items $items -ReadValue {
+                'invalid-address'
+            }
+        } | Should -Throw '*supplied input is empty or invalid*'
+
+        $protectParams = @{
+            Text         = 'Failed: test-secret'
+            SecretValues = @('test-secret')
+        }
+        Protect-RestoreInputTextHC @protectParams |
+            Should -Be 'Failed: [redacted]'
     }
     It 'asks for a prefix length from 1 to 32 and stores it as a number' {
         foreach ($value in @('', '0', '33', '024', '24.0', ' 24', 'abc')) {
-            Test-RestoreInputValueHC -Kind prefix -Value $value | Should -BeFalse -Because "'$value'"
+            Test-RestoreInputValueHC -Kind prefix -Value $value |
+                Should -BeFalse -Because "'$value'"
         }
         foreach ($value in @('1', '24', '32')) {
             Test-RestoreInputValueHC -Kind prefix -Value $value | Should -BeTrue
         }
-        $items = '{"NetworkCards":[{"InterfaceAlias":"Ethernet","IPSettings":{"IPAddress":"{{ipv4:Address}}","PrefixLength":"{{prefix:Prefix length}}"}}]}' | ConvertFrom-Json
-        $null = Resolve-RestoreInputHC -Items $items -ReadValue { param($field) if ($field.Kind -eq 'prefix') { '24' } else { '10.20.67.2' } }
+
+        $items = (
+            '{"NetworkCards":[{"InterfaceAlias":"Ethernet",' +
+            '"IPSettings":{"IPAddress":"{{ipv4:Address}}",' +
+            '"PrefixLength":"{{prefix:Prefix length}}"}}]}'
+        ) | ConvertFrom-Json
+        $null = Resolve-RestoreInputHC -Items $items -ReadValue {
+            param($field)
+            if ($field.Kind -eq 'prefix') { '24' } else { '10.20.67.2' }
+        }
         $items.NetworkCards[0].IPSettings.PrefixLength | Should -BeOfType [int]
         $items.NetworkCards[0].IPSettings.PrefixLength | Should -Be 24
-        { Resolve-RestoreInputHC -Items @{ A = @{ P = '{{prefix:P}}' } } -ReadValue { '40' } } | Should -Throw '*supplied input is empty or invalid*'
+
+        {
+            $badItems = @{ A = @{ P = '{{prefix:P}}' } }
+            Resolve-RestoreInputHC -Items $badItems -ReadValue { '40' }
+        } | Should -Throw '*supplied input is empty or invalid*'
     }
-    It 'asks for placeholders inside files that are filled in while copying, once per placeholder' {
+    It ('asks for placeholders inside files that are filled in while ' +
+        'copying, once per placeholder') {
         $null = New-Item -Path "$TestDrive\Files" -ItemType Directory -Force
-        "http://{{ipv4:Server}}:1353/?ref={{input:Reference}}`r`nagain {{ipv4:Server}}" | Set-Content -LiteralPath "$TestDrive\Files\Start.ps1"
+        ('http://{{ipv4:Server}}:1353/?ref={{input:Reference}}' +
+            "`r`nagain {{ipv4:Server}}") |
+            Set-Content -LiteralPath "$TestDrive\Files\Start.ps1"
         $items = @{
-            CopyFilesFolders = @(@{ From = 'Files\Start.ps1'; To = 'C:\HC\Start.ps1'; FillPlaceholders = $true })
-            HostsFileEntries = @(@{ IPAddress = '{{ipv4:Server}}'; Hostnames = @('server') })
+            CopyFilesFolders = @(
+                @{
+                    From             = 'Files\Start.ps1'
+                    To               = 'C:\HC\Start.ps1'
+                    FillPlaceholders = $true
+                }
+            )
+            HostsFileEntries = @(
+                @{ IPAddress = '{{ipv4:Server}}'; Hostnames = @('server') }
+            )
         }
         $script:asked = @()
-        $result = Resolve-RestoreInputHC -Items $items -RootFolder $TestDrive -ReadValue {
-            param($field)
-            $script:asked += $field.Placeholder
-            if ($field.Kind -eq 'ipv4') { '10.20.60.47' } else { 'TRM_01' }
+        $resolveParams = @{
+            Items      = $items
+            RootFolder = $TestDrive
+            ReadValue  = {
+                param($field)
+                $script:asked += $field.Placeholder
+                if ($field.Kind -eq 'ipv4') { '10.20.60.47' } else { 'TRM_01' }
+            }
         }
+        $result = Resolve-RestoreInputHC @resolveParams
+
         $asked | Should -Be @('{{ipv4:Server}}', '{{input:Reference}}')
         $result.Values['{{input:Reference}}'] | Should -Be 'TRM_01'
         $items.HostsFileEntries[0].IPAddress | Should -Be '10.20.60.47'
         $items.CopyFilesFolders[0].From | Should -Be 'Files\Start.ps1'
     }
     It 'refuses a password placeholder or an incomplete placeholder in a file' {
-        { Get-TextInputFieldsHC -Text 'pw={{password:Secret}}' -Path 'File' } | Should -Throw '*not allowed in a file*plain text*'
-        { Get-TextInputFieldsHC -Text 'ip={{ipv4:Server' -Path 'File' } | Should -Throw '*complete*'
-        @(Get-TextInputFieldsHC -Text 'no placeholders' -Path 'File').Count | Should -Be 0
+        {
+            Get-TextInputFieldsHC -Text 'pw={{password:Secret}}' -Path 'File'
+        } | Should -Throw '*not allowed in a file*plain text*'
+        {
+            Get-TextInputFieldsHC -Text 'ip={{ipv4:Server' -Path 'File'
+        } | Should -Throw '*complete*'
+        @(Get-TextInputFieldsHC -Text 'no placeholders' -Path 'File').Count |
+            Should -Be 0
     }
     It 'redacts the encoded forms in which a secret is commonly repeated' {
         $secret = "P&ss<w0rd>'x"
@@ -93,18 +171,29 @@ Describe 'Restore input placeholders' {
             $secret.Replace("'", "''")
         )
         foreach ($form in $forms) {
-            Protect-RestoreInputTextHC -Text "before $form after" -SecretValues @($secret) |
+            $protectParams = @{
+                Text         = "before $form after"
+                SecretValues = @($secret)
+            }
+            Protect-RestoreInputTextHC @protectParams |
                 Should -Be 'before [redacted] after' -Because $form
         }
-        Protect-RestoreInputTextHC -Text 'R&D <ok>' -SecretValues @($secret, '', $null) |
-            Should -Be 'R&D <ok>'
+
+        $protectParams = @{
+            Text         = 'R&D <ok>'
+            SecretValues = @($secret, '', $null)
+        }
+        Protect-RestoreInputTextHC @protectParams | Should -Be 'R&D <ok>'
     }
 }
 
 Describe 'Version 2 configuration' {
     BeforeEach {
         $path = Join-Path $TestDrive 'configuration.json'
-        $configuration = [ordered]@{ SchemaVersion = 3; Items = [ordered]@{ Software = @{}; UserAccounts = @() } }
+        $configuration = [ordered]@{
+            SchemaVersion = 3
+            Items         = [ordered]@{ Software = @{}; UserAccounts = @() }
+        }
     }
     It 'loads inline sections with defaults in fixed order' {
         Write-ConfigurationHC $configuration $path
@@ -117,67 +206,109 @@ Describe 'Version 2 configuration' {
     It 'reads the restart delay and rejects values outside 0 to 600' {
         $configuration.Settings = @{ RestartDelaySeconds = 0 }
         Write-ConfigurationHC $configuration $path
-        (Read-ConfigurationHC $path $TestDrive).Settings.RestartDelaySeconds | Should -Be 0
+        (Read-ConfigurationHC $path $TestDrive).Settings.RestartDelaySeconds |
+            Should -Be 0
+
         foreach ($delay in @(-1, 601, '60', 1.5, $true)) {
             $configuration.Settings = @{ RestartDelaySeconds = $delay }
             Write-ConfigurationHC $configuration $path
             (Read-ConfigurationHC $path $TestDrive).Problems -join ';' |
-                Should -Match 'Settings.RestartDelaySeconds: expected a whole number from 0 to 600' -Because "$delay"
+                Should -Match ('Settings.RestartDelaySeconds: expected a ' +
+                    'whole number from 0 to 600') -Because "$delay"
         }
     }
     It 'preserves empty and singleton arrays without a UTF8 BOM' {
-        $configuration.Items.UserAccounts = @([pscustomobject]@{ Name = 'Example' })
+        $configuration.Items.UserAccounts = @(
+            [pscustomobject]@{ Name = 'Example' }
+        )
         Write-ConfigurationHC $configuration $path
         $loaded = Read-ConfigurationHC $path $TestDrive
         $loaded.Items.UserAccounts.GetType().IsArray | Should -BeTrue
         $loaded.Items.UserAccounts.Count | Should -Be 1
         [IO.File]::ReadAllBytes($path)[0] | Should -Be 123
     }
-    It 'formats with two spaces and puts comments first in every nested object without mutating input' {
-        $configuration.Settings = [ordered]@{ RunElevated = $false; Comment = 'Settings note' }
+    It ('formats with two spaces and puts comments first in every nested ' +
+        'object without mutating input') {
+        $configuration.Settings = [ordered]@{
+            RunElevated = $false
+            Comment     = 'Settings note'
+        }
         $configuration.Items = [ordered]@{
-            UserAccounts = @([pscustomobject][ordered]@{ Name = 'Example'; Comment = 'Account note'; Enabled = $true })
-            Comment = 'Items note'
+            UserAccounts = @(
+                [pscustomobject][ordered]@{
+                    Name    = 'Example'
+                    Comment = 'Account note'
+                    Enabled = $true
+                }
+            )
+            Comment      = 'Items note'
         }
         Write-ConfigurationHC $configuration $path
+
         $text = [IO.File]::ReadAllText($path)
         $text | Should -Match '(?m)^  "SchemaVersion": 3,'
-        $text | Should -Match '"Settings": \{\r?\n    "Comment": "Settings note",'
+        $text |
+            Should -Match '"Settings": \{\r?\n    "Comment": "Settings note",'
         $text | Should -Match '"Items": \{\r?\n    "Comment": "Items note",'
-        $text | Should -Match '\{\r?\n        "Comment": "Account note",\r?\n        "Name": "Example",'
+        $text | Should -Match ('\{\r?\n        "Comment": "Account note",' +
+            '\r?\n        "Name": "Example",')
         @($configuration.Settings.Keys)[0] | Should -Be 'RunElevated'
         $text.EndsWith([Environment]::NewLine) | Should -BeTrue
     }
     It 'keeps short arrays compact and expands arrays that exceed 80 columns' {
         $configuration.Items.Software = [ordered]@{
-            Remove = @('Short', 'Another')
+            Remove  = @('Short', 'Another')
             Install = @()
             Comment = 'Software note'
         }
         Write-ConfigurationHC $configuration $path
-        [IO.File]::ReadAllText($path) | Should -Match '"Remove": \["Short", "Another"\]'
+        [IO.File]::ReadAllText($path) |
+            Should -Match '"Remove": \["Short", "Another"\]'
+
         $configuration.Items.Software.Remove = @(('A' * 35), ('B' * 35))
         Write-ConfigurationHC $configuration $path
         $text = [IO.File]::ReadAllText($path)
         $text | Should -Match '"Remove": \[\r?\n'
-        @($text -split '\r?\n' | Where-Object { $_.Length -gt 80 }).Count | Should -Be 0
-        (Read-ConfigurationHC $path $TestDrive).Items.Software.Remove | Should -Be $configuration.Items.Software.Remove
+        @($text -split '\r?\n' | Where-Object { $_.Length -gt 80 }).Count |
+            Should -Be 0
+        (Read-ConfigurationHC $path $TestDrive).Items.Software.Remove |
+            Should -Be $configuration.Items.Software.Remove
     }
     It 'preserves escaped text, nulls, booleans and numbers while formatting' {
-        $xml = '<Task attr="quoted">' + "`r`n" + ('text { [ ] } ' * 12) + '</Task>'
-        $configuration.Items.ScheduledTasks = @([ordered]@{ TaskName = 'Example'; TaskPath = '\HC\'; Enabled = $false; Xml = $xml })
-        $configuration.Items.Software = @{ Install = @(@{ ExecutablePath = 'C:\Example.exe'; Arguments = $null }) }
+        $xml = '<Task attr="quoted">' + "`r`n" + ('text { [ ] } ' * 12) +
+            '</Task>'
+        $configuration.Items.ScheduledTasks = @(
+            [ordered]@{
+                TaskName = 'Example'
+                TaskPath = '\HC\'
+                Enabled  = $false
+                Xml      = $xml
+            }
+        )
+        $configuration.Items.Software = @{
+            Install = @(
+                @{ ExecutablePath = 'C:\Example.exe'; Arguments = $null }
+            )
+        }
         Write-ConfigurationHC $configuration $path
+
         $loaded = Read-ConfigurationHC $path $TestDrive
         $loaded.Items.ScheduledTasks[0].Xml | Should -BeExactly $xml
         $loaded.Items.ScheduledTasks[0].Enabled | Should -BeFalse
         $loaded.Items.Software.Install[0].Arguments | Should -BeNullOrEmpty
-        ([IO.File]::ReadAllText($path) | ConvertFrom-Json).SchemaVersion | Should -Be 3
+        ([IO.File]::ReadAllText($path) | ConvertFrom-Json).SchemaVersion |
+            Should -Be 3
     }
-    It 'resolves references from the USB root rather than the current directory' {
-        '[{"Name":"Example"}]' | Set-Content -LiteralPath (Join-Path $TestDrive 'shared.json') -Encoding UTF8
+    It ('resolves references from the USB root rather than the current ' +
+        'directory') {
+        $setParams = @{
+            LiteralPath = Join-Path $TestDrive 'shared.json'
+            Encoding    = 'UTF8'
+        }
+        '[{"Name":"Example"}]' | Set-Content @setParams
         $configuration.Items.UserAccounts = 'shared.json'
         Write-ConfigurationHC $configuration $path
+
         $location = Get-Location
         try {
             Set-Location $env:TEMP
@@ -187,19 +318,25 @@ Describe 'Version 2 configuration' {
         finally { Set-Location $location }
     }
     It 'rejects a nested reference' {
-        '"another.json"' | Set-Content -LiteralPath (Join-Path $TestDrive 'shared.json')
+        '"another.json"' |
+            Set-Content -LiteralPath (Join-Path $TestDrive 'shared.json')
         $configuration.Items.UserAccounts = 'shared.json'
         Write-ConfigurationHC $configuration $path
-        Test-ConfigurationHC (Read-ConfigurationHC $path $TestDrive) $TestDrive | Should -Match 'nested section references'
+        $loaded = Read-ConfigurationHC $path $TestDrive
+        Test-ConfigurationHC $loaded $TestDrive |
+            Should -Match 'nested section references'
     }
     It 'reports a missing reference' {
         $configuration.Items.UserAccounts = 'missing.json'
-        @(Test-ConfigurationHC $configuration $TestDrive) | Should -Match 'Items.UserAccounts.*missing.json'
+        @(Test-ConfigurationHC $configuration $TestDrive) |
+            Should -Match 'Items.UserAccounts.*missing.json'
     }
     It 'reports invalid referenced JSON' {
-        'not json' | Set-Content -LiteralPath (Join-Path $TestDrive 'shared.json')
+        'not json' |
+            Set-Content -LiteralPath (Join-Path $TestDrive 'shared.json')
         $configuration.Items.UserAccounts = 'shared.json'
-        @(Test-ConfigurationHC $configuration $TestDrive) | Should -Match 'Items.UserAccounts.*shared.json'
+        @(Test-ConfigurationHC $configuration $TestDrive) |
+            Should -Match 'Items.UserAccounts.*shared.json'
     }
     It 'reports three independent problems together' {
         $configuration.SchemaVersion = 1
@@ -213,47 +350,71 @@ Describe 'Version 2 configuration' {
     }
     It 'rejects unknown top-level properties' {
         $configuration.Action = 'RestoreSnapshot'
-        @(Test-ConfigurationHC $configuration $TestDrive) | Should -Match 'Action: unknown property'
+        @(Test-ConfigurationHC $configuration $TestDrive) |
+            Should -Match 'Action: unknown property'
     }
     It 'checks asset paths relative to the root' {
         'asset' | Set-Content -LiteralPath (Join-Path $TestDrive 'app.exe')
-        $configuration.Items.Software = @{ Install = @(@{ ExecutablePath = 'app.exe' }); Remove = @() }
+        $configuration.Items.Software = @{
+            Install = @(@{ ExecutablePath = 'app.exe' })
+            Remove  = @()
+        }
         @(Test-ConfigurationHC $configuration $TestDrive).Count | Should -Be 0
+
         $configuration.Items.Software.Install[0].ExecutablePath = 'missing.exe'
-        @(Test-ConfigurationHC $configuration $TestDrive) | Should -Match 'Items.Software.Install\[0\].ExecutablePath.*not found'
+        @(Test-ConfigurationHC $configuration $TestDrive) |
+            Should -Match ('Items.Software.Install\[0\].ExecutablePath' +
+                '.*not found')
     }
 }
 
 Describe 'Shared snapshot catalogue' {
-    It 'preserves the established order and maps every item to an existing script' {
+    It ('preserves the established order and maps every item to an ' +
+        'existing script') {
         $scripts = Get-SnapshotScriptsHC
         @($scripts.Keys) | Should -Be @(
-            'StartCustomScriptsBefore', 'RegionalSettings', 'UserAccounts', 'UserGroups',
-            'FirewallRules', 'CreateFolders', 'SmbShares', 'NetworkCards', 'HostsFileEntries', 'NtpTimeServers',
-            'RegistryKeys', 'ScheduledTasks', 'CopyFilesFolders', 'Software', 'StartCustomScriptsAfter'
+            'StartCustomScriptsBefore', 'RegionalSettings', 'UserAccounts',
+            'UserGroups', 'FirewallRules', 'CreateFolders', 'SmbShares',
+            'NetworkCards', 'HostsFileEntries', 'NtpTimeServers',
+            'RegistryKeys', 'ScheduledTasks', 'CopyFilesFolders', 'Software',
+            'StartCustomScriptsAfter'
         )
         foreach ($script in $scripts.Values) {
             Join-Path "$PSScriptRoot\..\Scripts" $script | Should -Exist
         }
     }
-    It 'returns an independent map so caller overrides cannot change the catalogue' {
+    It ('returns an independent map so caller overrides cannot change the ' +
+        'catalogue') {
         $scripts = Get-SnapshotScriptsHC
         $scripts.UserAccounts = 'custom.ps1'
-        (Get-SnapshotScriptsHC).UserAccounts | Should -Be 'User accounts import export.ps1'
+        (Get-SnapshotScriptsHC).UserAccounts |
+            Should -Be 'User accounts import export.ps1'
     }
     It 'matches the items supported by the JSON schema' {
-        $schema = Get-Content -LiteralPath "$PSScriptRoot\..\Scripts\config.schema.json" -Raw | ConvertFrom-Json
-        $names = @($schema.properties.Items.properties.PSObject.Properties.Name | Where-Object { $_ -ne 'Comment' } | Sort-Object)
+        $schemaPath = "$PSScriptRoot\..\Scripts\config.schema.json"
+        $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
+        $names = @(
+            $schema.properties.Items.properties.PSObject.Properties.Name |
+                Where-Object { $_ -ne 'Comment' } | Sort-Object
+        )
         @((Get-SnapshotScriptsHC).Keys | Sort-Object) | Should -Be $names
     }
     It 'loads all empty sections in catalogue order regardless of JSON order' {
-        $schema = Get-Content -LiteralPath "$PSScriptRoot\..\Scripts\config.schema.json" -Raw | ConvertFrom-Json
+        $schemaPath = "$PSScriptRoot\..\Scripts\config.schema.json"
+        $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
         $items = [ordered]@{}
-        foreach ($name in (Get-SnapshotScriptsHC).Keys | Sort-Object -Descending) {
-            $items[$name] = if ($schema.'$defs'.$name.type -eq 'array') { ,@() } else { @{} }
+        $names = (Get-SnapshotScriptsHC).Keys | Sort-Object -Descending
+        foreach ($name in $names) {
+            $items[$name] = if ($schema.'$defs'.$name.type -eq 'array') {
+                ,@()
+            }
+            else {
+                @{}
+            }
         }
         $path = Join-Path $TestDrive 'all-items.json'
         Write-ConfigurationHC @{ SchemaVersion = 3; Items = $items } $path
+
         $loaded = Read-ConfigurationHC $path $TestDrive
         @($loaded.Items.Keys) | Should -Be @((Get-SnapshotScriptsHC).Keys)
         @(Test-ConfigurationHC $loaded $TestDrive).Count | Should -Be 0
@@ -265,95 +426,168 @@ Describe 'Safe configuration writing' {
         $folder = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         $null = New-Item -Path $folder -ItemType Directory
         $path = Join-Path $folder 'Example.json'
-        $document = @{ SchemaVersion = 3; Items = [ordered]@{ CreateFolders = @{ FolderPaths = @('C:\Example') } } }
+        $document = @{
+            SchemaVersion = 3
+            Items         = [ordered]@{
+                CreateFolders = @{ FolderPaths = @('C:\Example') }
+            }
+        }
     }
     It 'creates a new configuration file' {
         Write-ConfigurationHC $document $path
-        (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).Items.CreateFolders.FolderPaths | Should -Be @('C:\Example')
+        $written = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        $written.Items.CreateFolders.FolderPaths | Should -Be @('C:\Example')
     }
     It 'replaces an existing configuration file' {
         '{"existing":true}' | Set-Content -LiteralPath $path -Encoding UTF8
         Write-ConfigurationHC $document $path
-        (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).SchemaVersion | Should -Be 3
+        (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).SchemaVersion |
+            Should -Be 3
     }
     It 'leaves no temporary files behind' {
         '{"existing":true}' | Set-Content -LiteralPath $path -Encoding UTF8
         Write-ConfigurationHC $document $path
-        @(Get-ChildItem -LiteralPath $folder -Force).Name | Should -Be @('Example.json')
+        @(Get-ChildItem -LiteralPath $folder -Force).Name |
+            Should -Be @('Example.json')
     }
     It 'keeps the existing file intact and cleans up when replacing fails' {
         '{"existing":true}' | Set-Content -LiteralPath $path -Encoding UTF8
         $before = Get-Content -LiteralPath $path -Raw
         Set-ItemProperty -LiteralPath $path -Name IsReadOnly -Value $true
         try {
-            { Write-ConfigurationHC $document $path } | Should -Throw '*Failed to write configuration*'
+            { Write-ConfigurationHC $document $path } |
+                Should -Throw '*Failed to write configuration*'
             (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
-            @(Get-ChildItem -LiteralPath $folder -Force).Name | Should -Be @('Example.json')
+            @(Get-ChildItem -LiteralPath $folder -Force).Name |
+                Should -Be @('Example.json')
         }
-        finally { Set-ItemProperty -LiteralPath $path -Name IsReadOnly -Value $false }
+        finally {
+            Set-ItemProperty -LiteralPath $path -Name IsReadOnly -Value $false
+        }
     }
     It 'reports a missing folder without creating anything' {
         $missing = Join-Path $folder 'Missing\Example.json'
-        { Write-ConfigurationHC $document $missing } | Should -Throw '*Failed to write configuration*'
+        { Write-ConfigurationHC $document $missing } |
+            Should -Throw '*Failed to write configuration*'
         Join-Path $folder 'Missing' | Should -Not -Exist
     }
 }
+
 Describe 'Sections combined from several files' {
     BeforeEach {
         $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
-        $null = New-Item -Path "$root\Shared", "$root\Configurations" -ItemType Directory -Force
+        $newItemParams = @{
+            Path     = "$root\Shared", "$root\Configurations"
+            ItemType = 'Directory'
+            Force    = $true
+        }
+        $null = New-Item @newItemParams
+
         function New-SharedFileHC {
             param([string]$Name, [string]$Json)
             $Json | Set-Content -LiteralPath "$root\Shared\$Name" -Encoding UTF8
         }
         function Read-TestConfigurationHC {
             param([string]$ItemsJson)
+            $testPath = "$root\Configurations\Test.json"
             '{ "SchemaVersion": 3, "Items": ' + $ItemsJson + ' }' |
-                Set-Content -LiteralPath "$root\Configurations\Test.json" -Encoding UTF8
-            Read-ConfigurationHC "$root\Configurations\Test.json" $root
+                Set-Content -LiteralPath $testPath -Encoding UTF8
+            Read-ConfigurationHC $testPath $root
         }
     }
     It 'joins the lists of several files in order' {
-        New-SharedFileHC 'Common.json' '[ { "Name": "Data", "Path": "C:\\Data" } ]'
-        New-SharedFileHC 'Scanner.json' '[ { "Name": "Scans", "Path": "D:\\Scans" } ]'
-        $loaded = Read-TestConfigurationHC '{ "SmbShares": [ "Shared\\Common.json", "Shared\\Scanner.json" ] }'
-        $loaded.Problems.Count | Should -Be 0 -Because ($loaded.Problems -join '; ')
-        @($loaded.Items.SmbShares | ForEach-Object { $_.Name }) | Should -Be @('Data', 'Scans')
+        New-SharedFileHC 'Common.json' (
+            '[ { "Name": "Data", "Path": "C:\\Data" } ]'
+        )
+        New-SharedFileHC 'Scanner.json' (
+            '[ { "Name": "Scans", "Path": "D:\\Scans" } ]'
+        )
+        $loaded = Read-TestConfigurationHC (
+            '{ "SmbShares": [ "Shared\\Common.json", "Shared\\Scanner.json" ] }'
+        )
+        $loaded.Problems.Count |
+            Should -Be 0 -Because ($loaded.Problems -join '; ')
+        @($loaded.Items.SmbShares | ForEach-Object { $_.Name }) |
+            Should -Be @('Data', 'Scans')
         @(Test-ConfigurationHC $loaded $root).Count | Should -Be 0
     }
     It 'combines objects and their nested lists' {
-        New-SharedFileHC 'A.json' '{ "Comment": "A", "RunAsCurrentUser": { "RegistryKeys": [ { "Path": "HKLM:\\SOFTWARE\\Vendor", "Name": "A", "Type": "String", "Value": "1" } ] } }'
-        New-SharedFileHC 'B.json' '{ "Comment": "B", "RunAsCurrentUser": { "RegistryKeys": [ { "Path": "HKLM:\\SOFTWARE\\Vendor", "Name": "B", "Type": "String", "Value": "2" } ] }, "RunAsOtherUser": [] }'
-        $loaded = Read-TestConfigurationHC '{ "RegistryKeys": [ "Shared\\A.json", "Shared\\B.json" ] }'
-        $loaded.Problems.Count | Should -Be 0 -Because ($loaded.Problems -join '; ')
-        @($loaded.Items.RegistryKeys.RunAsCurrentUser.RegistryKeys | ForEach-Object { $_.Name }) | Should -Be @('A', 'B')
+        New-SharedFileHC 'A.json' (
+            '{ "Comment": "A", "RunAsCurrentUser": { "RegistryKeys": [ ' +
+            '{ "Path": "HKLM:\\SOFTWARE\\Vendor", "Name": "A", ' +
+            '"Type": "String", "Value": "1" } ] } }'
+        )
+        New-SharedFileHC 'B.json' (
+            '{ "Comment": "B", "RunAsCurrentUser": { "RegistryKeys": [ ' +
+            '{ "Path": "HKLM:\\SOFTWARE\\Vendor", "Name": "B", ' +
+            '"Type": "String", "Value": "2" } ] }, "RunAsOtherUser": [] }'
+        )
+        $loaded = Read-TestConfigurationHC (
+            '{ "RegistryKeys": [ "Shared\\A.json", "Shared\\B.json" ] }'
+        )
+        $loaded.Problems.Count |
+            Should -Be 0 -Because ($loaded.Problems -join '; ')
+        @(
+            $loaded.Items.RegistryKeys.RunAsCurrentUser.RegistryKeys |
+                ForEach-Object { $_.Name }
+        ) | Should -Be @('A', 'B')
         $loaded.Items.RegistryKeys.Comment | Should -Be 'A'
         @(Test-ConfigurationHC $loaded $root).Count | Should -Be 0
     }
     It 'accepts the same single value in several files' {
-        New-SharedFileHC 'A.json' '{ "SyncTimeWithDomain": false, "TimeServerNames": [ "a.example" ] }'
-        New-SharedFileHC 'B.json' '{ "SyncTimeWithDomain": false, "TimeServerNames": [ "b.example" ] }'
-        $loaded = Read-TestConfigurationHC '{ "NtpTimeServers": [ "Shared\\A.json", "Shared\\B.json" ] }'
-        $loaded.Problems.Count | Should -Be 0 -Because ($loaded.Problems -join '; ')
-        $loaded.Items.NtpTimeServers.TimeServerNames | Should -Be @('a.example', 'b.example')
+        New-SharedFileHC 'A.json' (
+            '{ "SyncTimeWithDomain": false, ' +
+            '"TimeServerNames": [ "a.example" ] }'
+        )
+        New-SharedFileHC 'B.json' (
+            '{ "SyncTimeWithDomain": false, ' +
+            '"TimeServerNames": [ "b.example" ] }'
+        )
+        $loaded = Read-TestConfigurationHC (
+            '{ "NtpTimeServers": [ "Shared\\A.json", "Shared\\B.json" ] }'
+        )
+        $loaded.Problems.Count |
+            Should -Be 0 -Because ($loaded.Problems -join '; ')
+        $loaded.Items.NtpTimeServers.TimeServerNames |
+            Should -Be @('a.example', 'b.example')
     }
     It 'reports a single value that two files set differently' {
-        New-SharedFileHC 'A.json' '{ "WinSystemLocaleName": "nl-BE", "TimeZoneId": "Romance Standard Time", "WinHomeLocationGeoId": 21, "CultureName": "nl-BE" }'
+        New-SharedFileHC 'A.json' (
+            '{ "WinSystemLocaleName": "nl-BE", ' +
+            '"TimeZoneId": "Romance Standard Time", ' +
+            '"WinHomeLocationGeoId": 21, "CultureName": "nl-BE" }'
+        )
         New-SharedFileHC 'B.json' '{ "TimeZoneId": "W. Europe Standard Time" }'
-        $loaded = Read-TestConfigurationHC '{ "RegionalSettings": [ "Shared\\A.json", "Shared\\B.json" ] }'
-        $loaded.Problems[0] | Should -BeLike "*'Items.RegionalSettings.TimeZoneId' is ""Romance Standard Time"" in 'Shared\A.json' but ""W. Europe Standard Time"" in 'Shared\B.json'*"
+        $loaded = Read-TestConfigurationHC (
+            '{ "RegionalSettings": [ "Shared\\A.json", "Shared\\B.json" ] }'
+        )
+        $loaded.Problems[0] | Should -BeLike (
+            "*'Items.RegionalSettings.TimeZoneId' is " +
+            """Romance Standard Time"" in 'Shared\A.json' but " +
+            """W. Europe Standard Time"" in 'Shared\B.json'*"
+        )
         $loaded.Items.Keys | Should -Not -Contain 'RegionalSettings'
     }
     It 'reports duplicates across files through the normal checks' {
         New-SharedFileHC 'A.json' '[ { "Name": "Data", "Path": "C:\\Data" } ]'
         New-SharedFileHC 'B.json' '[ { "Name": "Data", "Path": "E:\\Other" } ]'
-        $loaded = Read-TestConfigurationHC '{ "SmbShares": [ "Shared\\A.json", "Shared\\B.json" ] }'
-        (@(Test-ConfigurationHC $loaded $root) -join ';') | Should -BeLike "*share 'Data' is already configured*"
+        $loaded = Read-TestConfigurationHC (
+            '{ "SmbShares": [ "Shared\\A.json", "Shared\\B.json" ] }'
+        )
+        (@(Test-ConfigurationHC $loaded $root) -join ';') |
+            Should -BeLike "*share 'Data' is already configured*"
     }
     It 'reports a missing file and a file that refers to other files' {
         New-SharedFileHC 'Nested.json' '[ "Shared\\A.json" ]'
-        $loaded = Read-TestConfigurationHC '{ "UserAccounts": [ "Shared\\Nested.json" ], "UserGroups": [ "Shared\\Missing.json" ] }'
-        ($loaded.Problems -join ';') | Should -BeLike "*reference 'Shared\Nested.json': nested section references are not supported*"
-        ($loaded.Problems -join ';') | Should -BeLike "*reference 'Shared\Missing.json'*"
+        $loaded = Read-TestConfigurationHC (
+            '{ "UserAccounts": [ "Shared\\Nested.json" ], ' +
+            '"UserGroups": [ "Shared\\Missing.json" ] }'
+        )
+        ($loaded.Problems -join ';') | Should -BeLike (
+            "*reference 'Shared\Nested.json': nested section references " +
+            "are not supported*"
+        )
+        ($loaded.Problems -join ';') |
+            Should -BeLike "*reference 'Shared\Missing.json'*"
     }
 }

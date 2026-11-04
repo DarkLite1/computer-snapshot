@@ -21,7 +21,8 @@
 .PARAMETER Data
     Resolved section data. An empty section performs no operations.
 .PARAMETER RootFolder
-    Absolute USB root for asset paths. No configuration files are written here.
+    Absolute USB root for asset paths. No configuration files are written
+    here.
 .OUTPUTS
     Exactly one object: Data (export only), a string array of Messages and a
     string array of Errors.
@@ -34,6 +35,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
+
 #region Windows helpers
 function Get-HostsFilePathHC {
     Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
@@ -52,7 +54,9 @@ function ConvertFrom-HostsLineHC {
     if ($parts.Count -lt 2) { return $null }
     [pscustomobject]@{
         IPAddress = $parts[0]
-        Hostnames = [System.Collections.Generic.List[string]]@($parts[1..($parts.Count - 1)])
+        Hostnames = [System.Collections.Generic.List[string]]@(
+            $parts[1..($parts.Count - 1)]
+        )
         Comment   = $comment
         Text      = $Line
         Modified  = $false
@@ -68,25 +72,38 @@ function Write-HostsFileHC {
     # Write next to the hosts file, then swap it in and keep hosts.bak
     param(
         [Parameter(Mandatory)][string]$Path,
-        [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][string[]]$Lines
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()][AllowEmptyString()][string[]]$Lines
     )
     $temporary = "$Path.computer-snapshot.tmp"
-    [IO.File]::WriteAllLines($temporary, $Lines, (New-Object System.Text.UTF8Encoding $false))
+    $encoding = New-Object System.Text.UTF8Encoding $false
+    [IO.File]::WriteAllLines($temporary, $Lines, $encoding)
     if ([IO.File]::Exists($Path)) {
+        Write-Verbose "Replace hosts file '$Path' (backup '$Path.bak')"
         [IO.File]::Replace($temporary, $Path, "$Path.bak")
     }
     else {
+        Write-Verbose "Create hosts file '$Path'"
         [IO.File]::Move($temporary, $Path)
     }
 }
 #endregion
+
 $exportData = $null
 $messages = @()
 $errors = @()
 if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
-    return [pscustomobject]@{ Data = $null; Messages = [string[]]@('Nothing to do'); Errors = [string[]]@() }
+    Write-Verbose 'Import hosts file entries: empty section, nothing to do'
+    return [pscustomobject]@{
+        Data     = $null
+        Messages = [string[]]@('Nothing to do')
+        Errors   = [string[]]@()
+    }
 }
+
 $hostsPath = Get-HostsFilePathHC
+Write-Verbose "Read hosts file '$hostsPath'"
+
 # One item per line: an active entry object, or the line as text
 $lines = [System.Collections.Generic.List[object]]::new()
 if ([IO.File]::Exists($hostsPath)) {
@@ -95,72 +112,119 @@ if ([IO.File]::Exists($hostsPath)) {
         if ($entry) { $lines.Add($entry) } else { $lines.Add($line) }
     }
 }
+else {
+    Write-Verbose 'Hosts file not found, start with an empty file'
+}
+
 if ($Action -eq 'Export') {
     #region Capture section
+    Write-Verbose 'Export hosts file entries'
     $byAddress = [ordered]@{}
     foreach ($entry in @($lines | Where-Object { $_ -isnot [string] })) {
         if (-not $byAddress.Contains($entry.IPAddress)) {
-            $byAddress[$entry.IPAddress] = [System.Collections.Generic.List[string]]::new()
+            $byAddress[$entry.IPAddress] =
+            [System.Collections.Generic.List[string]]::new()
         }
         foreach ($name in $entry.Hostnames) {
-            if ($byAddress[$entry.IPAddress] -notcontains $name) { $byAddress[$entry.IPAddress].Add($name) }
+            if ($byAddress[$entry.IPAddress] -notcontains $name) {
+                $byAddress[$entry.IPAddress].Add($name)
+            }
         }
     }
     $exportData = @(
         foreach ($address in $byAddress.Keys) {
-            [ordered]@{ IPAddress = $address; Hostnames = @($byAddress[$address]) }
+            [ordered]@{
+                IPAddress = $address
+                Hostnames = @($byAddress[$address])
+            }
         }
     )
     #endregion
+
     $messages = @("Exported $($exportData.Count) hosts file address(es)")
 }
 else {
     #region Apply section
+    Write-Verbose 'Import hosts file entries'
     $changed = $false
     foreach ($item in @($Data | Where-Object { $null -ne $_ })) {
         $names = @($item.Hostnames | Where-Object { $_ })
         $isRemove = $item.Action -eq 'Remove'
-        $label = if ($isRemove) { "host name(s) '$($names -join "', '")'" } else { "'$($item.IPAddress)'" }
+        $label = if ($isRemove) {
+            "host name(s) '$($names -join "', '")'"
+        }
+        else {
+            "'$($item.IPAddress)'"
+        }
+        Write-Verbose "Hosts file entry ${label}"
         try {
             if (-not $names.Count) { throw 'Hostnames is empty' }
             foreach ($name in $names) {
-                if (-not (Test-HostNameHC $name)) { throw "'$name' is not a valid host name" }
+                if (-not (Test-HostNameHC $name)) {
+                    throw "'$name' is not a valid host name"
+                }
             }
-            if (-not $isRemove -and -not (Test-HostsIPAddressHC $item.IPAddress)) {
-                throw "'$($item.IPAddress)' is not an IPv4 or IPv6 address"
+            if (
+                -not $isRemove -and
+                -not (Test-HostsIPAddressHC $item.IPAddress)
+            ) {
+                throw ("'$($item.IPAddress)' is not an IPv4 or IPv6 " +
+                    'address')
             }
             $missing = [System.Collections.Generic.List[string]]::new()
             foreach ($name in $names) {
                 $found = $false
-                foreach ($entry in @($lines | Where-Object { $_ -isnot [string] })) {
-                    $match = @($entry.Hostnames | Where-Object { $_ -eq $name })
+                $entries = @($lines | Where-Object { $_ -isnot [string] })
+                foreach ($entry in $entries) {
+                    $match = @(
+                        $entry.Hostnames | Where-Object { $_ -eq $name }
+                    )
                     if (-not $match.Count) { continue }
-                    if (-not $isRemove -and $entry.IPAddress -eq $item.IPAddress) {
+                    if (
+                        -not $isRemove -and
+                        $entry.IPAddress -eq $item.IPAddress
+                    ) {
                         $found = $true
                         continue
                     }
-                    foreach ($existing in $match) { $null = $entry.Hostnames.Remove($existing) }
+                    foreach ($existing in $match) {
+                        $null = $entry.Hostnames.Remove($existing)
+                    }
                     $entry.Modified = $true
                     $changed = $true
                     if ($isRemove) {
-                        $messages += "Removed host name '$name' (pointed to $($entry.IPAddress)) from the hosts file"
+                        $messages += (
+                            "Removed host name '$name' (pointed to " +
+                            "$($entry.IPAddress)) from the hosts file"
+                        )
                         $found = $true
                     }
                     else {
-                        $messages += "Host name '$name' pointed to $($entry.IPAddress); it now points to $($item.IPAddress)"
+                        $messages += (
+                            "Host name '$name' pointed to " +
+                            "$($entry.IPAddress); it now points to " +
+                            "$($item.IPAddress)"
+                        )
                     }
                 }
                 if ($isRemove -and -not $found) {
-                    $messages += "Host name '$name' is not in the hosts file, nothing to remove"
+                    $messages += (
+                        "Host name '$name' is not in the hosts file, " +
+                        'nothing to remove'
+                    )
                 }
                 elseif (-not $isRemove -and -not $found) {
                     $missing.Add($name)
                 }
                 elseif (-not $isRemove) {
-                    $messages += "Host name '$name' already points to $($item.IPAddress)"
+                    $messages += (
+                        "Host name '$name' already points to " +
+                        "$($item.IPAddress)"
+                    )
                 }
             }
             if ($missing.Count) {
+                Write-Verbose "Add $($missing.Count) missing host name(s)"
                 $lines.Add([pscustomobject]@{
                         IPAddress = [string]$item.IPAddress
                         Hostnames = $missing
@@ -170,16 +234,23 @@ else {
                     })
                 $changed = $true
                 foreach ($name in $missing) {
-                    if (-not ($messages -like "Host name '$name' pointed to *")) {
-                        $messages += "Added host name '$name' for $($item.IPAddress)"
+                    $moved = "Host name '$name' pointed to *"
+                    if (-not ($messages -like $moved)) {
+                        $messages += (
+                            "Added host name '$name' for $($item.IPAddress)"
+                        )
                     }
                 }
             }
         }
         catch {
-            $errors += "Failed to apply hosts file entry ${label}: $($_.Exception.Message)"
+            $errors += (
+                "Failed to apply hosts file entry ${label}: " +
+                "$($_.Exception.Message)"
+            )
         }
     }
+
     if ($changed) {
         try {
             # Unchanged lines are kept as they were; a line whose names were
@@ -188,16 +259,30 @@ else {
                 foreach ($line in $lines) {
                     if ($line -is [string]) { $line }
                     elseif (-not $line.Modified) { $line.Text }
-                    elseif ($line.Hostnames.Count) { ConvertTo-HostsLineHC -Entry $line }
+                    elseif ($line.Hostnames.Count) {
+                        ConvertTo-HostsLineHC -Entry $line
+                    }
                 }
             )
             Write-HostsFileHC -Path $hostsPath -Lines $text
+            Write-Verbose 'Clear DNS client cache'
             Clear-DnsClientCache
         }
         catch {
-            $errors += "Failed to write the hosts file '$hostsPath': $($_.Exception.Message)"
+            $errors += (
+                "Failed to write the hosts file '$hostsPath': " +
+                "$($_.Exception.Message)"
+            )
         }
+    }
+    else {
+        Write-Verbose 'Hosts file unchanged, not written'
     }
     #endregion
 }
-[pscustomobject]@{ Data = $exportData; Messages = [string[]]$messages; Errors = [string[]]$errors }
+
+[pscustomobject]@{
+    Data     = $exportData
+    Messages = [string[]]$messages
+    Errors   = [string[]]$errors
+}

@@ -224,10 +224,11 @@ else {
             }
 
             $missing = [System.Collections.Generic.List[string]]::new()
+            # New entries are only added after this loop
+            $entries = @($lines | Where-Object { $_ -isnot [string] })
 
             foreach ($name in $names) {
                 $found = $false
-                $entries = @($lines | Where-Object { $_ -isnot [string] })
 
                 foreach ($entry in $entries) {
                     $match = @(

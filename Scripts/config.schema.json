@@ -622,11 +622,11 @@
           },
           "PasswordExpires": {
             "type": ["string", "null", "boolean"],
-            "description": "Existing password expiry value; null means no expiry."
+            "description": "Existing password expiry value; null means no expiry. Omit to leave the setting unchanged."
           },
           "AccountExpires": {
             "type": ["string", "null"],
-            "description": "Optional account expiry date."
+            "description": "Optional account expiry date; null means no expiry. Omit to leave the setting unchanged."
           },
           "UserMayChangePassword": {
             "type": "boolean",

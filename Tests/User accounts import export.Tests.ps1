@@ -175,8 +175,46 @@ Describe 'User accounts import errors' {
         Should -Invoke Enable-LocalUser -Times 0 -Exactly
         Should -Invoke Disable-LocalUser -Times 0 -Exactly
         Should -Invoke Set-LocalUser -Times 1 -Exactly -ParameterFilter {
-            -not $PSBoundParameters.ContainsKey('UserMayChangePassword') -and
-            -not $PSBoundParameters.ContainsKey('FullName')
+            -not $PesterBoundParameters.ContainsKey('UserMayChangePassword') -and
+            -not $PesterBoundParameters.ContainsKey('FullName') -and
+            -not $PesterBoundParameters.ContainsKey('PasswordNeverExpires') -and
+            -not $PesterBoundParameters.ContainsKey('AccountExpires') -and
+            -not $PesterBoundParameters.ContainsKey('AccountNeverExpires')
+        }
+    }
+    It 'sets password expiry <Expected> for PasswordExpires <Value>' -ForEach @(
+        @{ Value = $null; Expected = $true }
+        @{ Value = $false; Expected = $true }
+        @{ Value = $true; Expected = $false }
+        @{ Value = '2027-01-01T00:00:00'; Expected = $false }
+    ) {
+        $data = @(
+            [pscustomobject]@{ Name = 'Existing'; PasswordExpires = $Value }
+        )
+
+        $null = & $scriptPath -Action Import -Data $data -RootFolder $TestDrive
+
+        Should -Invoke Set-LocalUser -Times 1 -Exactly -ParameterFilter {
+            $PasswordNeverExpires -eq $Expected
+        }
+    }
+    It 'sets the account expiry only when AccountExpires is configured' {
+        $data = @(
+            [pscustomobject]@{ Name = 'Existing'; AccountExpires = $null }
+            [pscustomobject]@{
+                Name           = 'Locked'
+                AccountExpires = '2027-01-01T00:00:00'
+            }
+        )
+
+        $null = & $scriptPath -Action Import -Data $data -RootFolder $TestDrive
+
+        Should -Invoke Set-LocalUser -Times 1 -Exactly -ParameterFilter {
+            $Name -eq 'Existing' -and $AccountNeverExpires
+        }
+        Should -Invoke Set-LocalUser -Times 1 -Exactly -ParameterFilter {
+            $Name -eq 'Locked' -and $null -ne $AccountExpires -and
+            -not $AccountNeverExpires
         }
     }
 }

@@ -258,9 +258,12 @@ else {
             $properties = @(
                 $user.PSObject.Properties | ForEach-Object { $_.Name }
             )
-            $setUserParams = @{
-                Name                 = $user.Name
-                PasswordNeverExpires = ![Boolean]$user.PasswordExpires
+            $setUserParams = @{ Name = $user.Name }
+            if ($properties -contains 'PasswordExpires') {
+                # null means the password never expires
+                $setUserParams.PasswordNeverExpires = (
+                    -not [bool]$user.PasswordExpires
+                )
             }
             if ($null -ne $user.FullName) {
                 $setUserParams.FullName = $user.FullName
@@ -273,10 +276,12 @@ else {
                     [bool]$user.UserMayChangePassword
                 )
             }
-            if ($user.AccountExpires) {
-                $setUserParams.AccountExpires = $user.AccountExpires
+            if ($properties -contains 'AccountExpires') {
+                if ($user.AccountExpires) {
+                    $setUserParams.AccountExpires = $user.AccountExpires
+                }
+                else { $setUserParams.AccountNeverExpires = $true }
             }
-            else { $setUserParams.AccountNeverExpires = $true }
             Write-Verbose "User '$($user.Name)': update account details"
             Set-LocalUser @setUserParams
             #endregion

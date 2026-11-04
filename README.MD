@@ -48,7 +48,7 @@ Your USB stick has a specific layout to keep everything organized. Here are the 
 - **`Files/`**: Put any standard files or custom scripts you want copied to the new PC here.
 - **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers.
 - **`Log/`**: Check here for your execution reports.
-- **`Examples/`**: Ready-made sample data for every section. Copy what you need into your own configuration.
+- **`Examples/`**: Ready-made sample data for every section. Copy what you need into your own configuration. `Examples/Answer files/` holds an example answer file.
 - **`Answers/`**: Optional local answer files for individual PCs. Create this
   folder when needed; Git ignores it because answers can contain passwords.
 - **`Scripts/`**: The tool itself. You normally don't need to touch anything here.
@@ -529,7 +529,7 @@ always fail before any sections run, even in interactive mode.
 }
 ```
 
-This is the bundled [partial answer example](Examples/Answers%20prompted%20setup.json)
+This is the bundled [partial answer example](Examples/Answer%20files/Answers%20prompted%20setup.json)
 for [Example prompted setup](Configurations/Example%20prompted%20setup.json).
 It supplies a name and a documentation-only NTP address, and leaves the password
 to be entered interactively. **Change the address to your real NTP server**
@@ -568,7 +568,7 @@ The configuration and all source files stay unchanged.
 ```powershell
 & '.\Scripts\Invoke configuration.ps1' `
     -ConfigurationFile 'Configurations\Example prompted setup.json' `
-    -AnswerFile 'Examples\Answers prompted setup.json'
+    -AnswerFile 'Examples\Answer files\Answers prompted setup.json'
 ```
 
 This still asks for confirmation, and asks for the missing password after any

@@ -334,7 +334,9 @@ Describe 'Answer template generation' {
     It ('ships a partial example whose keys exactly match the prompted ' +
         'configuration') {
         $repository = Split-Path $PSScriptRoot -Parent
-        $example = Join-Path $repository 'Examples\Answers prompted setup.json'
+        $example = Join-Path $repository (
+            'Examples\Answer files\Answers prompted setup.json'
+        )
         $configurationFile = Join-Path $repository (
             'Configurations\Example prompted setup.json'
         )

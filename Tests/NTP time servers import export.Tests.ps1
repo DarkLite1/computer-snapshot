@@ -47,6 +47,35 @@ Describe 'NTP peer capture' {
         $result.Data.TimeServerNames.GetType().IsArray | Should -BeTrue
         $result.Data.TimeServerNames | Should -Be @('server1')
     }
+    It 'exports no time servers for domain synchronization' {
+        Mock Get-ItemProperty {
+            [pscustomobject]@{ Type = 'NT5DS'; NtpServer = 'time.windows.com' }
+        }
+
+        $result = . $scriptPath -Action Export -RootFolder $TestDrive
+
+        $result.Errors.Count | Should -Be 0
+        $result.Messages | Should -Be @('Exported NTP time servers')
+        $result.Data.SyncTimeWithDomain | Should -BeTrue
+        $result.Data.TimeServerNames.Count | Should -Be 0
+        Should -Invoke w32tm -Times 0 -Exactly
+    }
+    It 'exports the configured servers for type <Type>' -ForEach @(
+        @{ Type = 'AllSync' }
+        @{ Type = 'NoSync' }
+    ) {
+        Mock Get-ItemProperty {
+            [pscustomobject]@{ Type = $Type; NtpServer = 'server1,0x9' }
+        }
+
+        $result = . $scriptPath -Action Export -RootFolder $TestDrive
+
+        $result.Errors.Count | Should -Be 0
+        $result.Messages[1] | Should -BeLike "*type is '$Type'*"
+        $result.Data.SyncTimeWithDomain | Should -BeFalse
+        $result.Data.TimeServerNames | Should -Be @('server1')
+        Should -Invoke w32tm -Times 0 -Exactly
+    }
     It 'fails export when time-service settings cannot be read' {
         Mock Get-ItemProperty { throw 'Registry unavailable' }
 
@@ -84,13 +113,6 @@ Describe 'NTP command failures' {
     }
     AfterEach {
         $global:LASTEXITCODE = $savedExitCode
-    }
-    It 'reports source-query exit codes and diagnostics on export' {
-        Mock w32tm { $global:LASTEXITCODE = 5; 'Access denied' }
-
-        $result = . $scriptPath -Action Export -RootFolder $TestDrive
-
-        $result.Errors[0] | Should -BeLike '*exit code 5*Access denied*'
     }
     It 'stops a domain import when configuration fails' {
         Mock w32tm {

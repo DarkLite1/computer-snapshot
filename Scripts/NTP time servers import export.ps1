@@ -46,18 +46,18 @@ function Invoke-TimeServiceHC {
 }
 
 Function Get-TimeServerHC {
+    # Reads the configured servers from the registry for every type: the
+    # source reported by 'w32tm /query /source' is a domain controller or a
+    # localized text such as 'Local CMOS Clock', not a configured server
     [CmdletBinding()]
     param()
 
     $key = 'HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Parameters'
     $parameters = Get-ItemProperty -LiteralPath $key -ErrorAction Stop
-    $servers = if ($parameters.Type -eq 'NTP') {
-        $parameters.NtpServer -split '\s+' |
+    $servers = if ($parameters.Type -ne 'NT5DS') {
+        "$($parameters.NtpServer)" -split '\s+' |
         Where-Object { $_ } |
         ForEach-Object { ($_ -split ',', 2)[0] }
-    }
-    else {
-        Invoke-TimeServiceHC -Arguments '/query', '/source'
     }
     [pscustomobject]@{
         Type       = $parameters.Type
@@ -117,6 +117,12 @@ if ($Action -eq 'Export') {
             )
         }
         $messages = @('Exported NTP time servers')
+        if ($timeServers.Type -notin @('NT5DS', 'NTP')) {
+            $messages += (
+                "The time service type is '$($timeServers.Type)'; " +
+                'a restore synchronizes with the exported time servers only'
+            )
+        }
     }
     catch {
         $errors += (

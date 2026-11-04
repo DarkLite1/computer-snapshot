@@ -23,33 +23,33 @@ function Test-ShapeHC {
     }
 
     if ($Schema.type) {
-        $matches = $false
+        $typeMatched = $false
 
         foreach ($type in @($Schema.type)) {
             switch ($type) {
                 'null' {
                     if ($null -eq $Value) {
-                        $matches = $true
+                        $typeMatched = $true
                     }
                 }
                 'object' {
                     if (Test-ObjectHC $Value) {
-                        $matches = $true
+                        $typeMatched = $true
                     }
                 }
                 'array' {
                     if ($Value -is [array]) {
-                        $matches = $true
+                        $typeMatched = $true
                     }
                 }
                 'string' {
                     if ($Value -is [string] -or $Value -is [datetime]) {
-                        $matches = $true
+                        $typeMatched = $true
                     }
                 }
                 'boolean' {
                     if ($Value -is [bool]) {
-                        $matches = $true
+                        $typeMatched = $true
                     }
                 }
                 'integer' {
@@ -59,13 +59,13 @@ function Test-ShapeHC {
                         $Value -is [uint32] -or
                         $Value -is [uint64]
                     ) {
-                        $matches = $true
+                        $typeMatched = $true
                     }
                 }
             }
         }
 
-        if (-not $matches) {
+        if (-not $typeMatched) {
             "${Location}: expected $(@($Schema.type) -join ' or ')"
             return
         }
@@ -102,18 +102,19 @@ function Test-ShapeHC {
 
     foreach ($keyword in @('oneOf', 'anyOf')) {
         if ($Schema.$keyword) {
-            $matches = 0
+            $matchCount = 0
             foreach ($alternative in $Schema.$keyword) {
                 if (
                     @(
                         Test-ShapeHC $Value $alternative $Definitions $Location
                     ).Count -eq 0
                 ) {
-                    $matches++
+                    $matchCount++
                 }
             }
             if (
-                $matches -eq 0 -or ($keyword -eq 'oneOf' -and $matches -ne 1)
+                $matchCount -eq 0 -or
+                ($keyword -eq 'oneOf' -and $matchCount -ne 1)
             ) {
                 # Alternatives that only name one required property each
                 $choices = [System.Collections.Generic.List[string]]::new()
@@ -132,17 +133,32 @@ function Test-ShapeHC {
                     $keyword -eq 'oneOf' -and
                     $choices.Count -eq @($Schema.$keyword).Count
                 ) {
-                    $list = $choices -join ' or '
+                    if ($choices.Count -eq 2) {
+                        $list = $choices -join ' or '
 
-                    if ($matches -eq 0) {
-                        "${Location}: needs $list"
+                        if ($matchCount -eq 0) {
+                            "${Location}: needs $list"
+                        }
+                        else {
+                            "${Location}: use either $list, not both"
+                        }
                     }
                     else {
-                        "${Location}: use either $list, not both"
+                        $list = (
+                            ($choices[0..($choices.Count - 2)] -join ', ') +
+                            ' and ' + $choices[-1]
+                        )
+
+                        if ($matchCount -eq 0) {
+                            "${Location}: needs one of $list"
+                        }
+                        else {
+                            "${Location}: use only one of $list"
+                        }
                     }
                 }
                 elseif (
-                    $matches -eq 0 -and
+                    $matchCount -eq 0 -and
                     @($Schema.$keyword | Where-Object { $_.type }).Count -eq
                     @($Schema.$keyword).Count
                 ) {

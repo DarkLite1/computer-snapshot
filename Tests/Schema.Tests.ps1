@@ -199,6 +199,28 @@ Describe 'Schema contract' {
             'ScheduledTasks\[0\]: use either Xml or XmlFile, not both'
         )
     }
+    It 'names every choice when there are three or more alternatives' {
+        InModuleScope Configuration {
+            $choiceSchema = (
+                '{"type":"object","oneOf":[{"required":["A"]},' +
+                '{"required":["B"]},{"required":["C"]}]}'
+            ) | ConvertFrom-Json
+
+            $none = [pscustomobject]@{}
+            $two = [pscustomobject]@{
+                A = 1
+                B = 2
+            }
+            $one = [pscustomobject]@{ C = 3 }
+
+            Test-ShapeHC $none $choiceSchema $null 'X' |
+            Should -BeExactly 'X: needs one of A, B and C'
+            Test-ShapeHC $two $choiceSchema $null 'X' |
+            Should -BeExactly 'X: use only one of A, B and C'
+            Test-ShapeHC $one $choiceSchema $null 'X' |
+            Should -BeNullOrEmpty
+        }
+    }
     It ('requires objects in Software.Remove and only one of ' +
         'UninstallArguments and UninstallCommand') {
         $document = @{
@@ -489,12 +511,12 @@ Describe 'Schema contract' {
         foreach ($file in $files) {
             $data = Read-SectionExampleHC $file.FullName
             $sectionNames = $schema.'$defs'.PSObject.Properties.Name
-            $matches = @($sectionNames | Where-Object {
+            $matchingSections = @($sectionNames | Where-Object {
                     $document = @{ SchemaVersion = 3; Items = @{ $_ = $data } }
                     $document | ConvertTo-Json -Depth 20 |
                     Test-Json @testJsonParams
                 })
-            $matches.Count | Should -BeGreaterThan 0 -Because (
+            $matchingSections.Count | Should -BeGreaterThan 0 -Because (
                 "Shared file '$($file.Name)' must match a section shape"
             )
         }

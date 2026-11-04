@@ -43,8 +43,12 @@ $ErrorActionPreference = 'Stop'
 #region Windows helpers
 function Get-CurrentUserSidHC {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    try { $identity.User.Value }
-    finally { $identity.Dispose() }
+    try {
+        $identity.User.Value
+    }
+    finally {
+        $identity.Dispose()
+    }
 }
 
 function Assert-NotLastAdministratorHC {

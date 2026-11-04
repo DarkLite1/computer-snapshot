@@ -222,6 +222,42 @@ Describe 'Answer file reading and resolution' {
     }
 }
 
+Describe 'Test-ConfigurationBeforeInputHC' {
+    It ('leaves problems of placeholder values for later and reports ' +
+        'the others') {
+        $configuration = @{
+            SchemaVersion = 3
+            Items         = @{
+                NetworkCards = @(
+                    @{
+                        FindBy = @{ Name = 'Ethernet' }
+                        Change = @{
+                            IPSettings = @{
+                                IPAddress    = '{{ipv4:Address}}'
+                                PrefixLength = '{{prefix:Prefix}}'
+                            }
+                        }
+                    }
+                )
+                Software     = @{
+                    Install = @(
+                        @{ ExecutablePath = '{{input:Installer}}' }
+                        @{ ExecutablePath = 'Missing\setup.exe' }
+                    )
+                }
+            }
+        }
+
+        $problems = @(
+            Test-ConfigurationBeforeInputHC $configuration $TestDrive
+        )
+
+        $problems.Count | Should -Be 1 -Because ($problems -join '; ')
+        $problems[0] |
+            Should -BeLike "*Install[[]1].ExecutablePath: file 'Missing*"
+    }
+}
+
 Describe 'Answer template generation' {
     BeforeEach {
         $configurationPath = Join-Path $TestDrive 'configuration.json'

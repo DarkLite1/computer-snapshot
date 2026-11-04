@@ -295,87 +295,97 @@ function Invoke-ComputerSnapshotHC {
                 throw ($configuration.Problems -join [Environment]::NewLine)
             }
 
-            $answers = $null
-
-            if ($PSBoundParameters.ContainsKey('AnswerFile')) {
-                if ([string]::IsNullOrWhiteSpace($AnswerFile)) {
-                    throw 'AnswerFile must not be empty.'
-                }
-
-                $answerPath = Resolve-RootPathHC $AnswerFile $RootFolder
-                $answers = Read-RestoreAnswerFileHC -Path $answerPath
-            }
-
-            $inputParams = @{
-                Items      = $configuration.Items
-                RootFolder = $RootFolder
-                Answers    = $answers
-                Unattended = $Unattended
-                ReadValue  = {
-                    param($field)
-                    Read-RestoreInputHC -Field $field
-                }
-            }
-            $inputResult = Resolve-RestoreInputHC @inputParams
-
-            $secretValues = $inputResult.SecretValues
-
             $testParams = @{
                 Configuration = $configuration
                 RootFolder    = $RootFolder
             }
-            $problems = @(Test-ConfigurationHC @testParams)
 
-            # Each copy gets only the answers of its own file, never a
-            # password, so no other answer reaches the copy section
-            $copies = @(
-                $configuration.Items.CopyFilesFolders |
-                Where-Object { $null -ne $_ }
-            )
+            # Report what is wrong before anybody types an answer
+            $problems = @(Test-ConfigurationBeforeInputHC @testParams)
 
-            foreach ($copy in $copies) {
-                if ($copy.FillPlaceholders -ne $true) {
-                    continue
+            if ($problems.Count) {
+                Write-Verbose 'Configuration problems found, ask for no input'
+            }
+            else {
+                $answers = $null
+
+                if ($PSBoundParameters.ContainsKey('AnswerFile')) {
+                    if ([string]::IsNullOrWhiteSpace($AnswerFile)) {
+                        throw 'AnswerFile must not be empty.'
+                    }
+
+                    $answerPath = Resolve-RootPathHC $AnswerFile $RootFolder
+                    $answers = Read-RestoreAnswerFileHC -Path $answerPath
                 }
 
-                $dictionaryType = (
-                    'System.Collections.Generic.Dictionary[string,string]'
-                )
-                $fileValues = New-Object $dictionaryType (
-                    [StringComparer]::Ordinal
-                )
-
-                $fileParams = @{
-                    Items      = @{ CopyFilesFolders = @($copy) }
+                $inputParams = @{
+                    Items      = $configuration.Items
                     RootFolder = $RootFolder
-                }
-
-                foreach ($field in @(Get-FileInputFieldsHC @fileParams)) {
-                    if (
-                        $field.Kind -ne 'password' -and
-                        $inputResult.Values.ContainsKey($field.Placeholder)
-                    ) {
-                        $fileValues[$field.Placeholder] = (
-                            $inputResult.Values[$field.Placeholder]
-                        )
+                    Answers    = $answers
+                    Unattended = $Unattended
+                    ReadValue  = {
+                        param($field)
+                        Read-RestoreInputHC -Field $field
                     }
                 }
+                $inputResult = Resolve-RestoreInputHC @inputParams
 
-                Write-Verbose (
-                    "Copy '$($copy.From)': " +
-                    "$($fileValues.Count) placeholder answer(s)"
+                $secretValues = $inputResult.SecretValues
+
+                # The answers can still be invalid where they are used
+                $problems = @(Test-ConfigurationHC @testParams)
+
+                # Each copy gets only the answers of its own file, never a
+                # password, so no other answer reaches the copy section
+                $copies = @(
+                    $configuration.Items.CopyFilesFolders |
+                    Where-Object { $null -ne $_ }
                 )
 
-                if ($copy -is [System.Collections.IDictionary]) {
-                    $copy.PlaceholderValues = $fileValues
-                }
-                else {
-                    $memberParams = @{
-                        NotePropertyName  = 'PlaceholderValues'
-                        NotePropertyValue = $fileValues
-                        Force             = $true
+                foreach ($copy in $copies) {
+                    if ($copy.FillPlaceholders -ne $true) {
+                        continue
                     }
-                    $copy | Add-Member @memberParams
+
+                    $dictionaryType = (
+                        'System.Collections.Generic.Dictionary[string,string]'
+                    )
+                    $fileValues = New-Object $dictionaryType (
+                        [StringComparer]::Ordinal
+                    )
+
+                    $fileParams = @{
+                        Items      = @{ CopyFilesFolders = @($copy) }
+                        RootFolder = $RootFolder
+                    }
+
+                    foreach ($field in @(Get-FileInputFieldsHC @fileParams)) {
+                        if (
+                            $field.Kind -ne 'password' -and
+                            $inputResult.Values.ContainsKey($field.Placeholder)
+                        ) {
+                            $fileValues[$field.Placeholder] = (
+                                $inputResult.Values[$field.Placeholder]
+                            )
+                        }
+                    }
+
+                    Write-Verbose (
+                        "Copy '$($copy.From)': " +
+                        "$($fileValues.Count) placeholder answer(s)"
+                    )
+
+                    if ($copy -is [System.Collections.IDictionary]) {
+                        $copy.PlaceholderValues = $fileValues
+                    }
+                    else {
+                        $memberParams = @{
+                            NotePropertyName  = 'PlaceholderValues'
+                            NotePropertyValue = $fileValues
+                            Force             = $true
+                        }
+                        $copy | Add-Member @memberParams
+                    }
                 }
             }
 

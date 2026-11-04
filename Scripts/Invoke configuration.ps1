@@ -140,15 +140,9 @@ $params = @{
     Items      = $Items
 }
 $configuration = Read-ConfigurationHC @params
-$inputFields = @(Get-RestoreInputFieldsHC -Data $configuration.Items)
-$problems = @(
-    if ($inputFields.Count) {
-        $configuration.Problems
-    }
-    else {
-        Test-ConfigurationHC $configuration $rootFolder
-    }
-)
+
+# Placeholders are checked after the answers, in the restore itself
+$problems = @(Test-ConfigurationBeforeInputHC $configuration $rootFolder)
 if ($problems.Count) { throw ($problems -join [Environment]::NewLine) }
 #endregion
 

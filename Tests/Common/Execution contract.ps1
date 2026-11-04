@@ -496,6 +496,138 @@ Describe 'Single-file execution' {
         }
         Should -Invoke Write-SnapshotReportHC @invoke
     }
+    It ('reports a configuration problem before asking for any input, ' +
+        'and asks for nothing') {
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{
+                UserAccounts = @(
+                    @{ Name = 'Example'; Password = '{{password:Password}}' }
+                )
+                Software     = @{
+                    Install = @(@{ ExecutablePath = 'Missing\setup.exe' })
+                }
+            }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts', 'Software')
+        $params.Script = [ordered]@{
+            UserAccounts = $scriptPath
+            Software     = $scriptPath
+        }
+
+        { Invoke-ComputerSnapshotHC @params } |
+            Should -Throw '*validation failed*'
+
+        Should -Invoke Read-RestoreInputHC @inModule -Times 0 -Exactly
+        Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
+        $invoke = @{
+            ModuleName      = 'Execution'
+            Times           = 1
+            Exactly         = $true
+            ParameterFilter = {
+                $Results[0].Messages -match
+                "Install\[0\]\.ExecutablePath: file 'Missing\\setup\.exe'"
+            }
+        }
+        Should -Invoke Write-SnapshotReportHC @invoke
+    }
+    It ('accepts prefix and IPv4 placeholders before the input and asks ' +
+        'each once') {
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{
+                NetworkCards = @(
+                    @{
+                        FindBy = @{ Name = 'Ethernet' }
+                        Change = @{
+                            IPSettings = @{
+                                IPAddress      = '{{ipv4:Address}}'
+                                PrefixLength   = '{{prefix:Prefix}}'
+                                DefaultGateway = '{{ipv4:Gateway}}'
+                                DNSServers     = @('{{ipv4:Gateway}}')
+                            }
+                        }
+                    }
+                )
+            }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('NetworkCards')
+        $params.Script = [ordered]@{ NetworkCards = $scriptPath }
+        Mock Read-RestoreInputHC @inModule {
+            switch ($Field.Kind) {
+                'prefix' {
+                    '24'
+                }
+                default {
+                    if ($Field.Description -eq 'Address') {
+                        '192.0.2.10'
+                    }
+                    else {
+                        '192.0.2.1'
+                    }
+                }
+            }
+        }
+        Mock Invoke-ChildScriptHC @inModule {
+            $settings = $Data[0].Change.IPSettings
+            $settings.PrefixLength | Should -Be 24
+            $settings.DefaultGateway | Should -Be '192.0.2.1'
+            [pscustomobject]@{
+                Data     = $null
+                Messages = [string[]]@('Applied')
+                Errors   = [string[]]@()
+            }
+        }
+
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+
+        Should -Invoke Read-RestoreInputHC @inModule -Times 3 -Exactly
+        Should -Invoke Invoke-ChildScriptHC @inModule -Times 1 -Exactly
+    }
+    It ('fails before any section when an answer is invalid where it is ' +
+        'used') {
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{
+                NetworkCards = @(
+                    @{
+                        FindBy = @{ Name = 'Ethernet' }
+                        Change = @{
+                            IPSettings = @{
+                                IPAddress      = '{{ipv4:Address}}'
+                                PrefixLength   = 24
+                                DefaultGateway = '192.0.2.1'
+                            }
+                        }
+                    }
+                )
+            }
+        } $path
+        $answerPath = Join-Path $TestDrive 'subnet.answers.json'
+        '{"Answers":{"{{ipv4:Address}}":"198.51.100.10"}}' |
+            Set-Content -LiteralPath $answerPath
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('NetworkCards')
+        $params.Script = [ordered]@{ NetworkCards = $scriptPath }
+        $params.AnswerFile = $answerPath
+        $params.Unattended = $true
+
+        { Invoke-ComputerSnapshotHC @params } |
+            Should -Throw '*validation failed*'
+
+        Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
+        $invoke = @{
+            ModuleName      = 'Execution'
+            Times           = 1
+            Exactly         = $true
+            ParameterFilter = {
+                $Results[0].Messages -match 'is not in the subnet'
+            }
+        }
+        Should -Invoke Write-SnapshotReportHC @invoke
+    }
     It ('validates resolved values before any child runs and redacts ' +
         'validation messages') {
         Write-ConfigurationHC @{

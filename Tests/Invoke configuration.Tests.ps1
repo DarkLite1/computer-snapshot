@@ -175,6 +175,29 @@ Describe 'Configuration launcher' {
         Should -Invoke Read-RestoreInputHC -Times 0 -Exactly
         Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
     }
+    It ('reports a configuration problem before confirmation and ' +
+        'elevation, also with placeholders') {
+        $document.Settings.RunElevated = $true
+        $document.Items.UserAccounts = @(
+            @{ Name = 'Example'; Password = '{{password:Password}}' }
+        )
+        $document.Items.Software = @{
+            Install = @(@{ ExecutablePath = 'Missing\setup.exe' })
+        }
+        $document | ConvertTo-Json -Depth 20 |
+            Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+
+        $testParams = @{
+            ConfigurationFile = $testConfigurationFile
+            StartScript       = $testStartScript
+        }
+        { . $testScript @testParams } |
+            Should -Throw "*ExecutablePath: file 'Missing\setup.exe'*"
+
+        Should -Invoke Read-Host -Times 0 -Exactly
+        Should -Invoke Start-Process -Times 0 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
+    }
     It ('passes placeholder configurations to the executor without ' +
         'collecting answers in the launcher') {
         $document.Items.Software = @{

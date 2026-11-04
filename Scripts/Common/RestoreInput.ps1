@@ -575,6 +575,43 @@ function New-RestoreAnswerFileHC {
     $answerPath
 }
 
+function Test-ConfigurationBeforeInputHC {
+    <#
+    .SYNOPSIS
+        Check a configuration before restore-time input is asked for.
+    .DESCRIPTION
+        Returns the problems of Test-ConfigurationHC, except those of a value
+        that is still a complete placeholder, such as {{prefix:...}} where a
+        number is expected or {{ipv4:...}} in a path. Those are checked again
+        after the answers are filled in. This way nobody types answers for a
+        configuration that cannot be restored anyway.
+    #>
+    param(
+        [Parameter(Mandatory)]$Configuration,
+        [Parameter(Mandatory)][string]$RootFolder
+    )
+
+    $placeholderPaths = @(
+        Get-RestoreInputFieldsHC -Data $Configuration.Items |
+        ForEach-Object { " > $($_.Path): " }
+    )
+
+    $testParams = @{
+        Configuration = $Configuration
+        RootFolder    = $RootFolder
+    }
+
+    foreach ($problem in @(Test-ConfigurationHC @testParams)) {
+        $isPlaceholder = @(
+            $placeholderPaths | Where-Object { $problem.Contains($_) }
+        ).Count
+
+        if (-not $isPlaceholder) {
+            $problem
+        }
+    }
+}
+
 function Resolve-RestoreInputHC {
     param(
         $Items,

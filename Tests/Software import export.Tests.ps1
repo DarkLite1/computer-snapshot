@@ -6,20 +6,24 @@ Describe 'Software import' {
     BeforeAll {
         $scriptPath = "$PSScriptRoot\..\Scripts\Software import export.ps1"
         function Get-InstalledApplicationsHC { }
-        function Remove-ApplicationHC { param($ApplicationName, $UninstallString, $TimeoutSeconds) }
-        function Wait-ProcessTreeHC { param($Process, $TimeoutSeconds, $What) }
+        function Remove-ApplicationHC { param($ApplicationName, $UninstallString, $TimeoutSeconds, [switch]$WaitForAllProcesses) }
+        function Wait-ProcessTreeHC { param($Process, $TimeoutSeconds, $What, [switch]$WaitForAllProcesses) }
+        function New-FakeProcessResultHC {
+            param([int]$ExitCode, [string[]]$LeftRunning = @())
+            [pscustomobject]@{ ExitCode = $ExitCode; LeftRunning = $LeftRunning }
+        }
     }
     BeforeEach {
         Mock Start-Sleep
-        Mock Wait-ProcessTreeHC { [int]$Process.ExitCode }
+        Mock Wait-ProcessTreeHC { New-FakeProcessResultHC -ExitCode $Process.ExitCode }
         $fakeInstalledApplications = [System.Collections.Generic.List[string]]@('Old App', 'Stuck App', 'Msi App')
         Mock Get-InstalledApplicationsHC {
             foreach ($name in $fakeInstalledApplications) {
                 [pscustomobject]@{ DisplayName = $name; UninstallString = if ($name -eq 'Msi App') { 'MsiExec.exe /I{AAAA}' } else { "C:\$name\uninstall.exe" } }
             }
         }
-        Mock Remove-ApplicationHC { if ($ApplicationName -ne 'Stuck App') { $null = $fakeInstalledApplications.Remove($ApplicationName) }; 0 }
-        Mock Remove-ApplicationHC { 3010 } -ParameterFilter { $ApplicationName -eq 'Msi App' }
+        Mock Remove-ApplicationHC { if ($ApplicationName -ne 'Stuck App') { $null = $fakeInstalledApplications.Remove($ApplicationName) }; New-FakeProcessResultHC 0 }
+        Mock Remove-ApplicationHC { New-FakeProcessResultHC 3010 } -ParameterFilter { $ApplicationName -eq 'Msi App' }
         Mock Test-Path { $true }
         Mock Start-Process { [pscustomobject]@{ ExitCode = 0 } }
         Mock Start-Process { [pscustomobject]@{ ExitCode = 3010 } } -ParameterFilter { $FilePath -like '*reboot.exe' }
@@ -103,7 +107,7 @@ Describe 'Software import' {
     }
     It 'waits for an application that disappears shortly after its uninstaller ends' {
         $checksAfterRemoval = [ref]0
-        Mock Remove-ApplicationHC { 0 } -ParameterFilter { $ApplicationName -eq 'Old App' }
+        Mock Remove-ApplicationHC { New-FakeProcessResultHC 0 } -ParameterFilter { $ApplicationName -eq 'Old App' }
         Mock Get-InstalledApplicationsHC {
             $names = @($fakeInstalledApplications)
             if ((Get-PSCallStack).Command -contains 'Wait-ApplicationRemovedHC') {
@@ -118,6 +122,63 @@ Describe 'Software import' {
         $result[0].Messages | Should -Be @("Removed application 'Old App'")
         Should -Invoke Start-Sleep -Times 2 -Exactly
     }
+    It 'names the processes an installer or uninstaller left running, as a message' {
+        Mock Wait-ProcessTreeHC {
+            New-FakeProcessResultHC -ExitCode 0 -LeftRunning 'XApp.exe'
+        }
+        Mock Wait-ProcessTreeHC {
+            New-FakeProcessResultHC -ExitCode 3010 `
+                -LeftRunning 'Tray.exe', 'Updater.exe'
+        } -ParameterFilter { $Process.ExitCode -eq 3010 }
+        Mock Remove-ApplicationHC {
+            $null = $fakeInstalledApplications.Remove($ApplicationName)
+            New-FakeProcessResultHC -ExitCode 0 -LeftRunning 'Feedback.exe'
+        } -ParameterFilter { $ApplicationName -eq 'Old App' }
+        $data = [pscustomobject]@{
+            Remove  = @([pscustomobject]@{ DisplayName = 'Old App' })
+            Install = @(
+                [pscustomobject]@{ ExecutablePath = 'Software\X.exe' }
+                [pscustomobject]@{ ExecutablePath = 'Software\reboot.exe' }
+            )
+        }
+
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        $result[0].Messages | Should -Be @(
+            "Removed application 'Old App'; 'Feedback.exe' started by the uninstaller is still running and was left alone"
+            "Installed 'Software\X.exe'; 'XApp.exe' started by the installer is still running and was left alone"
+            "Installed 'Software\reboot.exe', a restart is needed to complete the installation; 'Tray.exe', 'Updater.exe' started by the installer are still running and were left alone"
+        )
+    }
+    It 'passes WaitForAllProcesses of Install and Remove entries, by default false' {
+        $data = [pscustomobject]@{
+            Remove  = @(
+                [pscustomobject]@{ DisplayName = 'Old App'; WaitForAllProcesses = $true }
+                [pscustomobject]@{ DisplayName = 'Msi App' }
+            )
+            Install = @(
+                [pscustomobject]@{ ExecutablePath = 'Software\ok.exe'; WaitForAllProcesses = $true }
+                [pscustomobject]@{ ExecutablePath = 'Software\reboot.exe' }
+            )
+        }
+
+        $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
+
+        $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+        Should -Invoke Remove-ApplicationHC -Times 1 -Exactly -ParameterFilter {
+            $ApplicationName -eq 'Old App' -and $WaitForAllProcesses
+        }
+        Should -Invoke Remove-ApplicationHC -Times 1 -Exactly -ParameterFilter {
+            $ApplicationName -eq 'Msi App' -and -not $WaitForAllProcesses
+        }
+        Should -Invoke Wait-ProcessTreeHC -Times 1 -Exactly -ParameterFilter {
+            $Process.ExitCode -eq 0 -and $WaitForAllProcesses
+        }
+        Should -Invoke Wait-ProcessTreeHC -Times 1 -Exactly -ParameterFilter {
+            $Process.ExitCode -eq 3010 -and -not $WaitForAllProcesses
+        }
+    }
 }
 
 
@@ -125,7 +186,11 @@ Describe 'Software removal by pattern' {
     BeforeAll {
         $scriptPath = "$PSScriptRoot\..\Scripts\Software import export.ps1"
         function Get-InstalledApplicationsHC { }
-        function Remove-ApplicationHC { param($ApplicationName, $UninstallString, $TimeoutSeconds) }
+        function Remove-ApplicationHC { param($ApplicationName, $UninstallString, $TimeoutSeconds, [switch]$WaitForAllProcesses) }
+        function New-FakeProcessResultHC {
+            param([int]$ExitCode, [string[]]$LeftRunning = @())
+            [pscustomobject]@{ ExitCode = $ExitCode; LeftRunning = $LeftRunning }
+        }
     }
     BeforeEach {
         Mock Start-Sleep
@@ -145,7 +210,7 @@ Describe 'Software removal by pattern' {
             foreach ($fake in @($fakeApplications | Where-Object { $UninstallString -like "$($_.UninstallString)*" -or $UninstallString -like '*custom.exe*' })) {
                 $null = $fakeApplications.Remove($fake)
             }
-            0
+            New-FakeProcessResultHC 0
         }
     }
     It 'removes every application that matches *, each with its own command' {
@@ -175,7 +240,7 @@ Describe 'Software removal by pattern' {
     It 'runs UninstallCommand once for all matches and accepts its SuccessExitCodes' {
         Mock Remove-ApplicationHC {
             foreach ($fake in @($fakeApplications | Where-Object { $_.DisplayName -like 'Vendor Tool*' })) { $null = $fakeApplications.Remove($fake) }
-            1
+            New-FakeProcessResultHC 1
         }
         $data = [pscustomobject]@{ Remove = @([pscustomobject]@{ DisplayName = 'Vendor Tool*'; UninstallCommand = 'C:\custom.exe /all'; SuccessExitCodes = @(0, 1) }) }
         $result = @(& $scriptPath -Action Import -Data $data -RootFolder $TestDrive)
@@ -209,7 +274,7 @@ Describe 'Waiting for installers and uninstallers' {
     }
     It 'returns the exit code of the process' {
         $process = Start-Process -FilePath $cmd -ArgumentList '/D /C exit 7' -WindowStyle Hidden -PassThru
-        Wait-ProcessTreeHC -Process $process -TimeoutSeconds 30 -What 'the test' | Should -Be 7
+        (Wait-ProcessTreeHC -Process $process -TimeoutSeconds 30 -What 'the test').ExitCode | Should -Be 7
     }
     It 'also waits for a process the command started and did not wait for' {
         $marker = Join-Path $TestDrive 'child.txt'
@@ -227,6 +292,187 @@ Describe 'Waiting for installers and uninstallers' {
         $process.WaitForExit(5000) | Should -BeTrue
         @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $($process.Id)" |
             Where-Object { $_.Name -eq 'PING.EXE' -or $_.Name -eq 'ping.exe' }).Count | Should -Be 0
+    }
+    Context 'process IDs that Windows reused' {
+        BeforeEach {
+            $fakeMarker = "fake-reuse-$([guid]::NewGuid().ToString('N'))"
+            $startFake = {
+                Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden `
+                    -PassThru -ArgumentList '-NoProfile', '-NonInteractive',
+                '-Command', "Start-Sleep -Seconds 120 # $fakeMarker"
+            }
+            $fakeTreeChild = & $startFake
+            $fakeUnrelated = & $startFake
+            $fakeTreeChildCreated = (
+                Get-CimInstance -ClassName Win32_Process `
+                    -Filter "ProcessId = $($fakeTreeChild.Id)"
+            ).CreationDate
+            $fakeUnrelatedCreated = (
+                Get-CimInstance -ClassName Win32_Process `
+                    -Filter "ProcessId = $($fakeUnrelated.Id)"
+            ).CreationDate
+            # An installer that is not a real process; its ID is never used
+            $fakeInstaller = [pscustomobject]@{
+                Id        = 2147480000
+                StartTime = (Get-Date).AddHours(-2)
+                HasExited = $false
+                Handle    = [IntPtr]::Zero
+                ExitCode  = 0
+            } | Add-Member -MemberType ScriptMethod -Name WaitForExit `
+                -Value { } -PassThru
+        }
+        AfterEach {
+            foreach ($fake in @($fakeTreeChild, $fakeUnrelated)) {
+                if (-not $fake.HasExited) {
+                    $fake.Kill()
+                }
+                $fake.Dispose()
+            }
+        }
+        It 'never stops a process that got the ID of a process in the tree' {
+            # The tree had a child with the ID of the unrelated process, but
+            # it started earlier; the unrelated process got its ID later
+            Mock Get-CimInstance {
+                [pscustomobject]@{
+                    ProcessId       = $fakeInstaller.Id
+                    ParentProcessId = 4
+                    CreationDate    = $fakeInstaller.StartTime
+                    Name            = 'setup.exe'
+                }
+                [pscustomobject]@{
+                    ProcessId       = $fakeTreeChild.Id
+                    ParentProcessId = $fakeInstaller.Id
+                    CreationDate    = $fakeTreeChildCreated
+                    Name            = 'powershell.exe'
+                }
+                [pscustomobject]@{
+                    ProcessId       = $fakeUnrelated.Id
+                    ParentProcessId = $fakeInstaller.Id
+                    CreationDate    = $fakeUnrelatedCreated.AddMinutes(-30)
+                    Name            = 'powershell.exe'
+                }
+            } -ParameterFilter { $ClassName -eq 'Win32_Process' -and -not $Filter }
+
+            {
+                Wait-ProcessTreeHC -Process $fakeInstaller -TimeoutSeconds 0 `
+                    -What 'the test'
+            } | Should -Throw 'the test did not finish within 0 minute(s) and was stopped'
+
+            $fakeTreeChild.WaitForExit(5000) | Should -BeTrue
+            $fakeUnrelated.HasExited | Should -BeFalse
+        }
+        It 'does not count a process that got the ID of an exited child' {
+            $fakeInstaller.HasExited = $true
+            $script:fakeListings = 0
+            Mock Get-CimInstance {
+                $script:fakeListings++
+                if ($script:fakeListings -eq 1) {
+                    # First seen as a child of the installer
+                    [pscustomobject]@{
+                        ProcessId       = $fakeUnrelated.Id
+                        ParentProcessId = $fakeInstaller.Id
+                        CreationDate    = $fakeUnrelatedCreated.AddMinutes(-30)
+                        Name            = 'child.exe'
+                    }
+                }
+                else {
+                    # That child exited; its ID now belongs to another process
+                    [pscustomobject]@{
+                        ProcessId       = $fakeUnrelated.Id
+                        ParentProcessId = 4
+                        CreationDate    = $fakeUnrelatedCreated
+                        Name            = 'powershell.exe'
+                    }
+                }
+            } -ParameterFilter { $ClassName -eq 'Win32_Process' -and -not $Filter }
+
+            $result = Wait-ProcessTreeHC -Process $fakeInstaller `
+                -TimeoutSeconds 60 -What 'the test' -GraceSeconds 30
+
+            $script:fakeListings | Should -BeGreaterOrEqual 2
+            $result.ExitCode | Should -Be 0
+            $result.LeftRunning | Should -BeNullOrEmpty
+            $fakeUnrelated.HasExited | Should -BeFalse
+        }
+    }
+    Context 'an installer that starts a long-running application' {
+        BeforeEach {
+            # Unique, so cleanup only stops the processes of this test
+            $fakeMarker = "fake-app-$([guid]::NewGuid().ToString('N'))"
+            $fakeInstaller = Join-Path $TestDrive "$fakeMarker setup.cmd"
+            @(
+                '@echo off'
+                "start `"`" /B powershell.exe -NoProfile -NonInteractive -Command `"Start-Sleep -Seconds 600 # $fakeMarker`""
+                # Like a real installer, run long enough to be seen
+                'ping -n 2 127.0.0.1 >nul'
+                'exit /b 0'
+            ) | Set-Content -LiteralPath $fakeInstaller -Encoding Ascii
+            $getFakeApplication = {
+                @(
+                    Get-CimInstance -ClassName Win32_Process `
+                        -Filter "Name = 'powershell.exe'" |
+                    Where-Object { $_.CommandLine -like "*$fakeMarker*" }
+                )
+            }
+            Mock Get-GraceSecondsHC { 2 }
+        }
+        AfterEach {
+            foreach ($fake in @(& $getFakeApplication)) {
+                Stop-Process -Id $fake.ProcessId -Force -ErrorAction SilentlyContinue
+            }
+        }
+        It 'reports it installed after the grace period and leaves the application running' {
+            $data = [pscustomobject]@{
+                Install = @([pscustomobject]@{ ExecutablePath = $fakeInstaller })
+            }
+            $timer = [Diagnostics.Stopwatch]::StartNew()
+
+            $result = @(
+                & "$PSScriptRoot\..\Scripts\Software import export.ps1" `
+                    -Action Import -Data $data -RootFolder $TestDrive
+            )
+
+            $timer.Elapsed.TotalSeconds | Should -BeLessThan 30
+            $result[0].Errors.Count | Should -Be 0 -Because ($result[0].Errors -join '; ')
+            $result[0].Messages | Should -Be @(
+                "Installed '$fakeInstaller'; 'powershell.exe' started by the installer is still running and was left alone"
+            )
+            @(& $getFakeApplication).Count | Should -Be 1
+        }
+        It 'times out and stops the application with WaitForAllProcesses' {
+            Mock Get-TimeoutSecondsHC { 3 }
+            $data = [pscustomobject]@{
+                Install = @(
+                    [pscustomobject]@{
+                        ExecutablePath      = $fakeInstaller
+                        WaitForAllProcesses = $true
+                    }
+                )
+            }
+
+            $result = @(
+                & "$PSScriptRoot\..\Scripts\Software import export.ps1" `
+                    -Action Import -Data $data -RootFolder $TestDrive
+            )
+
+            $result[0].Errors | Should -Be @(
+                "Failed to install '$fakeInstaller': the installation did not finish within 0.05 minute(s) and was stopped"
+            )
+            Start-Sleep -Seconds 1
+            @(& $getFakeApplication).Count | Should -Be 0
+        }
+        It 'leaves the application of an uninstaller started through cmd.exe running' {
+            $uninstaller = "`"$cmd`" /D /C `"$fakeInstaller`""
+            $timer = [Diagnostics.Stopwatch]::StartNew()
+
+            $uninstall = Remove-ApplicationHC -ApplicationName 'Fake' `
+                -UninstallString $uninstaller -TimeoutSeconds 60
+
+            $timer.Elapsed.TotalSeconds | Should -BeLessThan 30
+            $uninstall.ExitCode | Should -Be 0
+            $uninstall.LeftRunning | Should -Be @('powershell.exe')
+            @(& $getFakeApplication).Count | Should -Be 1
+        }
     }
 }
 

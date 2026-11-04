@@ -23,10 +23,21 @@
       restart is needed to complete the change. A removal or installer that
       uses other success codes lists them in SuccessExitCodes, for example
       [0, 1].
-    - Each uninstaller and installer, with the processes it starts, gets
-      TimeoutMinutes (default 15) to finish; then it is stopped and reported
-      as failed. After a successful uninstall the application may take up to
-      60 seconds to disappear, for uninstallers that finish in the background.
+    - Each uninstaller and installer gets TimeoutMinutes (default 15) to
+      finish; then it is stopped, with the processes it started, and
+      reported as failed. Once it has finished, the processes it started
+      get 60 seconds more, for setup steps in a child process. Processes
+      still running then, such as the installed application or an updater,
+      are left running and named in the report. With WaitForAllProcesses,
+      every process it started must also finish within TimeoutMinutes.
+      For an uninstall command, the uninstaller is the first process that
+      cmd.exe starts. Processes are matched by ID and creation time, so a
+      process that reused the ID of one in the tree is never stopped. A
+      process that starts another and exits within 50 ms is not seen, so
+      the process it started is not waited for, reported or stopped.
+      After a successful uninstall the application may take
+      up to 60 seconds to disappear, for uninstallers that finish in the
+      background.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -116,52 +127,199 @@ function Wait-ApplicationRemovedHC {
     }
     $false
 }
+function Get-GraceSecondsHC {
+    # Seconds to wait for the processes an installer started, after the
+    # installer itself has exited; a function so tests can shorten it
+    60
+}
+function Test-SameCreationTimeHC {
+    # Windows reports the creation time of a process to the microsecond
+    param([datetime]$First, [datetime]$Second)
+    [Math]::Abs(($First - $Second).Ticks) -lt 10
+}
+function Stop-TreeProcessHC {
+    <#
+    .SYNOPSIS
+        Stop a process only when it is still the process seen in the tree.
+    .DESCRIPTION
+        Windows reuses process IDs, so the ID alone could point to an
+        unrelated process by now. The process is stopped only when its
+        creation time still matches. The open handle keeps the ID from
+        being reused between that check and the stop.
+    #>
+    param(
+        [Parameter(Mandatory)][int]$ProcessId,
+        [Parameter(Mandatory)][datetime]$CreationDate
+    )
+    try {
+        $process = [Diagnostics.Process]::GetProcessById($ProcessId)
+    }
+    catch {
+        # It has exited already
+        return
+    }
+
+    try {
+        $null = $process.Handle
+        if (Test-SameCreationTimeHC $process.StartTime $CreationDate) {
+            $process.Kill()
+        }
+    }
+    catch {
+        # Exited meanwhile or not accessible: leave it alone
+    }
+    finally {
+        $process.Dispose()
+    }
+}
 function Wait-ProcessTreeHC {
     <#
     .SYNOPSIS
-        Wait for a process and every process it started; return its exit
-        code. After TimeoutSeconds they are all stopped and it throws.
+        Wait for an installer or uninstaller and return its exit code and
+        the names of the processes it started that were left running.
+    .DESCRIPTION
+        The process itself gets TimeoutSeconds; with FirstChildIsMain, as
+        for an uninstaller started through cmd.exe, its first child too.
+        When it does not exit in time, it and every process it started are
+        stopped and it throws.
+
+        After it exited, the processes it started get GraceSeconds to finish,
+        so setup steps in a child process can complete. Processes still
+        running then, such as the installed application, a tray tool or an
+        updater, are left alone and returned in LeftRunning.
+
+        With WaitForAllProcesses, every process started gets TimeoutSeconds
+        as well, and they are all stopped when one is still running then.
+
+        A process belongs to the tree by its ID and creation time, because
+        Windows reuses process IDs. The processes are checked every 50 ms
+        during the first 3 seconds, then every 500 ms. A process that starts
+        a child and exits between two checks is never seen, so that child
+        cannot be linked to the tree: it is not waited for, not reported
+        and never stopped.
     #>
     param(
         [Parameter(Mandatory)]$Process,
         [Parameter(Mandatory)][int]$TimeoutSeconds,
-        [Parameter(Mandatory)][string]$What
+        [Parameter(Mandatory)][string]$What,
+        [switch]$FirstChildIsMain,
+        [switch]$WaitForAllProcesses,
+        [int]$GraceSeconds = (Get-GraceSecondsHC)
     )
     # Reading the handle keeps the exit code available after the exit
     $null = $Process.Handle
     $since = $Process.StartTime.AddSeconds(-1)
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $started = Get-Date
+    $deadline = $started.AddSeconds($TimeoutSeconds)
+    $graceDeadline = $null
+    $mainIds = New-Object 'System.Collections.Generic.HashSet[int]'
+    $null = $mainIds.Add($Process.Id)
+    $firstChildFound = -not $FirstChildIsMain
+    # The ID and creation time of every process seen in the tree. Kept
+    # between checks, so the children of a process that has exited are
+    # still found through it.
+    $tree = New-Object 'System.Collections.Generic.Dictionary[int,datetime]'
+    $tree[$Process.Id] = $Process.StartTime
 
     while ($true) {
         $all = @(
             Get-CimInstance -ClassName Win32_Process `
-                -Property ProcessId, ParentProcessId, CreationDate
+                -Property ProcessId, ParentProcessId, CreationDate, Name |
+            Where-Object { $_.CreationDate -ge $since }
         )
-        $ids = New-Object 'System.Collections.Generic.HashSet[int]'
-        $null = $ids.Add($Process.Id)
+        $live = @{}
+        foreach ($item in $all) {
+            $live[[int]$item.ProcessId] = $item.CreationDate
+        }
 
         do {
             $added = $false
             foreach ($candidate in $all) {
+                $id = [int]$candidate.ProcessId
+                $parentId = [int]$candidate.ParentProcessId
+                $created = $candidate.CreationDate
+
                 if (
-                    $ids.Contains([int]$candidate.ParentProcessId) -and
-                    $candidate.CreationDate -ge $since -and
-                    $ids.Add([int]$candidate.ProcessId)
+                    $tree.ContainsKey($id) -and
+                    (Test-SameCreationTimeHC $tree[$id] $created)
                 ) {
-                    $added = $true
+                    continue
                 }
+
+                # A child starts after its parent
+                if (
+                    $id -eq $parentId -or
+                    -not $tree.ContainsKey($parentId) -or
+                    $created -lt $tree[$parentId]
+                ) {
+                    continue
+                }
+
+                # The parent exited and its ID now belongs to another
+                # process; only processes started before that are its own
+                if (
+                    $live.ContainsKey($parentId) -and
+                    -not (Test-SameCreationTimeHC $tree[$parentId] $live[$parentId]) -and
+                    $created -ge $live[$parentId]
+                ) {
+                    continue
+                }
+
+                $tree[$id] = $created
+                $added = $true
             }
         } while ($added)
 
-        $running = @($all | Where-Object { $ids.Contains([int]$_.ProcessId) })
+        # A console window host ends with its console; it is not started by
+        # the installer itself
+        $running = @(
+            $all | Where-Object {
+                $tree.ContainsKey([int]$_.ProcessId) -and
+                (Test-SameCreationTimeHC $tree[[int]$_.ProcessId] $_.CreationDate) -and
+                $_.Name -ne 'conhost.exe'
+            }
+        )
 
-        if (-not $running.Count -and $Process.HasExited) {
+        if (-not $firstChildFound) {
+            $firstChild = @(
+                $running |
+                Where-Object { [int]$_.ParentProcessId -eq $Process.Id } |
+                Sort-Object CreationDate
+            ) | Select-Object -First 1
+            if ($firstChild) {
+                $null = $mainIds.Add([int]$firstChild.ProcessId)
+                $firstChildFound = $true
+            }
+        }
+
+        $mainRunning = @(
+            $running | Where-Object { $mainIds.Contains([int]$_.ProcessId) }
+        )
+        $mainExited = $Process.HasExited -and -not $mainRunning.Count
+
+        if ($mainExited -and -not $running.Count) {
             break
         }
 
-        if ((Get-Date) -ge $deadline) {
+        if ($mainExited -and -not $WaitForAllProcesses) {
+            if (-not $graceDeadline) {
+                $graceDeadline = (Get-Date).AddSeconds($GraceSeconds)
+            }
+            if ((Get-Date) -ge $graceDeadline) {
+                $Process.WaitForExit()
+                return [pscustomobject]@{
+                    ExitCode    = [int]$Process.ExitCode
+                    LeftRunning = [string[]]@(
+                        $running | ForEach-Object { $_.Name } |
+                        Select-Object -Unique
+                    )
+                }
+            }
+        }
+        elseif ((Get-Date) -ge $deadline) {
             foreach ($item in $running) {
-                Stop-Process -Id $item.ProcessId -Force -ErrorAction SilentlyContinue
+                Stop-TreeProcessHC -ProcessId $item.ProcessId `
+                    -CreationDate $item.CreationDate
             }
             throw (
                 "$What did not finish within $([Math]::Round($TimeoutSeconds / 60, 2)) " +
@@ -169,13 +327,35 @@ function Wait-ProcessTreeHC {
             )
         }
 
-        Start-Sleep -Milliseconds 500
+        # Check often at first, to see short-lived processes that start others
+        if (((Get-Date) - $started).TotalSeconds -lt 3) {
+            Start-Sleep -Milliseconds 50
+        }
+        else {
+            Start-Sleep -Milliseconds 500
+        }
     }
 
     $Process.WaitForExit()
-    [int]$Process.ExitCode
-}
-function Get-TimeoutSecondsHC {
+    [pscustomobject]@{
+        ExitCode    = [int]$Process.ExitCode
+        LeftRunning = [string[]]@()
+    }
+}function Get-LeftRunningTextHC {
+    # '; 'a.exe' started by the installer is still running and was left alone'
+    param(
+        [string[]]$Names,
+        [Parameter(Mandatory)][string]$StartedBy
+    )
+    if (-not $Names.Count) {
+        return ''
+    }
+    $list = "'" + ($Names -join "', '") + "'"
+    if ($Names.Count -eq 1) {
+        return "; $list started by the $StartedBy is still running and was left alone"
+    }
+    "; $list started by the $StartedBy are still running and were left alone"
+}function Get-TimeoutSecondsHC {
     param($Entry)
     $minutes = if ($null -ne $Entry.TimeoutMinutes) { [int]$Entry.TimeoutMinutes } else { 15 }
     $minutes * 60
@@ -210,17 +390,22 @@ function Get-UninstallCommandHC {
     $command
 }
 function Remove-ApplicationHC {
-    # Returns the exit code of the uninstall command
+    # Returns the exit code of the uninstall command and the processes it
+    # started that were left running
     param(
         [Parameter(Mandatory)][String]$ApplicationName,
         [Parameter(Mandatory)][String]$UninstallString,
-        [int]$TimeoutSeconds = 900
+        [int]$TimeoutSeconds = 900,
+        [switch]$WaitForAllProcesses
     )
     Write-Verbose "Remove application '$ApplicationName' with '$UninstallString'"
     # /S: cmd only removes the outer quotes, the command keeps its own
     $process = Start-Process -FilePath "$env:SystemRoot\System32\cmd.exe" `
         -ArgumentList "/D /S /C `"$UninstallString`"" -NoNewWindow -PassThru
-    Wait-ProcessTreeHC -Process $process -TimeoutSeconds $TimeoutSeconds -What 'the uninstall'
+    # The uninstaller is the first process cmd.exe starts
+    Wait-ProcessTreeHC -Process $process -TimeoutSeconds $TimeoutSeconds `
+        -What 'the uninstall' -FirstChildIsMain `
+        -WaitForAllProcesses:($WaitForAllProcesses)
 }
 function Get-ExitCodeResultHC {
     <#
@@ -342,9 +527,13 @@ else {
                         throw 'no uninstall command found in the registry'
                     }
 
-                    $exitCode = Remove-ApplicationHC `
+                    $uninstall = Remove-ApplicationHC `
                         -ApplicationName $applicationName -UninstallString $command `
-                        -TimeoutSeconds (Get-TimeoutSecondsHC $removal)
+                        -TimeoutSeconds (Get-TimeoutSecondsHC $removal) `
+                        -WaitForAllProcesses:($removal.WaitForAllProcesses -eq $true)
+                    $exitCode = $uninstall.ExitCode
+                    $leftRunning = Get-LeftRunningTextHC `
+                        -Names $uninstall.LeftRunning -StartedBy 'uninstaller'
 
                     $result = Get-ExitCodeResultHC `
                         -ExitCode $exitCode -What 'the uninstall' `
@@ -358,10 +547,10 @@ else {
                     }
 
                     if ($result -eq 'restart') {
-                        $messages += "Removed application '$applicationName', a restart is needed to complete the removal"
+                        $messages += "Removed application '$applicationName', a restart is needed to complete the removal$leftRunning"
                     }
                     else {
-                        $messages += "Removed application '$applicationName'"
+                        $messages += "Removed application '$applicationName'$leftRunning"
                     }
                 }
                 catch {
@@ -385,9 +574,13 @@ else {
                 $startParams = @{ FilePath = $executablePath; NoNewWindow = $true; PassThru = $true }
                 if ($application.Arguments) { $startParams.ArgumentList = $application.Arguments }
                 $process = Start-Process @startParams
-                $exitCode = Wait-ProcessTreeHC `
+                $installation = Wait-ProcessTreeHC `
                     -Process $process -What 'the installation' `
-                    -TimeoutSeconds (Get-TimeoutSecondsHC $application)
+                    -TimeoutSeconds (Get-TimeoutSecondsHC $application) `
+                    -WaitForAllProcesses:($application.WaitForAllProcesses -eq $true)
+                $exitCode = $installation.ExitCode
+                $leftRunning = Get-LeftRunningTextHC `
+                    -Names $installation.LeftRunning -StartedBy 'installer'
                 $successExitCodes = @(
                     $application.SuccessExitCodes |
                     Where-Object { $null -ne $_ } |
@@ -403,13 +596,13 @@ else {
                     -SuccessExitCodes $successExitCodes
 
                 if ($result -eq 'restart') {
-                    $messages += "Installed $label, a restart is needed to complete the installation"
+                    $messages += "Installed $label, a restart is needed to complete the installation$leftRunning"
                 }
                 elseif ($exitCode) {
-                    $messages += "Installed $label (exit code $exitCode)"
+                    $messages += "Installed $label (exit code $exitCode)$leftRunning"
                 }
                 else {
-                    $messages += "Installed $label"
+                    $messages += "Installed $label$leftRunning"
                 }
             }
             catch {

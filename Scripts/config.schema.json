@@ -1430,7 +1430,12 @@
                 "minimum": 1,
                 "maximum": 1440,
                 "default": 15,
-                "description": "Minutes the uninstaller, with the processes it starts, may run; then it is stopped and the removal fails."
+                "description": "Minutes the uninstaller may run; then it is stopped, with the processes it started, and the removal fails."
+              },
+              "WaitForAllProcesses": {
+                "type": "boolean",
+                "default": false,
+                "description": "Also wait, up to TimeoutMinutes, for every process the uninstaller starts, and fail when one is still running then. Without it, those processes get 60 seconds after the uninstaller ends and are then left running and named in the report."
               },
               "Comment": {
                 "type": "string",
@@ -1470,7 +1475,12 @@
                 "minimum": 1,
                 "maximum": 1440,
                 "default": 15,
-                "description": "Minutes the installer, with the processes it starts, may run; then it is stopped and the installation fails."
+                "description": "Minutes the installer may run; then it is stopped, with the processes it started, and the installation fails."
+              },
+              "WaitForAllProcesses": {
+                "type": "boolean",
+                "default": false,
+                "description": "Also wait, up to TimeoutMinutes, for every process the installer starts, for installers that finish their work in a child process; fail when one is still running then. Without it, those processes get 60 seconds after the installer ends and are then left running and named in the report, such as the installed application or an updater."
               },
               "Comment": {
                 "type": "string",

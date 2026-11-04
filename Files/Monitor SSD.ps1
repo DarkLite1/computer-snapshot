@@ -109,7 +109,7 @@ Begin {
             Try {
                 $EncUTF8 = New-Object System.Text.utf8encoding
 
-                $OriginalMessage = @()
+                $Messages = [System.Collections.Generic.List[string]]::new()
 
                 #region Excel files that are opened can't be sent as attachment
                 # so we copy them first
@@ -133,7 +133,6 @@ Begin {
                 #endregion
             }
             Catch {
-                $Global:Error.RemoveAt(0)
                 throw "Failed sending e-mail to '$To': $_"
             }
         }
@@ -142,14 +141,13 @@ Begin {
             Foreach ($M in $Message) {
                 $M = $M.Trim()
 
-                $OriginalMessage += $M
                 if ($M -like '<*') {
                     # We receive pre-formatted HTML-code
-                    $Messages += $M
+                    $Messages.Add($M)
                 }
                 else {
                     # We receive plain text and make it a paragraph
-                    $Messages += "<p>$M</p>"
+                    $Messages.Add("<p>$M</p>")
                 }
             }
         }
@@ -224,7 +222,6 @@ $(if ($global:PSCommandPath) {
                 Write-Verbose "Mail sent to '$To'"
             }
             Catch {
-                $Global:Error.RemoveAt(0)
                 throw "Failed sending e-mail to '$($To)': $_"
             }
             Finally {

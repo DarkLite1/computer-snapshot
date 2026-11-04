@@ -49,8 +49,8 @@ Describe 'Firewall rules import errors' {
         $result[0].Messages |
             Should -Be @("Created firewall rule 'Example' (Example)")
         Should -Invoke New-NetFirewallRule -Times 1 -Exactly -ParameterFilter {
-            -not $PSBoundParameters.ContainsKey('EdgeTraversalPolicy') -and
-            -not $PSBoundParameters.ContainsKey('InterfaceType')
+            -not $PesterBoundParameters.ContainsKey('EdgeTraversalPolicy') -and
+            -not $PesterBoundParameters.ContainsKey('InterfaceType')
         }
     }
     It 'replaces an existing rule only after the new rule was created' {

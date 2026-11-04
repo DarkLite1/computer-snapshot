@@ -238,12 +238,45 @@ Describe 'Finding the card and IPv4 settings' {
         $static = $result.Data | Where-Object { $_.Change.NewName -eq 'Ethernet' }
         $static.FindBy.Description | Should -Be 'Intel(R) Ethernet'
         @($static.FindBy.Keys) | Should -Be @('Description')
-        $static.Change.IPSettings.IPAddress | Should -Be '10.20.67.2'
+        $static.Change.IPSettings.IPAddress | Should -Be "{{ipv4:IP address of network card 'Ethernet' (was 10.20.67.2)}}"
         $static.Change.IPSettings.PrefixLength | Should -Be 24
         $static.Change.IPSettings.DefaultGateway | Should -Be '10.20.67.254'
         $static.Change.IPSettings.DNSServers | Should -Be @('10.75.38.23', '10.75.38.22')
-        ($result.Data | Where-Object { $_.Change.NewName -eq 'Wi-Fi' }).Change.IPSettings.Dhcp | Should -BeTrue
-        $result.Messages | Should -Contain "Network card 'Ethernet' has 2 IPv4 addresses; only 10.20.67.2 was exported"
+        $dhcp = ($result.Data | Where-Object { $_.Change.NewName -eq 'Wi-Fi' }).Change.IPSettings
+        $dhcp.Dhcp | Should -BeTrue
+        @($dhcp.Keys) | Should -Not -Contain 'IPAddress'
+        $result.Messages | Should -Be @(
+            'Exported Network cards'
+            "Network card 'Ethernet' has the static IPv4 address 10.20.67.2; it was exported as a placeholder, so the restore asks for the address"
+            "Network card 'Ethernet' has 2 IPv4 addresses; only 10.20.67.2 was exported"
+        )
+    }
+    It 'exports a static address placeholder that New answer file.ps1 lists' {
+        Mock Get-NetIPInterface { [pscustomobject]@{ Dhcp = 'Disabled' } } -ParameterFilter { $InterfaceIndex -eq 7 }
+        Mock Get-NetIPAddress {
+            [pscustomobject]@{ IPAddress = '192.168.1.20'; PrefixLength = 24; PrefixOrigin = 'Manual' }
+        } -ParameterFilter { $InterfaceIndex -eq 7 }
+
+        $result = . $scriptPath -Action Export -RootFolder $TestDrive
+
+        Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
+        $fakeConfigurationPath = Join-Path $TestDrive 'exported network.json'
+        $fakeAnswerPath = Join-Path $TestDrive 'exported network.answers.json'
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{ NetworkCards = $result.Data }
+        } $fakeConfigurationPath
+
+        $null = & "$PSScriptRoot\..\Scripts\New answer file.ps1" `
+            -ConfigurationFile $fakeConfigurationPath `
+            -AnswerFile $fakeAnswerPath
+
+        $answers = (
+            Get-Content -LiteralPath $fakeAnswerPath -Raw | ConvertFrom-Json
+        ).Answers
+        @($answers.PSObject.Properties.Name) | Should -Be @(
+            "{{ipv4:IP address of network card 'Ethernet' (was 192.168.1.20)}}"
+        )
     }
 }
 

@@ -15,12 +15,12 @@
     }
   },
   {
-    "Comment": "Found by its current name; renamed, with a fixed static address.",
+    "Comment": "Found by its current name; renamed, as an export writes a static address: the restore asks for the address and shows the exported one, the prefix length, gateway and DNS servers are fixed.",
     "FindBy": { "Name": "Ethernet 2" },
     "Change": {
       "NewName": "LAN MACHINE",
       "IPSettings": {
-        "IPAddress": "10.20.67.2",
+        "IPAddress": "{{ipv4:IP address of network card 'Ethernet 2' (was 10.20.67.2)}}",
         "PrefixLength": 24,
         "DefaultGateway": "10.20.67.254",
         "DNSServers": ["10.75.38.23", "10.75.38.22"]

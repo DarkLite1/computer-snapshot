@@ -27,6 +27,9 @@
     Export finds each card by its description and writes its current name
     and settings in Change, including its IPv4 settings: Dhcp true, or its
     first static address with gateway, and DNS servers that were set by hand.
+    The static address is written as an {{ipv4:...}} placeholder that shows
+    the exported address, so the restore asks for it; the prefix length,
+    gateway and DNS servers are written as they are.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -389,7 +392,13 @@ function Get-IPv4SettingsHC {
         $settings.Dhcp = $true
     }
     else {
-        $settings.IPAddress = [string]$state.Addresses[0].IPAddress
+        # A placeholder, so restoring on several PCs never gives them all the
+        # same address; the exported address is shown when asking for it
+        $cardName = [string]$Adapter.Name -replace '[{}\r\n]', ''
+        $settings.IPAddress = (
+            "{{ipv4:IP address of network card '$cardName' " +
+            "(was $($state.Addresses[0].IPAddress))}}"
+        )
         $settings.PrefixLength = [int]$state.Addresses[0].PrefixLength
         $gateway = @($state.Routes | ForEach-Object { [string]$_.NextHop } | Where-Object { $_ -and $_ -ne '0.0.0.0' })
         if ($gateway.Count) { $settings.DefaultGateway = $gateway[0] }
@@ -420,9 +429,16 @@ if ($Action -eq 'Export') {
         $ipSettings = Get-IPv4SettingsHC -Adapter $adapter
         if ($ipSettings) {
             $change.IPSettings = $ipSettings
-            $addressCount = @((Get-IPv4StateHC -Adapter $adapter).Addresses).Count
-            if ($ipSettings.IPAddress -and $addressCount -gt 1) {
-                $messages += "Network card '$($adapter.Name)' has $addressCount IPv4 addresses; only $($ipSettings.IPAddress) was exported"
+            if ($ipSettings.IPAddress) {
+                $addresses = @((Get-IPv4StateHC -Adapter $adapter).Addresses)
+                $messages += (
+                    "Network card '$($adapter.Name)' has the static IPv4 " +
+                    "address $($addresses[0].IPAddress); it was exported as " +
+                    'a placeholder, so the restore asks for the address'
+                )
+                if ($addresses.Count -gt 1) {
+                    $messages += "Network card '$($adapter.Name)' has $($addresses.Count) IPv4 addresses; only $($addresses[0].IPAddress) was exported"
+                }
             }
         }
         [ordered]@{

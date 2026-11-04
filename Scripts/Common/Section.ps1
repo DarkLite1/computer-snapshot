@@ -25,6 +25,21 @@ function Get-SnapshotScriptsHC {
     }
 }
 
+function Test-ElevatedHC {
+    <#
+    .SYNOPSIS
+        True when the current process runs as administrator.
+    #>
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    try {
+        $principal = New-Object Security.Principal.WindowsPrincipal $identity
+        $principal.IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator
+        )
+    }
+    finally { $identity.Dispose() }
+}
+
 function Resolve-RootPathHC {
     param(
         [Parameter(Mandatory)][string]$Path,

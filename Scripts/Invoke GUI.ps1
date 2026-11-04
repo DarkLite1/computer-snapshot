@@ -17,17 +17,6 @@ param(
 . "$PSScriptRoot\Common\RestoreInput.ps1"
 
 #region Command construction
-function Test-WizardElevatedHC {
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    try {
-        $principal = New-Object Security.Principal.WindowsPrincipal $identity
-        return $principal.IsInRole(
-            [Security.Principal.WindowsBuiltInRole]::Administrator
-        )
-    }
-    finally { $identity.Dispose() }
-}
-
 function Show-WizardConsoleHC {
     param(
         $ConsoleUI = $Host.UI.RawUI,
@@ -65,7 +54,7 @@ function Show-WizardConsoleHC {
 '@
     Write-Host $art -ForegroundColor Cyan -BackgroundColor Black
 
-    $access = if (Test-WizardElevatedHC) {
+    $access = if (Test-ElevatedHC) {
         'Administrator'
     }
     else {
@@ -129,7 +118,7 @@ function Restart-WizardElevatedHC {
 function New-WizardElevationPanelHC {
     param([string]$RootFolder, [string]$WizardScript)
 
-    if (Test-WizardElevatedHC) { return }
+    if (Test-ElevatedHC) { return }
 
     $panel = New-Object Windows.Forms.FlowLayoutPanel
     $panel.Name = 'WizardElevation'
@@ -1074,7 +1063,7 @@ function Start-ConfigurationJobHC {
         }
         if ($Unattended) {
             $command += ' -Unattended'
-            if (-not (Test-WizardElevatedHC)) {
+            if (-not (Test-ElevatedHC)) {
                 throw (
                     'Unattended restore requires administrator rights. ' +
                     'Restart the wizard as administrator first.'

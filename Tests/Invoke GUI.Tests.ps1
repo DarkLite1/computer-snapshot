@@ -65,7 +65,7 @@ Describe 'Wizard console welcome' {
     BeforeEach {
         Mock Clear-Host
         Mock Write-Host
-        Mock Test-WizardElevatedHC { $false }
+        Mock Test-ElevatedHC { $false }
         $console = [pscustomobject]@{
             BackgroundColor = [ConsoleColor]::DarkBlue
             ForegroundColor = [ConsoleColor]::Yellow
@@ -100,7 +100,7 @@ Describe 'Wizard console welcome' {
         }
     }
     It 'identifies an elevated session' {
-        Mock Test-WizardElevatedHC { $true }
+        Mock Test-ElevatedHC { $true }
         Show-WizardConsoleHC -ConsoleUI $console
         Should -Invoke Write-Host -Times 1 -Exactly -ParameterFilter {
             $Object -like '*Access     : Administrator*'
@@ -216,7 +216,7 @@ Describe 'Single-file wizard commands' {
         $answerFile = Join-Path $TestDrive "kiosk's answers.json"
         '{"Answers":{"{{password:Password}}":"PRIVATE-ANSWER"}}' |
             Set-Content -LiteralPath $answerFile
-        Mock Test-WizardElevatedHC { $true }
+        Mock Test-ElevatedHC { $true }
         $params = @{
             Action            = 'RestoreSnapshot'
             RootFolder        = $TestDrive
@@ -242,7 +242,7 @@ Describe 'Single-file wizard commands' {
         $file = Join-Path $TestDrive 'elevated-answer-configuration.json'
         ('{"SchemaVersion":3,"Settings":{"RunElevated":true},' +
             '"Items":{"UserAccounts":[]}}') | Set-Content -LiteralPath $file
-        Mock Test-WizardElevatedHC { $false }
+        Mock Test-ElevatedHC { $false }
         $params = @{
             Action            = 'RestoreSnapshot'
             RootFolder        = $TestDrive
@@ -264,7 +264,7 @@ Describe 'Single-file wizard commands' {
         '{"SchemaVersion":3,"Settings":{"RunElevated":' + $RunElevated +
             '},"Items":{"UserAccounts":[]}}' |
             Set-Content -LiteralPath $file
-        Mock Test-WizardElevatedHC { $false }
+        Mock Test-ElevatedHC { $false }
 
         $params = @{
             Action            = 'RestoreSnapshot'
@@ -521,7 +521,7 @@ Describe 'Optional wizard elevation' {
     }
     BeforeEach {
         Mock Start-Process
-        Mock Test-WizardElevatedHC { $false }
+        Mock Test-ElevatedHC { $false }
     }
     It ('requests native UAC elevation and preserves quoted script and ' +
         'root paths') {
@@ -575,7 +575,7 @@ Describe 'Optional wizard elevation' {
         finally { $panel.Dispose() }
     }
     It 'omits the button when already elevated' {
-        Mock Test-WizardElevatedHC { $true }
+        Mock Test-ElevatedHC { $true }
         $params = @{ RootFolder = $TestDrive; WizardScript = 'C:\Wizard.ps1' }
         New-WizardElevationPanelHC @params | Should -BeNullOrEmpty
         Should -Invoke Start-Process -Times 0 -Exactly

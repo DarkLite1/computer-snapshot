@@ -82,18 +82,6 @@ function Invoke-ChildScriptHC {
     }
 }
 
-function Test-ElevatedHC {
-    <#
-    .SYNOPSIS
-        True when the current process runs as administrator.
-    #>
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal $identity
-    $administrator = [Security.Principal.WindowsBuiltInRole]::Administrator
-
-    return $principal.IsInRole($administrator)
-}
-
 function Write-SnapshotReportHC {
     <#
     .SYNOPSIS

@@ -48,13 +48,6 @@ Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
 . "$PSScriptRoot\Common\Section.ps1"
 . "$PSScriptRoot\Common\RestoreInput.ps1"
 
-function Test-IsStartedElevatedHC {
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal $identity
-    $principal.IsInRole(
-        [Security.Principal.WindowsBuiltInRole]::Administrator
-    )
-}
 function Invoke-ScriptHC {
     param([string]$Path, [hashtable]$Arguments)
     & $Path @Arguments
@@ -116,7 +109,7 @@ if (-not $ConfigurationFile) {
 }
 #endregion
 
-if ($Unattended -and -not (Test-IsStartedElevatedHC)) {
+if ($Unattended -and -not (Test-ElevatedHC)) {
     throw (
         'Unattended restore requires administrator rights. Start ' +
         'PowerShell as administrator first; UAC will not be requested.'
@@ -157,7 +150,7 @@ if (
 #region Restart elevated when required
 if (
     $configuration.Settings.RunElevated -and
-    -not (Test-IsStartedElevatedHC)
+    -not (Test-ElevatedHC)
 ) {
     Write-Verbose 'Administrator rights required, restart elevated'
     $format = (

@@ -8,7 +8,7 @@ BeforeAll {
     . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
 
     function Invoke-ScriptHC { param($Path, $Arguments) }
-    function Test-IsStartedElevatedHC {}
+    function Test-ElevatedHC {}
 }
 
 Describe 'Configuration launcher' {
@@ -25,7 +25,7 @@ Describe 'Configuration launcher' {
 
         Mock Invoke-ScriptHC
         Mock Start-Process
-        Mock Test-IsStartedElevatedHC { $false }
+        Mock Test-ElevatedHC { $false }
         Mock Read-Host { 'y' }
         Mock Out-GridView {
             [pscustomobject]@{ Path = $testConfigurationFile }
@@ -292,7 +292,7 @@ Describe 'Configuration launcher' {
     }
     It ('passes the answer-file path and unattended flag without asking ' +
         'for confirmation') {
-        Mock Test-IsStartedElevatedHC { $true }
+        Mock Test-ElevatedHC { $true }
 
         $testParams = @{
             ConfigurationFile = $testConfigurationFile
@@ -385,7 +385,7 @@ Describe 'Configuration launcher' {
         $document.Settings.RunElevated = $true
         $document | ConvertTo-Json -Depth 20 |
             Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
-        Mock Test-IsStartedElevatedHC { $true }
+        Mock Test-ElevatedHC { $true }
 
         $testParams = @{
             ConfigurationFile = $testConfigurationFile

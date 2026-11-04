@@ -5,6 +5,21 @@ BeforeAll {
     . "$PSScriptRoot\..\..\Scripts\Common\Section.ps1"
 }
 
+Describe 'Test-ElevatedHC' {
+    It 'tells whether the current process runs as administrator' {
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $expected = ([Security.Principal.WindowsPrincipal]$identity).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator
+        )
+        $identity.Dispose()
+
+        $result = Test-ElevatedHC
+
+        $result | Should -BeOfType [bool]
+        $result | Should -Be $expected
+    }
+}
+
 Describe 'Account names' {
     Context 'Convert-AccountNameHC' {
         BeforeEach {

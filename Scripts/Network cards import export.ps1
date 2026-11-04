@@ -560,9 +560,12 @@ function Set-IPv4SettingsHC {
 
 function Get-IPv4SettingsHC {
     # IPSettings to export for a card, or $null without IPv4
-    param([Parameter(Mandatory)]$Adapter)
-    $state = Get-IPv4StateHC -Adapter $Adapter
-    if (-not $state) { return $null }
+    param(
+        [Parameter(Mandatory)]$Adapter,
+        # Read by Get-IPv4StateHC
+        [Parameter(Mandatory)][AllowNull()]$State
+    )
+    if (-not $State) { return $null }
     $settings = [ordered]@{}
     if ($state.Dhcp -or -not $state.Addresses.Count) {
         $settings.Dhcp = $true
@@ -610,29 +613,42 @@ $netConnectionProfiles = @(
 $dnsClients = @(Get-DnsClient)
 Write-Verbose "Found $($netAdapters.Count) network card(s)"
 
+# Look up the DNS client and connection profiles of a card by its index
+$dnsClientByIndex = @{}
+foreach ($dnsClient in $dnsClients) {
+    $dnsClientByIndex[[int]$dnsClient.InterfaceIndex] = $dnsClient
+}
+$profilesByIndex = @{}
+foreach ($connectionProfile in $netConnectionProfiles) {
+    $index = [int]$connectionProfile.InterfaceIndex
+    if (-not $profilesByIndex.ContainsKey($index)) {
+        $profilesByIndex[$index] = (
+            [System.Collections.Generic.List[object]]::new()
+        )
+    }
+    $profilesByIndex[$index].Add($connectionProfile)
+}
+
 if ($Action -eq 'Export') {
     #region Capture section
     Write-Verbose 'Export Network cards'
     $cardsToExport = foreach ($adapter in $netAdapters) {
         Write-Verbose "Network card '$($adapter.Name)': export"
-        $networkCategory = (
-            $netConnectionProfiles |
-            Where-Object { $_.InterfaceAlias -eq $adapter.Name }
-        ).NetworkCategory
-        $dnsSuffix = (
-            $dnsClients |
-            Where-Object { $_.InterfaceIndex -eq $adapter.InterfaceIndex }
-        ).ConnectionSpecificSuffix
+        $index = [int]$adapter.InterfaceIndex
+        $networkCategory = @($profilesByIndex[$index]).NetworkCategory |
+            Select-Object -First 1
+        $dnsSuffix = $dnsClientByIndex[$index].ConnectionSpecificSuffix
         $change = [ordered]@{
             NewName         = $adapter.Name
             NetworkCategory = [String]$networkCategory
             DnsSuffix       = $dnsSuffix
         }
-        $ipSettings = Get-IPv4SettingsHC -Adapter $adapter
+        $state = Get-IPv4StateHC -Adapter $adapter
+        $ipSettings = Get-IPv4SettingsHC -Adapter $adapter -State $state
         if ($ipSettings) {
             $change.IPSettings = $ipSettings
             if ($ipSettings.IPAddress) {
-                $addresses = @((Get-IPv4StateHC -Adapter $adapter).Addresses)
+                $addresses = @($state.Addresses)
                 $messages += (
                     "Network card '$($adapter.Name)' has the static IPv4 " +
                     "address $($addresses[0].IPAddress); it was exported as " +
@@ -699,9 +715,7 @@ else {
 
             #region Set DNS suffix
             # An empty string clears it and null leaves it unchanged
-            $dnsClient = $dnsClients | Where-Object {
-                $_.InterfaceIndex -eq $adapter.InterfaceIndex
-            }
+            $dnsClient = $dnsClientByIndex[[int]$adapter.InterfaceIndex]
             if (
                 $null -ne $change.DnsSuffix -and
                 [string]$dnsClient.ConnectionSpecificSuffix -ne
@@ -725,9 +739,8 @@ else {
             #region Set network category
             if ($change.NetworkCategory) {
                 $adapterProfiles = @(
-                    $netConnectionProfiles | Where-Object {
-                        $_.InterfaceIndex -eq $adapter.InterfaceIndex
-                    }
+                    $profilesByIndex[[int]$adapter.InterfaceIndex] |
+                    Where-Object { $_ }
                 )
                 if (-not $adapterProfiles.Count) {
                     # Windows only has a network category for a connected

@@ -808,6 +808,57 @@ Describe 'Finding the card and IPv4 settings' {
             "{{ipv4:IP address of network card 'Ethernet' (was 192.168.1.20)}}"
         )
     }
+    It ('exports the category and DNS suffix of each card by interface ' +
+        'index and reads its IPv4 settings once') {
+        Mock Get-DnsClient {
+            [pscustomobject]@{
+                InterfaceIndex           = 7
+                ConnectionSpecificSuffix = 'lan.example'
+            }
+            [pscustomobject]@{
+                InterfaceIndex           = 8
+                ConnectionSpecificSuffix = 'wifi.example'
+            }
+        }
+        Mock Get-NetConnectionProfile {
+            [pscustomobject]@{
+                InterfaceAlias  = 'Wi-Fi'
+                InterfaceIndex  = 8
+                NetworkCategory = 'Public'
+            }
+            [pscustomobject]@{
+                InterfaceAlias  = 'Ethernet'
+                InterfaceIndex  = 7
+                NetworkCategory = 'Private'
+            }
+            [pscustomobject]@{
+                InterfaceAlias  = 'Ethernet'
+                InterfaceIndex  = 7
+                NetworkCategory = 'DomainAuthenticated'
+            }
+        }
+        Mock Get-NetIPInterface {
+            [pscustomobject]@{ Dhcp = 'Disabled' }
+        } -ParameterFilter { $InterfaceIndex -eq 7 }
+        Mock Get-NetIPAddress {
+            [pscustomobject]@{
+                IPAddress    = '192.168.1.20'
+                PrefixLength = 24
+                PrefixOrigin = 'Manual'
+            }
+        } -ParameterFilter { $InterfaceIndex -eq 7 }
+
+        $result = . $scriptPath -Action Export -RootFolder $TestDrive
+
+        $result.Errors.Count | Should -Be 0
+        $ethernet, $wifi = @($result.Data.Change)
+        $ethernet.NetworkCategory | Should -Be 'Private'
+        $ethernet.DnsSuffix | Should -Be 'lan.example'
+        $wifi.NetworkCategory | Should -Be 'Public'
+        $wifi.DnsSuffix | Should -Be 'wifi.example'
+        Should -Invoke Get-NetIPInterface -Times 2 -Exactly
+        Should -Invoke Get-NetIPAddress -Times 2 -Exactly
+    }
 }
 
 Describe 'Keeping the old IPv4 settings when a change fails' {

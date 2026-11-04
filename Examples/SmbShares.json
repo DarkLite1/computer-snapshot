@@ -56,6 +56,7 @@
         "AccessRight": "Change"
       }
     ],
-    "Comment": "Without NTFS, the permissions of the folder itself are left unchanged."
+    "ConcurrentUserLimit": "{{number:Maximum number of users of the Scans share, 0 for no limit}}",
+    "Comment": "Without NTFS, the permissions of the folder itself are left unchanged. {{number:...}} asks for the user limit at restore time."
   }
 ]

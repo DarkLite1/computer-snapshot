@@ -1,6 +1,6 @@
 {
   "WinSystemLocaleName": "en-US",
   "TimeZoneId": "Romance Standard Time",
-  "WinHomeLocationGeoId": 21,
+  "WinHomeLocationGeoId": "{{number:Windows home location GeoId, such as 21 for Belgium}}",
   "CultureName": "en-US"
 }

@@ -75,6 +75,53 @@ Describe 'Schema contract' {
             ).Count | Should -Be 0 -Because ($problems -join '; ')
         }
     }
+    It ('fills the number placeholders of the examples in as numbers that ' +
+        'pass the check') {
+        $numberFields = 0
+        foreach ($name in $mapping.Values | Select-Object -Unique) {
+            $examplePath = Join-Path $root "Examples\$name.json"
+            $data = Read-SectionExampleHC $examplePath
+            $document = @{ SchemaVersion = 3; Items = @{ $name = $data } }
+            $fields = @(
+                Get-RestoreInputFieldsHC -Data $document.Items |
+                Where-Object { $_.Kind -eq 'number' }
+            )
+            if (-not $fields.Count) {
+                continue
+            }
+            $numberFields += $fields.Count
+
+            $null = Resolve-RestoreInputHC -Items $document.Items -ReadValue {
+                param($field)
+                switch ($field.Kind) {
+                    'number' { '30' }
+                    'password' { 'Test-only password!42' }
+                    'ipv4' { '192.0.2.10' }
+                    'prefix' { '24' }
+                    default { 'Example' }
+                }
+            }
+            $problems = @(Test-ConfigurationHC $document $TestDrive)
+
+            foreach ($field in $fields) {
+                $value = if (
+                    $field.Container -is [System.Collections.IDictionary] -or
+                    $field.Container -is [array]
+                ) {
+                    $field.Container[$field.Key]
+                }
+                else {
+                    $field.Container.($field.Key)
+                }
+                $value | Should -BeOfType [int] -Because $field.Path
+                $value | Should -Be 30
+            }
+            @(
+                $problems | Where-Object { $_ -notmatch "file '.+' not found" }
+            ).Count | Should -Be 0 -Because "$name; $($problems -join '; ')"
+        }
+        $numberFields | Should -BeGreaterOrEqual 4
+    }
     It ('validates every component example using Test-Json on ' +
         'PowerShell 7') -Skip:($PSVersionTable.PSVersion.Major -lt 7) {
         foreach ($name in $mapping.Values) {

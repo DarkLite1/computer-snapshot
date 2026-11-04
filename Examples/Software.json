@@ -36,7 +36,8 @@
       "ExecutablePath": "Software\\Firebird-2.1.3.18185_0_x64.exe",
       "Arguments": "/Silent",
       "SuccessExitCodes": [0, 1],
-      "Comment": "This installer returns 1 when Firebird is already installed, which is fine. 3010 and 1641 (restart needed) always count as success."
+      "TimeoutMinutes": "{{number:Minutes the Firebird installer may run}}",
+      "Comment": "This installer returns 1 when Firebird is already installed, which is fine. 3010 and 1641 (restart needed) always count as success. {{number:...}} asks for the time limit at restore time; use a number, such as 30, to fix it."
     },
     {
       "ExecutablePath": "Software\\cscript.exe",

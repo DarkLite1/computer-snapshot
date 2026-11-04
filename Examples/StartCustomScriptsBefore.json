@@ -1,8 +1,8 @@
 [
   {
-    "Comment": "Place your reviewed PowerShell script under Files. Arguments are named parameters. A script that ends with robocopy needs SuccessExitCodes [0, 1, 2, 3, 4, 5, 6, 7].",
+    "Comment": "Place your reviewed PowerShell script under Files. Arguments are named parameters. A script that ends with robocopy needs SuccessExitCodes [0, 1, 2, 3, 4, 5, 6, 7]. {{number:...}} asks for an extra success code at restore time.",
     "Path": "Files\\Set power settings.ps1",
     "Arguments": {},
-    "SuccessExitCodes": [0]
+    "SuccessExitCodes": [0, "{{number:Extra exit code that means success, such as 1}}"]
   }
 ]

@@ -140,7 +140,7 @@ Describe 'Answer file reading and resolution' {
         'their values') -ForEach @(
         @{ Key = '{{ipv4:Server}}'; Value = 'INVALID-secret-value' }
         @{ Key = '{{prefix:Prefix}}'; Value = '33-secret-value' }
-        @{ Key = '{{prefix:Prefix}}'; Value = 24 }
+        @{ Key = '{{ipv4:Server}}'; Value = 24 }
         @{ Key = '{{password:Password}}'; Value = '' }
         @{ Key = '{{input:Account}}'; Value = @('secret-value') }
     ) {
@@ -150,6 +150,32 @@ Describe 'Answer file reading and resolution' {
             Should -Throw '*must be a nonempty, valid*string*'
         try { Read-RestoreAnswerFileHC $answerPath }
         catch { [string]$_ | Should -Not -Match 'secret-value' }
+    }
+    It 'accepts a prefix answer written as a number or as text' -ForEach @(
+        @{ Value = '24' }
+        @{ Value = '"24"' }
+    ) {
+        ('{"Answers":{"{{prefix:Prefix}}":' + $Value + '}}') |
+            Set-Content -LiteralPath $answerPath
+
+        $answers = Read-RestoreAnswerFileHC $answerPath
+
+        $answers['{{prefix:Prefix}}'] | Should -BeExactly '24'
+    }
+    It ('rejects the prefix answer <Value> without revealing other ' +
+        'answers') -ForEach @(
+        @{ Value = '24.5' }
+        @{ Value = '0' }
+        @{ Value = '33' }
+        @{ Value = 'true' }
+    ) {
+        ('{"Answers":{"{{password:Password}}":"Other-secret-value",' +
+            '"{{prefix:Prefix}}":' + $Value + '}}') |
+            Set-Content -LiteralPath $answerPath
+
+        $failure = { Read-RestoreAnswerFileHC $answerPath } |
+            Should -Throw '*valid prefix string or number*' -PassThru
+        $failure.Exception.Message | Should -Not -Match 'secret-value'
     }
     It 'rejects invalid document shapes, keys and malformed JSON' -ForEach @(
         @{ Json = '[]' }

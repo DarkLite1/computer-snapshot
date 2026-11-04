@@ -512,7 +512,8 @@ whether missing values may prompt:
 
 An answer file contains an `Answers` object, with an optional `Comment`.
 Keys are **complete, case-sensitive placeholders**, including the braces,
-type and description. Values are strings; write a prefix as `"24"`, not `24`.
+type and description. Values are strings; a prefix may also be a number, so
+`24` and `"24"` both work.
 `null` means **not supplied** and is useful in a generated template. Empty
 strings and invalid values are errors, not requests to prompt. Malformed files,
 duplicate keys, unknown top-level properties and invalid supplied answers

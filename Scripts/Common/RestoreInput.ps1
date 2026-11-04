@@ -460,17 +460,28 @@ function Read-RestoreAnswerFileHC {
         if ($node.GetAttribute('type') -eq 'null') {
             continue
         }
+        $kind = $field[0].Kind
+        $type = $node.GetAttribute('type')
+        $allowedTypes = @('string')
+        $expected = "nonempty, valid $kind string"
+
+        # A prefix length is a number, so 24 is as natural as "24"
+        if ($kind -eq 'prefix') {
+            $allowedTypes += 'number'
+            $expected += ' or number'
+        }
+
         $valueParams = @{
-            Kind  = $field[0].Kind
+            Kind  = $kind
             Value = $node.InnerText
         }
         if (
-            $node.GetAttribute('type') -ne 'string' -or
+            $type -notin $allowedTypes -or
             -not (Test-RestoreInputValueHC @valueParams)
         ) {
             throw (
                 "Answer file '$Path': the answer for '$key' must be a " +
-                "nonempty, valid $($field[0].Kind) string."
+                "$expected."
             )
         }
         $answers.Add($key, $node.InnerText)

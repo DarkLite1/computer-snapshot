@@ -1,7 +1,8 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Read, validate and write version-2 computer configurations on PowerShell 5.1.
+    Read, validate and write version-3 computer configurations on
+    PowerShell 5.1.
 #>
 
 . "$PSScriptRoot\Section.ps1"
@@ -10,29 +11,29 @@
 
 $script:ItemOrder = @((Get-SnapshotScriptsHC).Keys)
 $script:ArrayItems = @(
-    'StartCustomScriptsBefore', 
+    'StartCustomScriptsBefore',
     'UserAccounts',
-    'UserGroups', 
+    'UserGroups',
     'FirewallRules',
     'NetworkCards',
     'HostsFileEntries',
-    'ScheduledTasks', 
+    'ScheduledTasks',
     'SmbShares',
-    'CopyFilesFolders', 
+    'CopyFilesFolders',
     'StartCustomScriptsAfter'
 )
 
 function Get-PropertiesHC {
     param($Value)
-    
+
     if ($Value -is [System.Collections.IDictionary]) {
-        return @($Value.Keys) 
+        return @($Value.Keys)
     }
 
-    if ($Value -is [pscustomobject]) { 
-        return @($Value.PSObject.Properties | ForEach-Object { $_.Name }) 
+    if ($Value -is [pscustomobject]) {
+        return @($Value.PSObject.Properties | ForEach-Object { $_.Name })
     }
-    
+
     return @()
 }
 
@@ -48,11 +49,19 @@ function Test-ObjectHC {
 function Read-JsonValueHC {
     param([string]$Path)
 
-    $text = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
+    $contentParams = @{
+        LiteralPath = $Path
+        Raw         = $true
+        Encoding    = 'UTF8'
+        ErrorAction = 'Stop'
+    }
+    $text = Get-Content @contentParams
 
-    $wrapper = ConvertFrom-Json `
-        -InputObject ('{"Data":' + $text + '}') `
-        -ErrorAction Stop
+    $jsonParams = @{
+        InputObject = '{"Data":' + $text + '}'
+        ErrorAction = 'Stop'
+    }
+    $wrapper = ConvertFrom-Json @jsonParams
 
     return , $wrapper.Data
 }
@@ -71,7 +80,12 @@ function Test-ReferenceListHC {
 
 function Add-SectionOriginHC {
     # Remember which file set each single value, for conflict messages
-    param($Value, [string]$Path, [string]$Source, [hashtable]$Origins)
+    param(
+        $Value,
+        [string]$Path,
+        [string]$Source,
+        [hashtable]$Origins
+    )
 
     if ($Value -is [array]) {
         return
@@ -79,7 +93,13 @@ function Add-SectionOriginHC {
 
     if (Test-ObjectHC $Value) {
         foreach ($property in Get-PropertiesHC $Value) {
-            Add-SectionOriginHC $Value.$property "$Path.$property" $Source $Origins
+            $originParams = @{
+                Value   = $Value.$property
+                Path    = "$Path.$property"
+                Source  = $Source
+                Origins = $Origins
+            }
+            Add-SectionOriginHC @originParams
         }
 
         return
@@ -138,13 +158,25 @@ function Merge-SectionDataHC {
 
         foreach ($property in Get-PropertiesHC $Addition) {
             if (-not $combined.Contains($property)) {
-                Add-SectionOriginHC $Addition.$property "$Path.$property" $Source $Origins
+                $originParams = @{
+                    Value   = $Addition.$property
+                    Path    = "$Path.$property"
+                    Source  = $Source
+                    Origins = $Origins
+                }
+                Add-SectionOriginHC @originParams
+
                 $combined[$property] = $Addition.$property
             }
             elseif ($property -ne 'Comment') {
-                $combined[$property] = Merge-SectionDataHC `
-                    $combined[$property] $Addition.$property `
-                    "$Path.$property" $Source $Origins
+                $mergeParams = @{
+                    Base     = $combined[$property]
+                    Addition = $Addition.$property
+                    Path     = "$Path.$property"
+                    Source   = $Source
+                    Origins  = $Origins
+                }
+                $combined[$property] = Merge-SectionDataHC @mergeParams
             }
         }
 
@@ -166,8 +198,8 @@ function Merge-SectionDataHC {
 
 function ConvertTo-LoadedConfigurationHC {
     param(
-        $Configuration, 
-        [string]$RootFolder, 
+        $Configuration,
+        [string]$RootFolder,
         [string]$Source,
         [string[]]$Items
     )
@@ -206,7 +238,7 @@ function ConvertTo-LoadedConfigurationHC {
     }
 
     if (
-        $Configuration.SchemaVersion -ne 3 -or 
+        $Configuration.SchemaVersion -ne 3 -or
         $Configuration.SchemaVersion -is [string]
     ) {
         $problems.Add(
@@ -217,7 +249,7 @@ function ConvertTo-LoadedConfigurationHC {
 
     foreach ($property in @('Description', '$schema')) {
         if (
-            (Get-PropertiesHC $Configuration) -contains $property -and 
+            (Get-PropertiesHC $Configuration) -contains $property -and
             $Configuration.$property -isnot [string]
         ) {
             $problems.Add("$Source > ${property}: expected a string")
@@ -230,9 +262,11 @@ function ConvertTo-LoadedConfigurationHC {
         }
         else {
             foreach ($property in Get-PropertiesHC $Configuration.Settings) {
+                $location = "$Source > Settings.${property}"
+
                 if ($property -ceq 'Comment') {
-                    if ($Configuration.Settings.Comment -isnot [string]) { 
-                        $problems.Add("$Source > Settings.Comment: expected a string") 
+                    if ($Configuration.Settings.Comment -isnot [string]) {
+                        $problems.Add("${location}: expected a string")
                     }
                 }
                 elseif ($property -ceq 'RestartDelaySeconds') {
@@ -253,66 +287,77 @@ function ConvertTo-LoadedConfigurationHC {
                 }
                 elseif (
                     $property -cnotin @(
-                        'RebootComputer', 'OpenReportInBrowser', 'RunElevated')
+                        'RebootComputer', 'OpenReportInBrowser', 'RunElevated'
+                    )
                 ) {
-                    $problems.Add("$Source > Settings.${property}: unknown property")
+                    $problems.Add("${location}: unknown property")
                 }
                 elseif ($Configuration.Settings.$property -isnot [bool]) {
-                    $problems.Add("$Source > Settings.${property}: expected a Boolean")
+                    $problems.Add("${location}: expected a Boolean")
                 }
-                else { 
-                    $result.Settings[$property] = $Configuration.Settings.$property 
+                else {
+                    $result.Settings[$property] = (
+                        $Configuration.Settings.$property
+                    )
                 }
             }
         }
     }
+
     if (
-        -not (Test-ObjectHC $Configuration.Items) -or 
-        @(Get-PropertiesHC $Configuration.Items | 
+        -not (Test-ObjectHC $Configuration.Items) -or
+        @(
+            Get-PropertiesHC $Configuration.Items |
             Where-Object { $_ -ne 'Comment' }
         ).Count -eq 0
     ) {
-        $problems.Add("$Source > Items: expected an object containing at least one item")
-        
+        $problems.Add(
+            "$Source > Items: expected an object containing at least one item"
+        )
+
         return $result
     }
 
     foreach ($name in Get-PropertiesHC $Configuration.Items) {
         if ($name -ceq 'Comment') {
-            if ($Configuration.Items.Comment -isnot [string]) { 
-                $problems.Add("$Source > Items.Comment: expected a string") 
+            if ($Configuration.Items.Comment -isnot [string]) {
+                $problems.Add("$Source > Items.Comment: expected a string")
             }
         }
         elseif ($name -cnotin $script:ItemOrder) {
             $problems.Add("$Source > Items.${name}: unknown item")
         }
     }
+
     if ($null -ne $Items) {
-        if (-not $Items.Count) { 
-            $problems.Add('Select at least one item.') 
+        if (-not $Items.Count) {
+            $problems.Add('Select at least one item.')
         }
 
         foreach ($name in $Items) {
             if (
-                $name -notin $script:ItemOrder -or 
+                $name -notin $script:ItemOrder -or
                 $name -notin @(Get-PropertiesHC $Configuration.Items)
             ) {
-                $problems.Add("$Source > Items.${name}: selected item is not available in this configuration")
+                $problems.Add(
+                    "$Source > Items.${name}: selected item is not " +
+                    'available in this configuration'
+                )
             }
         }
     }
 
     foreach ($name in $script:ItemOrder) {
-        if ($null -ne $Items -and $name -notin $Items) { 
-            continue 
+        if ($null -ne $Items -and $name -notin $Items) {
+            continue
         }
 
-        if ((Get-PropertiesHC $Configuration.Items) -notcontains $name) { 
-            continue 
+        if ((Get-PropertiesHC $Configuration.Items) -notcontains $name) {
+            continue
         }
-        
+
         $data = $Configuration.Items.$name
-        
+
         # One file, or a list of files that are combined in order
         if (Test-ReferenceListHC $data) {
             $combined = $null
@@ -323,13 +368,19 @@ function ConvertTo-LoadedConfigurationHC {
                 try {
                     $referencePath = Resolve-RootPathHC $reference $RootFolder
                     $part = Read-JsonValueHC $referencePath
-                
+
                     if (Test-ReferenceListHC $part) {
-                        throw 'nested section references are not supported' 
+                        throw 'nested section references are not supported'
                     }
 
-                    $combined = Merge-SectionDataHC `
-                        $combined $part "Items.$name" $reference $origins
+                    $mergeParams = @{
+                        Base     = $combined
+                        Addition = $part
+                        Path     = "Items.$name"
+                        Source   = $reference
+                        Origins  = $origins
+                    }
+                    $combined = Merge-SectionDataHC @mergeParams
                 }
                 catch {
                     $problems.Add(
@@ -347,29 +398,42 @@ function ConvertTo-LoadedConfigurationHC {
 
             $data = $combined
         }
+
         $result.Items[$name] = $data
     }
+
     return $result
 }
 
 function Read-ConfigurationHC {
+    <#
+    .SYNOPSIS
+        Read a configuration file and combine its referenced section files.
+    #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][string]$Path, 
+        [Parameter(Mandatory)][string]$Path,
         [Parameter(Mandatory)][string]$RootFolder,
         [string[]]$Items
     )
 
     $fullPath = Resolve-RootPathHC $Path $RootFolder
 
-    try { 
-        $configuration = Read-JsonValueHC $fullPath 
+    try {
+        $configuration = Read-JsonValueHC $fullPath
     }
     catch {
-        throw "${fullPath} > configuration: invalid or unreadable JSON: $_" 
+        throw "${fullPath} > configuration: invalid or unreadable JSON: $_"
     }
-        
-    return ConvertTo-LoadedConfigurationHC $configuration $RootFolder $fullPath -Items $Items
+
+    $loadParams = @{
+        Configuration = $configuration
+        RootFolder    = $RootFolder
+        Source        = $fullPath
+        Items         = $Items
+    }
+
+    return ConvertTo-LoadedConfigurationHC @loadParams
 }
 
 function ConvertTo-IPv4NumberHC {
@@ -377,11 +441,12 @@ function ConvertTo-IPv4NumberHC {
     param($Value)
 
     $address = $null
+    $ipv4 = [Net.Sockets.AddressFamily]::InterNetwork
 
     if (
         $Value -isnot [string] -or
         -not [Net.IPAddress]::TryParse($Value, [ref]$address) -or
-        $address.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork -or
+        $address.AddressFamily -ne $ipv4 -or
         $address.ToString() -cne $Value
     ) {
         return $null
@@ -410,14 +475,20 @@ function Get-IPSettingsProblemHC {
     if ($Settings.Dhcp -eq $true) {
         foreach ($name in @('IPAddress', 'PrefixLength', 'DefaultGateway')) {
             if ($names -contains $name) {
-                ".${name}: not used with Dhcp true; remove it, or Dhcp for a static address"
+                (
+                    ".${name}: not used with Dhcp true; remove it, or Dhcp " +
+                    'for a static address'
+                )
             }
         }
     }
     else {
         foreach ($name in @('IPAddress', 'PrefixLength')) {
             if ($names -notcontains $name) {
-                ".${name}: required for a static address; use { `"Dhcp`": true } for an automatic address"
+                (
+                    ".${name}: required for a static address; use " +
+                    '{ "Dhcp": true } for an automatic address'
+                )
             }
         }
     }
@@ -425,14 +496,20 @@ function Get-IPSettingsProblemHC {
     $values = @{}
 
     foreach ($name in @('IPAddress', 'DefaultGateway')) {
-        if ($names -notcontains $name -or $Settings.$name -match $ipv4Placeholder) {
+        if (
+            $names -notcontains $name -or
+            $Settings.$name -match $ipv4Placeholder
+        ) {
             continue
         }
 
         $values[$name] = ConvertTo-IPv4NumberHC $Settings.$name
 
         if ($null -eq $values[$name]) {
-            ".${name}: '$($Settings.$name)' is not an IPv4 address such as 192.0.2.10"
+            (
+                ".${name}: '$($Settings.$name)' is not an IPv4 address " +
+                'such as 192.0.2.10'
+            )
         }
     }
 
@@ -441,7 +518,10 @@ function Get-IPSettingsProblemHC {
     if ($names -contains 'PrefixLength') {
         if ($prefix -is [string]) {
             if ($prefix -notmatch '\A\{\{prefix:[^{}\r\n]+\}\}\z') {
-                ".PrefixLength: expected a number from 1 to 32, or {{prefix:Description}}"
+                (
+                    '.PrefixLength: expected a number from 1 to 32, or ' +
+                    '{{prefix:Description}}'
+                )
             }
 
             $prefix = $null
@@ -449,15 +529,22 @@ function Get-IPSettingsProblemHC {
     }
 
     if (
-        $null -ne $values.IPAddress -and $null -ne $values.DefaultGateway -and
-        ($prefix -is [int] -or $prefix -is [long]) -and $prefix -ge 1 -and $prefix -le 32
+        $null -ne $values.IPAddress -and
+        $null -ne $values.DefaultGateway -and
+        ($prefix -is [int] -or $prefix -is [long]) -and
+        $prefix -ge 1 -and
+        $prefix -le 32
     ) {
         $all = [uint64]4294967295
         $mask = [uint32](($all -shl (32 - [int]$prefix)) -band $all)
+        $addressNetwork = $values.IPAddress -band $mask
+        $gatewayNetwork = $values.DefaultGateway -band $mask
 
-        if (($values.IPAddress -band $mask) -ne ($values.DefaultGateway -band $mask)) {
-            ".DefaultGateway: '$($Settings.DefaultGateway)' is not in the subnet of " +
-            "$($Settings.IPAddress)/$prefix"
+        if ($addressNetwork -ne $gatewayNetwork) {
+            (
+                ".DefaultGateway: '$($Settings.DefaultGateway)' is not in " +
+                "the subnet of $($Settings.IPAddress)/$prefix"
+            )
         }
     }
 
@@ -468,34 +555,50 @@ function Get-IPSettingsProblemHC {
             $servers[$index] -notmatch $ipv4Placeholder -and
             $null -eq (ConvertTo-IPv4NumberHC $servers[$index])
         ) {
-            ".DNSServers[$index]: '$($servers[$index])' is not an IPv4 address such as 192.0.2.10"
+            (
+                ".DNSServers[$index]: '$($servers[$index])' is not an " +
+                'IPv4 address such as 192.0.2.10'
+            )
         }
     }
 }
 
 function Test-ConfigurationHC {
+    <#
+    .SYNOPSIS
+        Return every problem in a configuration: its shape, section-specific
+        rules and asset paths.
+    #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)]$Configuration, 
+        [Parameter(Mandatory)]$Configuration,
         [Parameter(Mandatory)][string]$RootFolder
     )
-        
-    if (
-        $Configuration.PSObject.TypeNames -notcontains 'ComputerSnapshot.Configuration'
-    ) {
-        $Configuration = ConvertTo-LoadedConfigurationHC $Configuration $RootFolder '<configuration>'
+
+    $loadedType = 'ComputerSnapshot.Configuration'
+
+    if ($Configuration.PSObject.TypeNames -notcontains $loadedType) {
+        $loadParams = @{
+            Configuration = $Configuration
+            RootFolder    = $RootFolder
+            Source        = '<configuration>'
+        }
+        $Configuration = ConvertTo-LoadedConfigurationHC @loadParams
     }
 
     $problems = New-Object 'System.Collections.Generic.List[string]'
-    
-    foreach ($problem in $Configuration.Problems) { 
-        $problems.Add($problem) 
+
+    foreach ($problem in $Configuration.Problems) {
+        $problems.Add($problem)
     }
 
     $source = $Configuration.Source
-    $schema = Get-Content `
-        -LiteralPath "$PSScriptRoot\..\config.schema.json" `
-        -Raw -Encoding UTF8 | ConvertFrom-Json
+    $schemaParams = @{
+        LiteralPath = "$PSScriptRoot\..\config.schema.json"
+        Raw         = $true
+        Encoding    = 'UTF8'
+    }
+    $schema = Get-Content @schemaParams | ConvertFrom-Json
 
     foreach ($name in $Configuration.Items.Keys) {
         $data = $Configuration.Items[$name]
@@ -503,45 +606,49 @@ function Test-ConfigurationHC {
 
         if ($name -in $script:ArrayItems) {
             if ($data -isnot [array]) {
-                $problems.Add("${location}: expected an array") 
-                continue 
+                $problems.Add("${location}: expected an array")
+                continue
             }
-            
+
             foreach (
-                $index in 
-                0..($data.Count - 1) | 
+                $index in
+                0..($data.Count - 1) |
                 Where-Object { $_ -ge 0 -and $_ -lt $data.Count }
             ) {
-                if (-not (Test-ObjectHC $data[$index])) { 
+                if (-not (Test-ObjectHC $data[$index])) {
                     $problems.Add("${location}[$index]: expected an object")
                 }
             }
         }
-        elseif (-not (Test-ObjectHC $data)) { 
-            $problems.Add("${location}: expected an object") 
-            continue 
+        elseif (-not (Test-ObjectHC $data)) {
+            $problems.Add("${location}: expected an object")
+            continue
         }
 
         $shapeProblems = @(
             Test-ShapeHC $data $schema.'$defs'.$name $schema.'$defs' $location
         )
 
-        foreach ($problem in $shapeProblems) { 
+        foreach ($problem in $shapeProblems) {
             $problems.Add($problem)
         }
-         
+
         if ($shapeProblems.Count) {
-            continue 
+            continue
         }
+
         if (Test-EmptySectionHC $data) {
-            continue 
+            continue
         }
 
         $assets = @()
+
         switch ($name) {
             'UserAccounts' {
                 for ($index = 0; $index -lt $data.Count; $index++) {
-                    foreach ($problem in @(Test-UserAccountEntryHC $data[$index])) {
+                    $entryProblems = @(Test-UserAccountEntryHC $data[$index])
+
+                    foreach ($problem in $entryProblems) {
                         $problems.Add("${location}[$index].$problem")
                     }
                 }
@@ -549,10 +656,12 @@ function Test-ConfigurationHC {
             'Software' {
                 foreach ($property in @('Remove', 'Install')) {
                     if (
-                        (Get-PropertiesHC $data) -contains $property -and 
+                        (Get-PropertiesHC $data) -contains $property -and
                         $data.$property -isnot [array]
                     ) {
-                        $problems.Add("${location}.${property}: expected an array")
+                        $problems.Add(
+                            "${location}.${property}: expected an array"
+                        )
                     }
                 }
 
@@ -575,42 +684,47 @@ function Test-ConfigurationHC {
                 $installs = @($data.Install | Where-Object { $null -ne $_ })
 
                 for ($index = 0; $index -lt $installs.Count; $index++) {
-                    $assets += @{ 
-                        Value    = $installs[$index].ExecutablePath 
-                        Property = "Install[$index].ExecutablePath" 
-                        Leaf     = $true 
-                    } 
+                    $assets += @{
+                        Value    = $installs[$index].ExecutablePath
+                        Property = "Install[$index].ExecutablePath"
+                        Leaf     = $true
+                    }
                 }
             }
             'CopyFilesFolders' {
                 for ($index = 0; $index -lt $data.Count; $index++) {
                     $assets += @{
-                        Value    = $data[$index].From 
-                        Property = "[$index].From" 
+                        Value    = $data[$index].From
+                        Property = "[$index].From"
                         # Placeholders can only be filled in a file
                         Leaf     = $data[$index].FillPlaceholders -eq $true
                     }
 
-                    if ([string]::IsNullOrWhiteSpace($data[$index].To)) { 
-                        $problems.Add("${location}[$index].To: expected a destination path") 
+                    if ([string]::IsNullOrWhiteSpace($data[$index].To)) {
+                        $problems.Add(
+                            "${location}[$index].To: expected a destination " +
+                            'path'
+                        )
                     }
                 }
             }
-            { 
-                $_ -in @('StartCustomScriptsBefore', 'StartCustomScriptsAfter') 
+            {
+                $_ -in @('StartCustomScriptsBefore', 'StartCustomScriptsAfter')
             } {
                 for ($index = 0; $index -lt $data.Count; $index++) {
-                    $assets += @{ 
-                        Value    = $data[$index].Path 
-                        Property = "[$index].Path" 
-                        Leaf     = $true 
+                    $assets += @{
+                        Value    = $data[$index].Path
+                        Property = "[$index].Path"
+                        Leaf     = $true
                     }
 
                     if (
-                        $data[$index].Arguments -and 
+                        $data[$index].Arguments -and
                         -not (Test-ObjectHC $data[$index].Arguments)
                     ) {
-                        $problems.Add("${location}[$index].Arguments: expected an object")
+                        $problems.Add(
+                            "${location}[$index].Arguments: expected an object"
+                        )
                     }
                 }
             }
@@ -625,24 +739,31 @@ function Test-ConfigurationHC {
                     }
                 }
 
-                $users = @($data.RunAsOtherUser | Where-Object { $null -ne $_ })
+                $users = @(
+                    $data.RunAsOtherUser | Where-Object { $null -ne $_ }
+                )
 
-                for ($userIndex = 0; $userIndex -lt $users.Count; $userIndex++) {
+                for ($user = 0; $user -lt $users.Count; $user++) {
                     $groups += @{
-                        Location = ".RunAsOtherUser[$userIndex].RegistryKeys"
-                        Entries  = $users[$userIndex].RegistryKeys
+                        Location = ".RunAsOtherUser[$user].RegistryKeys"
+                        Entries  = $users[$user].RegistryKeys
                     }
                 }
 
                 foreach ($group in $groups) {
-                    $entries = @($group.Entries | Where-Object { $null -ne $_ })
+                    $entries = @(
+                        $group.Entries | Where-Object { $null -ne $_ }
+                    )
 
                     for ($index = 0; $index -lt $entries.Count; $index++) {
-                        foreach (
-                            $problem in @(Get-RegistryEntryProblemHC -Entry $entries[$index])
-                        ) {
+                        $entryProblems = @(
+                            Get-RegistryEntryProblemHC -Entry $entries[$index]
+                        )
+
+                        foreach ($problem in $entryProblems) {
                             $problems.Add(
-                                "${location}$($group.Location)[$index]: $problem"
+                                "${location}$($group.Location)[$index]: " +
+                                $problem
                             )
                         }
                     }
@@ -663,23 +784,30 @@ function Test-ConfigurationHC {
                         }
                     }
 
-                    foreach ($property in @('TaskName', 'TaskPath', $xmlProperty)) {
-                        if (
-                            [string]::IsNullOrWhiteSpace($data[$index].$property)
-                        ) { 
-                            $problems.Add("${location}[$index].${property}: expected a nonempty string") 
+                    $required = @('TaskName', 'TaskPath', $xmlProperty)
+
+                    foreach ($property in $required) {
+                        $value = $data[$index].$property
+
+                        if ([string]::IsNullOrWhiteSpace($value)) {
+                            $problems.Add(
+                                "${location}[$index].${property}: " +
+                                'expected a nonempty string'
+                            )
                         }
                     }
-                    if (
-                        $data[$index].Enabled -isnot [bool]
-                    ) { 
-                        $problems.Add("${location}[$index].Enabled: expected a Boolean") 
+
+                    if ($data[$index].Enabled -isnot [bool]) {
+                        $problems.Add(
+                            "${location}[$index].Enabled: expected a Boolean"
+                        )
                     }
+
                     try {
-                        $null = [xml]$data[$index].Xml 
+                        $null = [xml]$data[$index].Xml
                     }
-                    catch { 
-                        $problems.Add("${location}[$index].Xml: invalid XML") 
+                    catch {
+                        $problems.Add("${location}[$index].Xml: invalid XML")
                     }
 
                     if (
@@ -703,7 +831,8 @@ function Test-ConfigurationHC {
                     if ($shareNames.ContainsKey($shareName)) {
                         $problems.Add(
                             "${location}[$index].Name: share '$shareName' " +
-                            "is already configured at [$($shareNames[$shareName])]"
+                            'is already configured at ' +
+                            "[$($shareNames[$shareName])]"
                         )
                     }
                     else {
@@ -714,21 +843,28 @@ function Test-ConfigurationHC {
                         (Get-PropertiesHC $data[$index]) -contains 'Access' -and
                         $data[$index].Access -isnot [array]
                     ) {
-                        $problems.Add("${location}[$index].Access: expected an array")
+                        $problems.Add(
+                            "${location}[$index].Access: expected an array"
+                        )
                     }
                 }
             }
             'NetworkCards' {
                 for ($index = 0; $index -lt $data.Count; $index++) {
-                    if ($null -eq $data[$index].Change.IPSettings) {
+                    $ipSettings = $data[$index].Change.IPSettings
+
+                    if ($null -eq $ipSettings) {
                         continue
                     }
 
-                    foreach (
-                        $problem in
-                        @(Get-IPSettingsProblemHC -Settings $data[$index].Change.IPSettings)
-                    ) {
-                        $problems.Add("${location}[$index].Change.IPSettings$problem")
+                    $settingsProblems = @(
+                        Get-IPSettingsProblemHC -Settings $ipSettings
+                    )
+
+                    foreach ($problem in $settingsProblems) {
+                        $problems.Add(
+                            "${location}[$index].Change.IPSettings$problem"
+                        )
                     }
                 }
             }
@@ -739,15 +875,28 @@ function Test-ConfigurationHC {
 
                 for ($index = 0; $index -lt $data.Count; $index++) {
                     $entry = $data[$index]
+                    $entryLocation = "${location}[$index]"
                     $isRemove = $entry.Action -eq 'Remove'
-                    $names = @($entry.Hostnames | Where-Object { $null -ne $_ })
+                    $names = @(
+                        $entry.Hostnames | Where-Object { $null -ne $_ }
+                    )
 
                     if (-not $names.Count) {
-                        $problems.Add("${location}[$index].Hostnames: expected at least one host name")
+                        $problems.Add(
+                            "${entryLocation}.Hostnames: expected at least " +
+                            'one host name'
+                        )
                     }
 
-                    if ($isRemove -and (Get-PropertiesHC $entry) -contains 'IPAddress') {
-                        $problems.Add("${location}[$index].IPAddress: not used with Action Remove; remove it")
+                    $hasAddress = (
+                        (Get-PropertiesHC $entry) -contains 'IPAddress'
+                    )
+
+                    if ($isRemove -and $hasAddress) {
+                        $problems.Add(
+                            "${entryLocation}.IPAddress: not used with " +
+                            'Action Remove; remove it'
+                        )
                     }
                     elseif (-not $isRemove) {
                         if (
@@ -755,31 +904,50 @@ function Test-ConfigurationHC {
                             [string]$entry.IPAddress -notmatch $placeholder
                         ) {
                             $problems.Add(
-                                "${location}[$index].IPAddress: '$($entry.IPAddress)' is not an " +
-                                'IPv4 or IPv6 address such as 10.20.60.47 or fd00::47'
+                                "${entryLocation}.IPAddress: " +
+                                "'$($entry.IPAddress)' is not an IPv4 or " +
+                                'IPv6 address such as 10.20.60.47 or fd00::47'
                             )
                         }
                     }
 
-                    $address = if ($isRemove) { '(removed)' } else { [string]$entry.IPAddress }
+                    $address = if ($isRemove) {
+                        '(removed)'
+                    }
+                    else {
+                        [string]$entry.IPAddress
+                    }
 
-                    for ($nameIndex = 0; $nameIndex -lt $names.Count; $nameIndex++) {
+                    for (
+                        $nameIndex = 0
+                        $nameIndex -lt $names.Count
+                        $nameIndex++
+                    ) {
                         $name = [string]$names[$nameIndex]
+                        $nameLocation = (
+                            "${entryLocation}.Hostnames[$nameIndex]"
+                        )
 
-                        if (-not (Test-HostNameHC $name) -and $name -notmatch $placeholder) {
+                        if (
+                            -not (Test-HostNameHC $name) -and
+                            $name -notmatch $placeholder
+                        ) {
                             $problems.Add(
-                                "${location}[$index].Hostnames[$nameIndex]: '$name' is not a " +
-                                'valid host name'
+                                "${nameLocation}: '$name' is not a valid " +
+                                'host name'
                             )
                             continue
                         }
 
                         $key = $name.ToLowerInvariant()
 
-                        if ($addressOf.ContainsKey($key) -and $addressOf[$key] -ne $address) {
+                        if (
+                            $addressOf.ContainsKey($key) -and
+                            $addressOf[$key] -ne $address
+                        ) {
                             $problems.Add(
-                                "${location}[$index].Hostnames[$nameIndex]: '$name' is " +
-                                "already used for $($addressOf[$key])"
+                                "${nameLocation}: '$name' is already used " +
+                                "for $($addressOf[$key])"
                             )
                         }
                         else {
@@ -789,87 +957,106 @@ function Test-ConfigurationHC {
                 }
             }
         }
+
         foreach ($asset in $assets) {
             $property = $asset.Property
-           
-            if ($property -notlike '[[]*') { 
-                $property = '.' + $property 
+
+            if ($property -notlike '[[]*') {
+                $property = '.' + $property
             }
-           
+
             try {
                 if (
                     $asset.Value -isnot [string] -or
                     [string]::IsNullOrWhiteSpace($asset.Value)
                 ) {
-                    throw 'expected a nonempty path' 
+                    throw 'expected a nonempty path'
                 }
 
                 $path = Resolve-RootPathHC $asset.Value $RootFolder
                 $exists = if ($asset.Leaf) {
-                    Test-Path -LiteralPath $path -PathType Leaf 
+                    Test-Path -LiteralPath $path -PathType Leaf
                 }
-                else { 
-                    Test-Path -LiteralPath $path 
+                else {
+                    Test-Path -LiteralPath $path
                 }
-                if (-not $exists) { 
-                    throw "file '$($asset.Value)' not found" 
+
+                if (-not $exists) {
+                    throw "file '$($asset.Value)' not found"
                 }
             }
-            catch { 
-                $problems.Add("${location}${property}: $_") 
+            catch {
+                $problems.Add("${location}${property}: $_")
             }
         }
     }
+
     return $problems.ToArray()
 }
 
 function Format-ConfigurationJsonHC {
+    <#
+    .SYNOPSIS
+        Format a value as readable JSON: Comment first, short lists inline.
+    #>
     param(
         $Value,
         [int]$Depth = 0,
-        [int]$PrefixLength = 0      
+        [int]$PrefixLength = 0
     )
 
-    if ($null -eq $Value) { 
-        return 'null' 
+    if ($null -eq $Value) {
+        return 'null'
     }
 
     $indent = '  ' * $Depth
     $childIndent = '  ' * ($Depth + 1)
     $newline = [Environment]::NewLine
-    
+
     if (
         $Value -is [System.Collections.IDictionary] -or
-        ($null -ne $Value -and $Value.GetType() -eq [System.Management.Automation.PSCustomObject])
+        (
+            $null -ne $Value -and
+            $Value.GetType() -eq [System.Management.Automation.PSCustomObject]
+        )
     ) {
         $names = @(Get-PropertiesHC $Value)
 
-        if (-not $names.Count) { 
-            return '{}' 
+        if (-not $names.Count) {
+            return '{}'
         }
 
         $names = @(
-            $names | Where-Object { $_ -ceq 'Comment' }) + @($names | 
-            Where-Object { $_ -cne 'Comment' }
+            @($names | Where-Object { $_ -ceq 'Comment' }) +
+            @($names | Where-Object { $_ -cne 'Comment' })
         )
 
         $lines = foreach ($name in $names) {
             $key = ConvertTo-Json -InputObject ([string]$name) -Compress
-            $formatted = Format-ConfigurationJsonHC -Value $Value.$name -Depth ($Depth + 1) -PrefixLength ($key.Length + 2)
+            $formatParams = @{
+                Value        = $Value.$name
+                Depth        = $Depth + 1
+                PrefixLength = $key.Length + 2
+            }
+            $formatted = Format-ConfigurationJsonHC @formatParams
+
             $childIndent + $key + ': ' + $formatted
         }
 
-        return '{' + $newline + ($lines -join (',' + $newline)) + $newline + $indent + '}'
+        return (
+            '{' + $newline + ($lines -join (',' + $newline)) + $newline +
+            $indent + '}'
+        )
     }
 
     if ($Value -is [array]) {
-        if (-not $Value.Count) { 
-            return '[]' 
+        if (-not $Value.Count) {
+            return '[]'
         }
 
         $entries = @(
             foreach ($entry in $Value) {
-                Format-ConfigurationJsonHC -Value $entry -Depth ($Depth + 1) 
+                Format-ConfigurationJsonHC -Value $entry -Depth ($Depth + 1)
             }
         )
 
@@ -879,59 +1066,82 @@ function Format-ConfigurationJsonHC {
             -not $inline.Contains($newline) -and
             ($indent.Length + $PrefixLength + $inline.Length) -le 80
         ) {
-            return $inline 
+            return $inline
         }
 
-        return '[' + $newline + $childIndent + ($entries -join (',' + $newline + $childIndent)) + $newline + $indent + ']'
+        $separator = ',' + $newline + $childIndent
+
+        return (
+            '[' + $newline + $childIndent + ($entries -join $separator) +
+            $newline + $indent + ']'
+        )
     }
 
     return ConvertTo-Json -InputObject $Value -Depth 20 -Compress
 }
 
 function Write-ConfigurationHC {
+    <#
+    .SYNOPSIS
+        Write a configuration as formatted JSON, replacing the file safely.
+    #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)]$Configuration, 
+        [Parameter(Mandatory)]$Configuration,
         [Parameter(Mandatory)][string]$Path
     )
-        
+
     $document = [ordered]@{
         '$schema'     = '../Scripts/config.schema.json'
         SchemaVersion = 3
     }
 
     if ($null -ne $Configuration.Description) {
-        $document.Description = $Configuration.Description 
+        $document.Description = $Configuration.Description
     }
 
     if ($null -ne $Configuration.Settings) {
-        $document.Settings = $Configuration.Settings 
+        $document.Settings = $Configuration.Settings
     }
-        
+
     $document.Items = $Configuration.Items
     $json = Format-ConfigurationJsonHC $document
-    #region Write safely: the existing file is only replaced by a complete new file
+
+    #region Write safely: only a complete new file replaces the existing one
     $fullPath = [IO.Path]::GetFullPath($Path)
     $folder = [IO.Path]::GetDirectoryName($fullPath)
-    $tempPath = Join-Path $folder ('.{0}.{1}.tmp' -f 
-        [IO.Path]::GetFileName($fullPath), [guid]::NewGuid().ToString('N'))
+    $tempName = '.{0}.{1}.tmp' -f (
+        [IO.Path]::GetFileName($fullPath),
+        [guid]::NewGuid().ToString('N')
+    )
+    $tempPath = Join-Path $folder $tempName
 
     try {
-        [IO.File]::WriteAllText($tempPath, $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false))
+        $encoding = New-Object System.Text.UTF8Encoding $false
+        [IO.File]::WriteAllText(
+            $tempPath, $json + [Environment]::NewLine, $encoding
+        )
 
         if ([IO.File]::Exists($fullPath)) {
             [IO.File]::Replace($tempPath, $fullPath, [NullString]::Value)
         }
-        else { 
-            [IO.File]::Move($tempPath, $fullPath) 
+        else {
+            [IO.File]::Move($tempPath, $fullPath)
         }
     }
     catch {
         Remove-Item -LiteralPath $tempPath -Force -ErrorAction Ignore
 
-        throw "Failed to write configuration '$fullPath': $($_.Exception.Message)"
+        throw (
+            "Failed to write configuration '$fullPath': " +
+            $_.Exception.Message
+        )
     }
     #endregion
 }
 
-Export-ModuleMember -Function Read-ConfigurationHC, Test-ConfigurationHC, Write-ConfigurationHC
+Export-ModuleMember -Function @(
+    'Read-ConfigurationHC'
+    'Test-ConfigurationHC'
+    'Write-ConfigurationHC'
+)

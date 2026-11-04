@@ -13,12 +13,13 @@ function Invoke-ChildScriptHC {
     .SYNOPSIS
         Run one child script and pass on everything it writes.
     .DESCRIPTION
-        All streams are captured so that every error the child writes reaches the
-        caller, whatever the caller's ErrorAction is. Inside the child, errors stay
-        nonterminating so one failed entry does not stop the remaining entries.
-        Errors are rewritten as new error records with secrets redacted, so the
-        caller receives each reported error exactly once. Errors the child
-        handles itself (try/catch without Write-Error) are not reported.
+        All streams are captured so that every error the child writes reaches
+        the caller, whatever the caller's ErrorAction is. Inside the child,
+        errors stay nonterminating so one failed entry does not stop the
+        remaining entries. Errors are rewritten as new error records with
+        secrets redacted, so the caller receives each reported error exactly
+        once. Errors the child handles itself (try/catch without Write-Error)
+        are not reported.
     #>
     [CmdletBinding()]
     param(
@@ -32,32 +33,47 @@ function Invoke-ChildScriptHC {
     $callerPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
 
-    & $Path -Action $Action -Data $Data -RootFolder $RootFolder *>&1 | ForEach-Object {
+    $childParams = @{
+        Action     = $Action
+        Data       = $Data
+        RootFolder = $RootFolder
+    }
+
+    & $Path @childParams *>&1 | ForEach-Object {
         if ($_ -is [System.Management.Automation.ErrorRecord]) {
-            $message = Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $SecretValues
+            $protectParams = @{
+                Text         = [string]$_
+                SecretValues = $SecretValues
+            }
+            $message = Protect-RestoreInputTextHC @protectParams
 
             Write-Error -Message $message -ErrorAction $callerPreference
             return
-
         }
-        if ($_ -is [System.Management.Automation.WarningRecord] -or
+
+        if (
+            $_ -is [System.Management.Automation.WarningRecord] -or
             $_ -is [System.Management.Automation.VerboseRecord] -or
             $_ -is [System.Management.Automation.DebugRecord] -or
             $_ -is [System.Management.Automation.InformationRecord]
         ) {
-            $message = Protect-RestoreInputTextHC -Text ([string]$_) -SecretValues $SecretValues
+            $protectParams = @{
+                Text         = [string]$_
+                SecretValues = $SecretValues
+            }
+            $message = Protect-RestoreInputTextHC @protectParams
 
-            if ($_ -is [System.Management.Automation.WarningRecord]) { 
-                Write-Warning $message 
+            if ($_ -is [System.Management.Automation.WarningRecord]) {
+                Write-Warning $message
             }
-            elseif ($_ -is [System.Management.Automation.VerboseRecord]) { 
-                Write-Verbose $message 
+            elseif ($_ -is [System.Management.Automation.VerboseRecord]) {
+                Write-Verbose $message
             }
-            elseif ($_ -is [System.Management.Automation.DebugRecord]) { 
-                Write-Debug $message 
+            elseif ($_ -is [System.Management.Automation.DebugRecord]) {
+                Write-Debug $message
             }
             else {
-                Write-Information $message -InformationAction Continue 
+                Write-Information $message -InformationAction Continue
             }
             return
         }
@@ -67,54 +83,97 @@ function Invoke-ChildScriptHC {
 }
 
 function Test-ElevatedHC {
+    <#
+    .SYNOPSIS
+        True when the current process runs as administrator.
+    #>
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal $identity
+    $administrator = [Security.Principal.WindowsBuiltInRole]::Administrator
 
-    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    return $principal.IsInRole($administrator)
 }
 
 function Write-SnapshotReportHC {
+    <#
+    .SYNOPSIS
+        Write the HTML report, one row per section, and return its path.
+    #>
     param(
         [string]$ReportsFolder,
         [string]$Action,
-        [string]$ConfigurationFile, 
+        [string]$ConfigurationFile,
         $Results
     )
 
-    $null = New-Item `
-        -Path $ReportsFolder `
-        -ItemType Directory `
-        -Force -ErrorAction Stop
+    $folderParams = @{
+        Path        = $ReportsFolder
+        ItemType    = 'Directory'
+        Force       = $true
+        ErrorAction = 'Stop'
+    }
+    $null = New-Item @folderParams
 
     $operation = if ($Action -eq 'CreateSnapshot') {
         'Export'
     }
     else {
-        'Restore' 
+        'Restore'
     }
 
-    $configurationName = [IO.Path]::GetFileNameWithoutExtension($ConfigurationFile)
-
-    $reportName = '{0}-{1}-{2}-{3}' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyyMMdd-HHmmss'), $operation, $configurationName
+    $configurationName = [IO.Path]::GetFileNameWithoutExtension(
+        $ConfigurationFile
+    )
+    $reportName = '{0}-{1}-{2}-{3}' -f (
+        $env:COMPUTERNAME,
+        (Get-Date -Format 'yyyyMMdd-HHmmss'),
+        $operation,
+        $configurationName
+    )
 
     $path = Join-Path $ReportsFolder ($reportName + '.html')
-
     $suffix = 2
 
     while (Test-Path -LiteralPath $path) {
-        $path = Join-Path $ReportsFolder ('{0}-{1}.html' -f $reportName, $suffix)
-
+        $path = Join-Path $ReportsFolder (
+            '{0}-{1}.html' -f $reportName, $suffix
+        )
         $suffix++
     }
+
     $rows = foreach ($result in $Results) {
         $item = [System.Net.WebUtility]::HtmlEncode($result.Name)
         $status = [System.Net.WebUtility]::HtmlEncode($result.Status)
-        $messages = @($result.Messages | ForEach-Object { '<li>' + [System.Net.WebUtility]::HtmlEncode([string]$_) + '</li>' }) -join ''
+        $messages = @(
+            $result.Messages | ForEach-Object {
+                '<li>' +
+                [System.Net.WebUtility]::HtmlEncode([string]$_) +
+                '</li>'
+            }
+        ) -join ''
+
         "<tr><th>$item</th><td>$status</td><td><ul>$messages</ul></td></tr>"
     }
+
     $title = [System.Net.WebUtility]::HtmlEncode("$Action - $ConfigurationFile")
-    $html = '<!doctype html><html><head><meta charset="utf-8"><title>' + $title + '</title><style>body{font-family:Segoe UI,sans-serif;margin:2rem}table{border-collapse:collapse;width:100%}td,th{padding:0.6rem;border:1px solid #bbb;text-align:left;vertical-align:top}ul{margin:0}</style></head><body><h1>' + $title + '</h1><table><thead><tr><th>Item</th><th>Status</th><th>Messages</th></tr></thead><tbody>' + ($rows -join '') + '</tbody></table></body></html>'
-    [IO.File]::WriteAllText($path, $html, (New-Object System.Text.UTF8Encoding $false))
+    $style = (
+        'body{font-family:Segoe UI,sans-serif;margin:2rem}' +
+        'table{border-collapse:collapse;width:100%}' +
+        'td,th{padding:0.6rem;border:1px solid #bbb;text-align:left;' +
+        'vertical-align:top}' +
+        'ul{margin:0}'
+    )
+    $html = (
+        '<!doctype html><html><head><meta charset="utf-8"><title>' +
+        $title + '</title><style>' + $style + '</style></head><body><h1>' +
+        $title + '</h1><table><thead><tr><th>Item</th><th>Status</th>' +
+        '<th>Messages</th></tr></thead><tbody>' + ($rows -join '') +
+        '</tbody></table></body></html>'
+    )
+
+    $encoding = New-Object System.Text.UTF8Encoding $false
+    [IO.File]::WriteAllText($path, $html, $encoding)
+
     return $path
 }
 
@@ -135,21 +194,36 @@ function Start-ComputerRestartHC {
     # into a stopping error when the preference is Stop; the exit code decides
     $ErrorActionPreference = 'Continue'
 
-    $comment = 'Computer snapshot restore completed. ' +
-    'The computer restarts to apply the changes.'
+    $comment = (
+        'Computer snapshot restore completed. ' +
+        'The computer restarts to apply the changes.'
+    )
 
     $output = & shutdown.exe /r /t $DelaySeconds /d p:4:1 /c $comment 2>&1
 
     if ($LASTEXITCODE) {
-        throw "shutdown.exe failed with exit code $($LASTEXITCODE): " +
-        ($output -join ' ')
+        throw (
+            "shutdown.exe failed with exit code $($LASTEXITCODE): " +
+            ($output -join ' ')
+        )
     }
 }
 
 function Invoke-ComputerSnapshotHC {
+    <#
+    .SYNOPSIS
+        Export or restore the selected sections of one configuration.
+    .DESCRIPTION
+        Validates first, runs each section's child script in the fixed
+        order, writes the configuration on export, restarts after a
+        successful restore when asked, writes the report and returns the
+        result.
+    #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][ValidateSet('CreateSnapshot', 'RestoreSnapshot')][string]$Action,
+        [Parameter(Mandatory)]
+        [ValidateSet('CreateSnapshot', 'RestoreSnapshot')]
+        [string]$Action,
         [Parameter(Mandatory)][string]$ConfigurationFile,
         [string[]]$Items,
         [Parameter(Mandatory)][string]$RootFolder,
@@ -165,21 +239,30 @@ function Invoke-ComputerSnapshotHC {
         [switch]$Unattended,
         [switch]$Force
     )
-    if ($Action -ne 'RestoreSnapshot' -and ($PSBoundParameters.ContainsKey('AnswerFile') -or $Unattended)) {
+
+    $restoreOnly = (
+        $PSBoundParameters.ContainsKey('AnswerFile') -or $Unattended
+    )
+
+    if ($Action -ne 'RestoreSnapshot' -and $restoreOnly) {
         throw 'AnswerFile and Unattended are restore-only options.'
     }
+
     $configurationPath = Resolve-RootPathHC $ConfigurationFile $RootFolder
 
     if (
-        $Action -eq 'CreateSnapshot' -and 
-        (Test-Path -LiteralPath $configurationPath) -and 
+        $Action -eq 'CreateSnapshot' -and
+        (Test-Path -LiteralPath $configurationPath) -and
         -not $Force
     ) {
-        throw "Configuration '$configurationPath' already exists. Use -Force to replace it."
+        throw (
+            "Configuration '$configurationPath' already exists. " +
+            'Use -Force to replace it.'
+        )
     }
 
-    if (-not $ReportsFolder) { 
-        $ReportsFolder = Join-Path $RootFolder 'Log' 
+    if (-not $ReportsFolder) {
+        $ReportsFolder = Join-Path $RootFolder 'Log'
     }
 
     $ReportsFolder = Resolve-RootPathHC $ReportsFolder $RootFolder
@@ -201,33 +284,47 @@ function Invoke-ComputerSnapshotHC {
                 )
             }
 
-            $configuration = Read-ConfigurationHC `
-                -Path $configurationPath `
-                -RootFolder $RootFolder `
-                -Items $Items
+            $readParams = @{
+                Path       = $configurationPath
+                RootFolder = $RootFolder
+                Items      = $Items
+            }
+            $configuration = Read-ConfigurationHC @readParams
 
             if ($configuration.Problems.Count) {
-                throw ($configuration.Problems -join [Environment]::NewLine) 
+                throw ($configuration.Problems -join [Environment]::NewLine)
             }
+
             $answers = $null
+
             if ($PSBoundParameters.ContainsKey('AnswerFile')) {
-                if ([string]::IsNullOrWhiteSpace($AnswerFile)) { throw 'AnswerFile must not be empty.' }
-                $answers = Read-RestoreAnswerFileHC -Path (Resolve-RootPathHC $AnswerFile $RootFolder)
+                if ([string]::IsNullOrWhiteSpace($AnswerFile)) {
+                    throw 'AnswerFile must not be empty.'
+                }
+
+                $answerPath = Resolve-RootPathHC $AnswerFile $RootFolder
+                $answers = Read-RestoreAnswerFileHC -Path $answerPath
             }
-            $inputResult = Resolve-RestoreInputHC `
-                -Items $configuration.Items `
-                -RootFolder $RootFolder `
-                -Answers $answers `
-                -Unattended:$Unattended `
-                -ReadValue { param($field) Read-RestoreInputHC -Field $field }
+
+            $inputParams = @{
+                Items      = $configuration.Items
+                RootFolder = $RootFolder
+                Answers    = $answers
+                Unattended = $Unattended
+                ReadValue  = {
+                    param($field)
+                    Read-RestoreInputHC -Field $field
+                }
+            }
+            $inputResult = Resolve-RestoreInputHC @inputParams
 
             $secretValues = $inputResult.SecretValues
 
-            $problems = @(
-                Test-ConfigurationHC `
-                    -Configuration $configuration `
-                    -RootFolder $RootFolder
-            )
+            $testParams = @{
+                Configuration = $configuration
+                RootFolder    = $RootFolder
+            }
+            $problems = @(Test-ConfigurationHC @testParams)
 
             # Each copy gets only the answers of its own file, never a
             # password, so no other answer reaches the copy section
@@ -283,17 +380,24 @@ function Invoke-ComputerSnapshotHC {
             }
 
             if (-not $PSBoundParameters.ContainsKey('RebootComputer')) {
-                $RebootComputer = $configuration.Settings.RebootComputer 
+                $RebootComputer = $configuration.Settings.RebootComputer
             }
 
             if (-not $PSBoundParameters.ContainsKey('RestartDelaySeconds')) {
-                $RestartDelaySeconds = $configuration.Settings.RestartDelaySeconds
+                $RestartDelaySeconds = (
+                    $configuration.Settings.RestartDelaySeconds
+                )
             }
-            
-            if (-not $PSBoundParameters.ContainsKey('OpenReportInBrowser')) { 
-                $OpenReportInBrowser = $configuration.Settings.OpenReportInBrowser 
+
+            if (-not $PSBoundParameters.ContainsKey('OpenReportInBrowser')) {
+                $OpenReportInBrowser = (
+                    $configuration.Settings.OpenReportInBrowser
+                )
             }
-            if ($Unattended) { $OpenReportInBrowser = $false }
+
+            if ($Unattended) {
+                $OpenReportInBrowser = $false
+            }
 
             $Items = @($configuration.Items.Keys)
         }
@@ -301,100 +405,132 @@ function Invoke-ComputerSnapshotHC {
             Write-Host 'Restore cancelled. No items executed.'
 
             return [pscustomobject]@{
-                ConfigurationFile = $configurationPath 
+                ConfigurationFile = $configurationPath
                 ReportFile        = $null
-                Results           = @() 
+                Results           = @()
                 Success           = $false
-                Cancelled         = $true 
+                Cancelled         = $true
             }
         }
-        catch { 
-            $problems = @([string]$_) 
+        catch {
+            $problems = @([string]$_)
         }
     }
     else {
-        if (-not $Items) { 
-            $Items = @($Script.Keys) 
+        if (-not $Items) {
+            $Items = @($Script.Keys)
         }
 
-        if (-not (
-                Test-Path `
-                    -LiteralPath (Split-Path $configurationPath -Parent) `
-                    -PathType Container)
-        ) {
-            $problems += "Configuration directory does not exist: '$(Split-Path $configurationPath -Parent)'"
+        $configurationFolder = Split-Path $configurationPath -Parent
+        $testPathParams = @{
+            LiteralPath = $configurationFolder
+            PathType    = 'Container'
+        }
+
+        if (-not (Test-Path @testPathParams)) {
+            $problems += (
+                'Configuration directory does not exist: ' +
+                "'$configurationFolder'"
+            )
         }
     }
-    
+
     #region Only the built-in items can run, always in their fixed order
     $knownItems = @((Get-SnapshotScriptsHC).Keys)
     $supportedText = $knownItems -join ', '
-    
+
     foreach ($name in $Script.Keys) {
-        if ($name -notin $knownItems) { 
-            $problems += "Unknown item '$name' in the script map. Supported items: $supportedText" 
+        if ($name -notin $knownItems) {
+            $problems += (
+                "Unknown item '$name' in the script map. " +
+                "Supported items: $supportedText"
+            )
         }
     }
+
     foreach ($name in $Items) {
         if ($name -notin $knownItems) {
             # Unknown names that are in the script map were reported above
-            if (-not $Script.Contains($name)) { 
-                $problems += "Unknown item '$name'. Supported items: $supportedText" 
+            if (-not $Script.Contains($name)) {
+                $problems += (
+                    "Unknown item '$name'. Supported items: $supportedText"
+                )
             }
         }
-        elseif (-not $Script.Contains($name)) { 
-            $problems += "No script configured for item '$name'" 
+        elseif (-not $Script.Contains($name)) {
+            $problems += "No script configured for item '$name'"
         }
-        elseif (-not (Test-Path -LiteralPath $Script[$name] -PathType Leaf)) { 
-            $problems += "Script for '$name' not found: '$($Script[$name])'" 
+        elseif (-not (Test-Path -LiteralPath $Script[$name] -PathType Leaf)) {
+            $problems += "Script for '$name' not found: '$($Script[$name])'"
         }
     }
     #endregion
+
     if ($problems.Count) {
         $problems = @(
-            $problems | ForEach-Object { 
-                Protect-RestoreInputTextHC `
-                    -Text ([string]$_) `
-                    -SecretValues $secretValues }
+            $problems | ForEach-Object {
+                $protectParams = @{
+                    Text         = [string]$_
+                    SecretValues = $secretValues
+                }
+                Protect-RestoreInputTextHC @protectParams
+            }
         )
 
-        foreach ($problem in $problems) { 
-            Write-Warning $problem 
+        foreach ($problem in $problems) {
+            Write-Warning $problem
         }
 
         $results.Add(
-            [pscustomobject]@{ 
-                Name     = 'Validation' 
-                Status   = 'Failed' 
-                Messages = $problems 
+            [pscustomobject]@{
+                Name     = 'Validation'
+                Status   = 'Failed'
+                Messages = $problems
             }
         )
 
-        $report = Write-SnapshotReportHC $ReportsFolder $Action $configurationPath $results
+        $reportParams = @{
+            ReportsFolder     = $ReportsFolder
+            Action            = $Action
+            ConfigurationFile = $configurationPath
+            Results           = $results
+        }
+        $report = Write-SnapshotReportHC @reportParams
 
-        throw "Configuration validation failed. No items executed. Report: '$report'"
+        throw (
+            'Configuration validation failed. No items executed. ' +
+            "Report: '$report'"
+        )
     }
+
     if (-not (Test-ElevatedHC)) {
-        Write-Warning 'Not running as administrator; some Windows operations may be unavailable.' 
+        Write-Warning (
+            'Not running as administrator; some Windows operations may be ' +
+            'unavailable.'
+        )
     }
     #endregion
-    
-    # Validation above guarantees that every selected item is known and has a script
+
+    # Validation above guarantees that every selected item is known and has
+    # a script
     $selected = @($knownItems | Where-Object { $_ -in $Items })
     $exportItems = [ordered]@{}
     $step = 0
 
     foreach ($name in $selected) {
         $step++
-        Write-Progress `
-            -Activity $Action `
-            -Status $name `
-            -PercentComplete ([int](100 * $step / $selected.Count))
+
+        $progressParams = @{
+            Activity        = $Action
+            Status          = $name
+            PercentComplete = [int](100 * $step / $selected.Count)
+        }
+        Write-Progress @progressParams
 
         $data = $null
-        
+
         if ($Action -eq 'RestoreSnapshot') {
-            $data = $configuration.Items[$name] 
+            $data = $configuration.Items[$name]
         }
         elseif ($ExportOptions -and $ExportOptions.Contains($name)) {
             $data = $ExportOptions[$name]
@@ -402,50 +538,54 @@ function Invoke-ComputerSnapshotHC {
 
         if ($Action -eq 'RestoreSnapshot' -and (Test-EmptySectionHC $data)) {
             $results.Add(
-                [pscustomobject]@{ 
+                [pscustomobject]@{
                     Name     = $name
-                    Status   = 'Skipped' 
-                    Messages = @('Nothing to do') 
+                    Status   = 'Skipped'
+                    Messages = @('Nothing to do')
                 }
             )
 
             continue
         }
-        $childAction = if ($Action -eq 'CreateSnapshot') { 
-            'Export' 
+
+        $childAction = if ($Action -eq 'CreateSnapshot') {
+            'Export'
         }
-        else { 
-            'Import' 
+        else {
+            'Import'
         }
 
         $errors = New-Object 'System.Collections.Generic.List[object]'
         $output = New-Object 'System.Collections.Generic.List[object]'
         $terminatingError = $null
-        
+
         try {
-            # Redirect instead of -ErrorVariable: -ErrorVariable also records every
-            # frame a terminating error passes through, which duplicates messages.
-            # Sorting while streaming keeps errors written before a terminating error.
-            Invoke-ChildScriptHC `
-                -Path $Script[$name] `
-                -Action $childAction `
-                -Data $data `
-                -RootFolder $RootFolder `
-                -SecretValues $secretValues `
-                -ErrorAction Continue 2>&1 |
+            # Redirect instead of -ErrorVariable: -ErrorVariable also records
+            # every frame a terminating error passes through, which
+            # duplicates messages. Sorting while streaming keeps errors
+            # written before a terminating error.
+            $childParams = @{
+                Path         = $Script[$name]
+                Action       = $childAction
+                Data         = $data
+                RootFolder   = $RootFolder
+                SecretValues = $secretValues
+                ErrorAction  = 'Continue'
+            }
+            Invoke-ChildScriptHC @childParams 2>&1 |
             ForEach-Object {
                 if ($_ -is [System.Management.Automation.ErrorRecord]) {
-                    $errors.Add($_) 
+                    $errors.Add($_)
                 }
                 else {
-                    $output.Add($_) 
+                    $output.Add($_)
                 }
             }
         }
-        catch { 
-            $terminatingError = $_ 
+        catch {
+            $terminatingError = $_
         }
-        
+
         #region Collect every reported problem, not only the first
         $isValidResult = (
             $output.Count -eq 1 -and
@@ -459,28 +599,29 @@ function Invoke-ComputerSnapshotHC {
         # Errors the child reports itself, one per failed entry
         if ($isValidResult) {
             foreach ($childError in $output[0].Errors) {
-                $errorMessages.Add(
-                    (Protect-RestoreInputTextHC `
-                        -Text $childError `
-                        -SecretValues $secretValues)
-                )
+                $protectParams = @{
+                    Text         = $childError
+                    SecretValues = $secretValues
+                }
+                $errorMessages.Add((Protect-RestoreInputTextHC @protectParams))
             }
         }
+
         # Safety net: errors written to the error stream or thrown
         foreach ($childError in $errors) {
-            $errorMessages.Add(
-                (Protect-RestoreInputTextHC `
-                    -Text ([string]$childError) `
-                    -SecretValues $secretValues)
-            )
+            $protectParams = @{
+                Text         = [string]$childError
+                SecretValues = $secretValues
+            }
+            $errorMessages.Add((Protect-RestoreInputTextHC @protectParams))
         }
 
         if ($terminatingError) {
-            $errorMessages.Add(
-                (Protect-RestoreInputTextHC `
-                    -Text ([string]$terminatingError) `
-                    -SecretValues $secretValues)
-            )
+            $protectParams = @{
+                Text         = [string]$terminatingError
+                SecretValues = $secretValues
+            }
+            $errorMessages.Add((Protect-RestoreInputTextHC @protectParams))
         }
 
         if (-not $isValidResult -and -not $terminatingError) {
@@ -494,19 +635,25 @@ function Invoke-ComputerSnapshotHC {
         $messages = New-Object 'System.Collections.Generic.List[string]'
 
         if ($isValidResult) {
-            foreach ($message in $output[0].Messages) { $messages.Add((Protect-RestoreInputTextHC -Text $message -SecretValues $secretValues)) }
+            foreach ($message in $output[0].Messages) {
+                $protectParams = @{
+                    Text         = $message
+                    SecretValues = $secretValues
+                }
+                $messages.Add((Protect-RestoreInputTextHC @protectParams))
+            }
         }
-        
+
         foreach ($message in $errorMessages) {
-            $messages.Add("ERROR: $message") 
+            $messages.Add("ERROR: $message")
         }
 
         if ($errorMessages.Count) {
             $results.Add(
-                [pscustomobject]@{ 
+                [pscustomobject]@{
                     Name     = $name
                     Status   = 'Failed'
-                    Messages = $messages.ToArray() 
+                    Messages = $messages.ToArray()
                 }
             )
 
@@ -514,25 +661,28 @@ function Invoke-ComputerSnapshotHC {
         }
 
         if ($Action -eq 'CreateSnapshot') {
-            $exportItems[$name] = $output[0].Data 
+            $exportItems[$name] = $output[0].Data
         }
 
         $results.Add(
             [pscustomobject]@{
                 Name     = $name
                 Status   = 'Success'
-                Messages = $messages.ToArray() 
+                Messages = $messages.ToArray()
             }
         )
     }
 
     Write-Progress -Activity $Action -Completed
-    
+
     #region Single-file export
     if ($Action -eq 'CreateSnapshot' -and $exportItems.Count) {
         $document = [ordered]@{
             SchemaVersion = 3
-            Description   = 'Exported from {0} on {1}' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyy-MM-dd HH:mm')
+            Description   = 'Exported from {0} on {1}' -f (
+                $env:COMPUTERNAME,
+                (Get-Date -Format 'yyyy-MM-dd HH:mm')
+            )
             Settings      = [ordered]@{
                 RebootComputer      = $false
                 RestartDelaySeconds = 60
@@ -545,48 +695,53 @@ function Invoke-ComputerSnapshotHC {
         $isWritten = $false
 
         try {
-            Write-ConfigurationHC `
-                -Configuration $document `
-                -Path $configurationPath
+            $writeParams = @{
+                Configuration = $document
+                Path          = $configurationPath
+            }
+            Write-ConfigurationHC @writeParams
 
             $isWritten = $true
         }
         catch {
             # The previous configuration, if any, is left untouched
             $results.Add(
-                [pscustomobject]@{ 
+                [pscustomobject]@{
                     Name     = 'Configuration file'
                     Status   = 'Failed'
-                    Messages = @("ERROR: $_") 
+                    Messages = @("ERROR: $_")
                 }
             )
         }
+
         if ($isWritten) {
             try {
-                $exported = Read-ConfigurationHC `
-                    -Path $configurationPath `
-                    -RootFolder $RootFolder
-                    
-                $warnings = @(
-                    Test-ConfigurationHC `
-                        -Configuration $exported `
-                        -RootFolder $RootFolder
-                )
+                $readParams = @{
+                    Path       = $configurationPath
+                    RootFolder = $RootFolder
+                }
+                $exported = Read-ConfigurationHC @readParams
+
+                $testParams = @{
+                    Configuration = $exported
+                    RootFolder    = $RootFolder
+                }
+                $warnings = @(Test-ConfigurationHC @testParams)
             }
             catch {
-                $warnings = @([string]$_) 
+                $warnings = @([string]$_)
             }
 
             if ($warnings.Count) {
-                foreach ($warning in $warnings) { 
-                    Write-Warning $warning 
+                foreach ($warning in $warnings) {
+                    Write-Warning $warning
                 }
 
                 $results.Add(
                     [pscustomobject]@{
                         Name     = 'Export validation'
                         Status   = 'Warning'
-                        Messages = $warnings 
+                        Messages = $warnings
                     }
                 )
             }
@@ -644,12 +799,18 @@ function Invoke-ComputerSnapshotHC {
     foreach ($result in $results) {
         Write-Host ('{0}: {1}' -f $result.Name, $result.Status)
 
-        foreach ($message in $result.Messages) { 
-            Write-Host "  $message" 
+        foreach ($message in $result.Messages) {
+            Write-Host "  $message"
         }
     }
 
-    $report = Write-SnapshotReportHC $ReportsFolder $Action $configurationPath $results
+    $reportParams = @{
+        ReportsFolder     = $ReportsFolder
+        Action            = $Action
+        ConfigurationFile = $configurationPath
+        Results           = $results
+    }
+    $report = Write-SnapshotReportHC @reportParams
 
     if ($OpenReportInBrowser) {
         try {
@@ -664,20 +825,24 @@ function Invoke-ComputerSnapshotHC {
             )
         }
     }
-        
+
     if (
         $Action -eq 'CreateSnapshot' -and
         $exportItems.Count -eq 0
     ) {
-        throw "No items exported. No configuration written. Report: '$report'" 
+        throw (
+            'No items exported. No configuration written. ' +
+            "Report: '$report'"
+        )
     }
 
     [pscustomobject]@{
-        ConfigurationFile = $configurationPath 
+        ConfigurationFile = $configurationPath
         ReportFile        = $report
         Results           = $results.ToArray()
-        Success           = ($failed.Count -eq 0) 
+        Success           = ($failed.Count -eq 0)
         RestartScheduled  = $restartScheduled
     }
 }
+
 Export-ModuleMember -Function Invoke-ComputerSnapshotHC

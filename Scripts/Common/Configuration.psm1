@@ -641,7 +641,7 @@ function Test-ConfigurationHC {
             continue
         }
 
-        $assets = @()
+        $assets = New-Object 'System.Collections.Generic.List[hashtable]'
 
         switch ($name) {
             'UserAccounts' {
@@ -684,21 +684,21 @@ function Test-ConfigurationHC {
                 $installs = @($data.Install | Where-Object { $null -ne $_ })
 
                 for ($index = 0; $index -lt $installs.Count; $index++) {
-                    $assets += @{
+                    $assets.Add(@{
                         Value    = $installs[$index].ExecutablePath
                         Property = "Install[$index].ExecutablePath"
                         Leaf     = $true
-                    }
+                    })
                 }
             }
             'CopyFilesFolders' {
                 for ($index = 0; $index -lt $data.Count; $index++) {
-                    $assets += @{
+                    $assets.Add(@{
                         Value    = $data[$index].From
                         Property = "[$index].From"
                         # Placeholders can only be filled in a file
                         Leaf     = $data[$index].FillPlaceholders -eq $true
-                    }
+                    })
 
                     if ([string]::IsNullOrWhiteSpace($data[$index].To)) {
                         $problems.Add(
@@ -712,11 +712,11 @@ function Test-ConfigurationHC {
                 $_ -in @('StartCustomScriptsBefore', 'StartCustomScriptsAfter')
             } {
                 for ($index = 0; $index -lt $data.Count; $index++) {
-                    $assets += @{
+                    $assets.Add(@{
                         Value    = $data[$index].Path
                         Property = "[$index].Path"
                         Leaf     = $true
-                    }
+                    })
 
                     if (
                         $data[$index].Arguments -and
@@ -730,13 +730,15 @@ function Test-ConfigurationHC {
             }
             'RegistryKeys' {
                 # Value types, data and actions, before anything is changed
-                $groups = @()
+                $groups = New-Object (
+                    'System.Collections.Generic.List[hashtable]'
+                )
 
                 if ($null -ne $data.RunAsCurrentUser) {
-                    $groups += @{
+                    $groups.Add(@{
                         Location = '.RunAsCurrentUser.RegistryKeys'
                         Entries  = $data.RunAsCurrentUser.RegistryKeys
-                    }
+                    })
                 }
 
                 $users = @(
@@ -744,10 +746,10 @@ function Test-ConfigurationHC {
                 )
 
                 for ($user = 0; $user -lt $users.Count; $user++) {
-                    $groups += @{
+                    $groups.Add(@{
                         Location = ".RunAsOtherUser[$user].RegistryKeys"
                         Entries  = $users[$user].RegistryKeys
-                    }
+                    })
                 }
 
                 foreach ($group in $groups) {
@@ -777,11 +779,11 @@ function Test-ConfigurationHC {
                     if ((Get-PropertiesHC $data[$index]) -contains 'XmlFile') {
                         $xmlProperty = 'XmlFile'
 
-                        $assets += @{
+                        $assets.Add(@{
                             Value    = $data[$index].XmlFile
                             Property = "[$index].XmlFile"
                             Leaf     = $true
-                        }
+                        })
                     }
 
                     $required = @('TaskName', 'TaskPath', $xmlProperty)

@@ -86,7 +86,7 @@ Describe 'Restore input form' {
 
         $minutes.Text = '0'
         $minutes.Tag.Touched = $true
-        Update-RestoreInputFormHC -Form $dialog
+        Update-RestoreInputPanelHC -Panel $dialog.Tag.Panel
 
         $message.Text | Should -Be 'Enter a whole number from 1 to 1440.'
         $message.ForeColor | Should -Be ([Drawing.Color]::Firebrick)
@@ -369,6 +369,36 @@ Describe 'Single-file wizard commands' {
             )
             $command.Contains("-Items @('UserAccounts','Software')")
         }
+    }
+    It ('passes only the name of the answer pipe to the restore, and ' +
+        'refuses it on export') {
+        $testFile = Join-Path $TestDrive 'Example.json'
+        '{}' | Set-Content -LiteralPath $testFile
+        $params = @{
+            Action            = 'RestoreSnapshot'
+            RootFolder        = $TestDrive
+            ConfigurationFile = $testFile
+            AnswerPipe        = 'ComputerSnapshot-0123'
+        }
+
+        Start-ConfigurationJobHC @params
+
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString(
+                [Convert]::FromBase64String($ArgumentList[-1])
+            )
+            $command.Contains(" -AnswerPipe 'ComputerSnapshot-0123'")
+        }
+
+        $exportParams = @{
+            Action     = 'CreateSnapshot'
+            RootFolder = $TestDrive
+            Name       = 'Example'
+            Items      = 'UserAccounts'
+            AnswerPipe = 'ComputerSnapshot-0123'
+        }
+        { Start-ConfigurationJobHC @exportParams } |
+            Should -Throw '*restore-only*'
     }
     It 'rejects an empty restore selection before launching' {
         $testFile = Join-Path $TestDrive 'Example.json'
@@ -1218,5 +1248,146 @@ Describe 'Restore selection controls' {
             }
         }
         finally { $dialog.Dispose() }
+    }
+}
+Describe 'Restore questions in the restore window' {
+    BeforeAll {
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+    }
+    BeforeEach {
+        Mock Show-WizardErrorHC
+        $configurationFile = Join-Path $TestDrive 'Prompted.json'
+        [ordered]@{
+            SchemaVersion = 3
+            Items         = [ordered]@{
+                UserAccounts   = @(
+                    [ordered]@{
+                        Name     = '{{input:Account}}'
+                        Password = '{{password:Password}}'
+                    }
+                )
+                NtpTimeServers = [ordered]@{
+                    SyncTimeWithDomain = $false
+                    TimeServerNames    = @('{{ipv4:Server}}')
+                }
+            }
+        } | ConvertTo-Json -Depth 10 |
+            Set-Content -LiteralPath $configurationFile
+        $params = @{
+            ConfigurationName = 'Prompted'
+            ConfigurationFile = $configurationFile
+            RootFolder        = $TestDrive
+            Entries           = @(
+                Get-RestoreItemEntriesHC -ConfigurationFile $configurationFile
+            )
+        }
+        $dialog = New-RestoreSelectionFormHC @params
+        $dialog.Show()
+        $find = { param($name) $dialog.Controls.Find($name, $true)[0] }
+        $list = & $find 'SnapshotItems'
+        $ntp = $list.Items | Where-Object Tag -eq 'NtpTimeServers'
+        $ntp.Checked = $false
+    }
+    AfterEach {
+        $dialog.Dispose()
+    }
+    It 'asks only the questions of the checked sections, in the same window' {
+        (& $find 'RestoreSelected').PerformClick()
+
+        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::None)
+        (& $find 'SelectionPage').Visible | Should -BeFalse
+        (& $find 'QuestionsPage').Visible | Should -BeTrue
+        (& $find 'RestoreSelected').Visible | Should -BeFalse
+        (& $find 'RestoreWithAnswers').Visible | Should -BeTrue
+        (& $find 'BackToSelection').Visible | Should -BeTrue
+        @($dialog.Controls.Find('SectionHeader', $true).Text) |
+            Should -Be @('User accounts')
+        @($dialog.Controls.Find('QuestionDescription', $true).Text) |
+            Should -Be @('Account', 'Password')
+        (& $find 'RestoreWithAnswers').Enabled | Should -BeFalse
+    }
+    It 'goes back to the checklist and keeps the answers given' {
+        (& $find 'RestoreSelected').PerformClick()
+        $inputs = (& $find 'QuestionsPage').Tag.Panel.Tag.Inputs
+        $inputs[0].Text = 'kiosk'
+
+        (& $find 'BackToSelection').PerformClick()
+
+        (& $find 'SelectionPage').Visible | Should -BeTrue
+        (& $find 'QuestionsPage').Visible | Should -BeFalse
+        (& $find 'RestoreSelected').Visible | Should -BeTrue
+
+        $ntp.Checked = $true
+        (& $find 'RestoreSelected').PerformClick()
+
+        @($dialog.Controls.Find('SectionHeader', $true).Text) |
+            Should -Be @('User accounts', 'NTP time servers')
+        $inputs = (& $find 'QuestionsPage').Tag.Panel.Tag.Inputs
+        $inputs.Count | Should -Be 3
+        $inputs[0].Text | Should -BeExactly 'kiosk'
+        $inputs[1].Text | Should -BeExactly ''
+    }
+    It ('returns the checked sections and the answers when every answer ' +
+        'is valid') {
+        (& $find 'RestoreSelected').PerformClick()
+        $inputs = (& $find 'QuestionsPage').Tag.Panel.Tag.Inputs
+        $inputs[0].Text = 'kiosk'
+        $inputs[1].Text = 'Test-only password!42'
+
+        (& $find 'RestoreWithAnswers').PerformClick()
+
+        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
+        @($dialog.Tag) | Should -Be @('UserAccounts')
+        $answers = Get-RestoreSelectionAnswersHC -Form $dialog
+        $answers.Count | Should -Be 2
+        $answers['{{input:Account}}'] | Should -BeExactly 'kiosk'
+        $answers['{{password:Password}}'] |
+            Should -BeExactly 'Test-only password!42'
+    }
+    It 'asks nothing for answers in the answer file or an unattended restore' {
+        $answerFile = Join-Path $TestDrive 'Prompted.answers.json'
+        ('{"Answers":{"{{input:Account}}":"kiosk",' +
+            '"{{password:Password}}":"Test-only password!42"}}') |
+            Set-Content -LiteralPath $answerFile
+        (& $find 'AnswerFile').Text = $answerFile
+
+        (& $find 'RestoreSelected').PerformClick()
+
+        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
+        (& $find 'QuestionsPage').Visible | Should -BeFalse
+        Get-RestoreSelectionAnswersHC -Form $dialog | Should -BeNullOrEmpty
+
+        $dialog.DialogResult = [Windows.Forms.DialogResult]::None
+        (& $find 'AnswerFile').Text = ''
+        (& $find 'Unattended').Checked = $true
+
+        (& $find 'RestoreSelected').PerformClick()
+
+        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
+        (& $find 'QuestionsPage').Visible | Should -BeFalse
+    }
+    It 'reports configuration problems before asking anything' {
+        $broken = Join-Path $TestDrive 'Broken.json'
+        ('{"SchemaVersion":3,"Items":{"Software":{"Install":[' +
+            '{"ExecutablePath":"Missing\\setup.exe",' +
+            '"Arguments":"{{input:Arguments}}"}]}}}') |
+            Set-Content -LiteralPath $broken
+        $params.ConfigurationFile = $broken
+        $params.Entries = @(
+            Get-RestoreItemEntriesHC -ConfigurationFile $broken
+        )
+        $dialog.Dispose()
+        $dialog = New-RestoreSelectionFormHC @params
+        $dialog.Show()
+
+        (& $find 'RestoreSelected').PerformClick()
+
+        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::None)
+        (& $find 'SelectionPage').Visible | Should -BeTrue
+        Should -Invoke Show-WizardErrorHC -Times 1 -Exactly -ParameterFilter {
+            $Caption -eq 'Restore error' -and
+            $Text -like "*Install[[]0].ExecutablePath: file 'Missing*"
+        }
     }
 }

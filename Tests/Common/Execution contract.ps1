@@ -886,6 +886,82 @@ Describe 'Single-file execution' {
         }
         Should -Invoke Read-RestoreInputHC @invoke
     }
+    It ('uses the answers that the wizard hands over and asks nothing, ' +
+        'redacting its passwords') {
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{
+                UserAccounts = @(
+                    @{
+                        Name     = '{{input:Account}}'
+                        Password = '{{password:Password}}'
+                    }
+                )
+            }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.AnswerPipe = 'ComputerSnapshot-test'
+        Mock Receive-RestoreAnswersHC @inModule {
+            @{
+                '{{input:Account}}'    = 'Example'
+                '{{password:Password}}' = 'Pipe-secret!42'
+            }
+        }
+        Mock Invoke-ChildScriptHC @inModule {
+            $Data[0].Name | Should -Be 'Example'
+            $Data[0].Password | Should -Be 'Pipe-secret!42'
+            [pscustomobject]@{
+                Data     = $null
+                Messages = [string[]]@('Applied Pipe-secret!42')
+                Errors   = [string[]]@()
+            }
+        }
+
+        $result = Invoke-ComputerSnapshotHC @params
+
+        $result.Success | Should -BeTrue
+        $result.Results[0].Messages | Should -Be @('Applied [redacted]')
+        Should -Invoke Read-RestoreInputHC @inModule -Times 0 -Exactly
+        $invoke = @{
+            ModuleName      = 'Execution'
+            Times           = 1
+            Exactly         = $true
+            ParameterFilter = { $PipeName -eq 'ComputerSnapshot-test' }
+        }
+        Should -Invoke Receive-RestoreAnswersHC @invoke
+    }
+    It ('asks for the answers itself when the wizard cannot hand them ' +
+        'over') {
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{
+                UserAccounts = @(@{ Name = '{{input:Account}}' })
+            }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        $params.AnswerPipe = 'ComputerSnapshot-closed'
+        Mock Receive-RestoreAnswersHC @inModule {
+            throw 'The operation has timed out.'
+        }
+        Mock Read-RestoreInputHC @inModule {
+            & (New-FakeReadValuesHC { 'Example' }) $Questions
+        }
+
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+
+        Should -Invoke Read-RestoreInputHC @inModule -Times 1 -Exactly
+        $invoke = @{
+            ModuleName      = 'Execution'
+            Times           = 1
+            Exactly         = $true
+            ParameterFilter = {
+                $Message -like '*answers of the wizard could not be*'
+            }
+        }
+        Should -Invoke Write-Warning @invoke
+    }
     It ('fails unattended on missing answers before any child or ' +
         'restart, with no prompts') {
         Write-ConfigurationHC @{

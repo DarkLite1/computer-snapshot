@@ -82,6 +82,49 @@ function Invoke-ChildScriptHC {
     }
 }
 
+function Join-RestoreAnswersHC {
+    <#
+    .SYNOPSIS
+        The answers of the answer file, with the answers that the wizard
+        serves on a named pipe on top.
+    .DESCRIPTION
+        When the answers of the wizard cannot be received, for example
+        because the wizard was closed, a warning says so and the restore
+        asks for the missing answers in the input form instead.
+    #>
+    param(
+        [System.Collections.IDictionary]$Answers,
+        [Parameter(Mandatory)][string]$PipeName
+    )
+
+    $dictionaryType = 'System.Collections.Generic.Dictionary[string,object]'
+    $joined = New-Object $dictionaryType ([StringComparer]::Ordinal)
+
+    if ($null -ne $Answers) {
+        foreach ($key in $Answers.Keys) {
+            $joined[$key] = $Answers[$key]
+        }
+    }
+
+    try {
+        $received = Receive-RestoreAnswersHC -PipeName $PipeName
+
+        foreach ($key in $received.Keys) {
+            $joined[$key] = $received[$key]
+        }
+
+        Write-Verbose "Received $($received.Count) answer(s) from the wizard"
+    }
+    catch {
+        Write-Warning (
+            'The answers of the wizard could not be received ' +
+            "($($_.Exception.Message)); the restore asks for them instead."
+        )
+    }
+
+    return , $joined
+}
+
 function Write-SnapshotReportHC {
     <#
     .SYNOPSIS
@@ -224,16 +267,21 @@ function Invoke-ComputerSnapshotHC {
         # Per section, options that a child script receives as Data on export
         [System.Collections.IDictionary]$ExportOptions,
         [string]$AnswerFile,
+        # The named pipe on which the wizard serves the answers of its
+        # questions page
+        [string]$AnswerPipe,
         [switch]$Unattended,
         [switch]$Force
     )
 
     $restoreOnly = (
-        $PSBoundParameters.ContainsKey('AnswerFile') -or $Unattended
+        $PSBoundParameters.ContainsKey('AnswerFile') -or
+        $PSBoundParameters.ContainsKey('AnswerPipe') -or
+        $Unattended
     )
 
     if ($Action -ne 'RestoreSnapshot' -and $restoreOnly) {
-        throw 'AnswerFile and Unattended are restore-only options.'
+        throw 'AnswerFile, AnswerPipe and Unattended are restore-only options.'
     }
 
     $configurationPath = Resolve-RootPathHC $ConfigurationFile $RootFolder
@@ -304,6 +352,14 @@ function Invoke-ComputerSnapshotHC {
 
                     $answerPath = Resolve-RootPathHC $AnswerFile $RootFolder
                     $answers = Read-RestoreAnswerFileHC -Path $answerPath
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($AnswerPipe)) {
+                    $joinParams = @{
+                        Answers  = $answers
+                        PipeName = $AnswerPipe
+                    }
+                    $answers = Join-RestoreAnswersHC @joinParams
                 }
 
                 $inputParams = @{

@@ -8,6 +8,52 @@ BeforeAll {
     . "$PSScriptRoot\Common\Restore input.ps1"
 }
 
+Describe 'Answers handed over by the wizard' {
+    BeforeEach {
+        $dictionaryType = (
+            'System.Collections.Generic.Dictionary[string,string]'
+        )
+        $wizardAnswers = New-Object $dictionaryType ([StringComparer]::Ordinal)
+        $wizardAnswers['{{input:Name}}'] = 'kiosk'
+        $wizardAnswers['{{input:name}}'] = 'other'
+        $wizardAnswers['{{password:Password}}'] = "Test-only`r`n""pass""!"
+        $server = $null
+    }
+    AfterEach {
+        if ($server) {
+            $server.PowerShell.Stop()
+            $server.PowerShell.Dispose()
+        }
+    }
+    It 'hands every answer over once, from memory, with case-sensitive keys' {
+        $server = Start-RestoreAnswerServerHC -Answers $wizardAnswers
+
+        $received = Receive-RestoreAnswersHC -PipeName $server.PipeName
+
+        $received.Count | Should -Be 3
+        $received['{{input:Name}}'] | Should -BeExactly 'kiosk'
+        $received['{{input:name}}'] | Should -BeExactly 'other'
+        $received['{{password:Password}}'] |
+            Should -BeExactly "Test-only`r`n""pass""!"
+        $server.PipeName | Should -Match '^ComputerSnapshot-[0-9a-f]{32}$'
+        $server.PipeName | Should -Not -Match 'kiosk'
+
+        {
+            $receiveParams = @{
+                PipeName       = $server.PipeName
+                TimeoutSeconds = 1
+            }
+            Receive-RestoreAnswersHC @receiveParams
+        } | Should -Throw
+    }
+    It 'fails quickly when no wizard serves the answers' {
+        $pipeName = 'ComputerSnapshot-' + [guid]::NewGuid().ToString('N')
+
+        { Receive-RestoreAnswersHC -PipeName $pipeName -TimeoutSeconds 1 } |
+            Should -Throw
+    }
+}
+
 Describe 'Answer file reading and resolution' {
     BeforeEach {
         $answerPath = Join-Path $TestDrive 'answers.json'

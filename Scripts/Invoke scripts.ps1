@@ -29,6 +29,9 @@
 .PARAMETER AnswerFile
     Restore only: JSON answers keyed by complete placeholders. Missing answers
     are prompted for unless Unattended is set. Relative paths use the USB root.
+.PARAMETER AnswerPipe
+    Restore only: the named pipe on which the wizard serves the answers of its
+    questions page. When they cannot be received, the restore asks for them.
 .PARAMETER Unattended
     Restore only: fail on missing answers, suppress browser opening, and fail
     without administrator rights instead of requesting UAC.
@@ -50,6 +53,7 @@ param(
     [switch]$Force,
     [System.Collections.IDictionary]$ExportOptions,
     [string]$AnswerFile,
+    [string]$AnswerPipe,
     [switch]$Unattended,
     [System.Collections.IDictionary]$Script
 )
@@ -93,7 +97,7 @@ $arguments = @{
 # provides the defaults for the others
 $optionalSettings = @(
     'RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser',
-    'ExportOptions', 'AnswerFile', 'Unattended'
+    'ExportOptions', 'AnswerFile', 'AnswerPipe', 'Unattended'
 )
 foreach ($setting in $optionalSettings) {
     if ($PSBoundParameters.ContainsKey($setting)) {

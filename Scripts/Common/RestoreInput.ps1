@@ -654,16 +654,31 @@ function Get-RestoreInputControlValueHC {
     $Control.Text
 }
 
-function Update-RestoreInputFormHC {
-    # Show the problem of every answer that was left, and enable Continue
-    # only when every answer is valid
+function Get-RestoreInputPanelHC {
+    # The questions panel that contains a control
     param(
-        [Parameter(Mandatory)]$Form
+        [Parameter(Mandatory)]$Control
+    )
+
+    $parent = $Control
+
+    while ($null -ne $parent -and $parent.Name -ne 'RestoreInputPanel') {
+        $parent = $parent.Parent
+    }
+
+    $parent
+}
+
+function Update-RestoreInputPanelHC {
+    # Show the problem of every answer that was left, count the answers
+    # still needed, and enable the confirm button only when all are valid
+    param(
+        [Parameter(Mandatory)]$Panel
     )
 
     $invalid = 0
 
-    foreach ($control in $Form.Tag.Inputs) {
+    foreach ($control in $Panel.Tag.Inputs) {
         $state = $control.Tag
         $question = $state.Question
         $problemParams = @{
@@ -694,85 +709,115 @@ function Update-RestoreInputFormHC {
         }
     }
 
-    $Form.Controls.Find('ConfirmInput', $true)[0].Enabled = $invalid -eq 0
-    $Form.Controls.Find('InputSummary', $true)[0].Text = if ($invalid) {
-        "$invalid of $($Form.Tag.Inputs.Count) answer(s) still needed"
+    if ($null -ne $Panel.Tag.Confirm) {
+        $Panel.Tag.Confirm.Enabled = $invalid -eq 0
+    }
+
+    $Panel.Controls.Find('InputSummary', $true)[0].Text = if ($invalid) {
+        "$invalid of $($Panel.Tag.Inputs.Count) answer(s) still needed"
     }
     else {
         'All answers are valid'
     }
 }
 
-function New-RestoreInputFormHC {
-    <#
-    .SYNOPSIS
-        One form with every question, under a header for each section.
-    .DESCRIPTION
-        Each field checks its answer against the kind of placeholder and
-        the schema of the setting, and a field with fixed values is a list.
-        Continue is enabled once every answer is valid.
-    #>
+function Get-RestoreInputPanelValuesHC {
+    # The answers in the questions panel, by placeholder
     param(
-        [Parameter(Mandatory)][object[]]$Questions
+        [Parameter(Mandatory)]$Panel
     )
 
-    $dialog = New-Object Windows.Forms.Form
-    $dialog.Text = 'Restore - input required'
-    $dialog.ClientSize = New-Object Drawing.Size 640, 560
-    $dialog.MinimumSize = New-Object Drawing.Size 520, 360
-    $dialog.Font = New-Object Drawing.Font 'Segoe UI', 10
-    $dialog.StartPosition = 'CenterScreen'
-    $dialog.TopMost = $true
-    $dialog.Tag = @{
-        Inputs = New-Object 'System.Collections.Generic.List[object]'
-        Labels = New-Object 'System.Collections.Generic.List[object]'
-        Values = $null
+    $dictionaryType = 'System.Collections.Generic.Dictionary[string,string]'
+    $values = New-Object $dictionaryType ([StringComparer]::Ordinal)
+
+    foreach ($control in $Panel.Tag.Inputs) {
+        $values[$control.Tag.Question.Placeholder] = (
+            Get-RestoreInputControlValueHC -Control $control
+        )
     }
 
-    $percent = [Windows.Forms.SizeType]::Percent
-    $absolute = [Windows.Forms.SizeType]::Absolute
-    $autoSize = [Windows.Forms.SizeType]::AutoSize
-    $smallFont = New-Object Drawing.Font $dialog.Font.FontFamily, 9
-    $headerFont = New-Object Drawing.Font (
-        $dialog.Font.FontFamily, 11, [Drawing.FontStyle]::Bold
+    return , $values
+}
+
+function Clear-RestoreInputPanelHC {
+    # Forget the typed answers, passwords included
+    param(
+        [Parameter(Mandatory)]$Panel
     )
 
-    # Rows: introduction, questions, buttons
-    $layout = New-Object Windows.Forms.TableLayoutPanel
-    $layout.Dock = 'Fill'
-    $layout.Padding = New-Object Windows.Forms.Padding 16
-    $layout.ColumnCount = 1
-    $null = $layout.ColumnStyles.Add(
+    foreach ($control in $Panel.Tag.Inputs) {
+        if ($control -is [Windows.Forms.TextBox]) {
+            $control.Clear()
+        }
+    }
+}
+
+function New-RestoreInputPanelHC {
+    <#
+    .SYNOPSIS
+        Every question under a header for each section, for the input form
+        and for the questions page of the wizard.
+    .DESCRIPTION
+        Each field checks its answer against the kind of placeholder and the
+        schema of the setting, and a field with fixed values is a list.
+        Values fills the fields with earlier answers, by placeholder. Set
+        Tag.Confirm to the button that may only be used when every answer is
+        valid, then call Update-RestoreInputPanelHC.
+    #>
+    param(
+        [Parameter(Mandatory)][object[]]$Questions,
+        [string]$Introduction = (
+            'Answer every question to start the restore. Nothing is ' +
+            'changed before you click Continue.'
+        ),
+        [System.Collections.IDictionary]$Values,
+        [Drawing.Font]$Font = (New-Object Drawing.Font 'Segoe UI', 10)
+    )
+
+    $percent = [Windows.Forms.SizeType]::Percent
+    $autoSize = [Windows.Forms.SizeType]::AutoSize
+    $smallFont = New-Object Drawing.Font $Font.FontFamily, 9
+    $headerFont = New-Object Drawing.Font (
+        $Font.FontFamily, 11, [Drawing.FontStyle]::Bold
+    )
+
+    # Rows: introduction, questions, how many answers are still needed
+    $panel = New-Object Windows.Forms.TableLayoutPanel
+    $panel.Name = 'RestoreInputPanel'
+    $panel.Dock = 'Fill'
+    $panel.ColumnCount = 1
+    $null = $panel.ColumnStyles.Add(
         (New-Object Windows.Forms.ColumnStyle $percent, 100)
     )
-    $layout.RowCount = 3
-    $null = $layout.RowStyles.Add(
+    $panel.RowCount = 3
+    $null = $panel.RowStyles.Add(
         (New-Object Windows.Forms.RowStyle $autoSize)
     )
-    $null = $layout.RowStyles.Add(
+    $null = $panel.RowStyles.Add(
         (New-Object Windows.Forms.RowStyle $percent, 100)
     )
-    $null = $layout.RowStyles.Add(
-        (New-Object Windows.Forms.RowStyle $absolute, 48)
+    $null = $panel.RowStyles.Add(
+        (New-Object Windows.Forms.RowStyle $autoSize)
     )
-    $dialog.Controls.Add($layout)
+    $panel.Tag = @{
+        Inputs  = New-Object 'System.Collections.Generic.List[object]'
+        Labels  = New-Object 'System.Collections.Generic.List[object]'
+        Confirm = $null
+    }
 
     $intro = New-Object Windows.Forms.Label
     $intro.Name = 'InputIntro'
-    $intro.Text = (
-        'Answer every question to start the restore. Nothing is changed ' +
-        'before you click Continue.'
-    )
+    $intro.Text = $Introduction
     $intro.AutoSize = $true
     $intro.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 8
-    $dialog.Tag.Labels.Add($intro)
-    $layout.Controls.Add($intro, 0, 0)
+    $panel.Tag.Labels.Add($intro)
+    $panel.Controls.Add($intro, 0, 0)
 
     $scroll = New-Object Windows.Forms.Panel
     $scroll.Name = 'InputQuestions'
     $scroll.Dock = 'Fill'
     $scroll.AutoScroll = $true
-    $layout.Controls.Add($scroll, 0, 1)
+    $panel.Controls.Add($scroll, 0, 1)
 
     $list = New-Object Windows.Forms.TableLayoutPanel
     $list.Dock = 'Top'
@@ -784,6 +829,12 @@ function New-RestoreInputFormHC {
     )
     $list.GrowStyle = 'AddRows'
     $scroll.Controls.Add($list)
+
+    $summary = New-Object Windows.Forms.Label
+    $summary.Name = 'InputSummary'
+    $summary.AutoSize = $true
+    $summary.Margin = New-Object Windows.Forms.Padding 0, 8, 0, 0
+    $panel.Controls.Add($summary, 0, 2)
 
     $section = $null
 
@@ -814,7 +865,7 @@ function New-RestoreInputFormHC {
         $description.UseMnemonic = $false
         $description.AutoSize = $true
         $description.Margin = New-Object Windows.Forms.Padding 0, 6, 0, 0
-        $dialog.Tag.Labels.Add($description)
+        $panel.Tag.Labels.Add($description)
         $list.Controls.Add($description)
 
         $locationText = $question.Path
@@ -833,59 +884,131 @@ function New-RestoreInputFormHC {
         $location.ForeColor = [Drawing.Color]::DimGray
         $location.AutoSize = $true
         $location.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 2
-        $dialog.Tag.Labels.Add($location)
+        $panel.Tag.Labels.Add($location)
         $list.Controls.Add($location)
+
+        $earlier = $null
+        if ($null -ne $Values) {
+            $earlier = $Values[$question.Placeholder]
+        }
 
         if ($question.Rule.Values) {
             $control = New-Object Windows.Forms.ComboBox
             $control.DropDownStyle = 'DropDownList'
             $control.Items.AddRange([object[]]$question.Rule.Values)
+            if ($earlier -and $control.Items.Contains($earlier)) {
+                $control.SelectedItem = $earlier
+            }
             $control.Add_SelectedIndexChanged({
                 $this.Tag.Touched = $true
-                Update-RestoreInputFormHC -Form $this.FindForm()
+                $inputPanel = Get-RestoreInputPanelHC -Control $this
+                Update-RestoreInputPanelHC -Panel $inputPanel
             })
         }
         else {
             $control = New-Object Windows.Forms.TextBox
             $control.UseSystemPasswordChar = $question.Kind -eq 'password'
+            if ($earlier) {
+                $control.Text = $earlier
+            }
             $control.Add_TextChanged({
-                Update-RestoreInputFormHC -Form $this.FindForm()
+                $inputPanel = Get-RestoreInputPanelHC -Control $this
+                Update-RestoreInputPanelHC -Panel $inputPanel
             })
         }
 
-        $control.Name = "Answer$($dialog.Tag.Inputs.Count)"
+        $control.Name = "Answer$($panel.Tag.Inputs.Count)"
         $control.AccessibleName = $question.Description
         $control.Dock = 'Fill'
         $control.Margin = New-Object Windows.Forms.Padding 0
         $control.Add_Leave({
             $this.Tag.Touched = $true
-            Update-RestoreInputFormHC -Form $this.FindForm()
+            $inputPanel = Get-RestoreInputPanelHC -Control $this
+            Update-RestoreInputPanelHC -Panel $inputPanel
         })
 
         $message = New-Object Windows.Forms.Label
-        $message.Name = "Problem$($dialog.Tag.Inputs.Count)"
+        $message.Name = "Problem$($panel.Tag.Inputs.Count)"
         $message.Font = $smallFont
         $message.AutoSize = $true
         $message.Margin = New-Object Windows.Forms.Padding 0, 2, 0, 0
-        $dialog.Tag.Labels.Add($message)
+        $panel.Tag.Labels.Add($message)
 
         $control.Tag = @{
             Question = $question
             Message  = $message
-            Touched  = $false
+            Touched  = [bool]$earlier
         }
-        $dialog.Tag.Inputs.Add($control)
+        $panel.Tag.Inputs.Add($control)
         $list.Controls.Add($control)
         $list.Controls.Add($message)
     }
 
-    # Long texts wrap at the width of the form instead of scrolling sideways
+    # Long texts wrap at the width of the panel instead of scrolling sideways
     $scroll.Add_Resize({
         $width = [Math]::Max(120, $this.ClientSize.Width - 24)
-        foreach ($label in $this.FindForm().Tag.Labels) {
+        foreach ($label in $this.Parent.Tag.Labels) {
             $label.MaximumSize = New-Object Drawing.Size $width, 0
         }
     })
+
+    Update-RestoreInputPanelHC -Panel $panel
+
+    return , $panel
+}
+
+function New-RestoreInputFormHC {
+    <#
+    .SYNOPSIS
+        One form with every question, under a header for each section.
+    .DESCRIPTION
+        Asks the questions that the wizard did not answer, for example in a
+        restore from the command line. Continue is enabled once every
+        answer is valid.
+    #>
+    param(
+        [Parameter(Mandatory)][object[]]$Questions
+    )
+
+    $dialog = New-Object Windows.Forms.Form
+    $dialog.Text = 'Restore - input required'
+    $dialog.ClientSize = New-Object Drawing.Size 640, 560
+    $dialog.MinimumSize = New-Object Drawing.Size 520, 360
+    $dialog.Font = New-Object Drawing.Font 'Segoe UI', 10
+    $dialog.StartPosition = 'CenterScreen'
+    $dialog.TopMost = $true
+
+    # Rows: questions, buttons
+    $layout = New-Object Windows.Forms.TableLayoutPanel
+    $layout.Dock = 'Fill'
+    $layout.Padding = New-Object Windows.Forms.Padding 16
+    $layout.ColumnCount = 1
+    $null = $layout.ColumnStyles.Add(
+        (New-Object Windows.Forms.ColumnStyle (
+            [Windows.Forms.SizeType]::Percent
+        ), 100)
+    )
+    $layout.RowCount = 2
+    $null = $layout.RowStyles.Add(
+        (New-Object Windows.Forms.RowStyle (
+            [Windows.Forms.SizeType]::Percent
+        ), 100)
+    )
+    $null = $layout.RowStyles.Add(
+        (New-Object Windows.Forms.RowStyle (
+            [Windows.Forms.SizeType]::Absolute
+        ), 48)
+    )
+    $dialog.Controls.Add($layout)
+
+    $panel = New-RestoreInputPanelHC -Questions $Questions -Font $dialog.Font
+    $layout.Controls.Add($panel, 0, 0)
+
+    $dialog.Tag = @{
+        Panel  = $panel
+        Inputs = $panel.Tag.Inputs
+        Values = $null
+    }
 
     $buttons = New-Object Windows.Forms.FlowLayoutPanel
     $buttons.Dock = 'Fill'
@@ -895,24 +1018,15 @@ function New-RestoreInputFormHC {
     $confirm.Name = 'ConfirmInput'
     $confirm.Text = 'Continue'
     $confirm.Size = New-Object Drawing.Size 110, 34
-    $confirm.Enabled = $false
     $confirm.Add_Click({
         $owner = $this.FindForm()
-        Update-RestoreInputFormHC -Form $owner
+        $inputPanel = $owner.Tag.Panel
+        Update-RestoreInputPanelHC -Panel $inputPanel
         if (-not $this.Enabled) {
             return
         }
 
-        $dictionaryType = (
-            'System.Collections.Generic.Dictionary[string,string]'
-        )
-        $values = New-Object $dictionaryType ([StringComparer]::Ordinal)
-        foreach ($control in $owner.Tag.Inputs) {
-            $values[$control.Tag.Question.Placeholder] = (
-                Get-RestoreInputControlValueHC -Control $control
-            )
-        }
-        $owner.Tag.Values = $values
+        $owner.Tag.Values = Get-RestoreInputPanelValuesHC -Panel $inputPanel
         $owner.DialogResult = [Windows.Forms.DialogResult]::OK
     })
 
@@ -921,20 +1035,16 @@ function New-RestoreInputFormHC {
     $cancel.Size = New-Object Drawing.Size 110, 34
     $cancel.DialogResult = 'Cancel'
 
-    $summary = New-Object Windows.Forms.Label
-    $summary.Name = 'InputSummary'
-    $summary.AutoSize = $true
-    $summary.Margin = New-Object Windows.Forms.Padding 0, 10, 12, 0
-
-    $buttons.Controls.AddRange(@($confirm, $cancel, $summary))
-    $layout.Controls.Add($buttons, 0, 2)
+    $buttons.Controls.AddRange(@($confirm, $cancel))
+    $layout.Controls.Add($buttons, 0, 1)
     $dialog.AcceptButton = $confirm
     $dialog.CancelButton = $cancel
 
-    Update-RestoreInputFormHC -Form $dialog
+    $panel.Tag.Confirm = $confirm
+    Update-RestoreInputPanelHC -Panel $panel
 
-    if ($dialog.Tag.Inputs.Count) {
-        $dialog.ActiveControl = $dialog.Tag.Inputs[0]
+    if ($panel.Tag.Inputs.Count) {
+        $dialog.ActiveControl = $panel.Tag.Inputs[0]
     }
 
     return , $dialog
@@ -958,13 +1068,183 @@ function Read-RestoreInputHC {
         }
     }
     finally {
-        foreach ($control in $dialog.Tag.Inputs) {
-            if ($control -is [Windows.Forms.TextBox]) {
-                $control.Clear()
-            }
-        }
+        Clear-RestoreInputPanelHC -Panel $dialog.Tag.Panel
         $dialog.Tag.Values = $null
         $dialog.Dispose()
+    }
+}
+
+function ConvertTo-RestoreAnswerBytesHC {
+    # Answers as UTF-8 JSON; a list of pairs, because placeholders are
+    # case-sensitive and the keys of a JSON object are not in PowerShell
+    param(
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Answers
+    )
+
+    $pairs = @(
+        foreach ($key in $Answers.Keys) {
+            [pscustomobject]@{
+                Key   = [string]$key
+                Value = [string]$Answers[$key]
+            }
+        }
+    )
+    $json = ConvertTo-Json -InputObject $pairs -Compress
+
+    [Text.Encoding]::UTF8.GetBytes($json)
+}
+
+function ConvertFrom-RestoreAnswerBytesHC {
+    # The answers of ConvertTo-RestoreAnswerBytesHC, by placeholder
+    param(
+        [Parameter(Mandatory)][byte[]]$Bytes
+    )
+
+    $dictionaryType = 'System.Collections.Generic.Dictionary[string,string]'
+    $answers = New-Object $dictionaryType ([StringComparer]::Ordinal)
+    $json = [Text.Encoding]::UTF8.GetString($Bytes)
+    # Windows PowerShell returns the array as one object; foreach unrolls it
+    $pairs = ConvertFrom-Json -InputObject $json
+
+    foreach ($pair in $pairs) {
+        $answers[[string]$pair.Key] = [string]$pair.Value
+    }
+
+    return , $answers
+}
+
+function Start-RestoreAnswerServerHC {
+    <#
+    .SYNOPSIS
+        Serve answers once over a named pipe, from memory, and return the
+        pipe name and the PowerShell instance that serves it.
+    .DESCRIPTION
+        The wizard hands the answers of its questions page to the restore
+        process this way, without writing them to disk or putting them in
+        the command line. The pipe has a random name, admits only the
+        current account and the Administrators group, accepts one
+        connection, and closes after the answers are sent or after
+        TimeoutSeconds. Stop the returned instance to close it sooner.
+    #>
+    param(
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Answers,
+        [int]$TimeoutSeconds = 600
+    )
+
+    $pipeName = 'ComputerSnapshot-' + [guid]::NewGuid().ToString('N')
+    $bytes = ConvertTo-RestoreAnswerBytesHC -Answers $Answers
+
+    $serve = {
+        param(
+            [string]$PipeName,
+            [byte[]]$Bytes,
+            [int]$TimeoutSeconds
+        )
+
+        $pipes = 'System.IO.Pipes'
+        if ($PSVersionTable.PSVersion.Major -ge 7) {
+            Add-Type -AssemblyName System.IO.Pipes.AccessControl
+        }
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $administrators = New-Object Security.Principal.SecurityIdentifier (
+            'S-1-5-32-544'
+        )
+        $security = New-Object "$pipes.PipeSecurity"
+        $security.AddAccessRule(
+            (New-Object "$pipes.PipeAccessRule" (
+                $identity.User, 'FullControl', 'Allow'
+            ))
+        )
+        $security.AddAccessRule(
+            (New-Object "$pipes.PipeAccessRule" (
+                $administrators, 'ReadWrite', 'Allow'
+            ))
+        )
+        $identity.Dispose()
+
+        $pipeArguments = @(
+            $PipeName, [IO.Pipes.PipeDirection]::Out, 1,
+            [IO.Pipes.PipeTransmissionMode]::Byte,
+            [IO.Pipes.PipeOptions]::Asynchronous, 0, 0, $security
+        )
+        # PowerShell 7 creates a pipe with an access list through a factory
+        $server = if ("$pipes.NamedPipeServerStreamAcl" -as [type]) {
+            [IO.Pipes.NamedPipeServerStreamAcl]::Create.Invoke(
+                $pipeArguments + @([IO.HandleInheritability]::None, 0)
+            )
+        }
+        else {
+            New-Object "$pipes.NamedPipeServerStream" $pipeArguments
+        }
+
+        try {
+            $connection = $server.BeginWaitForConnection($null, $null)
+            $timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
+
+            if (-not $connection.AsyncWaitHandle.WaitOne($timeout)) {
+                return
+            }
+
+            $server.EndWaitForConnection($connection)
+            $server.Write($Bytes, 0, $Bytes.Length)
+            $server.Flush()
+            $server.WaitForPipeDrain()
+        }
+        finally {
+            [Array]::Clear($Bytes, 0, $Bytes.Length)
+            $server.Dispose()
+        }
+    }
+
+    $powerShell = [PowerShell]::Create()
+    $null = $powerShell.AddScript($serve.ToString())
+    $null = $powerShell.AddParameters(
+        @{
+            PipeName       = $pipeName
+            Bytes          = $bytes
+            TimeoutSeconds = $TimeoutSeconds
+        }
+    )
+    $null = $powerShell.BeginInvoke()
+
+    [pscustomobject]@{
+        PipeName   = $pipeName
+        PowerShell = $powerShell
+    }
+}
+
+function Receive-RestoreAnswersHC {
+    # The answers that Start-RestoreAnswerServerHC serves on the pipe
+    param(
+        [Parameter(Mandatory)][string]$PipeName,
+        [int]$TimeoutSeconds = 30
+    )
+
+    $client = New-Object IO.Pipes.NamedPipeClientStream (
+        '.', $PipeName, [IO.Pipes.PipeDirection]::In
+    )
+
+    try {
+        $client.Connect($TimeoutSeconds * 1000)
+
+        $buffer = New-Object IO.MemoryStream
+        try {
+            $client.CopyTo($buffer)
+            $bytes = $buffer.ToArray()
+        }
+        finally {
+            $buffer.Dispose()
+        }
+
+        try {
+            ConvertFrom-RestoreAnswerBytesHC -Bytes $bytes
+        }
+        finally {
+            [Array]::Clear($bytes, 0, $bytes.Length)
+        }
+    }
+    finally {
+        $client.Dispose()
     }
 }
 

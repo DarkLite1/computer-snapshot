@@ -331,6 +331,33 @@ Describe 'Configuration launcher' {
             $command.Contains(' -AnswerFile ')
         }
     }
+    It ('passes the answer pipe of the wizard to the main script and ' +
+        'through elevation') {
+        $testParams = @{
+            ConfigurationFile = $testConfigurationFile
+            StartScript       = $testStartScript
+            AnswerPipe        = 'ComputerSnapshot-0123'
+            SkipConfirmation  = $true
+        }
+        . $testScript @testParams
+
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
+            $Arguments.AnswerPipe -eq 'ComputerSnapshot-0123'
+        }
+
+        $document.Settings.RunElevated = $true
+        $document | ConvertTo-Json -Depth 20 |
+            Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+
+        . $testScript @testParams
+
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString(
+                [Convert]::FromBase64String($ArgumentList[-1])
+            )
+            $command.Contains(" -AnswerPipe 'ComputerSnapshot-0123'")
+        }
+    }
     It 'never displays a picker or UAC prompt in unattended mode' {
         $testParams = @{
             StartScript = $testStartScript

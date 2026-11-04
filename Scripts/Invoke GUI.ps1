@@ -243,6 +243,162 @@ function Show-WizardQuestionHC {
     )
 }
 
+function Show-WizardErrorHC {
+    param($Owner, [string]$Text, [string]$Caption)
+
+    $null = [Windows.Forms.MessageBox]::Show(
+        $Owner, $Text, $Caption, 'OK', 'Error'
+    )
+}
+
+function Get-WizardRestoreQuestionsHC {
+    <#
+    .SYNOPSIS
+        The questions of the checked sections that the answer file does not
+        answer.
+    .DESCRIPTION
+        Throws the problems of the configuration first, so they are fixed
+        before anybody types an answer.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ConfigurationFile,
+        [Parameter(Mandatory)][string]$RootFolder,
+        [Parameter(Mandatory)][string[]]$Items,
+        [string]$AnswerFile
+    )
+
+    if (-not (Get-Command Read-ConfigurationHC -ErrorAction Ignore)) {
+        Import-Module "$PSScriptRoot\Common\Configuration.psm1"
+    }
+
+    $readParams = @{
+        Path       = $ConfigurationFile
+        RootFolder = $RootFolder
+        Items      = $Items
+    }
+    $configuration = Read-ConfigurationHC @readParams
+    $problems = @($configuration.Problems)
+
+    if (-not $problems.Count) {
+        $problems = @(
+            Test-ConfigurationBeforeInputHC $configuration $RootFolder
+        )
+    }
+
+    if ($problems.Count) {
+        throw (
+            'Fix these problems in the configuration first:' +
+            [Environment]::NewLine + ($problems -join [Environment]::NewLine)
+        )
+    }
+
+    $answers = $null
+
+    if (-not [string]::IsNullOrWhiteSpace($AnswerFile)) {
+        $answerPath = Resolve-RootPathHC $AnswerFile $RootFolder
+        $answers = Read-RestoreAnswerFileHC -Path $answerPath
+    }
+
+    $fileParams = @{
+        Items      = $configuration.Items
+        RootFolder = $RootFolder
+    }
+    $fields = @(Get-RestoreInputFieldsHC -Data $configuration.Items) +
+        @(Get-FileInputFieldsHC @fileParams)
+
+    Get-RestoreInputQuestionHC -Fields $fields -Answers $answers
+}
+
+function Show-RestoreSelectionPageHC {
+    <#
+    .SYNOPSIS
+        Show the section checklist or the questions page of the restore
+        window, with the buttons that belong to it.
+    #>
+    param(
+        [Parameter(Mandatory)]$Form,
+        [switch]$Questions
+    )
+
+    $find = { param($name) $Form.Controls.Find($name, $true)[0] }
+
+    (& $find 'SelectionPage').Visible = -not $Questions
+    (& $find 'QuestionsPage').Visible = [bool]$Questions
+
+    foreach ($name in @('RestoreSelected', 'ClearAll', 'SelectAll')) {
+        (& $find $name).Visible = -not $Questions
+    }
+    foreach ($name in @('RestoreWithAnswers', 'BackToSelection')) {
+        (& $find $name).Visible = [bool]$Questions
+    }
+
+    if ($Questions) {
+        $Form.AcceptButton = & $find 'RestoreWithAnswers'
+        $inputs = (& $find 'QuestionsPage').Tag.Panel.Tag.Inputs
+        if ($inputs.Count) {
+            $Form.ActiveControl = $inputs[0]
+        }
+    }
+    else {
+        $Form.AcceptButton = $null
+        $Form.ActiveControl = & $find 'SnapshotItems'
+    }
+}
+
+function Show-RestoreQuestionsHC {
+    <#
+    .SYNOPSIS
+        Fill the questions page of the restore window and show it. Answers
+        typed earlier are kept for the questions that are still asked.
+    #>
+    param(
+        [Parameter(Mandatory)]$Form,
+        [Parameter(Mandatory)][object[]]$Questions
+    )
+
+    $page = $Form.Controls.Find('QuestionsPage', $true)[0]
+    $state = $page.Tag
+    $earlier = $null
+
+    if ($null -ne $state.Panel) {
+        $earlier = Get-RestoreInputPanelValuesHC -Panel $state.Panel
+        Clear-RestoreInputPanelHC -Panel $state.Panel
+        $page.Controls.Remove($state.Panel)
+        $state.Panel.Dispose()
+    }
+
+    $panelParams = @{
+        Questions    = $Questions
+        Values       = $earlier
+        Font         = $Form.Font
+        Introduction = (
+            'Answer the questions of the checked sections. Nothing is ' +
+            'changed before you click Restore. Click Back to change the ' +
+            'selection; your answers are kept.'
+        )
+    }
+    $panel = New-RestoreInputPanelHC @panelParams
+    $panel.Tag.Confirm = $Form.Controls.Find('RestoreWithAnswers', $true)[0]
+    $page.Controls.Add($panel)
+    $state.Panel = $panel
+    Update-RestoreInputPanelHC -Panel $panel
+
+    if ($null -ne $earlier) {
+        $earlier.Clear()
+    }
+
+    Show-RestoreSelectionPageHC -Form $Form -Questions
+}
+
+function Get-RestoreSelectionAnswersHC {
+    # The answers of the questions page, or nothing when none were asked
+    param(
+        [Parameter(Mandatory)]$Form
+    )
+
+    $Form.Controls.Find('QuestionsPage', $true)[0].Tag.Answers
+}
+
 function Confirm-WizardTaskFolderHC {
     param([string[]]$Folders, $Owner)
 
@@ -723,6 +879,8 @@ function New-RestoreSelectionFormHC {
     $dialog.Font = New-Object Drawing.Font 'Segoe UI', 10
     $dialog.ShowInTaskbar = $false
 
+    # Rows: the page, buttons. The pages are the section checklist and the
+    # questions of the checked sections
     $layout = New-Object Windows.Forms.TableLayoutPanel
     $layout.Dock = 'Fill'
     $layout.Padding = New-Object Windows.Forms.Padding 12
@@ -730,8 +888,42 @@ function New-RestoreSelectionFormHC {
     $null = $layout.ColumnStyles.Add(
         (New-Object Windows.Forms.ColumnStyle $sizeType::Percent, 100)
     )
-    $layout.RowCount = 6
-    $rows = $layout.RowStyles
+    $layout.RowCount = 2
+    $null = $layout.RowStyles.Add(
+        (New-Object Windows.Forms.RowStyle $sizeType::Percent, 100)
+    )
+    $null = $layout.RowStyles.Add(
+        (New-Object Windows.Forms.RowStyle $sizeType::Absolute, 48)
+    )
+    $dialog.Controls.Add($layout)
+
+    $pages = New-Object Windows.Forms.Panel
+    $pages.Dock = 'Fill'
+    $pages.Margin = New-Object Windows.Forms.Padding 0
+    $layout.Controls.Add($pages, 0, 0)
+
+    $questionsPage = New-Object Windows.Forms.Panel
+    $questionsPage.Name = 'QuestionsPage'
+    $questionsPage.Dock = 'Fill'
+    $questionsPage.Visible = $false
+    $questionsPage.Tag = @{
+        ConfigurationFile = $ConfigurationFile
+        RootFolder        = $RootFolder
+        Panel             = $null
+        Answers           = $null
+    }
+    $pages.Controls.Add($questionsPage)
+
+    # Rows: description, guidance, sections, answer file, options
+    $selectionPage = New-Object Windows.Forms.TableLayoutPanel
+    $selectionPage.Name = 'SelectionPage'
+    $selectionPage.Dock = 'Fill'
+    $selectionPage.ColumnCount = 1
+    $null = $selectionPage.ColumnStyles.Add(
+        (New-Object Windows.Forms.ColumnStyle $sizeType::Percent, 100)
+    )
+    $selectionPage.RowCount = 5
+    $rows = $selectionPage.RowStyles
     $null = $rows.Add((New-Object Windows.Forms.RowStyle $sizeType::AutoSize))
     $null = $rows.Add((New-Object Windows.Forms.RowStyle $sizeType::AutoSize))
     $null = $rows.Add(
@@ -739,10 +931,7 @@ function New-RestoreSelectionFormHC {
     )
     $null = $rows.Add((New-Object Windows.Forms.RowStyle $sizeType::AutoSize))
     $null = $rows.Add((New-Object Windows.Forms.RowStyle $sizeType::AutoSize))
-    $null = $rows.Add(
-        (New-Object Windows.Forms.RowStyle $sizeType::Absolute, 48)
-    )
-    $dialog.Controls.Add($layout)
+    $pages.Controls.Add($selectionPage)
 
     $descriptionValue = New-Object Windows.Forms.Label
     $descriptionValue.Name = 'ConfigurationDescription'
@@ -756,7 +945,7 @@ function New-RestoreSelectionFormHC {
     $descriptionValue.AutoSize = $true
     $descriptionValue.Dock = 'Fill'
     $descriptionValue.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
-    $layout.Controls.Add($descriptionValue, 0, 0)
+    $selectionPage.Controls.Add($descriptionValue, 0, 0)
 
     $description = New-Object Windows.Forms.Label
     $description.Name = 'RestoreGuidance'
@@ -768,17 +957,17 @@ function New-RestoreSelectionFormHC {
     $description.AutoSize = $true
     $description.Dock = 'Fill'
     $description.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
-    $layout.Controls.Add($description, 0, 1)
+    $selectionPage.Controls.Add($description, 0, 1)
 
     $list = New-SnapshotItemListHC -Entries $Entries
-    $layout.Controls.Add($list, 0, 2)
+    $selectionPage.Controls.Add($list, 0, 2)
 
     $answerParams = @{
         ConfigurationFile = $ConfigurationFile
         RootFolder        = $RootFolder
     }
     $answerPanel = New-RestoreAnswersPanelHC @answerParams
-    $layout.Controls.Add($answerPanel, 0, 3)
+    $selectionPage.Controls.Add($answerPanel, 0, 3)
 
     #region Restart and report options
     $options = New-Object Windows.Forms.FlowLayoutPanel
@@ -823,7 +1012,7 @@ function New-RestoreSelectionFormHC {
     $report.Checked = $settings.OpenReportInBrowser
 
     $options.Controls.AddRange(@($reboot, $delayLabel, $delay, $report))
-    $layout.Controls.Add($options, 0, 4)
+    $selectionPage.Controls.Add($options, 0, 4)
     #endregion
 
     #region Buttons
@@ -843,9 +1032,73 @@ function New-RestoreSelectionFormHC {
             $owner.Controls.Find('SnapshotItems', $true)[0].CheckedItems |
             ForEach-Object { [string]$_.Tag }
         )
-        if (-not $checked.Count) { return }
+        if (-not $checked.Count) {
+            return
+        }
+
+        $state = $owner.Controls.Find('QuestionsPage', $true)[0].Tag
+        $unattended = $owner.Controls.Find('Unattended', $true)[0].Checked
+        $questions = @()
+
+        # An unattended restore takes every answer from the answer file
+        if ($state.ConfigurationFile -and -not $unattended) {
+            try {
+                $questionParams = @{
+                    ConfigurationFile = $state.ConfigurationFile
+                    RootFolder        = $state.RootFolder
+                    Items             = $checked
+                    AnswerFile        =
+                        $owner.Controls.Find('AnswerFile', $true)[0].Text
+                }
+                $questions = @(Get-WizardRestoreQuestionsHC @questionParams)
+            }
+            catch {
+                $errorParams = @{
+                    Owner   = $owner
+                    Text    = [string]$_
+                    Caption = 'Restore error'
+                }
+                Show-WizardErrorHC @errorParams
+                return
+            }
+        }
+
         $owner.Tag = $checked
+        $state.Answers = $null
+
+        if ($questions.Count) {
+            Show-RestoreQuestionsHC -Form $owner -Questions $questions
+            return
+        }
+
         $owner.DialogResult = [Windows.Forms.DialogResult]::OK
+    })
+
+    $restoreAnswers = New-Object Windows.Forms.Button
+    $restoreAnswers.Name = 'RestoreWithAnswers'
+    $restoreAnswers.Text = 'Restore'
+    $restoreAnswers.Size = New-Object Drawing.Size 150, 34
+    $restoreAnswers.Visible = $false
+    Set-WizardPrimaryButtonHC $restoreAnswers
+    $restoreAnswers.Add_Click({
+        $owner = $this.FindForm()
+        $state = $owner.Controls.Find('QuestionsPage', $true)[0].Tag
+        Update-RestoreInputPanelHC -Panel $state.Panel
+        if (-not $this.Enabled) {
+            return
+        }
+
+        $state.Answers = Get-RestoreInputPanelValuesHC -Panel $state.Panel
+        $owner.DialogResult = [Windows.Forms.DialogResult]::OK
+    })
+
+    $back = New-Object Windows.Forms.Button
+    $back.Name = 'BackToSelection'
+    $back.Text = '< Back'
+    $back.Size = New-Object Drawing.Size 100, 34
+    $back.Visible = $false
+    $back.Add_Click({
+        Show-RestoreSelectionPageHC -Form $this.FindForm()
     })
 
     $cancel = New-Object Windows.Forms.Button
@@ -855,6 +1108,7 @@ function New-RestoreSelectionFormHC {
     $dialog.CancelButton = $cancel
 
     $clear = New-Object Windows.Forms.Button
+    $clear.Name = 'ClearAll'
     $clear.Text = 'Clear all'
     $clear.Size = New-Object Drawing.Size 100, 34
     $clear.Add_Click({
@@ -863,6 +1117,7 @@ function New-RestoreSelectionFormHC {
     })
 
     $all = New-Object Windows.Forms.Button
+    $all.Name = 'SelectAll'
     $all.Text = 'Select all'
     $all.Size = New-Object Drawing.Size 100, 34
     $all.Add_Click({
@@ -874,9 +1129,19 @@ function New-RestoreSelectionFormHC {
         }
     })
 
-    $buttons.Controls.AddRange(@($confirm, $cancel, $clear, $all))
-    $layout.Controls.Add($buttons, 0, 5)
+    $buttons.Controls.AddRange(
+        @($confirm, $restoreAnswers, $cancel, $back, $clear, $all)
+    )
+    $layout.Controls.Add($buttons, 0, 1)
     #endregion
+
+    # Forget typed answers, passwords included, when the window closes
+    $dialog.Add_FormClosed({
+        $state = $this.Controls.Find('QuestionsPage', $true)[0].Tag
+        if ($null -ne $state.Panel) {
+            Clear-RestoreInputPanelHC -Panel $state.Panel
+        }
+    })
 
     $list.Add_ItemChecked({
         $owner = $this.FindForm()
@@ -970,6 +1235,9 @@ function Start-ConfigurationJobHC {
         [ValidateRange(0, 600)]
         [int]$RestartDelaySeconds = 60,
         [string]$AnswerFile,
+        # The named pipe on which the wizard serves the answers of its
+        # questions page
+        [string]$AnswerPipe,
         [switch]$Unattended,
         [switch]$RunElevated,
         [switch]$Force
@@ -977,8 +1245,11 @@ function Start-ConfigurationJobHC {
 
     if ($Action -eq 'CreateSnapshot') {
         #region Build the export command
-        if ($AnswerFile -or $Unattended) {
-            throw 'AnswerFile and Unattended are restore-only options.'
+        if ($AnswerFile -or $AnswerPipe -or $Unattended) {
+            throw (
+                'AnswerFile, AnswerPipe and Unattended are restore-only ' +
+                'options.'
+            )
         }
         if (
             [string]::IsNullOrWhiteSpace($Name) -or
@@ -1063,6 +1334,9 @@ function Start-ConfigurationJobHC {
             }
             $command += " -AnswerFile '" + $answerPath.Replace("'", "''") + "'"
         }
+        if (-not [string]::IsNullOrWhiteSpace($AnswerPipe)) {
+            $command += " -AnswerPipe '" + $AnswerPipe.Replace("'", "''") + "'"
+        }
         if ($Unattended) {
             $command += ' -Unattended'
             if (-not (Test-ElevatedHC)) {
@@ -1114,6 +1388,8 @@ $sizeType = [Windows.Forms.SizeType]
 
 $form = New-Object Windows.Forms.Form
 $form.Text = 'Computer Snapshot'
+# Answer servers of restores that were started from this window
+$answerServers = New-Object 'System.Collections.Generic.List[object]'
 $form.ClientSize = New-Object Drawing.Size 820, 580
 $form.MinimumSize = New-Object Drawing.Size 650, 480
 $form.StartPosition = 'CenterScreen'
@@ -1254,8 +1530,19 @@ $restore.Add_Click({
                 Unattended          =
                     $controls.Find('Unattended', $true)[0].Checked
             }
+            $answers = Get-RestoreSelectionAnswersHC -Form $selection
         }
         finally { $selection.Dispose() }
+
+        # The restore process reads the answers once from a named pipe;
+        # they are never written to disk or put in the command line
+        $server = $null
+        if ($null -ne $answers -and $answers.Count) {
+            $server = Start-RestoreAnswerServerHC -Answers $answers
+            $answers.Clear()
+            $answerServers.Add($server)
+            $restoreOptions.AnswerPipe = $server.PipeName
+        }
 
         $jobParams = @{
             Action            = 'RestoreSnapshot'
@@ -1263,7 +1550,15 @@ $restore.Add_Click({
             ConfigurationFile = $selected.Tag
             Items             = $selectedItems
         }
-        Start-ConfigurationJobHC @jobParams @restoreOptions
+        try {
+            Start-ConfigurationJobHC @jobParams @restoreOptions
+        }
+        catch {
+            if ($null -ne $server) {
+                $server.PowerShell.Stop()
+            }
+            throw
+        }
     }
     catch {
         $null = [Windows.Forms.MessageBox]::Show(
@@ -1390,6 +1685,15 @@ $export.Add_Click({
 $form.Add_Shown({ $refresh.PerformClick() })
 
 Write-Verbose 'Show the wizard window'
-try { $null = $form.ShowDialog() }
-finally { $form.Dispose() }
+try {
+    $null = $form.ShowDialog()
+}
+finally {
+    # A restore that has not read its answers yet asks for them itself
+    foreach ($server in $answerServers) {
+        $server.PowerShell.Stop()
+        $server.PowerShell.Dispose()
+    }
+    $form.Dispose()
+}
 #endregion

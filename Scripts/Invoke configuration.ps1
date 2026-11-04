@@ -24,6 +24,9 @@
 .PARAMETER AnswerFile
     JSON answers keyed by complete placeholders. Missing answers are prompted
     for unless Unattended is set. Relative paths use the USB root.
+.PARAMETER AnswerPipe
+    The named pipe on which the wizard serves the answers of its questions
+    page. When they cannot be received, the restore asks for them.
 .PARAMETER Unattended
     Skip confirmation, fail on missing answers, do not open the report
     browser, and fail without administrator rights instead of requesting
@@ -42,6 +45,7 @@ param(
     [int]$RestartDelaySeconds,
     [bool]$OpenReportInBrowser,
     [string]$AnswerFile,
+    [string]$AnswerPipe,
     [switch]$Unattended
 )
 Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
@@ -180,6 +184,9 @@ if (
     if ($PSBoundParameters.ContainsKey('AnswerFile')) {
         $command += " -AnswerFile '" + $AnswerFile.Replace("'", "''") + "'"
     }
+    if ($PSBoundParameters.ContainsKey('AnswerPipe')) {
+        $command += " -AnswerPipe '" + $AnswerPipe.Replace("'", "''") + "'"
+    }
     $encodedCommand = [Convert]::ToBase64String(
         [Text.Encoding]::Unicode.GetBytes($command)
     )
@@ -206,7 +213,7 @@ if ($PSBoundParameters.ContainsKey('AnswerFile')) {
 }
 $settings = @(
     'RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser',
-    'Unattended'
+    'AnswerPipe', 'Unattended'
 )
 foreach ($setting in $settings) {
     if ($PSBoundParameters.ContainsKey($setting)) {

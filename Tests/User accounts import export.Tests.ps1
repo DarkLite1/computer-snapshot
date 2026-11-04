@@ -475,6 +475,25 @@ Describe 'User accounts removal' {
                 [string]$SID -eq 'S-1-5-21-1-2-3-1001'
             }
         }
+        It 'reads the local accounts only once to check the administrators' {
+            $fakeAdministrators = @(
+                $fakeBobAdministrator
+                [pscustomobject]@{
+                    Name            = 'PC\Other'
+                    SID             = 'S-1-5-21-1-2-3-1002'
+                    ObjectClass     = 'User'
+                    PrincipalSource = 'Local'
+                }
+            )
+
+            $result = & $scriptPath @removeBobParams
+
+            $result.Errors.Count | Should -Be 0 -Because (
+                $result.Errors -join '; '
+            )
+            # One read for the known names, one for the removal
+            Should -Invoke Get-LocalUser -Times 2 -Exactly
+        }
         It 'refuses when the other local administrator is disabled' {
             $localUsers[1].Enabled = $false
             $fakeAdministrators = @(

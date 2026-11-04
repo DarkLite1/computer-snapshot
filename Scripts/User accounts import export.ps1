@@ -53,7 +53,8 @@ function Assert-NotLastAdministratorHC {
     # and Azure AD users and groups count as another administrator.
     param(
         [Parameter(Mandatory)][string]$Sid,
-        [Parameter(Mandatory)][string]$Name
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$LocalUsers
     )
     try {
         # The group name depends on the Windows language, its SID does not
@@ -72,11 +73,11 @@ function Assert-NotLastAdministratorHC {
     }
 
     $enabledLocalSids = @(
-        Get-LocalUser |
+        $LocalUsers |
         Where-Object { $_.Enabled } |
         ForEach-Object { [string]$_.SID }
     )
-    $localSids = @(Get-LocalUser | ForEach-Object { [string]$_.SID })
+    $localSids = @($LocalUsers | ForEach-Object { [string]$_.SID })
 
     $otherAdministrators = @(
         $members | Where-Object {
@@ -188,8 +189,11 @@ else {
 
             if ($isRemove) {
                 Write-Verbose "User '$($user.Name)': remove"
+                # Read the accounts again: earlier entries can have created
+                # or removed accounts
+                $currentUsers = @(Get-LocalUser)
                 $matchingUsers = @(
-                    Get-LocalUser | Where-Object { $_.Name -eq $user.Name }
+                    $currentUsers | Where-Object { $_.Name -eq $user.Name }
                 )
                 if (-not $matchingUsers.Count) {
                     $messages += (
@@ -218,7 +222,12 @@ else {
                 if ($sid -eq $currentSid) {
                     throw 'the account running the restore cannot be removed'
                 }
-                Assert-NotLastAdministratorHC -Sid $sid -Name $user.Name
+                $assertParams = @{
+                    Sid        = $sid
+                    Name       = $user.Name
+                    LocalUsers = $currentUsers
+                }
+                Assert-NotLastAdministratorHC @assertParams
                 Write-Verbose "Remove local user with SID '$sid'"
                 Remove-LocalUser -SID $sid -Confirm:$false -ErrorAction Stop
                 $knownUserNames = @(

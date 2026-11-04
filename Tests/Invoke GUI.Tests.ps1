@@ -5,88 +5,135 @@ BeforeAll {
     . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
 }
 
-Describe 'Restore input popup' {
+Describe 'Restore input form' {
     BeforeAll {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
     }
-    It ('displays the field description and masks password input without ' +
-        'modifying the supplied value') {
-        $field = [pscustomobject]@{
-            Kind        = 'password'
-            Description = 'Password for the local kiosk account'
-            Path        = 'Items.UserAccounts[0].Password'
-        }
-        $dialog = New-RestoreInputFormHC -Field $field
-        try {
-            $dialog.Show()
-            $dialog.Controls.Find('InputDescription', $true)[0].Text |
-                Should -Be $field.Description
-            $inputBox = $dialog.Controls.Find('InputValue', $true)[0]
-            $confirm = $dialog.Controls.Find('ConfirmInput', $true)[0]
-            $inputBox.UseSystemPasswordChar | Should -BeTrue
-            $confirm.Enabled | Should -BeFalse
-            $inputBox.Text = 'Test-only password!"\$'
-            $confirm.Enabled | Should -BeTrue
-            $confirm.PerformClick()
-            $dialog.Tag.Value | Should -BeExactly 'Test-only password!"\$'
-            $dialog.DialogResult |
-                Should -Be ([Windows.Forms.DialogResult]::OK)
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('rejects invalid IPv4 input and supports cancellation without an ' +
-        'answer') {
-        $field = [pscustomobject]@{
-            Kind        = 'ipv4'
-            Description = 'IPv4 address for Ethernet'
-            Path        = 'Items.NetworkCards[0].IPSettings.IPAddress'
-        }
-        $dialog = New-RestoreInputFormHC -Field $field
-        try {
-            $dialog.Show()
-            $inputBox = $dialog.Controls.Find('InputValue', $true)[0]
-            $confirm = $dialog.Controls.Find('ConfirmInput', $true)[0]
-            $inputBox.UseSystemPasswordChar | Should -BeFalse
-            $inputBox.Text = '999.1.1.1'
-            $confirm.Enabled | Should -BeFalse
-            $inputBox.Text = '192.0.2.10'
-            $confirm.Enabled | Should -BeTrue
-            $dialog.CancelButton.PerformClick()
-            $dialog.Tag.Value | Should -BeNullOrEmpty
-            $dialog.DialogResult |
-                Should -Be ([Windows.Forms.DialogResult]::Cancel)
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('accepts only a whole number for a number placeholder and ' +
-        'explains why') {
-        $field = [pscustomobject]@{
-            Kind        = 'number'
-            Description = 'Minutes the installer may run'
-            Path        = 'Items.Software.Install[0].TimeoutMinutes'
-        }
-        $dialog = New-RestoreInputFormHC -Field $field
-        try {
-            $dialog.Show()
-            $inputBox = $dialog.Controls.Find('InputValue', $true)[0]
-            $confirm = $dialog.Controls.Find('ConfirmInput', $true)[0]
-            $validation = $dialog.Controls.Find('InputValidation', $true)[0]
-            foreach ($value in @('1.5', '015', 'abc')) {
-                $inputBox.Text = $value
-                $confirm.Enabled | Should -BeFalse -Because "'$value'"
-                $validation.Text |
-                    Should -Be 'Enter a whole number, such as 15.'
+    BeforeEach {
+        $items = [ordered]@{
+            Software     = [ordered]@{
+                Install = @(
+                    [ordered]@{
+                        ExecutablePath = 'Setup.exe'
+                        TimeoutMinutes = '{{number:Minutes}}'
+                    }
+                )
             }
-            $inputBox.Text = '30'
-            $confirm.Enabled | Should -BeTrue
-            $validation.Text | Should -Be ''
-            $confirm.PerformClick()
-            $dialog.Tag.Value | Should -BeExactly '30'
+            RegistryKeys = [ordered]@{
+                RunAsCurrentUser = [ordered]@{
+                    RegistryKeys = @(
+                        [ordered]@{
+                            Path  = 'HKCU:\Software\Example'
+                            Name  = '{{input:Account}}'
+                            Type  = '{{input:Value type}}'
+                            Value = '1'
+                        }
+                    )
+                }
+            }
+            UserAccounts = @(
+                [ordered]@{
+                    Name     = '{{input:Account}}'
+                    Password = '{{password:Password}}'
+                }
+            )
         }
-        finally {
-            $dialog.Dispose()
+        $fields = @(Get-RestoreInputFieldsHC -Data $items)
+        $questions = @(Get-RestoreInputQuestionHC -Fields $fields)
+        $dialog = New-RestoreInputFormHC -Questions $questions
+        $dialog.Show()
+        $answer = @{}
+        foreach ($control in $dialog.Tag.Inputs) {
+            $answer[$control.Tag.Question.Placeholder] = $control
         }
+    }
+    AfterEach {
+        $dialog.Dispose()
+    }
+    It ('shows every question once, under the header of the section that ' +
+        'runs first') {
+        @($dialog.Controls.Find('SectionHeader', $true).Text) |
+            Should -Be @('User accounts', 'Registry keys', 'Software')
+        @($dialog.Tag.Inputs.Count) | Should -Be 4
+        @($dialog.Controls.Find('QuestionDescription', $true).Text) |
+            Should -Be @('Account', 'Password', 'Value type', 'Minutes')
+        $dialog.Controls.Find('QuestionLocation', $true)[0].Text |
+            Should -BeLike (
+                "Items.UserAccounts[[]0].Name*Also used by: Registry keys"
+            )
+    }
+    It 'masks a password and offers the fixed values of a setting as a list' {
+        $answer['{{password:Password}}'].UseSystemPasswordChar |
+            Should -BeTrue
+        $answer['{{input:Account}}'].UseSystemPasswordChar | Should -BeFalse
+
+        $list = $answer['{{input:Value type}}']
+        $list | Should -BeOfType [Windows.Forms.ComboBox]
+        $list.DropDownStyle | Should -Be 'DropDownList'
+        @($list.Items) -ccontains 'DWord' | Should -BeTrue
+        @($list.Items) -ccontains 'REG_DWORD' | Should -BeTrue
+        @($list.Items) -ccontains 'DWORD' | Should -BeFalse
+        @($list.Items).Count | Should -Be 12
+    }
+    It ('shows what an answer must look like, and why it is wrong once ' +
+        'the field was left') {
+        $minutes = $answer['{{number:Minutes}}']
+        $message = $minutes.Tag.Message
+
+        $message.Text | Should -Be 'Enter a whole number from 1 to 1440.'
+        $message.ForeColor | Should -Be ([Drawing.Color]::DimGray)
+
+        $minutes.Text = '0'
+        $minutes.Tag.Touched = $true
+        Update-RestoreInputFormHC -Form $dialog
+
+        $message.Text | Should -Be 'Enter a whole number from 1 to 1440.'
+        $message.ForeColor | Should -Be ([Drawing.Color]::Firebrick)
+
+        $minutes.Text = '30'
+
+        $message.Text | Should -Be ''
+    }
+    It ('enables Continue only when every answer is valid and returns the ' +
+        'answers by placeholder') {
+        $confirm = $dialog.Controls.Find('ConfirmInput', $true)[0]
+        $summary = $dialog.Controls.Find('InputSummary', $true)[0]
+
+        $confirm.Enabled | Should -BeFalse
+        $summary.Text | Should -Be '4 of 4 answer(s) still needed'
+
+        $answer['{{input:Account}}'].Text = 'kiosk'
+        $answer['{{password:Password}}'].Text = 'Test-only password!"\$'
+        $answer['{{input:Value type}}'].SelectedItem = 'DWord'
+        $answer['{{number:Minutes}}'].Text = '1441'
+
+        $confirm.Enabled | Should -BeFalse
+        $summary.Text | Should -Be '1 of 4 answer(s) still needed'
+
+        $answer['{{number:Minutes}}'].Text = '1440'
+
+        $confirm.Enabled | Should -BeTrue
+        $summary.Text | Should -Be 'All answers are valid'
+
+        $confirm.PerformClick()
+
+        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
+        $dialog.Tag.Values.Count | Should -Be 4
+        $dialog.Tag.Values['{{input:Account}}'] | Should -BeExactly 'kiosk'
+        $dialog.Tag.Values['{{password:Password}}'] |
+            Should -BeExactly 'Test-only password!"\$'
+        $dialog.Tag.Values['{{input:Value type}}'] | Should -BeExactly 'DWord'
+        $dialog.Tag.Values['{{number:Minutes}}'] | Should -BeExactly '1440'
+    }
+    It 'returns no answers when the form is cancelled' {
+        $answer['{{input:Account}}'].Text = 'kiosk'
+
+        $dialog.CancelButton.PerformClick()
+
+        $dialog.DialogResult |
+            Should -Be ([Windows.Forms.DialogResult]::Cancel)
+        $dialog.Tag.Values | Should -BeNullOrEmpty
     }
 }
 

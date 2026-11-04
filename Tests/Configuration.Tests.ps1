@@ -4,6 +4,7 @@ BeforeAll {
     Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
     . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
     . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+    . "$PSScriptRoot\Common\Restore input.ps1"
 }
 
 Describe 'Restore input placeholders' {
@@ -18,7 +19,7 @@ Describe 'Restore input placeholders' {
             '"Comment":"{{input:Ignored}}"},"Number":24,"Nothing":null}'
         ) | ConvertFrom-Json
         $script:requests = @()
-        $result = Resolve-RestoreInputHC -Items $items -ReadValue {
+        $readValues = New-FakeReadValuesHC {
             param($field)
             $script:requests += $field.Path
             switch ($field.Kind) {
@@ -27,6 +28,7 @@ Describe 'Restore input placeholders' {
                 'ipv4' { '192.0.2.10' }
             }
         }
+        $result = Resolve-RestoreInputHC -Items $items -ReadValues $readValues
 
         $requests.Count | Should -Be 3
         $items.UserAccounts[0].Name | Should -Be 'Example'
@@ -49,10 +51,11 @@ Describe 'Restore input placeholders' {
             )
         }
         {
-            Resolve-RestoreInputHC -Items $items -ReadValue {
+            $readValues = New-FakeReadValuesHC {
                 param($field)
                 if ($field.Kind -eq 'input') { 'Example' }
             }
+            Resolve-RestoreInputHC -Items $items -ReadValues $readValues
         } | Should -Throw '*cancelled*'
         $items.UserAccounts[0].Name | Should -Be '{{input:Name}}'
         $items.UserAccounts[0].Password | Should -Be '{{password:Password}}'
@@ -78,9 +81,10 @@ Describe 'Restore input placeholders' {
 
         $items = @{ NetworkCards = @(@{ Address = '{{ipv4:Address}}' }) }
         {
-            Resolve-RestoreInputHC -Items $items -ReadValue {
+            $readValues = New-FakeReadValuesHC {
                 'invalid-address'
             }
+            Resolve-RestoreInputHC -Items $items -ReadValues $readValues
         } | Should -Throw '*supplied input is empty or invalid*'
 
         $protectParams = @{
@@ -104,16 +108,18 @@ Describe 'Restore input placeholders' {
             '"IPSettings":{"IPAddress":"{{ipv4:Address}}",' +
             '"PrefixLength":"{{prefix:Prefix length}}"}}]}'
         ) | ConvertFrom-Json
-        $null = Resolve-RestoreInputHC -Items $items -ReadValue {
+        $readValues = New-FakeReadValuesHC {
             param($field)
             if ($field.Kind -eq 'prefix') { '24' } else { '10.20.67.2' }
         }
+        $null = Resolve-RestoreInputHC -Items $items -ReadValues $readValues
         $items.NetworkCards[0].IPSettings.PrefixLength | Should -BeOfType [int]
         $items.NetworkCards[0].IPSettings.PrefixLength | Should -Be 24
 
         {
             $badItems = @{ A = @{ P = '{{prefix:P}}' } }
-            Resolve-RestoreInputHC -Items $badItems -ReadValue { '40' }
+            $readValues = New-FakeReadValuesHC { '40' }
+            Resolve-RestoreInputHC -Items $badItems -ReadValues $readValues
         } | Should -Throw '*supplied input is empty or invalid*'
     }
     It 'accepts the whole number <Value>' -ForEach @(
@@ -151,10 +157,11 @@ Describe 'Restore input placeholders' {
             '{{input:Text}}'        = '15'
         }
 
-        $null = Resolve-RestoreInputHC -Items $items -ReadValue {
+        $readValues = New-FakeReadValuesHC {
             param($field)
             $fakeAnswers[$field.Placeholder]
         }
+        $null = Resolve-RestoreInputHC -Items $items -ReadValues $readValues
 
         $install = $items.Software.Install[0]
         $install.TimeoutMinutes | Should -BeOfType [int]
@@ -170,7 +177,8 @@ Describe 'Restore input placeholders' {
         $items = @{ A = @{ P = '{{number:P}}' } }
 
         {
-            Resolve-RestoreInputHC -Items $items -ReadValue { '1.5' }
+            $readValues = New-FakeReadValuesHC { '1.5' }
+            Resolve-RestoreInputHC -Items $items -ReadValues $readValues
         } | Should -Throw '*supplied input is empty or invalid*'
         $items.A.P | Should -Be '{{number:P}}'
     }
@@ -210,11 +218,11 @@ Describe 'Restore input placeholders' {
         $resolveParams = @{
             Items      = $items
             RootFolder = $TestDrive
-            ReadValue  = {
+            ReadValues = (New-FakeReadValuesHC {
                 param($field)
                 $script:asked += $field.Placeholder
                 if ($field.Kind -eq 'ipv4') { '10.20.60.47' } else { 'TRM_01' }
-            }
+            })
         }
         $result = Resolve-RestoreInputHC @resolveParams
 
@@ -256,6 +264,178 @@ Describe 'Restore input placeholders' {
             SecretValues = @($secret, '', $null)
         }
         Protect-RestoreInputTextHC @protectParams | Should -Be 'R&D <ok>'
+    }
+}
+
+Describe 'Restore input questions and their rules' {
+    BeforeAll {
+        $schema = Get-Content -Raw -LiteralPath (
+            "$PSScriptRoot\..\Scripts\config.schema.json"
+        ) | ConvertFrom-Json
+    }
+    It 'finds the range of <Path>' -ForEach @(
+        @{
+            Path    = 'Items.Software.Install[0].TimeoutMinutes'
+            Minimum = 1
+            Maximum = 1440
+        }
+        @{
+            Path    = 'Items.Software.Remove[2].TimeoutMinutes'
+            Minimum = 1
+            Maximum = 1440
+        }
+        @{
+            Path    = 'Items.NetworkCards[0].Change.IPSettings.PrefixLength'
+            Minimum = 1
+            Maximum = 32
+        }
+    ) {
+        $rule = Get-RestoreInputRuleHC -Path $Path -Schema $schema
+
+        $rule.Minimum | Should -Be $Minimum
+        $rule.Maximum | Should -Be $Maximum
+        $rule.Values | Should -BeNullOrEmpty
+    }
+    It 'finds the fixed values of a setting once in each spelling' {
+        $path = (
+            'Items.RegistryKeys.RunAsOtherUser[1].RegistryKeys[0].Type'
+        )
+
+        $rule = Get-RestoreInputRuleHC -Path $path -Schema $schema
+
+        $rule.Values | Should -Contain 'DWord'
+        $rule.Values -ccontains 'DWORD' | Should -BeFalse
+        $rule.Values.Count | Should -Be 12
+        $rule.Minimum | Should -BeNullOrEmpty
+    }
+    It 'gives no rule for <Path>' -ForEach @(
+        @{ Path = 'Items.UserAccounts[0].Name' }
+        @{ Path = 'Items.RegionalSettings.WinHomeLocationGeoId' }
+        @{ Path = 'Items.StartCustomScriptsAfter[0].SuccessExitCodes[1]' }
+        @{ Path = 'Items.StartCustomScriptsAfter[0].Arguments.Mode' }
+        @{ Path = 'Items.RegistryKeys.RunAsCurrentUser.RegistryKeys[0].Value' }
+        @{ Path = 'Items.Software.Unknown' }
+        @{ Path = "Items.CopyFilesFolders[0].From 'Files\a b.txt'" }
+    ) {
+        Get-RestoreInputRuleHC -Path $Path -Schema $schema |
+            Should -BeNullOrEmpty
+    }
+    It 'keeps only what is valid everywhere for a placeholder used twice' {
+        $first = [pscustomobject]@{
+            Minimum = 1
+            Maximum = 1440
+            Values  = $null
+        }
+        $second = [pscustomobject]@{
+            Minimum = 10
+            Maximum = $null
+            Values  = $null
+        }
+
+        $rule = Merge-RestoreInputRuleHC $first $second
+
+        $rule.Minimum | Should -Be 10
+        $rule.Maximum | Should -Be 1440
+        Merge-RestoreInputRuleHC $null $second | Should -Be $second
+    }
+    It ('asks each placeholder once, in the section that runs first, ' +
+        'and skips the answered ones') {
+        $items = [ordered]@{
+            HostsFileEntries = @(
+                [ordered]@{
+                    IPAddress = '{{ipv4:Server}}'
+                    Hostnames = @('{{input:Host}}')
+                }
+            )
+            Software         = [ordered]@{
+                Install = @(
+                    [ordered]@{
+                        ExecutablePath = '{{input:Answered}}'
+                        TimeoutMinutes = '{{number:Minutes}}'
+                    }
+                )
+            }
+            NtpTimeServers   = [ordered]@{
+                TimeServerNames = @('{{ipv4:Server}}')
+            }
+        }
+        $fields = @(Get-RestoreInputFieldsHC -Data $items)
+        $questionParams = @{
+            Fields  = $fields
+            Answers = @{ '{{input:Answered}}' = 'Setup.exe' }
+        }
+
+        $questions = @(Get-RestoreInputQuestionHC @questionParams)
+
+        @($questions.Placeholder) | Should -Be @(
+            '{{ipv4:Server}}', '{{input:Host}}', '{{number:Minutes}}'
+        )
+        @($questions.Section) | Should -Be @(
+            'Hosts file entries', 'Hosts file entries', 'Software'
+        )
+        @($questions[0].OtherSections) | Should -Be @('NTP time servers')
+        $questions[0].Rule | Should -BeNullOrEmpty
+        $questions[2].Rule.Maximum | Should -Be 1440
+    }
+    It 'explains <Value> for a <Kind> answer as <Expected>' -ForEach @(
+        @{ Kind = 'input'; Value = ' '; Expected = 'A value is required.' }
+        @{
+            Kind     = 'ipv4'
+            Value    = '10.0.0'
+            Expected = 'Enter an IPv4 address, such as 192.0.2.10.'
+        }
+        @{
+            Kind     = 'prefix'
+            Value    = '33'
+            Expected = 'Enter a prefix length from 1 to 32, such as 24.'
+        }
+        @{
+            Kind     = 'number'
+            Value    = 'abc'
+            Expected = 'Enter a whole number, such as 15.'
+        }
+        @{
+            Kind     = 'number'
+            Value    = '0'
+            Minimum  = 1
+            Maximum  = 1440
+            Expected = 'Enter a whole number from 1 to 1440.'
+        }
+        @{
+            Kind     = 'number'
+            Value    = '5'
+            Minimum  = 10
+            Expected = 'Enter a whole number of at least 10.'
+        }
+        @{
+            Kind     = 'input'
+            Value    = 'Double'
+            Values   = @('String', 'DWord')
+            Expected = 'Choose a value from the list.'
+        }
+    ) {
+        $rule = [pscustomobject]@{
+            Minimum = $Minimum
+            Maximum = $Maximum
+            Values  = $Values
+        }
+
+        Get-RestoreInputProblemHC -Kind $Kind -Value $Value -Rule $rule |
+            Should -BeExactly $Expected
+    }
+    It 'accepts <Value> for a <Kind> answer' -ForEach @(
+        @{ Kind = 'input'; Value = 'kiosk' }
+        @{ Kind = 'number'; Value = '1440'; Minimum = 1; Maximum = 1440 }
+        @{ Kind = 'input'; Value = 'dword'; Values = @('String', 'DWord') }
+    ) {
+        $rule = [pscustomobject]@{
+            Minimum = $Minimum
+            Maximum = $Maximum
+            Values  = $Values
+        }
+
+        Get-RestoreInputProblemHC -Kind $Kind -Value $Value -Rule $rule |
+            Should -BeNullOrEmpty
     }
 }
 

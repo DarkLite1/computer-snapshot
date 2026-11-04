@@ -5,6 +5,7 @@ BeforeAll {
     Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
     . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
     . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+    . "$PSScriptRoot\Common\Restore input.ps1"
 
     $schemaPath = Join-Path $PSScriptRoot '..\Scripts\config.schema.json'
     $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
@@ -49,7 +50,7 @@ Describe 'Schema contract' {
         $loaded = Read-ConfigurationHC $file $root
 
         @(Get-RestoreInputFieldsHC -Data $loaded.Items).Count | Should -Be 3
-        $null = Resolve-RestoreInputHC -Items $loaded.Items -ReadValue {
+        $readValues = New-FakeReadValuesHC {
             param($field)
             switch ($field.Kind) {
                 'input' { 'Example' }
@@ -57,6 +58,11 @@ Describe 'Schema contract' {
                 'ipv4' { '192.0.2.10' }
             }
         }
+        $resolveParams = @{
+            Items      = $loaded.Items
+            ReadValues = $readValues
+        }
+        $null = Resolve-RestoreInputHC @resolveParams
         @(Test-ConfigurationHC $loaded $root).Count | Should -Be 0
         $loaded.Items.NtpTimeServers.TimeServerNames |
         Should -Be @('192.0.2.10')
@@ -91,7 +97,7 @@ Describe 'Schema contract' {
             }
             $numberFields += $fields.Count
 
-            $null = Resolve-RestoreInputHC -Items $document.Items -ReadValue {
+            $readValues = New-FakeReadValuesHC {
                 param($field)
                 switch ($field.Kind) {
                     'number' { '30' }
@@ -101,6 +107,11 @@ Describe 'Schema contract' {
                     default { 'Example' }
                 }
             }
+            $resolveParams = @{
+                Items      = $document.Items
+                ReadValues = $readValues
+            }
+            $null = Resolve-RestoreInputHC @resolveParams
             $problems = @(Test-ConfigurationHC $document $TestDrive)
 
             foreach ($field in $fields) {

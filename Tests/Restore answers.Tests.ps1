@@ -5,6 +5,7 @@ BeforeAll {
     Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
     . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
     . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+    . "$PSScriptRoot\Common\Restore input.ps1"
 }
 
 Describe 'Answer file reading and resolution' {
@@ -30,7 +31,7 @@ Describe 'Answer file reading and resolution' {
             Items      = $items
             Answers    = $answers
             Unattended = $true
-            ReadValue  = { throw 'Unexpected prompt' }
+            ReadValues = { throw 'Unexpected prompt' }
         }
         $result = Resolve-RestoreInputHC @params
         $items.UserAccounts[0].Name | Should -Be 'Example'
@@ -44,13 +45,13 @@ Describe 'Answer file reading and resolution' {
             Set-Content -LiteralPath $answerPath
         $answers = Read-RestoreAnswerFileHC $answerPath
         $params = @{
-            Items     = $items
-            Answers   = $answers
-            ReadValue = {
+            Items      = $items
+            Answers    = $answers
+            ReadValues = (New-FakeReadValuesHC {
                 param($field)
                 $field.Placeholder | Should -Be '{{password:Password}}'
                 'Prompt-secret!42'
-            }
+            })
         }
         $result = Resolve-RestoreInputHC @params
         $result.Values['{{input:Account}}'] | Should -Be 'Example'
@@ -62,7 +63,7 @@ Describe 'Answer file reading and resolution' {
         $params = @{
             Items      = $items
             Unattended = $true
-            ReadValue  = { throw 'Unexpected prompt' }
+            ReadValues = { throw 'Unexpected prompt' }
         }
         $failure = { Resolve-RestoreInputHC @params } |
             Should -Throw '*missing answers*' -PassThru
@@ -79,7 +80,7 @@ Describe 'Answer file reading and resolution' {
                 Items      = $items
                 Answers    = (Read-RestoreAnswerFileHC $answerPath)
                 Unattended = $true
-                ReadValue  = { throw 'Unexpected prompt' }
+                ReadValues = { throw 'Unexpected prompt' }
             }
             Resolve-RestoreInputHC @params
         } |
@@ -90,7 +91,7 @@ Describe 'Answer file reading and resolution' {
         $params = @{
             Items      = @{ UserAccounts = @(@{ Name = 'Existing' }) }
             Unattended = $true
-            ReadValue  = { throw 'Unexpected prompt' }
+            ReadValues = { throw 'Unexpected prompt' }
         }
         $result = Resolve-RestoreInputHC @params
         $result.Values.Count | Should -Be 0
@@ -114,7 +115,7 @@ Describe 'Answer file reading and resolution' {
             Should -Throw '*duplicate answer key*'
     }
     It 'keeps interactive cancellation behavior when an answer is missing' {
-        { Resolve-RestoreInputHC -Items $items -ReadValue { $null } } |
+        { Resolve-RestoreInputHC -Items $items -ReadValues { $null } } |
             Should -Throw '*Restore cancelled*'
     }
     It 'validates IPv4 and prefix answers and converts a prefix to an integer' {
@@ -129,7 +130,7 @@ Describe 'Answer file reading and resolution' {
             Items      = $data
             Answers    = (Read-RestoreAnswerFileHC $answerPath)
             Unattended = $true
-            ReadValue  = { throw 'Unexpected prompt' }
+            ReadValues = { throw 'Unexpected prompt' }
         }
         $null = Resolve-RestoreInputHC @params
         $data.Address | Should -Be '192.0.2.10'
@@ -222,7 +223,7 @@ Describe 'Answer file reading and resolution' {
             Items      = $data
             Answers    = (Read-RestoreAnswerFileHC $answerPath)
             Unattended = $true
-            ReadValue  = { throw 'Unexpected prompt' }
+            ReadValues = { throw 'Unexpected prompt' }
         }
 
         $null = Resolve-RestoreInputHC @params
@@ -266,7 +267,7 @@ Describe 'Answer file reading and resolution' {
             RootFolder = $TestDrive
             Answers    = (Read-RestoreAnswerFileHC $answerPath)
             Unattended = $true
-            ReadValue  = { throw 'Unexpected prompt' }
+            ReadValues = { throw 'Unexpected prompt' }
         }
         $result = Resolve-RestoreInputHC @params
         $result.Values.Count | Should -Be 2

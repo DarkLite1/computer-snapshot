@@ -5,6 +5,7 @@ Describe 'Single-file execution' {
         Import-Module "$scriptsFolder\Common\Configuration.psm1" -Force
         $scriptPath = Join-Path $scriptsFolder 'Folders import export.ps1'
         $inModule = @{ ModuleName = 'Execution' }
+        . "$PSScriptRoot\Restore input.ps1"
     }
     BeforeEach {
         $path = Join-Path $TestDrive (
@@ -310,13 +311,17 @@ Describe 'Single-file execution' {
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         Mock Read-RestoreInputHC @inModule {
-            Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
-            if ($Field.Kind -eq 'password') {
-                'Test-secret!42'
+            $answer = {
+                param($Field)
+                Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
+                if ($Field.Kind -eq 'password') {
+                    'Test-secret!42'
+                }
+                else {
+                    'Example'
+                }
             }
-            else {
-                'Example'
-            }
+            & (New-FakeReadValuesHC $answer) $Questions
         }
         Mock Invoke-ChildScriptHC @inModule {
             $Data[0].Name | Should -Be 'Example'
@@ -330,7 +335,15 @@ Describe 'Single-file execution' {
         $result = Invoke-ComputerSnapshotHC @params
         $result.Success | Should -BeTrue
         $result.Results[0].Messages | Should -Be @('Applied [redacted]')
-        Should -Invoke Read-RestoreInputHC @inModule -Times 2 -Exactly
+        $invoke = @{
+            ModuleName      = 'Execution'
+            Times           = 1
+            Exactly         = $true
+            ParameterFilter = {
+                @($Questions.Kind) -join ',' -eq 'input,password'
+            }
+        }
+        Should -Invoke Read-RestoreInputHC @invoke
         (Get-Content -LiteralPath $path -Raw) | Should -BeExactly $before
         (Get-Content -LiteralPath $sharedPath -Raw) |
             Should -BeExactly $sharedBefore
@@ -377,8 +390,12 @@ Describe 'Single-file execution' {
         $params.Items = @('CopyFilesFolders')
         $params.Script = [ordered]@{ CopyFilesFolders = $scriptPath }
         Mock Read-RestoreInputHC @inModule {
-            Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
-            '10.20.60.47'
+            $answer = {
+                param($Field)
+                Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
+                '10.20.60.47'
+            }
+            & (New-FakeReadValuesHC $answer) $Questions
         }
         Mock Invoke-ChildScriptHC @inModule {
             $Data[0].PlaceholderValues['{{ipv4:Terminal server}}'] |
@@ -433,17 +450,21 @@ Describe 'Single-file execution' {
             )
         }
         Mock Read-RestoreInputHC @inModule {
-            switch ($Field.Kind) {
-                'password' {
-                    'Test-secret!42'
-                }
-                'input' {
-                    'alpha'
-                }
-                'ipv4' {
-                    '192.0.2.20'
+            $answer = {
+                param($Field)
+                switch ($Field.Kind) {
+                    'password' {
+                        'Test-secret!42'
+                    }
+                    'input' {
+                        'alpha'
+                    }
+                    'ipv4' {
+                        '192.0.2.20'
+                    }
                 }
             }
+            & (New-FakeReadValuesHC $answer) $Questions
         }
         $mockParams = @{
             ModuleName      = 'Execution'
@@ -463,7 +484,13 @@ Describe 'Single-file execution' {
         $result = Invoke-ComputerSnapshotHC @params
 
         $result.Success | Should -BeTrue
-        Should -Invoke Read-RestoreInputHC @inModule -Times 3 -Exactly
+        $invoke = @{
+            ModuleName      = 'Execution'
+            Times           = 1
+            Exactly         = $true
+            ParameterFilter = { @($Questions).Count -eq 3 }
+        }
+        Should -Invoke Read-RestoreInputHC @invoke
         Get-Content -LiteralPath "$TestDrive\Out\First.txt" |
             Should -BeExactly 'a=alpha'
         Get-Content -LiteralPath "$TestDrive\Out\Second.txt" |
@@ -480,7 +507,9 @@ Describe 'Single-file execution' {
         } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
-        Mock Read-RestoreInputHC @inModule { 'Test-secret!42' }
+        Mock Read-RestoreInputHC @inModule {
+            & (New-FakeReadValuesHC { 'Test-secret!42' }) $Questions
+        }
         Mock Invoke-ChildScriptHC @inModule { throw 'Rejected Test-secret!42' }
         $result = Invoke-ComputerSnapshotHC @params
         $result.Success | Should -BeFalse
@@ -556,19 +585,23 @@ Describe 'Single-file execution' {
         $params.Items = @('NetworkCards')
         $params.Script = [ordered]@{ NetworkCards = $scriptPath }
         Mock Read-RestoreInputHC @inModule {
-            switch ($Field.Kind) {
-                'prefix' {
-                    '24'
-                }
-                default {
-                    if ($Field.Description -eq 'Address') {
-                        '192.0.2.10'
+            $answer = {
+                param($Field)
+                switch ($Field.Kind) {
+                    'prefix' {
+                        '24'
                     }
-                    else {
-                        '192.0.2.1'
+                    default {
+                        if ($Field.Description -eq 'Address') {
+                            '192.0.2.10'
+                        }
+                        else {
+                            '192.0.2.1'
+                        }
                     }
                 }
             }
+            & (New-FakeReadValuesHC $answer) $Questions
         }
         Mock Invoke-ChildScriptHC @inModule {
             $settings = $Data[0].Change.IPSettings
@@ -583,7 +616,13 @@ Describe 'Single-file execution' {
 
         (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
 
-        Should -Invoke Read-RestoreInputHC @inModule -Times 3 -Exactly
+        $invoke = @{
+            ModuleName      = 'Execution'
+            Times           = 1
+            Exactly         = $true
+            ParameterFilter = { @($Questions).Count -eq 3 }
+        }
+        Should -Invoke Read-RestoreInputHC @invoke
         Should -Invoke Invoke-ChildScriptHC @inModule -Times 1 -Exactly
     }
     Context 'a number placeholder' {
@@ -611,7 +650,9 @@ Describe 'Single-file execution' {
         }
         It ('passes the check before input, is asked once and reaches the ' +
             'section as a number') {
-            Mock Read-RestoreInputHC @inModule { '30' }
+            Mock Read-RestoreInputHC @inModule {
+                & (New-FakeReadValuesHC { '30' }) $Questions
+            }
             Mock Invoke-ChildScriptHC @inModule {
                 foreach ($install in $Data.Install) {
                     $install.TimeoutMinutes | Should -BeOfType [int]
@@ -630,7 +671,9 @@ Describe 'Single-file execution' {
             Should -Invoke Invoke-ChildScriptHC @inModule -Times 1 -Exactly
         }
         It 'refuses the prompt answer abc before any section runs' {
-            Mock Read-RestoreInputHC @inModule { 'abc' }
+            Mock Read-RestoreInputHC @inModule {
+                & (New-FakeReadValuesHC { 'abc' }) $Questions
+            }
 
             { Invoke-ComputerSnapshotHC @params } |
                 Should -Throw '*validation failed*'
@@ -730,7 +773,9 @@ Describe 'Single-file execution' {
         } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('Software')
-        Mock Read-RestoreInputHC @inModule { 'Test-secret!42' }
+        Mock Read-RestoreInputHC @inModule {
+            & (New-FakeReadValuesHC { 'Test-secret!42' }) $Questions
+        }
         { Invoke-ComputerSnapshotHC @params } |
             Should -Throw '*validation failed*'
         Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
@@ -826,13 +871,18 @@ Describe 'Single-file execution' {
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
         $params.AnswerFile = $answerPath
-        Mock Read-RestoreInputHC @inModule { 'Prompt-secret!42' }
+        Mock Read-RestoreInputHC @inModule {
+            & (New-FakeReadValuesHC { 'Prompt-secret!42' }) $Questions
+        }
         (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
         $invoke = @{
             ModuleName      = 'Execution'
             Times           = 1
             Exactly         = $true
-            ParameterFilter = { $Field.Kind -eq 'password' }
+            ParameterFilter = {
+                @($Questions).Count -eq 1 -and
+                $Questions[0].Kind -eq 'password'
+            }
         }
         Should -Invoke Read-RestoreInputHC @invoke
     }
@@ -1185,7 +1235,9 @@ Describe 'Single-file execution' {
         } $path
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
-        Mock Read-RestoreInputHC @inModule { 'Test-secret!42' }
+        Mock Read-RestoreInputHC @inModule {
+            & (New-FakeReadValuesHC { 'Test-secret!42' }) $Questions
+        }
         Mock Invoke-ChildScriptHC @inModule {
             [pscustomobject]@{
                 Data     = $null

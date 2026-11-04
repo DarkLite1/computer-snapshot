@@ -15,7 +15,7 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
    - Check the boxes next to the settings you want to apply.
    - Optionally choose an **Answer file**, or click **Create template...** to
      generate one for the checked sections. **Unattended** fails on missing
-     answers instead of showing input popups; see [Answer files](#answer-files-and-unattended-restores).
+     answers instead of showing the input form; see [Answer files](#answer-files-and-unattended-restores).
    - Click **Restore selected**. _(Note: If you change your mind, click Cancel to leave the computer unchanged)._
 4. **To save a PC's setup (Export):**
    - Click **Export**.
@@ -453,7 +453,7 @@ Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Ed
 
 Use a placeholder instead of a fixed string when a value changes between restores:
 
-| Placeholder                                     | Popup behavior                                                                      |
+| Placeholder                                     | Field in the input form                                                             |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `{{input:Enter the local account name}}`        | Required text input.                                                                |
 | `{{password:Enter the local account password}}` | Required, masked input. Use this form for passwords and other secrets.              |
@@ -461,7 +461,7 @@ Use a placeholder instead of a fixed string when a value changes between restore
 | `{{prefix:Enter the prefix length}}`            | Required subnet prefix length from 1 to 32, such as `24`; stored as a number.        |
 | `{{number:Minutes the installer may run}}`      | Required whole number, such as `15` or `-1`; stored as a number.                     |
 
-The text after the colon is the field description shown in the popup. The configuration field path is also displayed. For example, a user-account entry can contain:
+The text after the colon is the question shown in the input form, with the configuration field path below it. For example, a user-account entry can contain:
 
 ```json
 {
@@ -471,7 +471,9 @@ The text after the colon is the field description shown in the popup. The config
 }
 ```
 
-Select the configuration, click **Restore**, review the section checklist, and click **Restore selected**. The configuration is checked first: a typo or a missing file is reported before any answer is asked for, and nothing is asked. In interactive mode, after any required UAC elevation, a popup requests each value not supplied by an answer file. **Continue** accepts a valid answer; **Cancel**, Escape, or closing any input popup cancels the entire restore before any sections run. All answers are collected and the resolved configuration is checked again before applying settings. Windows may still reject an otherwise valid answer, for example because of password policy.
+Select the configuration, click **Restore**, review the section checklist, and click **Restore selected**. The configuration is checked first: a typo or a missing file is reported before any answer is asked for, and nothing is asked. In interactive mode, after any required UAC elevation, one input form asks every value that an answer file does not supply. The questions are grouped under a header for each section, in the order the sections run; a placeholder used in several sections is asked once, under the section that runs first, and names the others.
+
+Each field is checked while you type, against its placeholder kind and the setting it fills in: `TimeoutMinutes` only accepts 1 to 1440, a prefix length 1 to 32, and a setting with fixed values, such as a registry value `Type`, is a list to choose from. Below each field a grey line says what is expected; after you leave a field with a wrong answer, it turns red and says why. **Continue** is enabled once every answer is valid. **Cancel**, Escape, or closing the form cancels the entire restore before any sections run. The resolved configuration is checked again before applying settings. Windows may still reject an otherwise valid answer, for example because of password policy.
 
 Placeholders work in string values inside `Items`, including nested objects, arrays, and referenced shared sections. Only selected sections prompt. An identical placeholder (including its type and description) asks once and reuses the answer within that restore; use different descriptions to request independent values. Comments, metadata, settings, property names and section-reference filenames are not input fields. Do not use placeholders for booleans, or embed them within larger strings. `{{input:...}}` always gives text; use `{{prefix:...}}` for a prefix length and `{{number:...}}` for any other whole number, such as `TimeoutMinutes`, `SuccessExitCodes`, `WinHomeLocationGeoId` or `CATimeout`. Answers are used literally, not evaluated as PowerShell or expanded as further placeholders.
 
@@ -502,7 +504,7 @@ $ArgumentList = '--kiosk http://{{ipv4:IP address of the terminal server}}:1353/
 
 **Exported user accounts:** Windows never reveals passwords, so an export writes `{{password:Password for local user 'name'}}` for each local user. Restoring the export asks for each password (unless supplied in an answer file), and sets it on the user, also on a user that already exists. Accounts that Windows manages itself (Guest, DefaultAccount, WDAGUtilityAccount) get an empty password instead and keep their current one. To keep an existing user's password, replace its placeholder in the configuration with an empty string; a user that doesn't exist yet needs a password to be created.
 
-Interactive command-line restores use the same popups for missing answers and require an interactive Windows desktop. Browsing configurations and exporting do not ask for placeholder values. Use `-Unattended` to forbid input popups.
+Interactive command-line restores use the same input form for missing answers and require an interactive Windows desktop. Browsing configurations and exporting do not ask for placeholder values. Use `-Unattended` to forbid the input form.
 
 See [Configurations/Example prompted setup.json](Configurations/Example%20prompted%20setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [Network cards and IP settings](#network-cards-and-ip-settings).
 

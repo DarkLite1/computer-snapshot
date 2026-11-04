@@ -247,25 +247,497 @@ function ConvertTo-RestoreInputNumberHC {
     $number
 }
 
-function New-RestoreInputFormHC {
+function Get-RestoreInputSectionHC {
+    # The section of a configuration path such as Items.UserAccounts[0].Name,
+    # named after its script, such as 'User accounts', in execution order
     param(
-        $Field
+        [Parameter(Mandatory)][string]$Path
+    )
+
+    $scripts = Get-SnapshotScriptsHC
+    $key = ''
+
+    if ($Path -match '\AItems\.(?<Key>[A-Za-z]+)') {
+        $key = $Matches['Key']
+    }
+
+    if (-not $scripts.Contains($key)) {
+        return [pscustomobject]@{
+            Key   = $key
+            Name  = 'Other'
+            Order = $scripts.Count
+        }
+    }
+
+    $name = $scripts[$key] -replace ' import export\.ps1\z', ''
+
+    if ($key -eq 'StartCustomScriptsBefore') {
+        $name += ' before'
+    }
+    elseif ($key -eq 'StartCustomScriptsAfter') {
+        $name += ' after'
+    }
+
+    [pscustomobject]@{
+        Key   = $key
+        Name  = $name
+        Order = [array]::IndexOf(@($scripts.Keys), $key)
+    }
+}
+
+function Get-SchemaAlternativesHC {
+    # A schema node with its $ref, anyOf and oneOf alternatives, flattened
+    param(
+        $Node,
+        [Parameter(Mandatory)]$Schema
+    )
+
+    if ($null -eq $Node) {
+        return
+    }
+
+    if ($Node.'$ref') {
+        $name = $Node.'$ref' -replace '^#/\$defs/', ''
+        Get-SchemaAlternativesHC $Schema.'$defs'.$name $Schema
+
+        return
+    }
+
+    $Node
+
+    foreach ($alternative in @($Node.anyOf) + @($Node.oneOf)) {
+        if ($null -ne $alternative) {
+            Get-SchemaAlternativesHC $alternative $Schema
+        }
+    }
+}
+
+function Get-RestoreInputRuleHC {
+    <#
+    .SYNOPSIS
+        What the schema allows at a configuration path, such as
+        Items.Software.Install[0].TimeoutMinutes: the range of a whole number
+        or the fixed values of a text. Nothing when it does not limit the
+        answer.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)]$Schema
+    )
+
+    $pathMatch = [regex]::Match(
+        $Path,
+        (
+            '\AItems\.(?<Section>[A-Za-z]+)' +
+            '(?<Steps>(?:\.[^.\[\]]+|\[\d+\])*)\z'
+        )
+    )
+
+    if (-not $pathMatch.Success) {
+        return
+    }
+
+    $sectionName = $pathMatch.Groups['Section'].Value
+    $nodes = @(Get-SchemaAlternativesHC $Schema.'$defs'.$sectionName $Schema)
+    $steps = [regex]::Matches(
+        $pathMatch.Groups['Steps'].Value,
+        '\.(?<Name>[^.\[\]]+)|\[(?<Index>\d+)\]'
+    )
+
+    foreach ($step in $steps) {
+        $name = $step.Groups['Name'].Value
+        $children = foreach ($node in $nodes) {
+            if ($step.Groups['Index'].Success) {
+                $node.items
+            }
+            elseif (
+                $null -ne $node.properties -and
+                $node.properties.PSObject.Properties[$name]
+            ) {
+                $node.properties.$name
+            }
+            elseif ($null -ne $node.patternProperties) {
+                foreach (
+                    $pattern in $node.patternProperties.PSObject.Properties
+                ) {
+                    if ($name -match $pattern.Name) {
+                        $pattern.Value
+                    }
+                }
+            }
+        }
+        $nodes = @(
+            foreach ($child in $children) {
+                Get-SchemaAlternativesHC $child $Schema
+            }
+        )
+    }
+
+    $integers = @($nodes | Where-Object { @($_.type) -contains 'integer' })
+    # A string with a pattern is the placeholder itself, not an answer
+    $texts = @(
+        $nodes | Where-Object {
+            @($_.type) -contains 'string' -and -not $_.pattern
+        }
+    )
+
+    $minimum = $null
+    $maximum = $null
+
+    if (
+        $integers.Count -and
+        -not @($integers | Where-Object { $null -eq $_.minimum }).Count
+    ) {
+        $minimum = [long](
+            $integers | Measure-Object -Property minimum -Minimum
+        ).Minimum
+    }
+
+    if (
+        $integers.Count -and
+        -not @($integers | Where-Object { $null -eq $_.maximum }).Count
+    ) {
+        $maximum = [long](
+            $integers | Measure-Object -Property maximum -Maximum
+        ).Maximum
+    }
+
+    $values = $null
+
+    if (
+        $texts.Count -and
+        -not @($texts | Where-Object { -not $_.enum }).Count
+    ) {
+        # The check compares case-insensitively, so one spelling is enough
+        $hashSetType = 'System.Collections.Generic.HashSet[string]'
+        $seen = New-Object $hashSetType ([StringComparer]::OrdinalIgnoreCase)
+        $values = [string[]]@(
+            foreach ($text in $texts) {
+                foreach ($value in $text.enum) {
+                    if ($seen.Add([string]$value)) {
+                        [string]$value
+                    }
+                }
+            }
+        )
+    }
+
+    if ($null -eq $minimum -and $null -eq $maximum -and $null -eq $values) {
+        return
+    }
+
+    [pscustomobject]@{
+        Minimum = $minimum
+        Maximum = $maximum
+        Values  = $values
+    }
+}
+
+function Merge-RestoreInputRuleHC {
+    # One rule for a placeholder that is used in several places: an answer
+    # must be valid in each of them
+    param(
+        $First,
+        $Second
+    )
+
+    if ($null -eq $First) {
+        return $Second
+    }
+
+    if ($null -eq $Second) {
+        return $First
+    }
+
+    $minimum = @($First.Minimum, $Second.Minimum) |
+        Where-Object { $null -ne $_ } |
+        Measure-Object -Maximum
+    $maximum = @($First.Maximum, $Second.Maximum) |
+        Where-Object { $null -ne $_ } |
+        Measure-Object -Minimum
+
+    $values = if ($First.Values -and $Second.Values) {
+        [string[]]@($First.Values | Where-Object { $_ -in $Second.Values })
+    }
+    elseif ($First.Values) {
+        $First.Values
+    }
+    else {
+        $Second.Values
+    }
+
+    $merged = [pscustomobject]@{
+        Minimum = $null
+        Maximum = $null
+        Values  = $values
+    }
+
+    if ($minimum.Count) {
+        $merged.Minimum = [long]$minimum.Maximum
+    }
+
+    if ($maximum.Count) {
+        $merged.Maximum = [long]$maximum.Minimum
+    }
+
+    $merged
+}
+
+function Get-RestoreInputQuestionHC {
+    <#
+    .SYNOPSIS
+        One question per placeholder that has no answer yet, in the order
+        the sections run, with the rule of every place it is used.
+    #>
+    param(
+        [object[]]$Fields,
+        [System.Collections.IDictionary]$Answers
+    )
+
+    $schema = $null
+    $questions = New-Object 'System.Collections.Generic.List[object]'
+    $dictionaryType = 'System.Collections.Generic.Dictionary[string,object]'
+    $lookup = New-Object $dictionaryType ([StringComparer]::Ordinal)
+    $position = 0
+
+    foreach ($field in $Fields) {
+        $position++
+
+        if ($null -ne $Answers -and $null -ne $Answers[$field.Placeholder]) {
+            continue
+        }
+
+        $section = Get-RestoreInputSectionHC -Path $field.Path
+        $rule = $null
+
+        # A placeholder in a file is text; the schema does not describe it
+        if ($null -ne $field.Container) {
+            if ($null -eq $schema) {
+                $schemaParams = @{
+                    LiteralPath = "$PSScriptRoot\..\config.schema.json"
+                    Raw         = $true
+                    Encoding    = 'UTF8'
+                }
+                $schema = Get-Content @schemaParams | ConvertFrom-Json
+            }
+
+            $rule = Get-RestoreInputRuleHC -Path $field.Path -Schema $schema
+        }
+
+        $question = $null
+
+        if ($lookup.TryGetValue($field.Placeholder, [ref]$question)) {
+            $question.Rule = Merge-RestoreInputRuleHC $question.Rule $rule
+
+            # Ask it in the section that runs first, and name the others
+            if ($section.Order -lt $question.SectionOrder) {
+                $question.OtherSections.Insert(0, $question.Section)
+                $question.Path = $field.Path
+                $question.Section = $section.Name
+                $question.SectionOrder = $section.Order
+                $question.Index = $position
+                $null = $question.OtherSections.Remove($section.Name)
+            }
+            elseif (
+                $section.Name -ne $question.Section -and
+                $question.OtherSections -notcontains $section.Name
+            ) {
+                $question.OtherSections.Add($section.Name)
+            }
+
+            continue
+        }
+
+        $question = [pscustomobject]@{
+            Placeholder   = $field.Placeholder
+            Kind          = $field.Kind
+            Description   = $field.Description
+            Path          = $field.Path
+            Section       = $section.Name
+            SectionOrder  = $section.Order
+            Index         = $position
+            OtherSections = New-Object 'System.Collections.Generic.List[string]'
+            Rule          = $rule
+        }
+        $lookup.Add($field.Placeholder, $question)
+        $questions.Add($question)
+    }
+
+    $questions | Sort-Object -Property SectionOrder, Index
+}
+
+function Get-RestoreInputHintHC {
+    # What an answer must look like, as shown below its field
+    param(
+        [string]$Kind,
+        $Rule
+    )
+
+    if ($Rule.Values) {
+        return 'Choose a value from the list.'
+    }
+
+    $minimum = $Rule.Minimum
+    $maximum = $Rule.Maximum
+
+    switch ($Kind) {
+        'ipv4' {
+            'Enter an IPv4 address, such as 192.0.2.10.'
+        }
+        'prefix' {
+            'Enter a prefix length from 1 to 32, such as 24.'
+        }
+        'number' {
+            if ($null -ne $minimum -and $null -ne $maximum) {
+                "Enter a whole number from $minimum to $maximum."
+            }
+            elseif ($null -ne $minimum) {
+                "Enter a whole number of at least $minimum."
+            }
+            elseif ($null -ne $maximum) {
+                "Enter a whole number of at most $maximum."
+            }
+            else {
+                'Enter a whole number, such as 15.'
+            }
+        }
+        default {
+            ''
+        }
+    }
+}
+
+function Get-RestoreInputProblemHC {
+    # Why an answer is not valid for its question; nothing when it is valid
+    param(
+        [string]$Kind,
+        [string]$Value,
+        $Rule
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return 'A value is required.'
+    }
+
+    if ($Rule.Values -and $Value -notin $Rule.Values) {
+        return 'Choose a value from the list.'
+    }
+
+    $hint = Get-RestoreInputHintHC -Kind $Kind -Rule $Rule
+
+    if (-not (Test-RestoreInputValueHC -Kind $Kind -Value $Value)) {
+        return $hint
+    }
+
+    if ($Kind -in @('prefix', 'number')) {
+        $number = [long]$Value
+
+        if (
+            ($null -ne $Rule.Minimum -and $number -lt $Rule.Minimum) -or
+            ($null -ne $Rule.Maximum -and $number -gt $Rule.Maximum)
+        ) {
+            return $hint
+        }
+    }
+}
+
+function Get-RestoreInputControlValueHC {
+    # The answer in a text box or the value chosen in a list
+    param(
+        [Parameter(Mandatory)]$Control
+    )
+
+    if ($Control -is [Windows.Forms.ComboBox]) {
+        return [string]$Control.SelectedItem
+    }
+
+    $Control.Text
+}
+
+function Update-RestoreInputFormHC {
+    # Show the problem of every answer that was left, and enable Continue
+    # only when every answer is valid
+    param(
+        [Parameter(Mandatory)]$Form
+    )
+
+    $invalid = 0
+
+    foreach ($control in $Form.Tag.Inputs) {
+        $state = $control.Tag
+        $question = $state.Question
+        $problemParams = @{
+            Kind  = $question.Kind
+            Value = Get-RestoreInputControlValueHC -Control $control
+            Rule  = $question.Rule
+        }
+        $problem = Get-RestoreInputProblemHC @problemParams
+
+        if (-not $problem) {
+            $state.Message.Text = ''
+            continue
+        }
+
+        $invalid++
+
+        if ($state.Touched) {
+            $state.Message.Text = $problem
+            $state.Message.ForeColor = [Drawing.Color]::Firebrick
+        }
+        else {
+            $hintParams = @{
+                Kind = $question.Kind
+                Rule = $question.Rule
+            }
+            $state.Message.Text = Get-RestoreInputHintHC @hintParams
+            $state.Message.ForeColor = [Drawing.Color]::DimGray
+        }
+    }
+
+    $Form.Controls.Find('ConfirmInput', $true)[0].Enabled = $invalid -eq 0
+    $Form.Controls.Find('InputSummary', $true)[0].Text = if ($invalid) {
+        "$invalid of $($Form.Tag.Inputs.Count) answer(s) still needed"
+    }
+    else {
+        'All answers are valid'
+    }
+}
+
+function New-RestoreInputFormHC {
+    <#
+    .SYNOPSIS
+        One form with every question, under a header for each section.
+    .DESCRIPTION
+        Each field checks its answer against the kind of placeholder and
+        the schema of the setting, and a field with fixed values is a list.
+        Continue is enabled once every answer is valid.
+    #>
+    param(
+        [Parameter(Mandatory)][object[]]$Questions
     )
 
     $dialog = New-Object Windows.Forms.Form
     $dialog.Text = 'Restore - input required'
-    $dialog.ClientSize = New-Object Drawing.Size 560, 240
-    $dialog.MinimumSize = New-Object Drawing.Size 520, 280
+    $dialog.ClientSize = New-Object Drawing.Size 640, 560
+    $dialog.MinimumSize = New-Object Drawing.Size 520, 360
     $dialog.Font = New-Object Drawing.Font 'Segoe UI', 10
     $dialog.StartPosition = 'CenterScreen'
     $dialog.TopMost = $true
-    $dialog.Tag = @{ Kind = $Field.Kind; Value = $null }
+    $dialog.Tag = @{
+        Inputs = New-Object 'System.Collections.Generic.List[object]'
+        Labels = New-Object 'System.Collections.Generic.List[object]'
+        Values = $null
+    }
 
-    # Rows: description, location, input, validation message, buttons
     $percent = [Windows.Forms.SizeType]::Percent
     $absolute = [Windows.Forms.SizeType]::Absolute
     $autoSize = [Windows.Forms.SizeType]::AutoSize
+    $smallFont = New-Object Drawing.Font $dialog.Font.FontFamily, 9
+    $headerFont = New-Object Drawing.Font (
+        $dialog.Font.FontFamily, 11, [Drawing.FontStyle]::Bold
+    )
 
+    # Rows: introduction, questions, buttons
     $layout = New-Object Windows.Forms.TableLayoutPanel
     $layout.Dock = 'Fill'
     $layout.Padding = New-Object Windows.Forms.Padding 16
@@ -273,53 +745,147 @@ function New-RestoreInputFormHC {
     $null = $layout.ColumnStyles.Add(
         (New-Object Windows.Forms.ColumnStyle $percent, 100)
     )
-    $layout.RowCount = 5
-    foreach ($index in 1..2) {
-        $null = $layout.RowStyles.Add(
-            (New-Object Windows.Forms.RowStyle $autoSize)
-        )
-    }
+    $layout.RowCount = 3
     $null = $layout.RowStyles.Add(
-        (New-Object Windows.Forms.RowStyle $absolute, 38)
+        (New-Object Windows.Forms.RowStyle $autoSize)
     )
     $null = $layout.RowStyles.Add(
         (New-Object Windows.Forms.RowStyle $percent, 100)
     )
     $null = $layout.RowStyles.Add(
-        (New-Object Windows.Forms.RowStyle $absolute, 44)
+        (New-Object Windows.Forms.RowStyle $absolute, 48)
     )
     $dialog.Controls.Add($layout)
 
-    $description = New-Object Windows.Forms.Label
-    $description.Name = 'InputDescription'
-    $description.Text = $Field.Description
-    $description.UseMnemonic = $false
-    $description.AutoSize = $true
-    $description.Dock = 'Fill'
-    $description.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 8
-    $layout.Controls.Add($description, 0, 0)
+    $intro = New-Object Windows.Forms.Label
+    $intro.Name = 'InputIntro'
+    $intro.Text = (
+        'Answer every question to start the restore. Nothing is changed ' +
+        'before you click Continue.'
+    )
+    $intro.AutoSize = $true
+    $intro.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 8
+    $dialog.Tag.Labels.Add($intro)
+    $layout.Controls.Add($intro, 0, 0)
 
-    $location = New-Object Windows.Forms.Label
-    $location.Text = $Field.Path
-    $location.UseMnemonic = $false
-    $location.Font = New-Object Drawing.Font $dialog.Font.FontFamily, 9
-    $location.AutoSize = $true
-    $location.Dock = 'Fill'
-    $location.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
-    $layout.Controls.Add($location, 0, 1)
+    $scroll = New-Object Windows.Forms.Panel
+    $scroll.Name = 'InputQuestions'
+    $scroll.Dock = 'Fill'
+    $scroll.AutoScroll = $true
+    $layout.Controls.Add($scroll, 0, 1)
 
-    $inputBox = New-Object Windows.Forms.TextBox
-    $inputBox.Name = 'InputValue'
-    $inputBox.AccessibleName = $Field.Description
-    $inputBox.Dock = 'Fill'
-    $inputBox.UseSystemPasswordChar = $Field.Kind -eq 'password'
-    $layout.Controls.Add($inputBox, 0, 2)
+    $list = New-Object Windows.Forms.TableLayoutPanel
+    $list.Dock = 'Top'
+    $list.AutoSize = $true
+    $list.AutoSizeMode = 'GrowAndShrink'
+    $list.ColumnCount = 1
+    $null = $list.ColumnStyles.Add(
+        (New-Object Windows.Forms.ColumnStyle $percent, 100)
+    )
+    $list.GrowStyle = 'AddRows'
+    $scroll.Controls.Add($list)
 
-    $validation = New-Object Windows.Forms.Label
-    $validation.Name = 'InputValidation'
-    $validation.Text = 'A value is required.'
-    $validation.Dock = 'Fill'
-    $layout.Controls.Add($validation, 0, 3)
+    $section = $null
+
+    foreach ($question in $Questions) {
+        if ($question.Section -ne $section) {
+            $section = $question.Section
+
+            $header = New-Object Windows.Forms.Label
+            $header.Name = 'SectionHeader'
+            $header.Text = $section
+            $header.UseMnemonic = $false
+            $header.Font = $headerFont
+            $header.ForeColor = [Drawing.Color]::DarkSlateBlue
+            $header.AutoSize = $true
+            $top = if ($list.Controls.Count) {
+                16
+            }
+            else {
+                0
+            }
+            $header.Margin = New-Object Windows.Forms.Padding 0, $top, 0, 4
+            $list.Controls.Add($header)
+        }
+
+        $description = New-Object Windows.Forms.Label
+        $description.Name = 'QuestionDescription'
+        $description.Text = $question.Description
+        $description.UseMnemonic = $false
+        $description.AutoSize = $true
+        $description.Margin = New-Object Windows.Forms.Padding 0, 6, 0, 0
+        $dialog.Tag.Labels.Add($description)
+        $list.Controls.Add($description)
+
+        $locationText = $question.Path
+        if ($question.OtherSections.Count) {
+            $locationText += (
+                [Environment]::NewLine +
+                "Also used by: $($question.OtherSections -join ', ')"
+            )
+        }
+
+        $location = New-Object Windows.Forms.Label
+        $location.Name = 'QuestionLocation'
+        $location.Text = $locationText
+        $location.UseMnemonic = $false
+        $location.Font = $smallFont
+        $location.ForeColor = [Drawing.Color]::DimGray
+        $location.AutoSize = $true
+        $location.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 2
+        $dialog.Tag.Labels.Add($location)
+        $list.Controls.Add($location)
+
+        if ($question.Rule.Values) {
+            $control = New-Object Windows.Forms.ComboBox
+            $control.DropDownStyle = 'DropDownList'
+            $control.Items.AddRange([object[]]$question.Rule.Values)
+            $control.Add_SelectedIndexChanged({
+                $this.Tag.Touched = $true
+                Update-RestoreInputFormHC -Form $this.FindForm()
+            })
+        }
+        else {
+            $control = New-Object Windows.Forms.TextBox
+            $control.UseSystemPasswordChar = $question.Kind -eq 'password'
+            $control.Add_TextChanged({
+                Update-RestoreInputFormHC -Form $this.FindForm()
+            })
+        }
+
+        $control.Name = "Answer$($dialog.Tag.Inputs.Count)"
+        $control.AccessibleName = $question.Description
+        $control.Dock = 'Fill'
+        $control.Margin = New-Object Windows.Forms.Padding 0
+        $control.Add_Leave({
+            $this.Tag.Touched = $true
+            Update-RestoreInputFormHC -Form $this.FindForm()
+        })
+
+        $message = New-Object Windows.Forms.Label
+        $message.Name = "Problem$($dialog.Tag.Inputs.Count)"
+        $message.Font = $smallFont
+        $message.AutoSize = $true
+        $message.Margin = New-Object Windows.Forms.Padding 0, 2, 0, 0
+        $dialog.Tag.Labels.Add($message)
+
+        $control.Tag = @{
+            Question = $question
+            Message  = $message
+            Touched  = $false
+        }
+        $dialog.Tag.Inputs.Add($control)
+        $list.Controls.Add($control)
+        $list.Controls.Add($message)
+    }
+
+    # Long texts wrap at the width of the form instead of scrolling sideways
+    $scroll.Add_Resize({
+        $width = [Math]::Max(120, $this.ClientSize.Width - 24)
+        foreach ($label in $this.FindForm().Tag.Labels) {
+            $label.MaximumSize = New-Object Drawing.Size $width, 0
+        }
+    })
 
     $buttons = New-Object Windows.Forms.FlowLayoutPanel
     $buttons.Dock = 'Fill'
@@ -332,12 +898,21 @@ function New-RestoreInputFormHC {
     $confirm.Enabled = $false
     $confirm.Add_Click({
         $owner = $this.FindForm()
-        $value = $owner.Controls.Find('InputValue', $true)[0].Text
-        $valid = Test-RestoreInputValueHC -Kind $owner.Tag.Kind -Value $value
-        if (-not $valid) {
+        Update-RestoreInputFormHC -Form $owner
+        if (-not $this.Enabled) {
             return
         }
-        $owner.Tag.Value = $value
+
+        $dictionaryType = (
+            'System.Collections.Generic.Dictionary[string,string]'
+        )
+        $values = New-Object $dictionaryType ([StringComparer]::Ordinal)
+        foreach ($control in $owner.Tag.Inputs) {
+            $values[$control.Tag.Question.Placeholder] = (
+                Get-RestoreInputControlValueHC -Control $control
+            )
+        }
+        $owner.Tag.Values = $values
         $owner.DialogResult = [Windows.Forms.DialogResult]::OK
     })
 
@@ -346,55 +921,49 @@ function New-RestoreInputFormHC {
     $cancel.Size = New-Object Drawing.Size 110, 34
     $cancel.DialogResult = 'Cancel'
 
-    $buttons.Controls.AddRange(@($confirm, $cancel))
-    $layout.Controls.Add($buttons, 0, 4)
+    $summary = New-Object Windows.Forms.Label
+    $summary.Name = 'InputSummary'
+    $summary.AutoSize = $true
+    $summary.Margin = New-Object Windows.Forms.Padding 0, 10, 12, 0
+
+    $buttons.Controls.AddRange(@($confirm, $cancel, $summary))
+    $layout.Controls.Add($buttons, 0, 2)
     $dialog.AcceptButton = $confirm
     $dialog.CancelButton = $cancel
 
-    $inputBox.Add_TextChanged({
-        $owner = $this.FindForm()
-        $valueParams = @{ Kind = $owner.Tag.Kind; Value = $this.Text }
-        $valid = Test-RestoreInputValueHC @valueParams
-        $owner.Controls.Find('ConfirmInput', $true)[0].Enabled = $valid
-        $owner.Controls.Find('InputValidation', $true)[0].Text = if ($valid) {
-            ''
-        }
-        elseif ([string]::IsNullOrWhiteSpace($this.Text)) {
-            'A value is required.'
-        }
-        elseif ($owner.Tag.Kind -eq 'prefix') {
-            'Enter a prefix length from 1 to 32, such as 24.'
-        }
-        elseif ($owner.Tag.Kind -eq 'number') {
-            'Enter a whole number, such as 15.'
-        }
-        else {
-            'Enter an IPv4 address such as 192.0.2.10.'
-        }
-    })
+    Update-RestoreInputFormHC -Form $dialog
 
-    $dialog.ActiveControl = $inputBox
+    if ($dialog.Tag.Inputs.Count) {
+        $dialog.ActiveControl = $dialog.Tag.Inputs[0]
+    }
+
     return , $dialog
 }
 
 function Read-RestoreInputHC {
+    # Ask every question in one form; returns the answers by placeholder,
+    # or nothing when the form is cancelled
     param(
-        $Field
+        [Parameter(Mandatory)][object[]]$Questions
     )
 
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
 
-    $dialog = New-RestoreInputFormHC -Field $Field
+    $dialog = New-RestoreInputFormHC -Questions $Questions
 
     try {
         if ($dialog.ShowDialog() -eq [Windows.Forms.DialogResult]::OK) {
-            return $dialog.Tag.Value
+            return $dialog.Tag.Values
         }
     }
     finally {
-        $dialog.Controls.Find('InputValue', $true)[0].Clear()
-        $dialog.Tag.Value = $null
+        foreach ($control in $dialog.Tag.Inputs) {
+            if ($control -is [Windows.Forms.TextBox]) {
+                $control.Clear()
+            }
+        }
+        $dialog.Tag.Values = $null
         $dialog.Dispose()
     }
 }
@@ -655,7 +1224,10 @@ function Test-ConfigurationBeforeInputHC {
 function Resolve-RestoreInputHC {
     param(
         $Items,
-        [Parameter(Mandatory)][scriptblock]$ReadValue,
+        # Called once with every question that has no answer yet, one per
+        # placeholder; returns the answers by placeholder, or nothing to
+        # cancel the restore
+        [Parameter(Mandatory)][scriptblock]$ReadValues,
         # Also ask for the placeholders in files that are filled while copying
         [string]$RootFolder,
         [System.Collections.IDictionary]$Answers,
@@ -704,6 +1276,24 @@ function Resolve-RestoreInputHC {
         }
     }
 
+    $questionParams = @{
+        Fields  = $fields
+        Answers = $suppliedAnswers
+    }
+    $questions = @(Get-RestoreInputQuestionHC @questionParams)
+    $readAnswers = $null
+
+    if ($questions.Count) {
+        Write-Verbose "Ask $($questions.Count) question(s) in one form"
+        $readAnswers = & $ReadValues $questions
+
+        if ($null -eq $readAnswers) {
+            throw [OperationCanceledException]::new(
+                'Restore cancelled. No items executed.'
+            )
+        }
+    }
+
     foreach ($field in $fields) {
         if ($answers.ContainsKey($field.Placeholder)) {
             continue
@@ -716,8 +1306,7 @@ function Resolve-RestoreInputHC {
             $suppliedAnswers[$field.Placeholder]
         }
         else {
-            Write-Verbose "Ask input for '$($field.Placeholder)'"
-            & $ReadValue $field
+            $readAnswers[$field.Placeholder]
         }
 
         if ($null -eq $value) {

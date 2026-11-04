@@ -311,9 +311,9 @@ function Invoke-ComputerSnapshotHC {
                     RootFolder = $RootFolder
                     Answers    = $answers
                     Unattended = $Unattended
-                    ReadValue  = {
-                        param($field)
-                        Read-RestoreInputHC -Field $field
+                    ReadValues = {
+                        param($questions)
+                        Read-RestoreInputHC -Questions $questions
                     }
                 }
                 $inputResult = Resolve-RestoreInputHC @inputParams

@@ -37,7 +37,9 @@ function Test-ElevatedHC {
             [Security.Principal.WindowsBuiltInRole]::Administrator
         )
     }
-    finally { $identity.Dispose() }
+    finally {
+        $identity.Dispose()
+    }
 }
 
 function Resolve-RootPathHC {
@@ -193,8 +195,12 @@ function New-SectionResultHC {
         [AllowNull()][string[]]$Messages = @(),
         [AllowNull()][string[]]$Errors = @()
     )
-    if ($null -eq $Messages) { $Messages = @() }
-    if ($null -eq $Errors) { $Errors = @() }
+    if ($null -eq $Messages) {
+        $Messages = @()
+    }
+    if ($null -eq $Errors) {
+        $Errors = @()
+    }
     [pscustomobject]@{
         Data     = $Data
         Messages = $Messages

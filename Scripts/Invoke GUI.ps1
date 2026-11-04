@@ -118,7 +118,9 @@ function Restart-WizardElevatedHC {
 function New-WizardElevationPanelHC {
     param([string]$RootFolder, [string]$WizardScript)
 
-    if (Test-ElevatedHC) { return }
+    if (Test-ElevatedHC) {
+        return
+    }
 
     $panel = New-Object Windows.Forms.FlowLayoutPanel
     $panel.Name = 'WizardElevation'

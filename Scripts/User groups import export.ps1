@@ -250,7 +250,9 @@ else {
                 $messages.Add("Updated the description of group '$groupName'")
             }
             else {
-                $messages.Add("Group '$groupName' already exists and is correct")
+                $messages.Add(
+                    "Group '$groupName' already exists and is correct"
+                )
             }
         }
         catch {

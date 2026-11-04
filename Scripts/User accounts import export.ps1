@@ -286,7 +286,9 @@ else {
                 if ($user.AccountExpires) {
                     $setUserParams.AccountExpires = $user.AccountExpires
                 }
-                else { $setUserParams.AccountNeverExpires = $true }
+                else {
+                    $setUserParams.AccountNeverExpires = $true
+                }
             }
             Write-Verbose "User '$($user.Name)': update account details"
             Set-LocalUser @setUserParams

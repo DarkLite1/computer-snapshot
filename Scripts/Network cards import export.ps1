@@ -565,7 +565,9 @@ function Get-IPv4SettingsHC {
         # Read by Get-IPv4StateHC
         [Parameter(Mandatory)][AllowNull()]$State
     )
-    if (-not $State) { return $null }
+    if (-not $State) {
+        return $null
+    }
     $settings = [ordered]@{}
     if ($state.Dhcp -or -not $state.Addresses.Count) {
         $settings.Dhcp = $true

@@ -146,6 +146,57 @@ Describe 'Hosts file entries' {
         Get-Content -LiteralPath $testHostsFile |
             Should -Contain "10.20.60.47`tgood"
     }
+    It 'keeps the previous content as hosts.bak after a change' {
+        $before = [IO.File]::ReadAllBytes($testHostsFile)
+        $data = @(
+            [pscustomobject]@{
+                IPAddress = '10.20.60.47'
+                Hostnames = @('new')
+            }
+        )
+
+        $testParams = @{
+            Action     = 'Import'
+            Data       = $data
+            RootFolder = $TestDrive
+        }
+        $result = & $scriptPath @testParams
+
+        $result.Errors.Count |
+            Should -Be 0 -Because ($result.Errors -join '; ')
+        [IO.File]::ReadAllBytes("$testHostsFile.bak") | Should -Be $before
+    }
+    It ('keeps the hosts file and leaves no temporary file when the ' +
+        'write fails') {
+        $before = [IO.File]::ReadAllBytes($testHostsFile)
+        $data = @(
+            [pscustomobject]@{
+                IPAddress = '10.20.60.47'
+                Hostnames = @('new')
+            }
+        )
+        $testParams = @{
+            Action     = 'Import'
+            Data       = $data
+            RootFolder = $TestDrive
+        }
+
+        # Others may read the file, but it cannot be replaced
+        $stream = [IO.File]::Open($testHostsFile, 'Open', 'Read', 'Read')
+        try {
+            $result = & $scriptPath @testParams
+        }
+        finally {
+            $stream.Dispose()
+        }
+
+        $result.Errors.Count | Should -Be 1
+        $result.Errors[0] |
+            Should -BeLike "Failed to write the hosts file '$testHostsFile':*"
+        [IO.File]::ReadAllBytes($testHostsFile) | Should -Be $before
+        "$testHostsFile.computer-snapshot.tmp" | Should -Not -Exist
+        Should -Invoke Clear-DnsClientCache -Times 0 -Exactly
+    }
     It 'exports every active line, one entry per address' {
         Add-Content -LiteralPath $testHostsFile -Value '10.0.0.5 another'
 

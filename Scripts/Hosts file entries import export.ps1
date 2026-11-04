@@ -77,14 +77,24 @@ function Write-HostsFileHC {
     )
     $temporary = "$Path.computer-snapshot.tmp"
     $encoding = New-Object System.Text.UTF8Encoding $false
-    [IO.File]::WriteAllLines($temporary, $Lines, $encoding)
-    if ([IO.File]::Exists($Path)) {
-        Write-Verbose "Replace hosts file '$Path' (backup '$Path.bak')"
-        [IO.File]::Replace($temporary, $Path, "$Path.bak")
+
+    try {
+        [IO.File]::WriteAllLines($temporary, $Lines, $encoding)
+
+        if ([IO.File]::Exists($Path)) {
+            Write-Verbose "Replace hosts file '$Path' (backup '$Path.bak')"
+            [IO.File]::Replace($temporary, $Path, "$Path.bak")
+        }
+        else {
+            Write-Verbose "Create hosts file '$Path'"
+            [IO.File]::Move($temporary, $Path)
+        }
     }
-    else {
-        Write-Verbose "Create hosts file '$Path'"
-        [IO.File]::Move($temporary, $Path)
+    finally {
+        # Only left behind when the swap failed
+        if ([IO.File]::Exists($temporary)) {
+            [IO.File]::Delete($temporary)
+        }
     }
 }
 #endregion

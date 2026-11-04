@@ -17,7 +17,9 @@
       user that was just created for it is removed again.
     - Action Remove: remove the named local account, keeping profile files.
       An absent account is a successful no-op. Built-in accounts and the
-      account running the restore cannot be removed.
+      account running the restore cannot be removed, nor the last enabled
+      local administrator. When the members of the Administrators group
+      cannot be read, no account is removed.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -41,6 +43,55 @@ function Get-CurrentUserSidHC {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     try { $identity.User.Value }
     finally { $identity.Dispose() }
+}
+
+function Assert-NotLastAdministratorHC {
+    # Throws when the local account with Sid is the only enabled member of
+    # the local Administrators group. Other enabled local accounts, domain
+    # and Azure AD users and groups count as another administrator.
+    param(
+        [Parameter(Mandatory)][string]$Sid,
+        [Parameter(Mandatory)][string]$Name
+    )
+    try {
+        # The group name depends on the Windows language, its SID does not
+        $members = @(Get-LocalGroupMember -SID 'S-1-5-32-544')
+    }
+    catch {
+        throw (
+            'cannot read the members of the local Administrators group ' +
+            "($($_.Exception.Message)); removal refused"
+        )
+    }
+
+    $memberSids = @($members | ForEach-Object { [string]$_.SID })
+    if ($memberSids -notcontains $Sid) {
+        return
+    }
+
+    $enabledLocalSids = @(
+        Get-LocalUser |
+        Where-Object { $_.Enabled } |
+        ForEach-Object { [string]$_.SID }
+    )
+    $localSids = @(Get-LocalUser | ForEach-Object { [string]$_.SID })
+
+    $otherAdministrators = @(
+        $members | Where-Object {
+            $memberSid = [string]$_.SID
+            $memberSid -ne $Sid -and (
+                $enabledLocalSids -contains $memberSid -or (
+                    $localSids -notcontains $memberSid -and
+                    [string]$_.PrincipalSource -in @(
+                        'ActiveDirectory', 'AzureAD'
+                    )
+                )
+            )
+        }
+    )
+    if (-not $otherAdministrators.Count) {
+        throw "'$Name' is the last enabled local administrator; removal refused"
+    }
 }
 
 function Set-UserPasswordHC {
@@ -130,6 +181,7 @@ else {
                 if ($sid -eq $currentSid) {
                     throw 'the account running the restore cannot be removed'
                 }
+                Assert-NotLastAdministratorHC -Sid $sid -Name $user.Name
                 Remove-LocalUser -SID $sid -Confirm:$false -ErrorAction Stop
                 $knownUserNames = @($knownUserNames | Where-Object { $_ -ne $user.Name })
                 $messages += "Removed user account '$($user.Name)' (profile files kept)"

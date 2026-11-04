@@ -84,11 +84,23 @@ Describe 'User accounts removal' {
     }
     BeforeEach {
         $localUsers = [System.Collections.Generic.List[object]]@(
-            [pscustomobject]@{ Name = 'bob'; SID = 'S-1-5-21-1-2-3-1001' }
-            [pscustomobject]@{ Name = 'Other'; SID = 'S-1-5-21-1-2-3-1002' }
-            [pscustomobject]@{ Name = 'Operator'; SID = 'S-1-5-21-1-2-3-1003' }
+            [pscustomobject]@{ Name = 'bob'; SID = 'S-1-5-21-1-2-3-1001'; Enabled = $true }
+            [pscustomobject]@{ Name = 'Other'; SID = 'S-1-5-21-1-2-3-1002'; Enabled = $true }
+            [pscustomobject]@{ Name = 'Operator'; SID = 'S-1-5-21-1-2-3-1003'; Enabled = $true }
         )
         Mock Get-LocalUser { $localUsers.ToArray() }
+        $fakeAdministrators = @(
+            [pscustomobject]@{
+                Name            = 'PC\Operator'
+                SID             = 'S-1-5-21-1-2-3-1003'
+                ObjectClass     = 'User'
+                PrincipalSource = 'Local'
+            }
+        )
+        Mock Get-LocalGroupMember { $fakeAdministrators } -ParameterFilter {
+            [string]$SID -eq 'S-1-5-32-544'
+        }
+        Mock Get-LocalGroupMember { throw 'Only the Administrators group' }
         Mock Get-CurrentUserSidHC { 'S-1-5-21-1-2-3-1003' }
         Mock Remove-LocalUser {
             $found = @($localUsers | Where-Object { $_.SID -eq [string]$SID })
@@ -193,6 +205,165 @@ Describe 'User accounts removal' {
         $result.Errors.Count | Should -Be 1
         Should -Invoke Remove-LocalUser -Times 0 -Exactly
         Should -Invoke Set-LocalUser -Times 0 -Exactly
+    }
+    Context 'the account is a local administrator' {
+        BeforeEach {
+            $fakeBobAdministrator = [pscustomobject]@{
+                Name            = 'PC\bob'
+                SID             = 'S-1-5-21-1-2-3-1001'
+                ObjectClass     = 'User'
+                PrincipalSource = 'Local'
+            }
+            $fakeBuiltInAdministrator = [pscustomobject]@{
+                Name            = 'PC\Administrator'
+                SID             = 'S-1-5-21-1-2-3-500'
+                ObjectClass     = 'User'
+                PrincipalSource = 'Local'
+            }
+            $localUsers.Add(
+                [pscustomobject]@{
+                    Name    = 'Administrator'
+                    SID     = 'S-1-5-21-1-2-3-500'
+                    Enabled = $false
+                }
+            )
+            $fakeRemoveBob = @(
+                [pscustomobject]@{ Name = 'bob'; Action = 'Remove' }
+            )
+        }
+        It 'refuses to remove the last enabled administrator' {
+            $fakeAdministrators = @(
+                $fakeBuiltInAdministrator
+                $fakeBobAdministrator
+            )
+
+            $result = & $scriptPath -Action Import -Data $fakeRemoveBob `
+                -RootFolder $TestDrive
+
+            $result.Errors | Should -Be @(
+                "Failed to remove user account 'bob': 'bob' is the last " +
+                'enabled local administrator; removal refused'
+            )
+            Should -Invoke Remove-LocalUser -Times 0 -Exactly
+        }
+        It 'removes it when another enabled local administrator exists' {
+            $fakeAdministrators = @(
+                $fakeBobAdministrator
+                [pscustomobject]@{
+                    Name            = 'PC\Other'
+                    SID             = 'S-1-5-21-1-2-3-1002'
+                    ObjectClass     = 'User'
+                    PrincipalSource = 'Local'
+                }
+            )
+
+            $result = & $scriptPath -Action Import -Data $fakeRemoveBob `
+                -RootFolder $TestDrive
+
+            $result.Errors.Count | Should -Be 0 -Because (
+                $result.Errors -join '; '
+            )
+            Should -Invoke Remove-LocalUser -Times 1 -Exactly -ParameterFilter {
+                [string]$SID -eq 'S-1-5-21-1-2-3-1001'
+            }
+        }
+        It 'refuses when the other local administrator is disabled' {
+            $localUsers[1].Enabled = $false
+            $fakeAdministrators = @(
+                $fakeBobAdministrator
+                [pscustomobject]@{
+                    Name            = 'PC\Other'
+                    SID             = 'S-1-5-21-1-2-3-1002'
+                    ObjectClass     = 'User'
+                    PrincipalSource = 'Local'
+                }
+            )
+
+            $result = & $scriptPath -Action Import -Data $fakeRemoveBob `
+                -RootFolder $TestDrive
+
+            $result.Errors -join ';' |
+            Should -Match 'last enabled local administrator; removal refused'
+            Should -Invoke Remove-LocalUser -Times 0 -Exactly
+        }
+        It 'removes it when a <Source> <Class> is an administrator' -ForEach @(
+            @{
+                Source = 'ActiveDirectory'
+                Class  = 'Group'
+                Name   = 'CONTOSO\Domain Admins'
+                SID    = 'S-1-5-21-9-8-7-512'
+            }
+            @{
+                Source = 'AzureAD'
+                Class  = 'User'
+                Name   = 'AzureAD\Admin'
+                SID    = 'S-1-12-1-1-2-3-4'
+            }
+        ) {
+            $fakeAdministrators = @(
+                $fakeBobAdministrator
+                [pscustomobject]@{
+                    Name            = $Name
+                    SID             = $SID
+                    ObjectClass     = $Class
+                    PrincipalSource = $Source
+                }
+            )
+
+            $result = & $scriptPath -Action Import -Data $fakeRemoveBob `
+                -RootFolder $TestDrive
+
+            $result.Errors.Count | Should -Be 0 -Because (
+                $result.Errors -join '; '
+            )
+            Should -Invoke Remove-LocalUser -Times 1 -Exactly
+        }
+        It 'does not count an unresolved SID as an administrator' {
+            $fakeAdministrators = @(
+                $fakeBobAdministrator
+                [pscustomobject]@{
+                    Name            = 'S-1-5-21-1-2-3-1099'
+                    SID             = 'S-1-5-21-1-2-3-1099'
+                    ObjectClass     = 'User'
+                    PrincipalSource = 'Unknown'
+                }
+            )
+
+            $result = & $scriptPath -Action Import -Data $fakeRemoveBob `
+                -RootFolder $TestDrive
+
+            $result.Errors -join ';' |
+            Should -Match 'last enabled local administrator; removal refused'
+            Should -Invoke Remove-LocalUser -Times 0 -Exactly
+        }
+        It 'refuses removal when the administrators cannot be read' {
+            Mock Get-LocalGroupMember {
+                throw 'Failed to compare two elements in the array'
+            } -ParameterFilter { [string]$SID -eq 'S-1-5-32-544' }
+
+            $result = & $scriptPath -Action Import -Data $fakeRemoveBob `
+                -RootFolder $TestDrive
+
+            $result.Errors | Should -Be @(
+                "Failed to remove user account 'bob': cannot read the " +
+                'members of the local Administrators group (Failed to ' +
+                'compare two elements in the array); removal refused'
+            )
+            Should -Invoke Remove-LocalUser -Times 0 -Exactly
+        }
+    }
+    It 'removes an account that is not an administrator as before' {
+        $result = & $scriptPath -Action Import `
+            -Data @([pscustomobject]@{ Name = 'Other'; Action = 'Remove' }) `
+            -RootFolder $TestDrive
+
+        $result.Errors.Count | Should -Be 0 -Because ($result.Errors -join '; ')
+        $result.Messages | Should -Be @(
+            "Removed user account 'Other' (profile files kept)"
+        )
+        Should -Invoke Get-LocalGroupMember -Times 1 -Exactly -ParameterFilter {
+            [string]$SID -eq 'S-1-5-32-544'
+        }
     }
 }
 

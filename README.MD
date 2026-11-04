@@ -137,6 +137,10 @@ Use `Action: "Remove"` in `UserAccounts` instead of a custom removal script:
   domain-qualified name or SID. Only named accounts are removed.
 - Windows built-in accounts (even renamed ones) and the account running the
   restore are protected by SID; attempts to remove them are reported as errors.
+- The last enabled local administrator is never removed. Another enabled
+  local account, or a domain or Azure AD user or group, in the
+  Administrators group counts as another administrator. When the members of
+  that group cannot be read, removal is refused.
 - An account that is already absent is reported as nothing to remove.
   Other failures are reported, and remaining entries are still processed.
 - This deletes the account, **not its Windows profile or files**. Recreating

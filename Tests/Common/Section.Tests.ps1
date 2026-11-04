@@ -85,3 +85,12 @@ Describe 'Account names' {
         }
     }
 }
+
+Describe 'Get-ExportTaskFolderHC' {
+    It 'removes duplicate folders regardless of case, keeping the first' {
+        $options = @{ TaskPath = @('\HC\', '\hc\', 'HC', 'Vendor') }
+
+        Get-ExportTaskFolderHC -Options $options |
+            Should -BeExactly @('\HC\', '\Vendor\')
+    }
+}

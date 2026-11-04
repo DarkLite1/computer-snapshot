@@ -123,12 +123,17 @@ function Get-ExportTaskFolderHC {
         $Options
     )
 
+    # Task folder names are case-insensitive; keep the first spelling
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' (
+        [StringComparer]::OrdinalIgnoreCase
+    )
+
     $folders = @(
         $Options.TaskPath |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
         ForEach-Object { '\' + ([string]$_).Trim().Trim('\') + '\' } |
         ForEach-Object { $_ -replace '^\\\\$', '\' } |
-        Select-Object -Unique
+        Where-Object { $seen.Add($_) }
     )
 
     if (-not $folders.Count) {

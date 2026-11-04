@@ -18,7 +18,8 @@
     With FillPlaceholders, a text file is copied with its {{input:...}},
     {{ipv4:...}} and {{prefix:...}} placeholders replaced by the answers
     given at the start of the restore, in PlaceholderValues. The file keeps
-    its encoding.
+    its encoding. When To is an existing folder, the file is written into
+    it under its own name.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -260,6 +261,14 @@ else {
                 $what = "the contents of folder '$($item.From)'"
             }
             else {
+                # Like Copy-Item, an existing folder receives the file
+                if (
+                    $item.FillPlaceholders -eq $true -and
+                    [IO.Directory]::Exists($to)
+                ) {
+                    $to = [IO.Path]::Combine($to, $fromItem.Name)
+                }
+
                 $parent = Split-Path -Path $to -Parent
 
                 if ($parent) {

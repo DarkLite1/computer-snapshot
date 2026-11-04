@@ -208,6 +208,36 @@ Describe 'Copy a file with its placeholders filled in' {
                 "no answer for the placeholder(s) $placeholder")
         )
     }
+    It ('writes into an existing destination folder under the source ' +
+        'file name, also over a read-only file') {
+        $folder = Join-Path $root 'Out'
+        $null = New-Item -Path $folder -ItemType Directory
+        $entry.To = $folder
+        $expected = Join-Path $folder 'Start terminal.ps1'
+
+        $result = @(
+            & $scriptPath -Action Import -Data @($entry) -RootFolder $root
+        )
+
+        $result[0].Errors.Count |
+            Should -Be 0 -Because ($result[0].Errors -join '; ')
+        $result[0].Messages | Should -Be @(
+            ("Copied file 'Files\Start terminal.ps1' with 1 placeholder(s) " +
+                "filled in to '$expected'")
+        )
+        [IO.File]::ReadAllText($expected) | Should -Match '10\.20\.60\.47'
+
+        Set-ItemProperty -LiteralPath $expected -Name IsReadOnly -Value $true
+        $entry.PlaceholderValues[$placeholder] = '10.20.60.48'
+
+        $result = @(
+            & $scriptPath -Action Import -Data @($entry) -RootFolder $root
+        )
+
+        $result[0].Errors.Count |
+            Should -Be 0 -Because ($result[0].Errors -join '; ')
+        [IO.File]::ReadAllText($expected) | Should -Match '10\.20\.60\.48'
+    }
     It 'refuses FillPlaceholders for a folder' {
         $entry.From = 'Files'
 

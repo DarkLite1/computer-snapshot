@@ -487,7 +487,7 @@ $ArgumentList = '--kiosk http://{{ipv4:IP address of the terminal server}}:1353/
 ]
 ```
 
-`{{input:...}}`, `{{ipv4:...}}` and `{{prefix:...}}` work in files. `{{password:...}}` is refused, because the password would be stored in plain text on the computer. `FillPlaceholders` works for a single file, not for a folder.
+`{{input:...}}`, `{{ipv4:...}}` and `{{prefix:...}}` work in files. `{{password:...}}` is refused, because the password would be stored in plain text on the computer. `FillPlaceholders` works for a single file, not for a folder. When `To` is an existing folder, the filled file is written into it under its own name, as for a normal file copy.
 
 **Exported user accounts:** Windows never reveals passwords, so an export writes `{{password:Password for local user 'name'}}` for each local user. Restoring the export asks for each password (unless supplied in an answer file), and sets it on the user, also on a user that already exists. Accounts that Windows manages itself (Guest, DefaultAccount, WDAGUtilityAccount) get an empty password instead and keep their current one. To keep an existing user's password, replace its placeholder in the configuration with an empty string; a user that doesn't exist yet needs a password to be created.
 

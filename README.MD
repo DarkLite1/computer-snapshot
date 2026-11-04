@@ -578,9 +578,10 @@ if (-not $result.Success) { exit 1 }
 
 `-Unattended` skips confirmation and requires an explicit configuration path;
 it never shows the configuration picker. It suppresses browser opening even
-if `OpenReportInBrowser` is true. When `Settings.RunElevated` is true and the
-process is not elevated, it fails with instructions rather than requesting
-UAC. Restart settings still apply; use `-RebootComputer $false` to override them.
+if `OpenReportInBrowser` is true. It always requires administrator rights,
+whatever `Settings.RunElevated` says: without them it fails with
+instructions before any input is read or any section runs, rather than
+requesting UAC. Restart settings still apply; use `-RebootComputer $false` to override them.
 A validation failure throws before any section runs, and the executor writes a
 failure report. Section failures are reported through `Success: false`, as in
 other restores; check that result in automation as shown above.

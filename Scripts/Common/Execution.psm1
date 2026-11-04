@@ -191,6 +191,16 @@ function Invoke-ComputerSnapshotHC {
     #region Preflight
     if ($Action -eq 'RestoreSnapshot') {
         try {
+            # Most sections need administrator rights, and an unattended
+            # restore cannot ask for them
+            if ($Unattended -and -not (Test-ElevatedHC)) {
+                throw (
+                    'Unattended restore requires administrator rights. ' +
+                    'Start PowerShell as administrator first; UAC will ' +
+                    'not be requested.'
+                )
+            }
+
             $configuration = Read-ConfigurationHC `
                 -Path $configurationPath `
                 -RootFolder $RootFolder `
@@ -198,9 +208,6 @@ function Invoke-ComputerSnapshotHC {
 
             if ($configuration.Problems.Count) {
                 throw ($configuration.Problems -join [Environment]::NewLine) 
-            }
-            if ($Unattended -and $configuration.Settings.RunElevated -and -not (Test-ElevatedHC)) {
-                throw 'Unattended restore requires administrator rights for this configuration. Start PowerShell as administrator first; UAC will not be requested.'
             }
             $answers = $null
             if ($PSBoundParameters.ContainsKey('AnswerFile')) {

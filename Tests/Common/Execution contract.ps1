@@ -360,16 +360,50 @@ Describe 'Single-file execution' {
         (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
         Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 0 -Exactly
     }
-    It 'fails unattended when the configuration requires elevation, without prompting or launching' {
-        Write-ConfigurationHC @{ SchemaVersion = 3; Settings = @{ RunElevated = $true }; Items = @{ UserAccounts = @(@{ Name = '{{input:Account}}' }) } } $path
+    It 'refuses unattended without administrator rights, RunElevated <RunElevated>, before reading answers or running a child' -ForEach @(
+        @{ RunElevated = $true }
+        @{ RunElevated = $false }
+    ) {
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Settings      = @{ RunElevated = $RunElevated }
+            Items         = @{ UserAccounts = @(@{ Name = '{{input:Account}}' }) }
+        } $path
+        $answerPath = Join-Path $TestDrive 'admin.answers.json'
+        '{"Answers":{"{{input:Account}}":"kiosk"}}' |
+        Set-Content -LiteralPath $answerPath
+        Mock Read-RestoreAnswerFileHC -ModuleName Execution
         $params.Action = 'RestoreSnapshot'
         $params.Items = @('UserAccounts')
+        $params.AnswerFile = $answerPath
         $params.Unattended = $true
         Mock Test-ElevatedHC -ModuleName Execution { $false }
-        { Invoke-ComputerSnapshotHC @params } | Should -Throw '*validation failed*'
+
+        { Invoke-ComputerSnapshotHC @params } |
+        Should -Throw '*validation failed*'
+
+        Should -Invoke Write-SnapshotReportHC -ModuleName Execution `
+            -Times 1 -Exactly -ParameterFilter {
+            ($Results.Messages -join ' ') -like
+            '*Unattended restore requires administrator rights*'
+        }
+        Should -Invoke Read-RestoreAnswerFileHC -ModuleName Execution -Times 0 -Exactly
         Should -Invoke Read-RestoreInputHC -ModuleName Execution -Times 0 -Exactly
         Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 0 -Exactly
         Should -Invoke Start-Process -ModuleName Execution -Times 0 -Exactly
+    }
+    It 'only warns about missing administrator rights in an interactive restore' {
+        Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ UserAccounts = @(@{ Name = 'Existing' }) } } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts')
+        Mock Test-ElevatedHC -ModuleName Execution { $false }
+
+        (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+
+        Should -Invoke Write-Warning -ModuleName Execution -Times 1 -Exactly -ParameterFilter {
+            $Message -like 'Not running as administrator*'
+        }
+        Should -Invoke Invoke-ChildScriptHC -ModuleName Execution -Times 1 -Exactly
     }
     It 'redacts file-supplied passwords from resolved-configuration validation failures' {
         Write-ConfigurationHC @{ SchemaVersion = 3; Items = @{ Software = @{ Install = @(@{ ExecutablePath = '{{password:Path}}' }) } } } $path

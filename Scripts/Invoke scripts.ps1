@@ -29,7 +29,7 @@
     are prompted for unless Unattended is set. Relative paths use the USB root.
 .PARAMETER Unattended
     Restore only: fail on missing answers, suppress browser opening, and fail
-    if configured elevation is required instead of requesting UAC.
+    without administrator rights instead of requesting UAC.
 .PARAMETER Script
     Item-to-script map; intended for testing and controlled customization.
 #>

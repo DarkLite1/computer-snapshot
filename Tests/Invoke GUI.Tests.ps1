@@ -135,6 +135,7 @@ Describe 'Single-file wizard commands' {
             '{"SchemaVersion":3,"Items":{"UserAccounts":[]}}' | Set-Content -LiteralPath $file
             $answerFile = Join-Path $TestDrive "kiosk's answers.json"
             '{"Answers":{"{{password:Password}}":"PRIVATE-ANSWER"}}' | Set-Content -LiteralPath $answerFile
+            Mock Test-WizardElevatedHC { $true }
             Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $file -AnswerFile $answerFile -Unattended
             Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
                 $command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($ArgumentList[-1]))
@@ -151,6 +152,23 @@ Describe 'Single-file wizard commands' {
                 Should -Throw '*not found*'
             { Start-ConfigurationJobHC -Action RestoreSnapshot -RootFolder $TestDrive -ConfigurationFile $file -Unattended } |
                 Should -Throw '*administrator rights*'
+            Should -Invoke Start-Process -Times 0 -Exactly
+        }
+        It 'refuses unattended without administrator rights, RunElevated <RunElevated>' -ForEach @(
+            @{ RunElevated = 'true' }
+            @{ RunElevated = 'false' }
+        ) {
+            $file = Join-Path $TestDrive 'unattended-configuration.json'
+            '{"SchemaVersion":3,"Settings":{"RunElevated":' + $RunElevated +
+            '},"Items":{"UserAccounts":[]}}' |
+            Set-Content -LiteralPath $file
+            Mock Test-WizardElevatedHC { $false }
+
+            {
+                Start-ConfigurationJobHC -Action RestoreSnapshot `
+                    -RootFolder $TestDrive -ConfigurationFile $file -Unattended
+            } | Should -Throw 'Unattended restore requires administrator rights.*'
+
             Should -Invoke Start-Process -Times 0 -Exactly
         }
     It 'passes checked restore keys to the configuration launcher' {

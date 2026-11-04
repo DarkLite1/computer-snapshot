@@ -24,7 +24,8 @@
     for unless Unattended is set. Relative paths use the USB root.
 .PARAMETER Unattended
     Skip confirmation, fail on missing answers, do not open the report browser,
-    and fail instead of requesting UAC. Requires an explicit ConfigurationFile.
+    and fail without administrator rights instead of requesting UAC.
+    Requires an explicit ConfigurationFile.
 #>
 [CmdletBinding()]
 param(
@@ -68,6 +69,12 @@ if (-not $ConfigurationFile) {
     if (-not $selected) { return }
     $ConfigurationFile = $selected.Path
 }
+if ($Unattended -and -not (Test-IsStartedElevatedHC)) {
+    throw (
+        'Unattended restore requires administrator rights. Start ' +
+        'PowerShell as administrator first; UAC will not be requested.'
+    )
+}
 $configurationPath = Resolve-RootPathHC $ConfigurationFile $rootFolder
 if ($PSBoundParameters.ContainsKey('AnswerFile')) {
     if ([string]::IsNullOrWhiteSpace($AnswerFile)) { throw 'AnswerFile must not be empty.' }
@@ -84,7 +91,6 @@ if (
     return
 }
 if ($configuration.Settings.RunElevated -and -not (Test-IsStartedElevatedHC)) {
-    if ($Unattended) { throw 'Unattended restore requires administrator rights for this configuration. Start PowerShell as administrator first; UAC will not be requested.' }
     $command = "& '{0}' -ConfigurationFile '{1}' -StartScript '{2}' -SkipConfirmation" -f $PSCommandPath.Replace("'", "''"), $configurationPath.Replace("'", "''"), $StartScript.Replace("'", "''")
     if ($null -ne $Items) {
         $itemArguments = ($Items | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','

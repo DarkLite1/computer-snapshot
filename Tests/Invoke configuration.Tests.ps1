@@ -115,6 +115,7 @@ Describe 'Configuration launcher' {
         }
     }
     It 'passes the answer-file path and unattended flag without asking for confirmation' {
+        Mock Test-IsStartedElevatedHC { $true }
         . $testScript -ConfigurationFile $testConfigurationFile -StartScript $testStartScript -AnswerFile "Answers\kiosk's answers.json" -Unattended
         Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
             $Arguments.Unattended -and $Arguments.AnswerFile -like "*\Answers\kiosk's answers.json"
@@ -139,6 +140,23 @@ Describe 'Configuration launcher' {
         Should -Invoke Out-GridView -Times 0 -Exactly
         Should -Invoke Start-Process -Times 0 -Exactly
         Should -Invoke Read-Host -Times 0 -Exactly
+        Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
+    }
+    It 'refuses unattended without administrator rights, RunElevated <RunElevated>, before reading the configuration' -ForEach @(
+        @{ RunElevated = $true }
+        @{ RunElevated = $false }
+    ) {
+        $document.Settings.RunElevated = $RunElevated
+        $document | ConvertTo-Json -Depth 20 |
+        Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+        Mock Read-ConfigurationHC { throw 'The configuration must not be read.' }
+
+        {
+            . $testScript -ConfigurationFile $testConfigurationFile `
+                -StartScript $testStartScript -Unattended
+        } | Should -Throw 'Unattended restore requires administrator rights.*'
+
+        Should -Invoke Start-Process -Times 0 -Exactly
         Should -Invoke Invoke-ScriptHC -Times 0 -Exactly
     }
     It 'runs an elevation-requesting configuration unattended when already elevated' {

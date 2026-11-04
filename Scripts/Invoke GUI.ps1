@@ -372,7 +372,7 @@ function New-RestoreAnswersPanelHC {
     $panel.SetColumnSpan($unattended, 3)
     $hint = New-Object Windows.Forms.Label
     $hint.Name = 'AnswerFileGuidance'
-    $hint.Text = 'Missing answers prompt unless Unattended is checked. Invalid answers always fail. Unattended disables browser opening and will not request UAC. Password answers are plain text.'
+    $hint.Text = 'Missing answers prompt unless Unattended is checked. Invalid answers always fail. Unattended needs the wizard to run as administrator, disables browser opening and will not request UAC. Password answers are plain text.'
     $hint.AutoSize = $true
     $hint.Dock = 'Fill'
     $hint.Font = New-Object Drawing.Font 'Segoe UI', 9
@@ -622,9 +622,11 @@ function Start-ConfigurationJobHC {
         }
         if ($Unattended) {
             $command += ' -Unattended'
-            $document = Get-Content -LiteralPath $ConfigurationFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            if (($RunElevated -or $document.Settings.RunElevated) -and -not (Test-WizardElevatedHC)) {
-                throw 'Unattended restore requires administrator rights for this configuration. Restart the wizard as administrator first.'
+            if (-not (Test-WizardElevatedHC)) {
+                throw (
+                    'Unattended restore requires administrator rights. ' +
+                    'Restart the wizard as administrator first.'
+                )
             }
         }
     }

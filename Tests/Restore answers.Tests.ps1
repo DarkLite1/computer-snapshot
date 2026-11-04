@@ -256,6 +256,49 @@ Describe 'Test-ConfigurationBeforeInputHC' {
         $problems[0] |
             Should -BeLike "*Install[[]1].ExecutablePath: file 'Missing*"
     }
+    It 'leaves a registry value that is still a placeholder for later' {
+        $configuration = @{
+            SchemaVersion = 3
+            Items         = @{
+                RegistryKeys = @{
+                    RunAsCurrentUser = @{
+                        RegistryKeys = @(
+                            @{
+                                Path  = 'HKCU:\Software\Example'
+                                Name  = 'Port'
+                                Type  = 'DWord'
+                                Value = '{{input:Port number}}'
+                            }
+                            @{
+                                Path  = 'HKCU:\Software\Example'
+                                Name  = 'Retries'
+                                Type  = 'DWord'
+                                Value = 'many'
+                            }
+                            @{
+                                Path   = 'HKCU:\Software\Example'
+                                Action = 'RemoveValue'
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        $problems = @(
+            Test-ConfigurationBeforeInputHC $configuration $TestDrive
+        )
+
+        $problems.Count | Should -Be 2 -Because ($problems -join '; ')
+        $problems[0] | Should -BeLike (
+            '*RunAsCurrentUser.RegistryKeys[[]1].Value: ' +
+            "'many' is not a number*"
+        )
+        $problems[1] | Should -BeLike (
+            '*RunAsCurrentUser.RegistryKeys[[]2].Name: ' +
+            'required for Action RemoveValue'
+        )
+    }
 }
 
 Describe 'Answer template generation' {

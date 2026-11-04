@@ -278,6 +278,11 @@ function Get-RegistryEntryProblemHC {
     <#
     .SYNOPSIS
         Problems in one RegistryKeys entry, as text; nothing when it is valid.
+    .DESCRIPTION
+        Each problem starts with the field it belongs to, such as
+        'Value: ...'. The configuration check reports it on that field, so a
+        value that is still a {{input:...}} placeholder is checked only after
+        it is filled in.
     #>
     param(
         [Parameter(Mandatory)]$Entry
@@ -292,13 +297,13 @@ function Get-RegistryEntryProblemHC {
 
     if ($action -notin $script:RegistryActionsHC) {
         return (
-            "unknown Action '$action'; use " +
+            "Action: unknown Action '$action'; use " +
             ($script:RegistryActionsHC -join ', ')
         )
     }
 
     if ([string]::IsNullOrWhiteSpace($Entry.Path)) {
-        return 'Path is required'
+        return 'Path: required'
     }
 
     $names = @($Entry.PSObject.Properties | ForEach-Object { $_.Name })
@@ -310,13 +315,22 @@ function Get-RegistryEntryProblemHC {
         'Set' {
             foreach ($property in @('Name', 'Type', 'Value')) {
                 if ($names -notcontains $property) {
-                    "$property is required for Action Set"
+                    "${property}: required for Action Set"
                 }
             }
 
+            $type = $null
             if ($names -contains 'Type') {
                 try {
                     $type = ConvertTo-RegistryTypeHC -Type ([string]$Entry.Type)
+                }
+                catch {
+                    "Type: $($_.Exception.Message)"
+                }
+            }
+
+            if ($type -and $names -contains 'Value') {
+                try {
                     $dataParams = @{
                         Value = $Entry.Value
                         Type  = $type
@@ -324,13 +338,13 @@ function Get-RegistryEntryProblemHC {
                     $null = ConvertTo-RegistryDataHC @dataParams
                 }
                 catch {
-                    $_.Exception.Message
+                    "Value: $($_.Exception.Message)"
                 }
             }
         }
         'RemoveValue' {
             if ($names -notcontains 'Name') {
-                'Name is required for Action RemoveValue'
+                'Name: required for Action RemoveValue'
             }
         }
         default {
@@ -338,8 +352,9 @@ function Get-RegistryEntryProblemHC {
 
             if (Test-BroadRegistryKeyHC -Path $registryPath) {
                 (
-                    "Action $action is refused for '$($Entry.Path)', a hive " +
-                    'root or a key directly below it; use a more specific key'
+                    "Path: Action $action is refused for '$($Entry.Path)', " +
+                    'a hive root or a key directly below it; use a more ' +
+                    'specific key'
                 )
             }
         }

@@ -764,7 +764,7 @@ function Test-ConfigurationHC {
 
                         foreach ($problem in $entryProblems) {
                             $problems.Add(
-                                "${location}$($group.Location)[$index]: " +
+                                "${location}$($group.Location)[$index]." +
                                 $problem
                             )
                         }

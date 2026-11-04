@@ -227,7 +227,17 @@ else {
                 if ($group.Description) {
                     $newGroupParams.Description = $group.Description
                 }
-                $null = New-LocalGroup @newGroupParams
+                $newGroup = New-LocalGroup @newGroupParams
+                # A later entry for the same group must update it, not
+                # create it again
+                $knownGroups += if ($newGroup) { $newGroup }
+                else {
+                    [pscustomobject]@{
+                        Name        = $group.Name
+                        Description = [string]$group.Description
+                        SID         = ''
+                    }
+                }
                 $messages += "Created group '$($group.Name)'"
             }
             elseif (

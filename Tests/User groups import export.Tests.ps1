@@ -129,6 +129,37 @@ Describe 'User groups errors' {
         )
         Should -Invoke Set-LocalGroup -Times 0 -Exactly
     }
+    It 'creates a new group only once when it is configured twice' {
+        Mock New-LocalGroup {
+            [pscustomobject]@{
+                Name        = $Name
+                Description = $Description
+                SID         = 'S-1-5-21-1-2-3-1003'
+            }
+        }
+        $data = @(
+            [pscustomobject]@{
+                Name        = 'Captains'
+                Description = 'Star fleet'
+                Members     = @('kirk')
+            }
+            [pscustomobject]@{ Name = 'Captains'; Members = @('picard') }
+        )
+
+        $result = @(
+            & $scriptPath -Action Import -Data $data -RootFolder $TestDrive
+        )
+
+        $result[0].Errors.Count |
+            Should -Be 0 -Because ($result[0].Errors -join '; ')
+        $result[0].Messages | Should -Be @(
+            "Created group 'Captains'"
+            "Added account 'kirk' to group 'Captains'"
+            "Group 'Captains' already exists and is correct"
+            "Added account 'picard' to group 'Captains'"
+        )
+        Should -Invoke New-LocalGroup -Times 1 -Exactly
+    }
     It ('reports a group whose members cannot be read and still exports ' +
         'the other groups') {
         $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)

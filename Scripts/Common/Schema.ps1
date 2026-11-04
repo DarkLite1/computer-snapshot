@@ -85,6 +85,19 @@ function Test-ShapeHC {
         "${Location}: string is empty"
     }
 
+    if (
+        $Schema.pattern -and
+        $Value -is [string] -and
+        $Value -cnotmatch $Schema.pattern
+    ) {
+        if ($Schema.description) {
+            "${Location}: expected $($Schema.description)"
+        }
+        else {
+            "${Location}: '$Value' does not match '$($Schema.pattern)'"
+        }
+    }
+
     $isNumber = $Value -is [int] -or $Value -is [long] -or $Value -is [double]
 
     if (

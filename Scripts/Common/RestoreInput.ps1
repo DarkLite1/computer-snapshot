@@ -10,7 +10,7 @@ function Get-RestoreInputFieldsHC {
 
     if ($Data -is [string]) {
         $pattern = (
-            '\A\{\{(?<Kind>input|password|ipv4|prefix):' +
+            '\A\{\{(?<Kind>input|password|ipv4|prefix|number):' +
             '(?<Description>[^{}\r\n]+)\}\}\z'
         )
         $match = [regex]::Match($Data, $pattern)
@@ -32,12 +32,12 @@ function Get-RestoreInputFieldsHC {
         }
         elseif (
             $Data.StartsWith('{{') -or
-            $Data -match '\{\{(?:input|password|ipv4|prefix):'
+            $Data -match '\{\{(?:input|password|ipv4|prefix|number):'
         ) {
             throw (
                 "${Path}: use a complete {{input:Description}}, " +
-                '{{password:Description}}, {{ipv4:Description}} or ' +
-                '{{prefix:Description}} string.'
+                '{{password:Description}}, {{ipv4:Description}}, ' +
+                '{{prefix:Description}} or {{number:Description}} string.'
             )
         }
 
@@ -96,16 +96,20 @@ function Get-TextInputFieldsHC {
     $complete = [regex]::Matches(
         $Text,
         (
-            '\{\{(?<Kind>input|password|ipv4|prefix):' +
+            '\{\{(?<Kind>input|password|ipv4|prefix|number):' +
             '(?<Description>[^{}\r\n]+)\}\}'
         )
     )
-    $started = [regex]::Matches($Text, '\{\{(?:input|password|ipv4|prefix):')
+    $started = [regex]::Matches(
+        $Text,
+        '\{\{(?:input|password|ipv4|prefix|number):'
+    )
 
     if ($started.Count -ne $complete.Count) {
         throw (
             "${Path}: use complete {{input:Description}}, " +
-            '{{ipv4:Description}} or {{prefix:Description}} placeholders.'
+            '{{ipv4:Description}}, {{prefix:Description}} or ' +
+            '{{number:Description}} placeholders.'
         )
     }
 
@@ -208,7 +212,39 @@ function Test-RestoreInputValueHC {
         return $Value -match '\A(?:[1-9]|[12][0-9]|3[0-2])\z'
     }
 
+    if ($Kind -eq 'number') {
+        # A whole number written plainly, such as 15 or -1, that fits a long
+        $number = [long]0
+
+        return (
+            $Value -match '\A-?(?:0|[1-9][0-9]*)\z' -and
+            [long]::TryParse(
+                $Value,
+                [Globalization.NumberStyles]::AllowLeadingSign,
+                [Globalization.CultureInfo]::InvariantCulture,
+                [ref]$number
+            )
+        )
+    }
+
     return $true
+}
+
+function ConvertTo-RestoreInputNumberHC {
+    # The answer of a {{number:...}} placeholder: an int when it fits,
+    # otherwise a long
+    param(
+        [Parameter(Mandatory)][string]$Value
+    )
+
+    $culture = [Globalization.CultureInfo]::InvariantCulture
+    $number = [long]::Parse($Value, $culture)
+
+    if ($number -ge [int]::MinValue -and $number -le [int]::MaxValue) {
+        return [int]$number
+    }
+
+    $number
 }
 
 function New-RestoreInputFormHC {
@@ -328,6 +364,9 @@ function New-RestoreInputFormHC {
         }
         elseif ($owner.Tag.Kind -eq 'prefix') {
             'Enter a prefix length from 1 to 32, such as 24.'
+        }
+        elseif ($owner.Tag.Kind -eq 'number') {
+            'Enter a whole number, such as 15.'
         }
         else {
             'Enter an IPv4 address such as 192.0.2.10.'
@@ -465,8 +504,9 @@ function Read-RestoreAnswerFileHC {
         $allowedTypes = @('string')
         $expected = "nonempty, valid $kind string"
 
-        # A prefix length is a number, so 24 is as natural as "24"
-        if ($kind -eq 'prefix') {
+        # A prefix length or a whole number is a number, so 24 is as natural
+        # as "24"
+        if ($kind -in @('prefix', 'number')) {
             $allowedTypes += 'number'
             $expected += ' or number'
         }
@@ -706,12 +746,17 @@ function Resolve-RestoreInputHC {
             continue
         }
 
-        # A prefix length is a number in the configuration
-        $answer = if ($field.Kind -eq 'prefix') {
-            [int]$answers[$field.Placeholder]
-        }
-        else {
-            $answers[$field.Placeholder]
+        # Prefix lengths and whole numbers are numbers in the configuration
+        $answer = switch ($field.Kind) {
+            'prefix' {
+                [int]$answers[$field.Placeholder]
+            }
+            'number' {
+                ConvertTo-RestoreInputNumberHC $answers[$field.Placeholder]
+            }
+            default {
+                $answers[$field.Placeholder]
+            }
         }
 
         if (

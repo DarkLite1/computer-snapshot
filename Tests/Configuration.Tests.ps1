@@ -116,6 +116,78 @@ Describe 'Restore input placeholders' {
             Resolve-RestoreInputHC -Items $badItems -ReadValue { '40' }
         } | Should -Throw '*supplied input is empty or invalid*'
     }
+    It 'accepts the whole number <Value>' -ForEach @(
+        @{ Value = '15' }
+        @{ Value = '0' }
+        @{ Value = '-1' }
+        @{ Value = '9223372036854775807' }
+    ) {
+        Test-RestoreInputValueHC -Kind number -Value $Value | Should -BeTrue
+    }
+    It 'rejects <Value> as a whole number' -ForEach @(
+        @{ Value = '' }
+        @{ Value = '015' }
+        @{ Value = '1.5' }
+        @{ Value = '1e3' }
+        @{ Value = ' 15' }
+        @{ Value = '15 ' }
+        @{ Value = 'abc' }
+        @{ Value = '+15' }
+        @{ Value = '9223372036854775808' }
+    ) {
+        Test-RestoreInputValueHC -Kind number -Value $Value | Should -BeFalse
+    }
+    It 'stores a whole number as an int, or as a long when it is large' {
+        $items = (
+            '{"Software":{"Install":[{"ExecutablePath":"Setup.exe",' +
+            '"TimeoutMinutes":"{{number:Minutes}}",' +
+            '"SuccessExitCodes":[0,"{{number:Extra code}}"]}]},' +
+            '"Other":{"Big":"{{number:Big}}","Text":"{{input:Text}}"}}'
+        ) | ConvertFrom-Json
+        $fakeAnswers = @{
+            '{{number:Minutes}}'    = '15'
+            '{{number:Extra code}}' = '-1'
+            '{{number:Big}}'        = '3000000000'
+            '{{input:Text}}'        = '15'
+        }
+
+        $null = Resolve-RestoreInputHC -Items $items -ReadValue {
+            param($field)
+            $fakeAnswers[$field.Placeholder]
+        }
+
+        $install = $items.Software.Install[0]
+        $install.TimeoutMinutes | Should -BeOfType [int]
+        $install.TimeoutMinutes | Should -Be 15
+        $install.SuccessExitCodes[1] | Should -BeOfType [int]
+        $install.SuccessExitCodes[1] | Should -Be -1
+        $items.Other.Big | Should -BeOfType [long]
+        $items.Other.Big | Should -Be 3000000000
+        $items.Other.Text | Should -BeOfType [string]
+        $items.Other.Text | Should -BeExactly '15'
+    }
+    It 'refuses an invalid whole number from the prompt' {
+        $items = @{ A = @{ P = '{{number:P}}' } }
+
+        {
+            Resolve-RestoreInputHC -Items $items -ReadValue { '1.5' }
+        } | Should -Throw '*supplied input is empty or invalid*'
+        $items.A.P | Should -Be '{{number:P}}'
+    }
+    It 'finds a number placeholder in a file and in configuration data' {
+        $fields = @(
+            Get-TextInputFieldsHC -Text 'wait={{number:Seconds}}' -Path 'F'
+        )
+        $fields.Count | Should -Be 1
+        $fields[0].Kind | Should -Be 'number'
+
+        {
+            Get-TextInputFieldsHC -Text 'wait={{number:Seconds' -Path 'F'
+        } | Should -Throw '*{{number:Description}}*'
+        {
+            Get-RestoreInputFieldsHC -Data @{ A = 'x {{number:Seconds}}' }
+        } | Should -Throw '*{{number:Description}}*'
+    }
     It ('asks for placeholders inside files that are filled in while ' +
         'copying, once per placeholder') {
         $null = New-Item -Path "$TestDrive\Files" -ItemType Directory -Force

@@ -249,4 +249,23 @@ Describe 'Copy a file with its placeholders filled in' {
             '*FillPlaceholders only works for a file, not for a folder'
         )
     }
+    It 'fills in a number placeholder as text' {
+        $number = '{{number:Seconds to wait}}'
+        [IO.File]::WriteAllText(
+            $template,
+            "Start-Sleep -Seconds $number # $placeholder",
+            (New-Object System.Text.UTF8Encoding $false)
+        )
+        $entry.PlaceholderValues[$number] = '30'
+
+        $result = @(
+            & $scriptPath -Action Import -Data @($entry) -RootFolder $root
+        )
+
+        $result[0].Errors.Count |
+            Should -Be 0 -Because ($result[0].Errors -join '; ')
+        $result[0].Messages[0] | Should -BeLike '*with 2 placeholder(s)*'
+        [IO.File]::ReadAllText($target) |
+            Should -BeExactly 'Start-Sleep -Seconds 30 # 10.20.60.47'
+    }
 }

@@ -59,6 +59,35 @@ Describe 'Restore input popup' {
         }
         finally { $dialog.Dispose() }
     }
+    It ('accepts only a whole number for a number placeholder and ' +
+        'explains why') {
+        $field = [pscustomobject]@{
+            Kind        = 'number'
+            Description = 'Minutes the installer may run'
+            Path        = 'Items.Software.Install[0].TimeoutMinutes'
+        }
+        $dialog = New-RestoreInputFormHC -Field $field
+        try {
+            $dialog.Show()
+            $inputBox = $dialog.Controls.Find('InputValue', $true)[0]
+            $confirm = $dialog.Controls.Find('ConfirmInput', $true)[0]
+            $validation = $dialog.Controls.Find('InputValidation', $true)[0]
+            foreach ($value in @('1.5', '015', 'abc')) {
+                $inputBox.Text = $value
+                $confirm.Enabled | Should -BeFalse -Because "'$value'"
+                $validation.Text |
+                    Should -Be 'Enter a whole number, such as 15.'
+            }
+            $inputBox.Text = '30'
+            $confirm.Enabled | Should -BeTrue
+            $validation.Text | Should -Be ''
+            $confirm.PerformClick()
+            $dialog.Tag.Value | Should -BeExactly '30'
+        }
+        finally {
+            $dialog.Dispose()
+        }
+    }
 }
 
 Describe 'Wizard console welcome' {

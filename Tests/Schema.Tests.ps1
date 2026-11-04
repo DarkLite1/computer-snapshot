@@ -287,6 +287,193 @@ Describe 'Schema contract' {
             'Install\[0\]\.TimeoutMinutes: expected a number from 1 to 1440'
         )
     }
+    It 'reports TimeoutMinutes <Value> as <Expected>' -ForEach @(
+        @{ Value = 0; Expected = 'expected a number from 1 to 1440' }
+        @{
+            Value    = 'abc'
+            Expected = 'expected a whole number or {{number:Description}}'
+        }
+        @{
+            Value    = '15'
+            Expected = 'expected a whole number or {{number:Description}}'
+        }
+        @{
+            Value    = '{{input:Minutes}}'
+            Expected = 'expected a whole number or {{number:Description}}'
+        }
+    ) {
+        $installer = @{
+            ExecutablePath = 'C:\Windows\notepad.exe'
+            TimeoutMinutes = $Value
+        }
+        $document = @{
+            SchemaVersion = 3
+            Items         = @{ Software = @{ Install = @($installer) } }
+        }
+
+        $problems = @(Test-ConfigurationHC $document $TestDrive)
+
+        $problems.Count | Should -Be 1 -Because ($problems -join '; ')
+        $problems[0] |
+        Should -BeLike "*Install[[]0].TimeoutMinutes: $Expected"
+    }
+    It ('accepts {{number:...}} in the whole-number settings and keeps ' +
+        'null for SMB limits') {
+        $document = @{
+            SchemaVersion = 3
+            Items         = @{
+                Software                 = @{
+                    Remove  = @(
+                        @{
+                            DisplayName      = 'A'
+                            TimeoutMinutes   = '{{number:Remove minutes}}'
+                            SuccessExitCodes = @(0, '{{number:Remove code}}')
+                        }
+                    )
+                    Install = @(
+                        @{
+                            ExecutablePath   = 'C:\Windows\notepad.exe'
+                            TimeoutMinutes   = 15
+                            SuccessExitCodes = @(0, '{{number:Extra code}}')
+                        }
+                        @{
+                            ExecutablePath = 'C:\Windows\notepad.exe'
+                            TimeoutMinutes = '{{number:Minutes}}'
+                        }
+                    )
+                }
+                StartCustomScriptsBefore = @(
+                    @{
+                        Path             = 'C:\Windows\notepad.exe'
+                        SuccessExitCodes = @('{{number:Before code}}')
+                    }
+                )
+                StartCustomScriptsAfter  = @(
+                    @{
+                        Path             = 'C:\Windows\notepad.exe'
+                        SuccessExitCodes = @('{{number:After code}}')
+                    }
+                )
+                RegionalSettings         = @{
+                    WinSystemLocaleName  = 'en-US'
+                    TimeZoneId           = 'Romance Standard Time'
+                    WinHomeLocationGeoId = '{{number:Location}}'
+                    CultureName          = 'en-US'
+                }
+                SmbShares                = @(
+                    @{
+                        Name                = 'Data'
+                        Path                = 'C:\Data'
+                        CATimeout           = '{{number:Timeout}}'
+                        ThrottleLimit       = $null
+                        ConcurrentUserLimit = 10
+                    }
+                )
+            }
+        }
+
+        $problems = @(Test-ConfigurationHC $document $TestDrive)
+
+        $problems.Count | Should -Be 0 -Because ($problems -join '; ')
+    }
+    It 'rejects text that is not a number placeholder in <Setting>' -ForEach @(
+        @{
+            Setting = 'WinHomeLocationGeoId'
+            Items   = @{
+                RegionalSettings = @{
+                    WinSystemLocaleName  = 'en-US'
+                    TimeZoneId           = 'Romance Standard Time'
+                    WinHomeLocationGeoId = '21'
+                    CultureName          = 'en-US'
+                }
+            }
+        }
+        @{
+            Setting = 'CATimeout'
+            Items   = @{
+                SmbShares = @(
+                    @{ Name = 'Data'; Path = 'C:\Data'; CATimeout = 'abc' }
+                )
+            }
+        }
+        @{
+            Setting = 'SuccessExitCodes'
+            Items   = @{
+                StartCustomScriptsAfter = @(
+                    @{
+                        Path             = 'C:\Windows\notepad.exe'
+                        SuccessExitCodes = @(0, '{{prefix:Code}}')
+                    }
+                )
+            }
+        }
+    ) {
+        $document = @{ SchemaVersion = 3; Items = $Items }
+
+        $problems = @(Test-ConfigurationHC $document $TestDrive)
+
+        $problems -join ';' | Should -BeLike (
+            "*${Setting}*: expected a whole number or " +
+            '{{number:Description}}*'
+        )
+    }
+    It ('reports a string that does not match a pattern with the ' +
+        'description, or a generic message without one') {
+        InModuleScope Configuration {
+            $described = (
+                '{"type":"string","pattern":"^a+$",' +
+                '"description":"only the letter a"}'
+            ) | ConvertFrom-Json
+            $plain = '{"type":"string","pattern":"^a+$"}' | ConvertFrom-Json
+
+            Test-ShapeHC 'aaa' $described $null 'X' | Should -BeNullOrEmpty
+            Test-ShapeHC 'abc' $described $null 'X' |
+            Should -BeExactly 'X: expected only the letter a'
+            Test-ShapeHC 'AAA' $described $null 'X' |
+            Should -BeExactly 'X: expected only the letter a'
+            Test-ShapeHC 'abc' $plain $null 'X' |
+            Should -BeExactly "X: 'abc' does not match '^a+$'"
+        }
+    }
+    It 'ignores a pattern for a value that is not a string' {
+        InModuleScope Configuration {
+            $schema = (
+                '{"type":["string","integer","null"],"pattern":"^a+$",' +
+                '"description":"only the letter a"}'
+            ) | ConvertFrom-Json
+
+            Test-ShapeHC 5 $schema $null 'X' | Should -BeNullOrEmpty
+            Test-ShapeHC $null $schema $null 'X' | Should -BeNullOrEmpty
+        }
+    }
+    It 'reports a PrefixLength that is not a prefix placeholder unchanged' {
+        $test = {
+            param($prefix)
+            $card = @{
+                FindBy = @{ Name = 'Ethernet' }
+                Change = @{
+                    IPSettings = @{
+                        IPAddress    = '10.20.67.2'
+                        PrefixLength = $prefix
+                    }
+                }
+            }
+            $document = @{
+                SchemaVersion = 3
+                Items         = @{ NetworkCards = @($card) }
+            }
+            @(Test-ConfigurationHC $document $TestDrive)
+        }
+
+        $problems = @(& $test 'abc')
+        $problems.Count | Should -Be 1 -Because ($problems -join '; ')
+        $problems[0] | Should -BeLike (
+            '*IPSettings.PrefixLength: expected a number from 1 to 32, or ' +
+            '{{prefix:Description}}'
+        )
+        @(& $test '{{prefix:P}}').Count | Should -Be 0
+        @(& $test '{{number:P}}').Count | Should -Be 1
+    }
     It ('finds a network card by exactly one of FindBy.Description and ' +
         'FindBy.Name') {
         $test = {

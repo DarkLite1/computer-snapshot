@@ -177,6 +177,59 @@ Describe 'Answer file reading and resolution' {
             Should -Throw '*valid prefix string or number*' -PassThru
         $failure.Exception.Message | Should -Not -Match 'secret-value'
     }
+    It 'accepts a number answer written as a number or as text' -ForEach @(
+        @{ Value = '15' }
+        @{ Value = '"15"' }
+    ) {
+        ('{"Answers":{"{{number:Minutes}}":' + $Value + '}}') |
+            Set-Content -LiteralPath $answerPath
+
+        $answers = Read-RestoreAnswerFileHC $answerPath
+
+        $answers['{{number:Minutes}}'] | Should -BeExactly '15'
+    }
+    It ('rejects the number answer <Value> without revealing other ' +
+        'answers') -ForEach @(
+        @{ Value = '1.5' }
+        @{ Value = 'true' }
+        @{ Value = '"015"' }
+        @{ Value = '"abc"' }
+        @{ Value = '1e3' }
+        @{ Value = '9223372036854775808' }
+    ) {
+        ('{"Answers":{"{{password:Password}}":"Other-secret-value",' +
+            '"{{number:Minutes}}":' + $Value + '}}') |
+            Set-Content -LiteralPath $answerPath
+
+        $failure = { Read-RestoreAnswerFileHC $answerPath } |
+            Should -Throw '*valid number string or number*' -PassThru
+        $failure.Exception.Message | Should -Not -Match 'secret-value'
+    }
+    It 'fills in a number answer from an answer file as a number' {
+        '{"Answers":{"{{number:Minutes}}":30}}' |
+            Set-Content -LiteralPath $answerPath
+        $data = @{
+            Software = @{
+                Install = @(
+                    @{
+                        ExecutablePath = 'Setup.exe'
+                        TimeoutMinutes = '{{number:Minutes}}'
+                    }
+                )
+            }
+        }
+        $params = @{
+            Items      = $data
+            Answers    = (Read-RestoreAnswerFileHC $answerPath)
+            Unattended = $true
+            ReadValue  = { throw 'Unexpected prompt' }
+        }
+
+        $null = Resolve-RestoreInputHC @params
+
+        $data.Software.Install[0].TimeoutMinutes | Should -BeOfType ([int])
+        $data.Software.Install[0].TimeoutMinutes | Should -Be 30
+    }
     It 'rejects invalid document shapes, keys and malformed JSON' -ForEach @(
         @{ Json = '[]' }
         @{ Json = '{"Answers":[]}' }
@@ -355,6 +408,39 @@ Describe 'Answer template generation' {
             Force       = $true
         }
         @(Get-ChildItem @tempFiles).Count | Should -Be 0
+    }
+    It 'lists number placeholders of the configuration and of files' {
+        'wait={{number:Seconds}}' | Set-Content -LiteralPath $sourcePath
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{
+                Software         = @{
+                    Install = @(
+                        @{
+                            ExecutablePath = 'C:\Windows\notepad.exe'
+                            TimeoutMinutes = '{{number:Minutes}}'
+                        }
+                    )
+                }
+                CopyFilesFolders = @(
+                    @{
+                        From             = $sourcePath
+                        To               = 'C:\Example\template.txt'
+                        FillPlaceholders = $true
+                    }
+                )
+            }
+        } $configurationPath
+        $script = Join-Path $PSScriptRoot '..\Scripts\New answer file.ps1'
+
+        $null = & $script -ConfigurationFile $configurationPath -AnswerFile (
+            $answerPath
+        )
+
+        $document = Get-Content -LiteralPath $answerPath -Raw |
+            ConvertFrom-Json
+        @($document.Answers.PSObject.Properties.Name | Sort-Object) |
+            Should -Be @('{{number:Minutes}}', '{{number:Seconds}}')
     }
     It 'protects existing answer files unless Force is explicitly used' {
         'existing answers' | Set-Content -LiteralPath $answerPath

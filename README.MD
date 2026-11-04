@@ -459,6 +459,7 @@ Use a placeholder instead of a fixed string when a value changes between restore
 | `{{password:Enter the local account password}}` | Required, masked input. Use this form for passwords and other secrets.              |
 | `{{ipv4:Enter the time-server IPv4 address}}`   | Required IPv4 address, such as `192.0.2.10`; invalid addresses cannot be submitted. |
 | `{{prefix:Enter the prefix length}}`            | Required subnet prefix length from 1 to 32, such as `24`; stored as a number.        |
+| `{{number:Minutes the installer may run}}`      | Required whole number, such as `15` or `-1`; stored as a number.                     |
 
 The text after the colon is the field description shown in the popup. The configuration field path is also displayed. For example, a user-account entry can contain:
 
@@ -472,7 +473,17 @@ The text after the colon is the field description shown in the popup. The config
 
 Select the configuration, click **Restore**, review the section checklist, and click **Restore selected**. The configuration is checked first: a typo or a missing file is reported before any answer is asked for, and nothing is asked. In interactive mode, after any required UAC elevation, a popup requests each value not supplied by an answer file. **Continue** accepts a valid answer; **Cancel**, Escape, or closing any input popup cancels the entire restore before any sections run. All answers are collected and the resolved configuration is checked again before applying settings. Windows may still reject an otherwise valid answer, for example because of password policy.
 
-Placeholders work in string values inside `Items`, including nested objects, arrays, and referenced shared sections. Only selected sections prompt. An identical placeholder (including its type and description) asks once and reuses the answer within that restore; use different descriptions to request independent values. Comments, metadata, settings, property names and section-reference filenames are not input fields. Do not use placeholders for other numbers or booleans, or embed them within larger strings; `{{prefix:...}}` is the only placeholder that gives a number. Answers are used literally, not evaluated as PowerShell or expanded as further placeholders.
+Placeholders work in string values inside `Items`, including nested objects, arrays, and referenced shared sections. Only selected sections prompt. An identical placeholder (including its type and description) asks once and reuses the answer within that restore; use different descriptions to request independent values. Comments, metadata, settings, property names and section-reference filenames are not input fields. Do not use placeholders for booleans, or embed them within larger strings. `{{input:...}}` always gives text; use `{{prefix:...}}` for a prefix length and `{{number:...}}` for any other whole number, such as `TimeoutMinutes`, `SuccessExitCodes`, `WinHomeLocationGeoId` or `CATimeout`. Answers are used literally, not evaluated as PowerShell or expanded as further placeholders.
+
+For example, to ask how long an installer may run:
+
+```json
+"Install": [
+  { "ExecutablePath": "Software\\Setup.exe", "TimeoutMinutes": "{{number:Minutes the installer may run}}" }
+]
+```
+
+The answer must be a plain whole number, such as `30`: no leading zeros, decimals or spaces. The restore receives the number `30`, not the text `"30"`, so the setting passes the configuration check after filling in.
 
 **Placeholders inside a copied file:** a script or other text file on the USB stick can contain placeholders anywhere in its text, also in the middle of a line. Copy it with `CopyFilesFolders` and `"FillPlaceholders": true`; the placeholders are asked for at the start of the restore, together with the others, and the copy on the computer gets the answers. The file on the USB stick stays as it is, and the copy keeps the file's encoding.
 
@@ -487,7 +498,7 @@ $ArgumentList = '--kiosk http://{{ipv4:IP address of the terminal server}}:1353/
 ]
 ```
 
-`{{input:...}}`, `{{ipv4:...}}` and `{{prefix:...}}` work in files. `{{password:...}}` is refused, because the password would be stored in plain text on the computer. `FillPlaceholders` works for a single file, not for a folder. When `To` is an existing folder, the filled file is written into it under its own name, as for a normal file copy.
+`{{input:...}}`, `{{ipv4:...}}`, `{{prefix:...}}` and `{{number:...}}` work in files; in a file every answer is written as text. `{{password:...}}` is refused, because the password would be stored in plain text on the computer. `FillPlaceholders` works for a single file, not for a folder. When `To` is an existing folder, the filled file is written into it under its own name, as for a normal file copy.
 
 **Exported user accounts:** Windows never reveals passwords, so an export writes `{{password:Password for local user 'name'}}` for each local user. Restoring the export asks for each password (unless supplied in an answer file), and sets it on the user, also on a user that already exists. Accounts that Windows manages itself (Guest, DefaultAccount, WDAGUtilityAccount) get an empty password instead and keep their current one. To keep an existing user's password, replace its placeholder in the configuration with an empty string; a user that doesn't exist yet needs a password to be created.
 
@@ -512,8 +523,8 @@ whether missing values may prompt:
 
 An answer file contains an `Answers` object, with an optional `Comment`.
 Keys are **complete, case-sensitive placeholders**, including the braces,
-type and description. Values are strings; a prefix may also be a number, so
-`24` and `"24"` both work.
+type and description. Values are strings; a prefix or a number may also be a
+JSON number, so `24` and `"24"` both work, as do `15` and `"15"`.
 `null` means **not supplied** and is useful in a generated template. Empty
 strings and invalid values are errors, not requests to prompt. Malformed files,
 duplicate keys, unknown top-level properties and invalid supplied answers

@@ -586,6 +586,94 @@ Describe 'Single-file execution' {
         Should -Invoke Read-RestoreInputHC @inModule -Times 3 -Exactly
         Should -Invoke Invoke-ChildScriptHC @inModule -Times 1 -Exactly
     }
+    Context 'a number placeholder' {
+        BeforeEach {
+            Write-ConfigurationHC @{
+                SchemaVersion = 3
+                Items         = @{
+                    Software = @{
+                        Install = @(
+                            @{
+                                ExecutablePath = 'C:\Windows\notepad.exe'
+                                TimeoutMinutes = '{{number:Minutes}}'
+                            }
+                            @{
+                                ExecutablePath = 'C:\Windows\notepad.exe'
+                                TimeoutMinutes = '{{number:Minutes}}'
+                            }
+                        )
+                    }
+                }
+            } $path
+            $params.Action = 'RestoreSnapshot'
+            $params.Items = @('Software')
+            $params.Script = [ordered]@{ Software = $scriptPath }
+        }
+        It ('passes the check before input, is asked once and reaches the ' +
+            'section as a number') {
+            Mock Read-RestoreInputHC @inModule { '30' }
+            Mock Invoke-ChildScriptHC @inModule {
+                foreach ($install in $Data.Install) {
+                    $install.TimeoutMinutes | Should -BeOfType [int]
+                    $install.TimeoutMinutes | Should -Be 30
+                }
+                [pscustomobject]@{
+                    Data     = $null
+                    Messages = [string[]]@('Applied')
+                    Errors   = [string[]]@()
+                }
+            }
+
+            (Invoke-ComputerSnapshotHC @params).Success | Should -BeTrue
+
+            Should -Invoke Read-RestoreInputHC @inModule -Times 1 -Exactly
+            Should -Invoke Invoke-ChildScriptHC @inModule -Times 1 -Exactly
+        }
+        It 'refuses the prompt answer abc before any section runs' {
+            Mock Read-RestoreInputHC @inModule { 'abc' }
+
+            { Invoke-ComputerSnapshotHC @params } |
+                Should -Throw '*validation failed*'
+
+            Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
+            $invoke = @{
+                ModuleName      = 'Execution'
+                Times           = 1
+                Exactly         = $true
+                ParameterFilter = {
+                    $Results[0].Messages -match (
+                        'TimeoutMinutes: the supplied input is empty or ' +
+                        'invalid'
+                    )
+                }
+            }
+            Should -Invoke Write-SnapshotReportHC @invoke
+        }
+        It 'refuses the answer file answer abc before any section runs' {
+            $answerPath = Join-Path $TestDrive 'number.answers.json'
+            '{"Answers":{"{{number:Minutes}}":"abc"}}' |
+                Set-Content -LiteralPath $answerPath
+            $params.AnswerFile = $answerPath
+            $params.Unattended = $true
+
+            { Invoke-ComputerSnapshotHC @params } |
+                Should -Throw '*validation failed*'
+
+            Should -Invoke Read-RestoreInputHC @inModule -Times 0 -Exactly
+            Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
+            $invoke = @{
+                ModuleName      = 'Execution'
+                Times           = 1
+                Exactly         = $true
+                ParameterFilter = {
+                    $Results[0].Messages -match (
+                        'must be a nonempty, valid number string or number'
+                    )
+                }
+            }
+            Should -Invoke Write-SnapshotReportHC @invoke
+        }
+    }
     It ('fails before any section when an answer is invalid where it is ' +
         'used') {
         Write-ConfigurationHC @{

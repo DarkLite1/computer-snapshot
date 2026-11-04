@@ -490,8 +490,17 @@
             "description": "Exit codes that mean the script succeeded; defaults to [0]. A script that ends with robocopy needs [0, 1, 2, 3, 4, 5, 6, 7], because robocopy uses 1 to 7 for success.",
             "minItems": 1,
             "items": {
-              "type": "integer",
-              "description": "An exit code that means success."
+              "description": "An exit code that means success; or {{number:Description}} to ask for it.",
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string",
+                  "description": "a whole number or {{number:Description}}",
+                  "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                }
+              ]
             }
           },
           "Comment": {
@@ -535,8 +544,17 @@
             "description": "Exit codes that mean the script succeeded; defaults to [0]. A script that ends with robocopy needs [0, 1, 2, 3, 4, 5, 6, 7], because robocopy uses 1 to 7 for success.",
             "minItems": 1,
             "items": {
-              "type": "integer",
-              "description": "An exit code that means success."
+              "description": "An exit code that means success; or {{number:Description}} to ask for it.",
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string",
+                  "description": "a whole number or {{number:Description}}",
+                  "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                }
+              ]
             }
           },
           "Comment": {
@@ -561,8 +579,17 @@
           "description": "Windows time-zone identifier."
         },
         "WinHomeLocationGeoId": {
-          "type": "integer",
-          "description": "Windows geographic location identifier."
+          "description": "Windows geographic location identifier; or {{number:Description}} to ask for it.",
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string",
+              "description": "a whole number or {{number:Description}}",
+              "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+            }
+          ]
         },
         "CultureName": {
           "type": "string",
@@ -884,16 +911,43 @@
             "description": "SMB share FolderEnumerationMode setting."
           },
           "CATimeout": {
-            "type": ["integer", "null"],
-            "description": "SMB share CATimeout value."
+            "description": "SMB share CATimeout value; or {{number:Description}} to ask for it.",
+            "anyOf": [
+              {
+                "type": ["integer", "null"]
+              },
+              {
+                "type": "string",
+                "description": "a whole number or {{number:Description}}",
+                "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+              }
+            ]
           },
           "ThrottleLimit": {
-            "type": ["integer", "null"],
-            "description": "SMB share ThrottleLimit value."
+            "description": "SMB share ThrottleLimit value; or {{number:Description}} to ask for it.",
+            "anyOf": [
+              {
+                "type": ["integer", "null"]
+              },
+              {
+                "type": "string",
+                "description": "a whole number or {{number:Description}}",
+                "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+              }
+            ]
           },
           "ConcurrentUserLimit": {
-            "type": ["integer", "null"],
-            "description": "SMB share ConcurrentUserLimit value."
+            "description": "SMB share ConcurrentUserLimit value; or {{number:Description}} to ask for it.",
+            "anyOf": [
+              {
+                "type": ["integer", "null"]
+              },
+              {
+                "type": "string",
+                "description": "a whole number or {{number:Description}}",
+                "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+              }
+            ]
           },
           "EncryptData": {
             "type": ["boolean", "null"],
@@ -1093,6 +1147,7 @@
             },
             {
               "type": "string",
+              "description": "a number from 1 to 32, or {{prefix:Description}}",
               "pattern": "^\\{\\{prefix:[^{}\\r\\n]+\\}\\}$"
             }
           ]
@@ -1376,7 +1431,7 @@
           },
           "FillPlaceholders": {
             "type": "boolean",
-            "description": "true: From is a text file whose {{input:...}}, {{ipv4:...}} and {{prefix:...}} placeholders are asked for at the start of the restore and filled in on the copy. {{password:...}} is not allowed in a file."
+            "description": "true: From is a text file whose {{input:...}}, {{ipv4:...}}, {{prefix:...}} and {{number:...}} placeholders are asked for at the start of the restore and filled in on the copy. {{password:...}} is not allowed in a file."
           },
           "Comment": {
             "type": "string",
@@ -1417,8 +1472,17 @@
                 "description": "Exit codes that mean the removal succeeded; defaults to [0]. 3010 and 1641 always mean success with a restart needed.",
                 "minItems": 1,
                 "items": {
-                  "type": "integer",
-                  "description": "An exit code that means success."
+                  "description": "An exit code that means success; or {{number:Description}} to ask for it.",
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string",
+                      "description": "a whole number or {{number:Description}}",
+                      "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                    }
+                  ]
                 }
               },
               "AllowMultiple": {
@@ -1426,11 +1490,20 @@
                 "description": "Allow DisplayName to match more than 5 applications. Without it, such a removal is refused to protect against a too broad pattern."
               },
               "TimeoutMinutes": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 1440,
                 "default": 15,
-                "description": "Minutes the uninstaller may run; then it is stopped, with the processes it started, and the removal fails."
+                "description": "Minutes the uninstaller may run; then it is stopped, with the processes it started, and the removal fails; or {{number:Description}} to ask for it.",
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
+                  },
+                  {
+                    "type": "string",
+                    "description": "a whole number or {{number:Description}}",
+                    "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                  }
+                ]
               },
               "WaitForAllProcesses": {
                 "type": "boolean",
@@ -1466,16 +1539,34 @@
                 "description": "Exit codes that mean the installation succeeded; defaults to [0]. 3010 and 1641 always mean success with a restart needed.",
                 "minItems": 1,
                 "items": {
-                  "type": "integer",
-                  "description": "An exit code that means success."
+                  "description": "An exit code that means success; or {{number:Description}} to ask for it.",
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string",
+                      "description": "a whole number or {{number:Description}}",
+                      "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                    }
+                  ]
                 }
               },
               "TimeoutMinutes": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 1440,
                 "default": 15,
-                "description": "Minutes the installer may run; then it is stopped, with the processes it started, and the installation fails."
+                "description": "Minutes the installer may run; then it is stopped, with the processes it started, and the installation fails; or {{number:Description}} to ask for it.",
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
+                  },
+                  {
+                    "type": "string",
+                    "description": "a whole number or {{number:Description}}",
+                    "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                  }
+                ]
               },
               "WaitForAllProcesses": {
                 "type": "boolean",

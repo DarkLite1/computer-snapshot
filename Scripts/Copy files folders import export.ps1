@@ -16,10 +16,10 @@
     remaining entries are still copied.
 
     With FillPlaceholders, a text file is copied with its {{input:...}},
-    {{ipv4:...}} and {{prefix:...}} placeholders replaced by the answers
-    given at the start of the restore, in PlaceholderValues. The file keeps
-    its encoding. When To is an existing folder, the file is written into
-    it under its own name.
+    {{ipv4:...}}, {{prefix:...}} and {{number:...}} placeholders replaced by
+    the answers given at the start of the restore, in PlaceholderValues. The
+    file keeps its encoding. When To is an existing folder, the file is
+    written into it under its own name.
 .PARAMETER Action
     Export captures data in memory. Import applies Data to Windows.
 .PARAMETER Data
@@ -89,7 +89,7 @@ function Copy-FilledFileHC {
 
     $skip = $encoding.GetPreamble().Length
     $text = $encoding.GetString($bytes, $skip, $bytes.Length - $skip)
-    $pattern = '\{\{(?:input|ipv4|prefix):[^{}\r\n]+\}\}'
+    $pattern = '\{\{(?:input|ipv4|prefix|number):[^{}\r\n]+\}\}'
     $placeholders = @(
         [regex]::Matches($text, $pattern) | ForEach-Object { $_.Value }
     )

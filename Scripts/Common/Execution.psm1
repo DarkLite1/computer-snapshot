@@ -229,22 +229,56 @@ function Invoke-ComputerSnapshotHC {
                     -RootFolder $RootFolder
             )
 
-            # The copy fills in the placeholders of these files with the answers
-            foreach (
-                $copy in
-                @($configuration.Items.CopyFilesFolders | Where-Object { $null -ne $_ })
-            ) {
+            # Each copy gets only the answers of its own file, never a
+            # password, so no other answer reaches the copy section
+            $copies = @(
+                $configuration.Items.CopyFilesFolders |
+                Where-Object { $null -ne $_ }
+            )
+
+            foreach ($copy in $copies) {
                 if ($copy.FillPlaceholders -ne $true) {
                     continue
                 }
 
+                $dictionaryType = (
+                    'System.Collections.Generic.Dictionary[string,string]'
+                )
+                $fileValues = New-Object $dictionaryType (
+                    [StringComparer]::Ordinal
+                )
+
+                $fileParams = @{
+                    Items      = @{ CopyFilesFolders = @($copy) }
+                    RootFolder = $RootFolder
+                }
+
+                foreach ($field in @(Get-FileInputFieldsHC @fileParams)) {
+                    if (
+                        $field.Kind -ne 'password' -and
+                        $inputResult.Values.ContainsKey($field.Placeholder)
+                    ) {
+                        $fileValues[$field.Placeholder] = (
+                            $inputResult.Values[$field.Placeholder]
+                        )
+                    }
+                }
+
+                Write-Verbose (
+                    "Copy '$($copy.From)': " +
+                    "$($fileValues.Count) placeholder answer(s)"
+                )
+
                 if ($copy -is [System.Collections.IDictionary]) {
-                    $copy.PlaceholderValues = $inputResult.Values
+                    $copy.PlaceholderValues = $fileValues
                 }
                 else {
-                    $copy | Add-Member `
-                        -NotePropertyName PlaceholderValues `
-                        -NotePropertyValue $inputResult.Values -Force
+                    $memberParams = @{
+                        NotePropertyName  = 'PlaceholderValues'
+                        NotePropertyValue = $fileValues
+                        Force             = $true
+                    }
+                    $copy | Add-Member @memberParams
                 }
             }
 

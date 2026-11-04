@@ -393,6 +393,82 @@ Describe 'Single-file execution' {
         Should -Invoke Read-RestoreInputHC @inModule -Times 1 -Exactly
         Should -Invoke Invoke-ChildScriptHC @inModule -Times 1 -Exactly
     }
+    It ('gives each copied file only its own answers and never a ' +
+        'password') {
+        $null = New-Item -Path "$TestDrive\Files" -ItemType Directory -Force
+        'a={{input:First}}' |
+            Set-Content -LiteralPath "$TestDrive\Files\First.txt"
+        'b={{ipv4:Second}}' |
+            Set-Content -LiteralPath "$TestDrive\Files\Second.txt"
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Settings      = @{ OpenReportInBrowser = $false }
+            Items         = @{
+                UserAccounts     = @(
+                    @{
+                        Name     = 'Example'
+                        Password = '{{password:Password}}'
+                    }
+                )
+                CopyFilesFolders = @(
+                    @{
+                        From             = 'Files\First.txt'
+                        To               = "$TestDrive\Out\First.txt"
+                        FillPlaceholders = $true
+                    }
+                    @{
+                        From             = 'Files\Second.txt'
+                        To               = "$TestDrive\Out\Second.txt"
+                        FillPlaceholders = $true
+                    }
+                )
+            }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('UserAccounts', 'CopyFilesFolders')
+        $params.Script = [ordered]@{
+            UserAccounts     = $scriptPath
+            CopyFilesFolders = Join-Path $scriptsFolder (
+                'Copy files folders import export.ps1'
+            )
+        }
+        Mock Read-RestoreInputHC @inModule {
+            switch ($Field.Kind) {
+                'password' {
+                    'Test-secret!42'
+                }
+                'input' {
+                    'alpha'
+                }
+                'ipv4' {
+                    '192.0.2.20'
+                }
+            }
+        }
+        $mockParams = @{
+            ModuleName      = 'Execution'
+            ParameterFilter = { $Path -like '*Copy files folders*' }
+        }
+        Mock Invoke-ChildScriptHC @mockParams -MockWith {
+            @($Data[0].PlaceholderValues.Keys) |
+                Should -BeExactly @('{{input:First}}')
+            @($Data[1].PlaceholderValues.Keys) |
+                Should -BeExactly @('{{ipv4:Second}}')
+            $Data | ForEach-Object { $_.PlaceholderValues.Values } |
+                Should -Not -Contain 'Test-secret!42'
+
+            & $Path -Action $Action -Data $Data -RootFolder $RootFolder
+        }
+
+        $result = Invoke-ComputerSnapshotHC @params
+
+        $result.Success | Should -BeTrue
+        Should -Invoke Read-RestoreInputHC @inModule -Times 3 -Exactly
+        Get-Content -LiteralPath "$TestDrive\Out\First.txt" |
+            Should -BeExactly 'a=alpha'
+        Get-Content -LiteralPath "$TestDrive\Out\Second.txt" |
+            Should -BeExactly 'b=192.0.2.20'
+    }
     It 'redacts prompted passwords from child failure results and reports' {
         Write-ConfigurationHC @{
             SchemaVersion = 3

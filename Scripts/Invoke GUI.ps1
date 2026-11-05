@@ -1624,108 +1624,117 @@ function Set-RestoreWizardQuestionsHC {
 }
 
 function Update-RestoreWizardReviewHC {
-    # Show what the restore will do, with every answer and where it is from
+    <#
+    .SYNOPSIS
+        Show what the restore will do: the choices on a card, and every
+        checked section with its answers and where they are from.
+    #>
     param(
         [Parameter(Mandatory)]$Wizard
     )
 
     $state = $Wizard.Tag
     $find = { param($name) Find-RestoreWizardControlHC $Wizard $name }
-    $sections = @(
-        (& $find 'SnapshotItems').CheckedItems | ForEach-Object { $_.Text }
-    )
+    $unattended = (& $find 'Unattended').Checked
     $answerFile = if ($state.AnswerFile) {
         'Answers\' + (Get-RestoreWizardAnswerPathHC $Wizard $state.AnswerFile)
     }
     else {
         'None'
     }
-    $restart = if ((& $find 'RebootComputer').Checked) {
-        'restart the computer after ' +
-        "$((& $find 'RestartDelaySeconds').Value) seconds when nothing failed"
-    }
-    else {
-        'do not restart the computer'
-    }
-    $report = if ((& $find 'OpenReportInBrowser').Checked) {
-        'open the report in the browser'
-    }
-    else {
-        'do not open the report'
-    }
 
-    $lines = @(
-        "Configuration: $($state.ConfigurationName)"
-        "Sections: $($sections -join ', ')"
-        "Answer file: $answerFile"
-        "Afterwards: $restart, and $report."
-    )
-    if ((& $find 'Unattended').Checked) {
-        $lines += (
-            'Unattended: nothing is asked, and the restore fails without ' +
-            'administrator rights.'
+    $values = @{
+        ReviewConfiguration = $state.ConfigurationName
+        ReviewAnswerFile    = $answerFile
+        ReviewRestart       = if ((& $find 'RebootComputer').Checked) {
+            "After $((& $find 'RestartDelaySeconds').Value) seconds, when " +
+            'nothing failed'
+        }
+        else {
+            'No'
+        }
+        ReviewReport        = if ((& $find 'OpenReportInBrowser').Checked) {
+            'Opens in the browser'
+        }
+        else {
+            'Not opened'
+        }
+        ReviewUnattended    = (
+            'Nothing is asked; the restore needs administrator rights'
         )
     }
-    (& $find 'ReviewSummary').Text = $lines -join [Environment]::NewLine
+    foreach ($name in $values.Keys) {
+        (& $find $name).Text = $values[$name]
+    }
+    foreach ($name in @('ReviewUnattended', 'ReviewUnattendedCaption')) {
+        (& $find $name).Visible = $unattended
+    }
 
+    $labels = Get-SnapshotSectionLabelsHC
     $list = & $find 'ReviewAnswers'
     $list.BeginUpdate()
 
     try {
         $list.Items.Clear()
         $list.Groups.Clear()
-        $groups = @{}
 
-        foreach ($question in $state.Questions) {
-            $typed = $null
-            if ($null -ne $state.Answers) {
-                $typed = $state.Answers[$question.Placeholder]
-            }
-
-            $value, $source = if (
-                $typed -and $null -ne $state.FileAnswers -and
-                $state.FileAnswers[$question.Placeholder]
-            ) {
-                $typed, 'Changed'
-            }
-            elseif ($typed) {
-                $typed, 'Typed'
-            }
-            else {
-                $state.FileAnswers[$question.Placeholder], 'Answer file'
-            }
-
-            # Never show a password, nor how long it is
-            $shown = if ($question.Kind -eq 'password') {
-                [string]([char]0x25CF) * 8
-            }
-            else {
-                $value
-            }
-
-            if (-not $groups.ContainsKey($question.Section)) {
-                $groups[$question.Section] = New-Object (
-                    'Windows.Forms.ListViewGroup'
-                ) $question.Section
-                $null = $list.Groups.Add($groups[$question.Section])
-            }
-
-            $item = New-Object Windows.Forms.ListViewItem (
-                $question.Description
+        # Every checked section, in the order the sections run
+        foreach ($key in $state.Items) {
+            $section = $labels[$key][0]
+            $group = New-Object Windows.Forms.ListViewGroup $section
+            $null = $list.Groups.Add($group)
+            $questions = @(
+                $state.Questions | Where-Object { $_.Section -eq $section }
             )
-            $null = $item.SubItems.Add([string]$shown)
-            $null = $item.SubItems.Add($source)
-            $item.Group = $groups[$question.Section]
-            $null = $list.Items.Add($item)
+
+            if (-not $questions.Count) {
+                $item = New-Object Windows.Forms.ListViewItem 'No questions'
+                $item.ForeColor = [Drawing.SystemColors]::GrayText
+                $item.Group = $group
+                $null = $list.Items.Add($item)
+                continue
+            }
+
+            foreach ($question in $questions) {
+                $typed = $null
+                if ($null -ne $state.Answers) {
+                    $typed = $state.Answers[$question.Placeholder]
+                }
+
+                $value, $source = if (
+                    $typed -and $null -ne $state.FileAnswers -and
+                    $state.FileAnswers[$question.Placeholder]
+                ) {
+                    $typed, 'Changed'
+                }
+                elseif ($typed) {
+                    $typed, 'Typed'
+                }
+                else {
+                    $state.FileAnswers[$question.Placeholder], 'Answer file'
+                }
+
+                # Never show a password, nor how long it is
+                $shown = if ($question.Kind -eq 'password') {
+                    [string]([char]0x25CF) * 8
+                }
+                else {
+                    $value
+                }
+
+                $item = New-Object Windows.Forms.ListViewItem (
+                    $question.Description
+                )
+                $null = $item.SubItems.Add([string]$shown)
+                $null = $item.SubItems.Add($source)
+                $item.Group = $group
+                $null = $list.Items.Add($item)
+            }
         }
     }
     finally {
         $list.EndUpdate()
     }
-
-    $hasAnswers = $list.Items.Count -gt 0
-    $list.Visible = $hasAnswers
-    (& $find 'ReviewNoAnswers').Visible = -not $hasAnswers
 }
 
 function Start-RestoreWizardJobHC {
@@ -2272,16 +2281,52 @@ function New-RestoreWizardHC {
     $step.Controls.Add($gridSummary, 0, 2)
     #endregion
 
-    #region Review step: summary, answers, guidance
-    $step = & $newStep 'ReviewStep' @(0, 1, 0, 0)
+    #region Review step: overview, sections and answers, guidance
+    $step = & $newStep 'ReviewStep' @(0, 1, 0)
 
-    $summary = New-Object Windows.Forms.Label
-    $summary.Name = 'ReviewSummary'
-    $summary.UseMnemonic = $false
-    $summary.AutoSize = $true
-    $summary.Dock = 'Fill'
-    $summary.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
-    $step.Controls.Add($summary, 0, 0)
+    # A card with a caption and a value for each choice
+    $overview = New-Object Windows.Forms.TableLayoutPanel
+    $overview.Name = 'ReviewSummary'
+    $overview.Dock = 'Fill'
+    $overview.AutoSize = $true
+    $overview.BackColor = [Drawing.SystemColors]::Window
+    $overview.Padding = New-Object Windows.Forms.Padding 12, 10, 12, 10
+    $overview.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 12
+    $overview.ColumnCount = 2
+    $null = $overview.ColumnStyles.Add(
+        (New-Object Windows.Forms.ColumnStyle $sizeType::AutoSize)
+    )
+    $null = $overview.ColumnStyles.Add(
+        (New-Object Windows.Forms.ColumnStyle $sizeType::Percent, 100)
+    )
+    $captionFont = New-Object Drawing.Font (
+        $Font.FontFamily, 9, [Drawing.FontStyle]::Bold
+    )
+    $choices = [ordered]@{
+        ReviewConfiguration = 'Configuration'
+        ReviewAnswerFile    = 'Answer file'
+        ReviewRestart       = 'Restart'
+        ReviewReport        = 'Report'
+        ReviewUnattended    = 'Unattended'
+    }
+    foreach ($name in $choices.Keys) {
+        $caption = New-Object Windows.Forms.Label
+        $caption.Name = "${name}Caption"
+        $caption.Text = $choices[$name]
+        $caption.Font = $captionFont
+        $caption.ForeColor = [Drawing.Color]::DimGray
+        $caption.AutoSize = $true
+        $caption.Margin = New-Object Windows.Forms.Padding 0, 4, 16, 4
+
+        $value = New-Object Windows.Forms.Label
+        $value.Name = $name
+        $value.UseMnemonic = $false
+        $value.AutoSize = $true
+        $value.Margin = New-Object Windows.Forms.Padding 0, 3, 0, 3
+
+        $overview.Controls.AddRange(@($caption, $value))
+    }
+    $step.Controls.Add($overview, 0, 0)
 
     $reviewAnswers = New-Object Windows.Forms.ListView
     $reviewAnswers.Name = 'ReviewAnswers'
@@ -2294,17 +2339,12 @@ function New-RestoreWizardHC {
     $null = $reviewAnswers.Columns.Add('From', 110)
     $step.Controls.Add($reviewAnswers, 0, 1)
 
-    $noAnswers = & $newGuidance 'ReviewNoAnswers' (
-        'The checked sections ask no questions.'
-    )
-    $step.Controls.Add($noAnswers, 0, 2)
-
     $guidance = & $newGuidance 'ReviewGuidance' (
         'Nothing is changed before you click Restore. Click Back to change ' +
         'anything.'
     )
     $guidance.Margin = New-Object Windows.Forms.Padding 0, 8, 0, 0
-    $step.Controls.Add($guidance, 0, 3)
+    $step.Controls.Add($guidance, 0, 2)
     #endregion
 
     #region Buttons

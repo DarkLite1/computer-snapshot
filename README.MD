@@ -30,9 +30,11 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
       unchanged). The **Check** column says what is expected or wrong while
       you type, and where a valid answer comes from. Skipped when Unattended
       is checked.
-   5. **Review:** check the configuration, sections, options and every answer
-      with where it comes from (passwords are hidden), then click **Restore**.
-      Nothing is changed before that.
+   5. **Review:** a card shows the configuration, the answer file, the
+      restart, the report and, when checked, Unattended. Below it every
+      checked section is listed in run order with its answers and where each
+      comes from (answer file, changed, or typed; passwords are hidden), or
+      "No questions". Click **Restore**; nothing is changed before that.
 4. **To save a PC's setup (Export):**
    - Click **Export**.
    - Choose which sections you want to save (like users, folders, or network settings).

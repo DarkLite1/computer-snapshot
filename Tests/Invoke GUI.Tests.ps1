@@ -1004,9 +1004,18 @@ Describe 'Restore wizard' {
         (& $find 'WizardStepTitle').Text |
             Should -Be 'Step 5: Review and restore'
         $next.Text | Should -Be 'Restore'
-        (& $find 'ReviewSummary').Text | Should -BeLike (
-            '*Answer file: Answers\Kiosk\Gent\Kiosk.json*'
-        )
+        (& $find 'ReviewConfiguration').Text | Should -Be 'Prompted'
+        (& $find 'ReviewAnswerFile').Text |
+            Should -Be 'Answers\Kiosk\Gent\Kiosk.json'
+        (& $find 'ReviewRestart').Text |
+            Should -Be 'After 30 seconds, when nothing failed'
+        (& $find 'ReviewReport').Text | Should -Be 'Not opened'
+        (& $find 'ReviewUnattended').Visible | Should -BeFalse
+        (& $find 'ReviewUnattendedCaption').Visible | Should -BeFalse
+        @((& $find 'ReviewSummary').Controls |
+            Where-Object { $_.Name -like '*Caption' -and $_.Visible } |
+            ForEach-Object { $_.Text }) |
+            Should -Be @('Configuration', 'Answer file', 'Restart', 'Report')
         $review = & $find 'ReviewAnswers'
         @($review.Items | ForEach-Object { $_.SubItems[1].Text }) |
             Should -Be @(
@@ -1216,7 +1225,7 @@ Describe 'Restore wizard' {
         @((& $find 'ReviewAnswers').Items |
             ForEach-Object { $_.SubItems[2].Text } | Select-Object -Unique) |
             Should -Be @('Typed')
-        (& $find 'ReviewSummary').Text | Should -BeLike '*Answer file: None*'
+        (& $find 'ReviewAnswerFile').Text | Should -Be 'None'
 
         foreach ($step in 1..4) {
             (& $find 'WizardBack').PerformClick()
@@ -1226,8 +1235,10 @@ Describe 'Restore wizard' {
 
         (& $find 'WizardStepTitle').Text |
             Should -Be 'Step 3: Review and restore'
-        (& $find 'ReviewNoAnswers').Visible | Should -BeTrue
-        (& $find 'ReviewAnswers').Visible | Should -BeFalse
+        $review = & $find 'ReviewAnswers'
+        $review.Items.Count | Should -Be 1
+        $review.Items[0].Text | Should -Be 'No questions'
+        $review.Items[0].Group.Header | Should -Be 'User accounts'
 
         $next.PerformClick()
 
@@ -1249,7 +1260,9 @@ Describe 'Restore wizard' {
         }
 
         & $chooseAnswerFile 'Kiosk\Gent\Kiosk.json'
-        (& $find 'ReviewSummary').Text | Should -BeLike '*Unattended*'
+        (& $find 'ReviewUnattended').Visible | Should -BeTrue
+        (& $find 'ReviewUnattendedCaption').Visible | Should -BeTrue
+        (& $find 'ReviewUnattended').Text | Should -BeLike 'Nothing is asked*'
         $next.PerformClick()
 
         Should -Invoke Start-ConfigurationJobHC @once -ParameterFilter {

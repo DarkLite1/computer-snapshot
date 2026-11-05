@@ -235,6 +235,94 @@ function Get-WizardTaskFolderHC {
     return $folders
 }
 
+function New-WizardHeaderHC {
+    <#
+    .SYNOPSIS
+        The top of the wizard window: the configuration and answer file of
+        the restore, in a large font, and the administrator restart button
+        when it is needed.
+    #>
+    param(
+        $ElevationPanel
+    )
+
+    $sizeType = [Windows.Forms.SizeType]
+
+    $header = New-Object Windows.Forms.TableLayoutPanel
+    $header.Name = 'WizardHeader'
+    $header.Dock = 'Fill'
+    $header.AutoSize = $true
+    $header.Padding = New-Object Windows.Forms.Padding 12, 6, 0, 0
+    $header.ColumnCount = 2
+    $null = $header.ColumnStyles.Add(
+        (New-Object Windows.Forms.ColumnStyle $sizeType::Percent, 100)
+    )
+    $null = $header.ColumnStyles.Add(
+        (New-Object Windows.Forms.ColumnStyle $sizeType::AutoSize)
+    )
+    $header.RowCount = 1
+
+    $selection = New-Object Windows.Forms.FlowLayoutPanel
+    $selection.Dock = 'Fill'
+    $selection.AutoSize = $true
+    $selection.FlowDirection = 'TopDown'
+    $selection.WrapContents = $false
+    $selection.Margin = New-Object Windows.Forms.Padding 0
+
+    $configuration = New-Object Windows.Forms.Label
+    $configuration.Name = 'SelectedConfiguration'
+    $configuration.AccessibleName = 'Selected configuration'
+    $configuration.Font = New-Object Drawing.Font (
+        'Segoe UI', 15, [Drawing.FontStyle]::Bold
+    )
+    $configuration.ForeColor = [Drawing.Color]::DarkSlateBlue
+    $configuration.UseMnemonic = $false
+    $configuration.AutoSize = $true
+    $configuration.Margin = New-Object Windows.Forms.Padding 0
+
+    $answerFile = New-Object Windows.Forms.Label
+    $answerFile.Name = 'SelectedAnswerFile'
+    $answerFile.AccessibleName = 'Selected answer file'
+    $answerFile.Font = New-Object Drawing.Font 'Segoe UI', 11
+    $answerFile.ForeColor = [Drawing.Color]::DimGray
+    $answerFile.UseMnemonic = $false
+    $answerFile.AutoSize = $true
+    $answerFile.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 4
+
+    $selection.Controls.AddRange(@($configuration, $answerFile))
+    $header.Controls.Add($selection, 0, 0)
+
+    if ($ElevationPanel) {
+        $header.Controls.Add($ElevationPanel, 1, 0)
+    }
+
+    return , $header
+}
+
+function Show-WizardHeaderHC {
+    # Show a configuration and an answer file at the top of the window;
+    # nothing hides the line
+    param(
+        [Parameter(Mandatory)]$Form,
+        [string]$Configuration,
+        [string]$AnswerFile
+    )
+
+    $labels = @{
+        SelectedConfiguration = $Configuration
+        SelectedAnswerFile    = $AnswerFile
+    }
+
+    foreach ($name in $labels.Keys) {
+        $label = $Form.Controls.Find($name, $true) | Select-Object -First 1
+        if ($null -eq $label) {
+            continue
+        }
+        $label.Text = $labels[$name]
+        $label.Visible = -not [string]::IsNullOrEmpty($labels[$name])
+    }
+}
+
 function Show-WizardQuestionHC {
     param($Owner, [string]$Text, [string]$Caption)
 
@@ -586,6 +674,83 @@ function Get-RestoreAnswerFileEntriesHC {
     }
 }
 
+function Get-RestoreWizardAnswerPathHC {
+    # The path of an answer file inside the Answers folder
+    param(
+        [Parameter(Mandatory)]$Wizard,
+        [Parameter(Mandatory)][string]$FullName
+    )
+
+    $folder = [IO.Path]::GetFullPath(
+        (Join-Path $Wizard.Tag.RootFolder 'Answers')
+    )
+
+    $FullName.Substring($folder.Length).TrimStart('\')
+}
+
+function Update-RestoreWizardHeaderHC {
+    <#
+    .SYNOPSIS
+        Show the configuration and answer file of the restore at the top
+        of the window, so they stay in sight through the steps.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowNull()]$Wizard
+    )
+
+    if ($null -eq $Wizard -or $null -eq $Wizard.FindForm()) {
+        return
+    }
+
+    $state = $Wizard.Tag
+    $find = { param($name) Find-RestoreWizardControlHC $Wizard $name }
+
+    $configuration = if ($state.Step -eq 'Configuration') {
+        (& $find 'Configurations').SelectedItems |
+            Select-Object -First 1 -ExpandProperty Text
+    }
+    else {
+        $state.ConfigurationName
+    }
+
+    $answerFile = $null
+
+    if ($state.Step -eq 'AnswerFile') {
+        $selected = (& $find 'AnswerFiles').SelectedItems |
+            Select-Object -First 1
+        if ($null -ne $selected) {
+            $answerFile = $selected.Tag.FullName
+            if (-not $answerFile) {
+                $answerFile = 'None'
+            }
+        }
+    }
+    elseif (
+        $state.Step -in @('Questions', 'Review') -and
+        @($state.Questions).Count
+    ) {
+        $answerFile = if ($state.AnswerFile) {
+            $state.AnswerFile
+        }
+        else {
+            'None'
+        }
+    }
+
+    if ($answerFile -and $answerFile -ne 'None') {
+        $answerFile = Get-RestoreWizardAnswerPathHC $Wizard $answerFile
+    }
+
+    $headerParams = @{
+        Form          = $Wizard.FindForm()
+        Configuration = $configuration
+        AnswerFile    = if ($answerFile) {
+            "Answer file: $answerFile"
+        }
+    }
+    Show-WizardHeaderHC @headerParams
+}
+
 function Get-RestoreWizardHC {
     # The restore wizard that contains a control
     param(
@@ -655,6 +820,8 @@ function Update-RestoreWizardButtonsHC {
             $next.Enabled = $true
         }
     }
+
+    Update-RestoreWizardHeaderHC -Wizard $Wizard
 }
 
 function Show-RestoreWizardStepHC {
@@ -1103,10 +1270,7 @@ function Update-RestoreWizardReviewHC {
         (& $find 'SnapshotItems').CheckedItems | ForEach-Object { $_.Text }
     )
     $answerFile = if ($state.AnswerFile) {
-        $folder = [IO.Path]::GetFullPath(
-            (Join-Path $state.RootFolder 'Answers')
-        )
-        'Answers\' + $state.AnswerFile.Substring($folder.Length).TrimStart('\')
+        'Answers\' + (Get-RestoreWizardAnswerPathHC $Wizard $state.AnswerFile)
     }
     else {
         'None'
@@ -2089,12 +2253,23 @@ $elevationParams = @{
     WizardScript = $PSCommandPath
 }
 $elevationPanel = New-WizardElevationPanelHC @elevationParams
-if ($elevationPanel) { $wizardLayout.Controls.Add($elevationPanel, 0, 0) }
+$header = New-WizardHeaderHC -ElevationPanel $elevationPanel
+$wizardLayout.Controls.Add($header, 0, 0)
 $wizardLayout.Controls.Add($tabs, 0, 1)
 
 #region Restore tab
 $restoreWizard = New-RestoreWizardHC -RootFolder $RootFolder -Font $form.Font
 $restoreTab.Controls.Add($restoreWizard)
+
+# The header shows what is restored; an export restores nothing
+$tabs.Add_SelectedIndexChanged({
+    if ($tabs.SelectedTab -eq $restoreTab) {
+        Update-RestoreWizardHeaderHC -Wizard $restoreWizard
+    }
+    else {
+        Show-WizardHeaderHC -Form $form
+    }
+})
 #endregion
 
 #region Export tab

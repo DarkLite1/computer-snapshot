@@ -727,10 +727,21 @@ Describe 'Restore wizard' {
             $form = New-Object Windows.Forms.Form
             $form.ClientSize = New-Object Drawing.Size 820, 580
             $form.Font = New-Object Drawing.Font 'Segoe UI', 10
+            $layout = New-Object Windows.Forms.TableLayoutPanel
+            $layout.Dock = 'Fill'
+            $layout.RowCount = 2
+            $null = $layout.RowStyles.Add(
+                (New-Object Windows.Forms.RowStyle 'AutoSize')
+            )
+            $null = $layout.RowStyles.Add(
+                (New-Object Windows.Forms.RowStyle 'Percent', 100)
+            )
+            $form.Controls.Add($layout)
+            $layout.Controls.Add((New-WizardHeaderHC), 0, 0)
             $wizard = New-RestoreWizardHC -RootFolder $RootFolder -Font (
                 $form.Font
             )
-            $form.Controls.Add($wizard)
+            $layout.Controls.Add($wizard, 0, 1)
             $form.Show()
             Update-RestoreConfigurationListHC -Wizard $wizard
 
@@ -1183,6 +1194,66 @@ Describe 'Restore wizard' {
         { $list.Items[2].Selected = $true } | Should -Not -Throw
         $list.Dispose()
         $detached.Dispose()
+    }
+    It ('shows the configuration and answer file at the top of the window ' +
+        'through the steps') {
+        $form = $wizard.FindForm()
+        $configuration = $form.Controls.Find('SelectedConfiguration', $true)[0]
+        $answerFile = $form.Controls.Find('SelectedAnswerFile', $true)[0]
+
+        $configuration.Visible | Should -BeFalse
+        $configuration.Font.Size | Should -BeGreaterThan $wizard.Font.Size
+
+        $prompted = (& $find 'Configurations').Items |
+            Where-Object Text -eq 'Prompted'
+        $prompted.Selected = $true
+        $configuration.Text | Should -Be 'Prompted'
+        $configuration.Visible | Should -BeTrue
+        $answerFile.Visible | Should -BeFalse
+
+        $next.PerformClick()
+        $next.PerformClick()
+        $answerFile.Text | Should -Be 'Answer file: None'
+
+        $item = (& $find 'AnswerFiles').Items |
+            Where-Object Text -eq 'Kiosk\Gent\Kiosk.json'
+        $item.Selected = $true
+        $answerFile.Text | Should -Be 'Answer file: Kiosk\Gent\Kiosk.json'
+
+        $next.PerformClick()
+        $configuration.Text | Should -Be 'Prompted'
+        $answerFile.Text | Should -Be 'Answer file: Kiosk\Gent\Kiosk.json'
+
+        foreach ($step in 1..$($wizard.Tag.History.Count - 1)) {
+            (& $find 'WizardBack').PerformClick()
+        }
+        & $chooseConfiguration 'Plain'
+        $next.PerformClick()
+        $configuration.Text | Should -Be 'Plain'
+        $answerFile.Visible | Should -BeFalse
+    }
+    It 'puts the administrator restart button to the right of the header' {
+        $button = New-Object Windows.Forms.Button
+        $button.Name = 'RestartAsAdministrator'
+        $panel = New-Object Windows.Forms.FlowLayoutPanel
+        $panel.AutoSize = $true
+        $panel.Controls.Add($button)
+        $form = New-Object Windows.Forms.Form
+        $form.ClientSize = New-Object Drawing.Size 820, 200
+        try {
+            $header = New-WizardHeaderHC -ElevationPanel $panel
+            $header.Dock = 'Top'
+            $form.Controls.Add($header)
+            $form.Show()
+            Show-WizardHeaderHC -Form $form -Configuration 'Kiosk'
+
+            $label = $form.Controls.Find('SelectedConfiguration', $true)[0]
+            $header.GetColumn($panel) | Should -Be 1
+            $label.Parent.Right | Should -BeLessOrEqual $panel.Left
+        }
+        finally {
+            $form.Dispose()
+        }
     }
     It 'keeps the steps and buttons inside the minimum window size' {
         $form = $wizard.FindForm()

@@ -16,11 +16,11 @@
     "RunAsPassword": "{{password:Password of 'svc-cleanup' for the clean-up task}}"
   },
   {
-    "Comment": "A built-in service account by SID: S-1-5-19 is LOCAL SERVICE, in every Windows language. No password needed.",
+    "Comment": "A built-in service account by its English name, which works in every Windows language. No password needed.",
     "TaskName": "Collect inventory",
     "TaskPath": "\\HC\\",
     "Enabled": false,
     "XmlFile": "Files\\Example task.xml",
-    "RunAsUser": "S-1-5-19"
+    "RunAsUser": "NT AUTHORITY\\LOCAL SERVICE"
   }
 ]

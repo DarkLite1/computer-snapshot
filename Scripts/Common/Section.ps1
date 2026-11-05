@@ -310,19 +310,133 @@ function Test-AccountExistsHC {
     }
 }
 
+function Get-WellKnownAccountHC {
+    <#
+    .SYNOPSIS
+        The built-in accounts that have the same SID on every computer,
+        with their English name.
+    .DESCRIPTION
+        Windows translates these names: Administrators is Administratoren
+        on a German Windows. An export writes the English name so it can be
+        read, and a restore finds the SID by that name and uses the name of
+        the computer's own language.
+    #>
+    if ($null -eq $script:wellKnownAccountsHC) {
+        $script:wellKnownAccountsHC = [ordered]@{
+            'S-1-1-0'      = 'Everyone'
+            'S-1-2-0'      = 'LOCAL'
+            'S-1-2-1'      = 'CONSOLE LOGON'
+            'S-1-3-0'      = 'CREATOR OWNER'
+            'S-1-3-1'      = 'CREATOR GROUP'
+            'S-1-3-4'      = 'OWNER RIGHTS'
+            'S-1-5-1'      = 'NT AUTHORITY\DIALUP'
+            'S-1-5-2'      = 'NT AUTHORITY\NETWORK'
+            'S-1-5-3'      = 'NT AUTHORITY\BATCH'
+            'S-1-5-4'      = 'NT AUTHORITY\INTERACTIVE'
+            'S-1-5-6'      = 'NT AUTHORITY\SERVICE'
+            'S-1-5-7'      = 'NT AUTHORITY\ANONYMOUS LOGON'
+            'S-1-5-9'      = 'NT AUTHORITY\ENTERPRISE DOMAIN CONTROLLERS'
+            'S-1-5-10'     = 'NT AUTHORITY\SELF'
+            'S-1-5-11'     = 'NT AUTHORITY\Authenticated Users'
+            'S-1-5-12'     = 'NT AUTHORITY\RESTRICTED'
+            'S-1-5-13'     = 'NT AUTHORITY\TERMINAL SERVER USER'
+            'S-1-5-14'     = 'NT AUTHORITY\REMOTE INTERACTIVE LOGON'
+            'S-1-5-15'     = 'NT AUTHORITY\This Organization'
+            'S-1-5-17'     = 'NT AUTHORITY\IUSR'
+            'S-1-5-18'     = 'NT AUTHORITY\SYSTEM'
+            'S-1-5-19'     = 'NT AUTHORITY\LOCAL SERVICE'
+            'S-1-5-20'     = 'NT AUTHORITY\NETWORK SERVICE'
+            'S-1-5-113'    = 'NT AUTHORITY\Local account'
+            'S-1-5-114'    = (
+                'NT AUTHORITY\Local account and member of Administrators group'
+            )
+            'S-1-5-32-544' = 'BUILTIN\Administrators'
+            'S-1-5-32-545' = 'BUILTIN\Users'
+            'S-1-5-32-546' = 'BUILTIN\Guests'
+            'S-1-5-32-547' = 'BUILTIN\Power Users'
+            'S-1-5-32-550' = 'BUILTIN\Print Operators'
+            'S-1-5-32-551' = 'BUILTIN\Backup Operators'
+            'S-1-5-32-552' = 'BUILTIN\Replicator'
+            'S-1-5-32-555' = 'BUILTIN\Remote Desktop Users'
+            'S-1-5-32-556' = 'BUILTIN\Network Configuration Operators'
+            'S-1-5-32-558' = 'BUILTIN\Performance Monitor Users'
+            'S-1-5-32-559' = 'BUILTIN\Performance Log Users'
+            'S-1-5-32-562' = 'BUILTIN\Distributed COM Users'
+            'S-1-5-32-568' = 'BUILTIN\IIS_IUSRS'
+            'S-1-5-32-569' = 'BUILTIN\Cryptographic Operators'
+            'S-1-5-32-573' = 'BUILTIN\Event Log Readers'
+            'S-1-5-32-574' = 'BUILTIN\Certificate Service DCOM Access'
+            'S-1-5-32-575' = 'BUILTIN\RDS Remote Access Servers'
+            'S-1-5-32-576' = 'BUILTIN\RDS Endpoint Servers'
+            'S-1-5-32-577' = 'BUILTIN\RDS Management Servers'
+            'S-1-5-32-578' = 'BUILTIN\Hyper-V Administrators'
+            'S-1-5-32-579' = 'BUILTIN\Access Control Assistance Operators'
+            'S-1-5-32-580' = 'BUILTIN\Remote Management Users'
+            'S-1-5-32-581' = 'BUILTIN\System Managed Accounts Group'
+            'S-1-5-32-582' = 'BUILTIN\Storage Replica Administrators'
+            'S-1-5-32-583' = 'BUILTIN\Device Owners'
+            'S-1-15-2-1'   = (
+                'APPLICATION PACKAGE AUTHORITY\ALL APPLICATION PACKAGES'
+            )
+            'S-1-15-2-2'   = (
+                'APPLICATION PACKAGE AUTHORITY\' +
+                'ALL RESTRICTED APPLICATION PACKAGES'
+            )
+        }
+    }
+
+    $script:wellKnownAccountsHC
+}
+
+function Get-WellKnownAccountSidHC {
+    <#
+    .SYNOPSIS
+        The SID of a configured built-in account: a SID as it is, or the
+        English name of a built-in account, with or without its prefix,
+        such as 'BUILTIN\Administrators' or 'Administrators'. Nothing for
+        any other name.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    if ($Name -match '^S-1-\d+(-\d+)+$') {
+        return $Name.ToUpperInvariant()
+    }
+
+    $accounts = Get-WellKnownAccountHC
+    $short = $Name.Split('\')[-1]
+    $matching = @(
+        $accounts.Keys | Where-Object {
+            $accounts[$_] -eq $Name -or (
+                $Name -notlike '*\*' -and
+                $accounts[$_].Split('\')[-1] -eq $short
+            )
+        }
+    )
+
+    if ($matching.Count -eq 1) {
+        return $matching[0]
+    }
+}
+
 function ConvertTo-PortableAccountNameHC {
     <#
     .SYNOPSIS
-        The name to export for an account: its SID when that is the same on
-        every computer, otherwise the account name.
+        The name to export for an account, so it is readable and works on
+        every computer, in every Windows language.
     .DESCRIPTION
-        Built-in accounts and groups such as Everyone (S-1-1-0) or
-        Administrators (S-1-5-32-544) have a fixed SID, but their name
-        depends on the Windows language. Exporting the SID makes the
-        configuration work in every language. Local and domain accounts
-        (S-1-5-21-...) have a SID that differs per computer or domain, so
-        they keep their name. A name that cannot be resolved, such as an
-        orphaned account, is kept as it is.
+        - Local and domain accounts (S-1-5-21-...) have a SID that differs
+          per computer or domain, so they keep their name.
+        - Built-in accounts such as Everyone (S-1-1-0) or Administrators
+          (S-1-5-32-544) have the same SID everywhere, but a name in the
+          Windows language: they get their English name, which a restore
+          translates.
+        - Service accounts (NT SERVICE\...) have a name in every language.
+        - Other built-in accounts, without an English name in the table,
+          are exported by SID.
+        A name that cannot be resolved, such as an orphaned account, is
+        kept as it is.
     #>
     param(
         [Parameter(Mandatory)][string]$Name,
@@ -340,8 +454,13 @@ function ConvertTo-PortableAccountNameHC {
         }
     }
 
-    if ($Sid -like 'S-1-5-21-*') {
+    if ($Sid -like 'S-1-5-21-*' -or $Sid -like 'S-1-5-80-*') {
         return $Name
+    }
+
+    $accounts = Get-WellKnownAccountHC
+    if ($accounts.Contains($Sid)) {
+        return $accounts[$Sid]
     }
 
     $Sid
@@ -357,8 +476,9 @@ function Convert-AccountNameHC {
         'PC2\bob'. Other names are kept: names without a prefix, built-in
         and service accounts, and every account this computer can resolve,
         such as 'CONTOSO\Domain Admins' on a computer in that domain.
-        A SID, which an export writes for built-in accounts, becomes the
-        account's name in this computer's language.
+        A built-in account, by SID or by its English name such as
+        'BUILTIN\Administrators', becomes the account's name in this
+        computer's language.
 
         When neither the name nor the local name can be resolved, the name
         is returned unchanged, so the error names the configured account.
@@ -367,10 +487,12 @@ function Convert-AccountNameHC {
         [Parameter(Mandatory)][string]$Name
     )
 
-    # A SID, as exported for built-in accounts: use this computer's name
-    if ($Name -match '^S-1-\d+(-\d+)+$') {
+    # A built-in account, by SID or by English name: use this computer's
+    # name, in its own language
+    $wellKnownSid = Get-WellKnownAccountSidHC -Name $Name
+    if ($wellKnownSid) {
         try {
-            $sid = [System.Security.Principal.SecurityIdentifier]$Name
+            $sid = [System.Security.Principal.SecurityIdentifier]$wellKnownSid
 
             return $sid.Translate(
                 [System.Security.Principal.NTAccount]

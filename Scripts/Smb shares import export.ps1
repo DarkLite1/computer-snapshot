@@ -68,7 +68,8 @@ if ($Action -eq 'Export') {
     #region Capture section
     # One entry per share, with its share permissions (Access) and the NTFS
     # permissions of its folder (NTFS). Built-in accounts such as Everyone
-    # are exported by SID, so the configuration works in every language.
+    # get their English name, which a restore translates to the Windows
+    # language of that computer.
     Write-Verbose 'Export Smb shares'
     $shares = @(
         Get-SmbShare | Where-Object {

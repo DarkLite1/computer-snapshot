@@ -167,7 +167,7 @@ Describe 'User groups errors' {
         $result[0].Errors.Count | Should -Be 1
         $result[0].Errors[0] |
             Should -BeLike "Failed to read the members of group 'Orphans'*"
-        @($result[0].Data.Name) | Should -Be @('S-1-5-32-544', 'Empty')
+        @($result[0].Data.Name) | Should -Be @('Administrators', 'Empty')
     }
     It 'exports an empty member list instead of a null member' {
         $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
@@ -230,44 +230,59 @@ Describe 'User groups across Windows languages' {
         Mock New-LocalGroup
         Mock Set-LocalGroup
     }
-    It ('exports built-in groups and members by SID, without their ' +
-        'translated description') {
+    It ('exports built-in groups and members by English name, without ' +
+        'their translated description') {
         $result = @(& $scriptPath -Action Export -RootFolder $TestDrive)
 
-        $builtIn = $result[0].Data | Where-Object { $_.Name -eq 'S-1-5-32-544' }
-        $builtIn.Members | Should -Be @('S-1-1-0')
+        $builtIn = $result[0].Data |
+            Where-Object { $_.Name -eq 'Administrators' }
+        $builtIn.Members | Should -Be @('Everyone')
         $builtIn.Keys | Should -Not -Contain 'Description'
-        $builtIn.Comment | Should -BeLike "Built-in group 'Administratoren'*"
+        $builtIn.Keys | Should -Not -Contain 'Comment'
         (
             $result[0].Data | Where-Object { $_.Name -eq 'Captains' }
         ).Description | Should -Be 'Star fleet'
     }
-    It ('finds a built-in group by SID and never creates a group named ' +
-        'after a SID') {
+    It ('finds a built-in group by its English name or SID, in the ' +
+        'Windows language, and never creates it') {
         $data = @(
-            [pscustomobject]@{ Name = 'S-1-5-32-544'; Members = @('kirk') }
+            [pscustomobject]@{ Name = 'Administrators'; Members = @('kirk') }
+            [pscustomobject]@{ Name = 'S-1-5-32-544'; Members = @('spock') }
         )
 
         $result = @(
             & $scriptPath -Action Import -Data $data -RootFolder $TestDrive
         )
 
+        $result[0].Errors.Count |
+            Should -Be 0 -Because ($result[0].Errors -join '; ')
         $result[0].Messages | Should -Contain (
             "Group 'Administratoren' already exists and is correct"
         )
         $result[0].Messages |
             Should -Contain "Added account 'kirk' to group 'Administratoren'"
+        $result[0].Messages |
+            Should -Contain "Added account 'spock' to group 'Administratoren'"
         Should -Invoke New-LocalGroup -Times 0 -Exactly
     }
-    It 'reports a SID that is not a group on this computer' {
-        $data = @([pscustomobject]@{ Name = 'S-1-5-32-999' })
+    It 'reports a built-in group or SID that is not on this computer' {
+        $data = @(
+            [pscustomobject]@{ Name = 'S-1-5-32-999' }
+            [pscustomobject]@{ Name = 'Backup Operators' }
+        )
 
         $result = @(
             & $scriptPath -Action Import -Data $data -RootFolder $TestDrive
         )
 
-        $result[0].Errors[0] |
-            Should -BeLike "*there is no group with SID 'S-1-5-32-999'*"
+        $result[0].Errors | Should -Be @(
+            "Failed to create or update group 'S-1-5-32-999': there is no " +
+            "built-in group 'S-1-5-32-999' (S-1-5-32-999) on " +
+            "'$env:COMPUTERNAME'"
+            "Failed to create or update group 'Backup Operators': there is " +
+            "no built-in group 'Backup Operators' (S-1-5-32-551) on " +
+            "'$env:COMPUTERNAME'"
+        )
         Should -Invoke New-LocalGroup -Times 0 -Exactly
     }
 }

@@ -78,8 +78,8 @@ Describe 'Inline NTFS permissions' {
         $exportResult.Data[0].Name | Should -Be 'Example'
         $exportResult.Data[0].NTFS.Access.Count | Should -Be 1
         $exportResult.Data[0].NTFS.Access[0].IdentityReference |
-            Should -Be 'S-1-1-0'
-        $exportResult.Data[0].NTFS.Owner | Should -Be 'S-1-5-32-544'
+            Should -Be 'Everyone'
+        $exportResult.Data[0].NTFS.Owner | Should -Be 'BUILTIN\Administrators'
 
         $testConfiguration = @{
             SchemaVersion = 3

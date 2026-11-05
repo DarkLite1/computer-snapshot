@@ -72,12 +72,10 @@ Describe 'Account names' {
             Convert-AccountNameHC -Name 'CONTOSO\ghost' |
                 Should -Be 'CONTOSO\ghost'
         }
-        It ('keeps names without a prefix, built-in and ' +
+        It ('keeps names without a prefix, service accounts and ' +
             'this computer''s accounts') {
             foreach ($name in @(
-                    'Everyone'
-                    'BUILTIN\Users'
-                    'NT AUTHORITY\SYSTEM'
+                    'kiosk'
                     'NT SERVICE\TrustedInstaller'
                     "$env:COMPUTERNAME\alice"
                 )) {
@@ -86,14 +84,21 @@ Describe 'Account names' {
             Should -Invoke Test-AccountExistsHC -Times 0 -Exactly
         }
     }
-    Context 'Accounts stored by SID' {
-        It ('exports a built-in account by SID and a local or domain ' +
-            'account by name') {
+    Context 'Built-in accounts by English name' {
+        It ('exports a built-in account by English name, a local or domain ' +
+            'or service account by name, and an unknown built-in by SID') {
             $params = @{
-                Name = 'NT AUTHORITY\Iedereen'
+                Name = 'Iedereen'
                 Sid  = 'S-1-1-0'
             }
-            ConvertTo-PortableAccountNameHC @params | Should -Be 'S-1-1-0'
+            ConvertTo-PortableAccountNameHC @params | Should -Be 'Everyone'
+
+            $params = @{
+                Name = 'BUILTIN\Administratoren'
+                Sid  = 'S-1-5-32-544'
+            }
+            ConvertTo-PortableAccountNameHC @params |
+                Should -Be 'BUILTIN\Administrators'
 
             $params = @{
                 Name = 'PC1\bob'
@@ -101,17 +106,69 @@ Describe 'Account names' {
             }
             ConvertTo-PortableAccountNameHC @params | Should -Be 'PC1\bob'
 
+            $params = @{
+                Name = 'NT SERVICE\TrustedInstaller'
+                Sid  = 'S-1-5-80-956008885-3418522649-1831038044-' +
+                    '1853292631-2271478464'
+            }
+            ConvertTo-PortableAccountNameHC @params |
+                Should -Be 'NT SERVICE\TrustedInstaller'
+
+            $params = @{
+                Name = 'APPLICATION PACKAGE AUTHORITY\Some capability'
+                Sid  = 'S-1-15-3-1024-1'
+            }
+            ConvertTo-PortableAccountNameHC @params |
+                Should -Be 'S-1-15-3-1024-1'
+
             ConvertTo-PortableAccountNameHC -Name 'NoSuchAccount8f3a' |
                 Should -Be 'NoSuchAccount8f3a'
         }
-        It 'turns a SID into the account name of this Windows language' {
+        It ('finds the SID of an English name, with or without prefix, ' +
+            'and of a SID') {
+            Get-WellKnownAccountSidHC -Name 'BUILTIN\Administrators' |
+                Should -Be 'S-1-5-32-544'
+            Get-WellKnownAccountSidHC -Name 'administrators' |
+                Should -Be 'S-1-5-32-544'
+            Get-WellKnownAccountSidHC -Name 'NT AUTHORITY\SYSTEM' |
+                Should -Be 'S-1-5-18'
+            Get-WellKnownAccountSidHC -Name 'Everyone' | Should -Be 'S-1-1-0'
+            Get-WellKnownAccountSidHC -Name 's-1-5-32-545' |
+                Should -Be 'S-1-5-32-545'
+            Get-WellKnownAccountSidHC -Name 'kiosk' | Should -BeNullOrEmpty
+            Get-WellKnownAccountSidHC -Name 'CONTOSO\Administrators' |
+                Should -BeNullOrEmpty
+        }
+        It ('has a unique, valid SID and English name for every built-in ' +
+            'account') {
+            $accounts = Get-WellKnownAccountHC
+            foreach ($sid in $accounts.Keys) {
+                $sid | Should -Match '^S-1-\d+(-\d+)+$'
+                Get-WellKnownAccountSidHC -Name $accounts[$sid] |
+                    Should -Be $sid -Because $accounts[$sid]
+            }
+        }
+        It ('turns an English name or SID into the account name of this ' +
+            'Windows language') {
             $sid = [System.Security.Principal.SecurityIdentifier]'S-1-1-0'
             $everyone = $sid.Translate(
                 [System.Security.Principal.NTAccount]
             ).Value
             Convert-AccountNameHC -Name 'S-1-1-0' | Should -Be $everyone
+            Convert-AccountNameHC -Name 'Everyone' | Should -Be $everyone
             ConvertTo-PortableAccountNameHC -Name $everyone |
-                Should -Be 'S-1-1-0'
+                Should -Be 'Everyone'
+
+            $sid = [System.Security.Principal.SecurityIdentifier](
+                'S-1-5-32-544'
+            )
+            $administrators = $sid.Translate(
+                [System.Security.Principal.NTAccount]
+            ).Value
+            Convert-AccountNameHC -Name 'BUILTIN\Administrators' |
+                Should -Be $administrators
+            Convert-AccountNameHC -Name 'Administrators' |
+                Should -Be $administrators
         }
         It 'keeps a SID that this computer does not know' {
             Convert-AccountNameHC -Name 'S-1-5-21-1-2-3-99999' |

@@ -178,7 +178,7 @@ for creation or update; they never generate removal actions.
 
 ### Accounts in other Windows languages
 
-Built-in accounts and groups have a different name in each Windows language: *Everyone* is *Iedereen* in Dutch and *Jeder* in German. So exports store them by their security ID (SID), which is the same everywhere, for example `S-1-1-0` for Everyone and `S-1-5-32-544` for Administrators. A restore turns the SID back into the name used by that computer. This applies to user group names and members, share permissions and folder permissions. You can write SIDs in your own configurations too. Local and domain accounts keep their name, because their SID differs per computer or domain.
+Built-in accounts and groups have a different name in each Windows language: *Everyone* is *Iedereen* in Dutch and *Jeder* in German. So exports write them with their **English name**, such as `Everyone`, `BUILTIN\Administrators` or `NT AUTHORITY\Authenticated Users`. A restore looks the English name up in a fixed list of built-in accounts, whose security IDs (SIDs) are the same on every Windows, and uses the name of that computer's language. The prefix is optional: `Administrators` works too. This applies to user group names and members, share permissions, folder permissions and the account of scheduled tasks.
 
 ### Paths
 
@@ -203,21 +203,21 @@ All paths in a configuration (installers, files to copy, custom scripts, shared 
     "Name": "Data",
     "Path": "C:\\Data",
     "Access": [
-      { "AccountName": "S-1-5-32-544", "AccessControlType": "Allow", "AccessRight": "Full" },
-      { "AccountName": "S-1-5-11", "AccessControlType": "Allow", "AccessRight": "Change" }
+      { "AccountName": "BUILTIN\\Administrators", "AccessControlType": "Allow", "AccessRight": "Full" },
+      { "AccountName": "NT AUTHORITY\\Authenticated Users", "AccessControlType": "Allow", "AccessRight": "Change" }
     ],
     "NTFS": {
-      "Owner": "S-1-5-32-544",
+      "Owner": "BUILTIN\\Administrators",
       "AreAccessRulesProtected": false,
       "Access": [
-        { "IdentityReference": "S-1-5-32-545", "AccessControlType": "Allow", "FileSystemRights": "Modify, Synchronize", "InheritanceFlags": "ContainerInherit, ObjectInherit", "PropagationFlags": "None" }
+        { "IdentityReference": "BUILTIN\\Users", "AccessControlType": "Allow", "FileSystemRights": "Modify, Synchronize", "InheritanceFlags": "ContainerInherit, ObjectInherit", "PropagationFlags": "None" }
       ]
     }
   },
   {
     "Name": "Scans",
     "Path": "D:\\Scans",
-    "Access": [ { "AccountName": "S-1-5-32-545", "AccessControlType": "Allow", "AccessRight": "Read" } ]
+    "Access": [ { "AccountName": "BUILTIN\\Users", "AccessControlType": "Allow", "AccessRight": "Read" } ]
   }
 ]
 ```
@@ -344,7 +344,7 @@ The account a task runs as:
 | Properties                       | The task runs                                                                          |
 | -------------------------------- | -------------------------------------------------------------------------------------- |
 | `RunAsUser` and `RunAsPassword`  | as that user, whether or not the user is signed in; the password is saved in Task Scheduler |
-| `RunAsUser` only                 | as that account: a service account such as `S-1-5-19` (LOCAL SERVICE), or a user while signed in |
+| `RunAsUser` only                 | as that account: a service account such as `NT AUTHORITY\LOCAL SERVICE`, or a user while signed in |
 | neither                          | as SYSTEM                                                                              |
 
 Use a `{{password:...}}` placeholder for `RunAsPassword`, so the password is asked for during the restore and never stored in the configuration. An export does exactly that for each task with a saved password. A task that runs for a group can't be exported with its account and is restored as SYSTEM; the export report says so.

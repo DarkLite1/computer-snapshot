@@ -153,7 +153,7 @@ if ($Action -eq 'Export') {
                 )
             }
 
-            # Built-in members such as Everyone are exported by SID
+            # Built-in members such as Everyone get their English name
             $memberNames = @(
                 $members | Where-Object { $_.Name } | ForEach-Object {
                     ConvertTo-PortableAccountNameHC -Name $_.Name -Sid $_.SID
@@ -166,15 +166,11 @@ if ($Action -eq 'Export') {
             $groupName = ConvertTo-PortableAccountNameHC @portableParams
             if ($groupName -ne $group.Name) {
                 # A built-in group: its name and description depend on the
-                # Windows language, so it is stored by SID and its
-                # description is left to Windows
-                Write-Verbose "Group '$($group.Name)': built-in, store by SID"
+                # Windows language, so it is stored by its English name,
+                # without BUILTIN\, and its description is left to Windows
+                Write-Verbose "Group '$($group.Name)': built-in"
                 [ordered]@{
-                    Name    = $groupName
-                    Comment = (
-                        "Built-in group '$($group.Name)', stored by SID so " +
-                        'it works in every Windows language'
-                    )
+                    Name    = $groupName.Split('\')[-1]
                     Members = $memberNames
                 }
             }
@@ -205,16 +201,30 @@ else {
         #region Create the group or update its description
         $groupName = $group.Name
         try {
-            $isSid = $group.Name -match '^S-1-\d+(-\d+)+$'
-            $existingGroup = $knownGroups | Where-Object {
-                $_.Name -eq $group.Name -or
-                ($isSid -and [string]$_.SID -eq $group.Name)
-            } | Select-Object -First 1
+            # A built-in group, by SID or English name, is found by its SID,
+            # so 'Administrators' also finds 'Administratoren'
+            $wellKnownSid = Get-WellKnownAccountSidHC -Name $group.Name
+            $existingGroup = $null
+            if ($wellKnownSid) {
+                $existingGroup = $knownGroups | Where-Object {
+                    [string]$_.SID -eq $wellKnownSid
+                } | Select-Object -First 1
+            }
+            if (-not $existingGroup) {
+                $existingGroup = $knownGroups | Where-Object {
+                    $_.Name -eq $group.Name
+                } | Select-Object -First 1
+            }
             if ($existingGroup) { $groupName = $existingGroup.Name }
-            if (-not $existingGroup -and $isSid) {
+            if (
+                -not $existingGroup -and (
+                    $group.Name -match '^S-1-\d+(-\d+)+$' -or
+                    $wellKnownSid -like 'S-1-5-32-*'
+                )
+            ) {
                 throw (
-                    "there is no group with SID '$($group.Name)' on " +
-                    "'$env:COMPUTERNAME'"
+                    "there is no built-in group '$($group.Name)' " +
+                    "($wellKnownSid) on '$env:COMPUTERNAME'"
                 )
             }
             if (-not $existingGroup) {

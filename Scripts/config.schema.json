@@ -681,7 +681,7 @@
         "properties": {
           "Name": {
             "type": "string",
-            "description": "Local group name, or the SID of a built-in group such as S-1-5-32-544 (Administrators), which works in every Windows language."
+            "description": "Local group name. A built-in group by its English name, such as Administrators, or its SID, such as S-1-5-32-544, works in every Windows language."
           },
           "Description": {
             "type": "string",
@@ -692,7 +692,7 @@
             "description": "Members to add to this group.",
             "items": {
               "type": ["string", "null"],
-              "description": "Account name in local or domain notation, or the SID of a built-in account such as S-1-1-0 (Everyone)."
+              "description": "Account name in local or domain notation. A built-in account by its English name, such as Everyone or NT AUTHORITY\\Authenticated Users, or its SID works in every Windows language."
             }
           },
           "Comment": {
@@ -971,7 +971,7 @@
                 },
                 "AccountName": {
                   "type": ["string", "null"],
-                  "description": "Account name, or the SID of a built-in account such as S-1-1-0 (Everyone), which works in every Windows language."
+                  "description": "Account name. A built-in account by its English name, such as Everyone or BUILTIN\\Users, or its SID works in every Windows language."
                 },
                 "AccessControlType": {
                   "type": ["string", "null"],
@@ -996,7 +996,7 @@
             "properties": {
               "Owner": {
                 "type": "string",
-                "description": "Folder owner: account name, or the SID of a built-in account such as S-1-5-32-544 (Administrators)."
+                "description": "Folder owner: account name. A built-in account by its English name, such as BUILTIN\\Administrators, or its SID works in every Windows language."
               },
               "AreAccessRulesProtected": {
                 "type": "boolean",
@@ -1012,7 +1012,7 @@
                   "properties": {
                     "IdentityReference": {
                       "type": "string",
-                      "description": "Account name, or the SID of a built-in account such as S-1-1-0 (Everyone), which works in every Windows language."
+                      "description": "Account name. A built-in account by its English name, such as Everyone or BUILTIN\\Users, or its SID works in every Windows language."
                     },
                     "AccessControlType": {
                       "type": "string",
@@ -1391,7 +1391,7 @@
           },
           "RunAsUser": {
             "type": "string",
-            "description": "Account the task runs as, such as 'kiosk', 'CONTOSO\\svc-backup' or a SID like S-1-5-19 (LOCAL SERVICE). Without it, the task runs as SYSTEM."
+            "description": "Account the task runs as, such as 'kiosk', 'CONTOSO\\svc-backup' or a built-in account by its English name, such as NT AUTHORITY\\LOCAL SERVICE, which works in every Windows language. Without it, the task runs as SYSTEM."
           },
           "RunAsPassword": {
             "type": "string",

@@ -213,7 +213,8 @@ Describe 'Single-file wizard commands' {
             Items               = 'UserAccounts', 'Software'
             OpenReportInBrowser = $false
         }
-        Start-ConfigurationJobHC @params
+        Mock Start-Process { 'process' }
+        Start-ConfigurationJobHC @params | Should -Be 'process'
 
         @(Get-ChildItem -LiteralPath $TestDrive -Recurse).Count |
             Should -Be $before
@@ -221,6 +222,7 @@ Describe 'Single-file wizard commands' {
             $command = [Text.Encoding]::Unicode.GetString(
                 [Convert]::FromBase64String($ArgumentList[-1])
             )
+            $PassThru -and
             $command -like '*-Action CreateSnapshot*' -and
             $command -like '*Configurations\Kiosk example.json*' -and
             $command -like '*-Items*UserAccounts*Software*'
@@ -617,6 +619,67 @@ Describe 'Export scheduled task folders' {
             }
         }
         finally { $form.Dispose() }
+    }
+    It ('keeps Export disabled while the export runs, and enables it ' +
+        'again once it has ended') {
+        $button = New-Object Windows.Forms.Button
+        $button.Text = 'Export'
+        $process = [pscustomobject]@{ HasExited = $false; Disposed = $false }
+        $process | Add-Member -MemberType ScriptMethod -Name Dispose -Value {
+            $this.Disposed = $true
+        }
+        $waitUntil = {
+            param([scriptblock]$Condition, [int]$Milliseconds = 5000)
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            while (
+                -not (& $Condition) -and
+                $clock.ElapsedMilliseconds -lt $Milliseconds
+            ) {
+                [Windows.Forms.Application]::DoEvents()
+                Start-Sleep -Milliseconds 20
+            }
+        }
+        try {
+            $button.Enabled = $false
+            $waitParams = @{
+                Button   = $button
+                Process  = $process
+                BusyText = 'Exporting...'
+                Interval = 20
+            }
+            Wait-WizardProcessHC @waitParams
+
+            # Several timer ticks while the export still runs
+            & $waitUntil { $false } 200
+            $button.Enabled | Should -BeFalse
+            $button.Text | Should -Be 'Exporting...'
+
+            $process.HasExited = $true
+            & $waitUntil { $button.Enabled }
+            $button.Enabled | Should -BeTrue
+            $button.Text | Should -Be 'Export'
+            $process.Disposed | Should -BeTrue
+
+            # Not started, such as a cancelled confirmation or an error
+            $button.Enabled = $false
+            Wait-WizardProcessHC -Button $button -Process $null
+            $button.Enabled | Should -BeTrue
+
+            # A process that can not be watched counts as ended
+            $hidden = [pscustomobject]@{}
+            $memberParams = @{
+                MemberType = 'ScriptProperty'
+                Name       = 'HasExited'
+                Value      = { throw 'Access is denied' }
+            }
+            $hidden | Add-Member @memberParams
+            $button.Enabled = $false
+            Wait-WizardProcessHC -Button $button -Process $hidden
+            $button.Enabled | Should -BeTrue
+        }
+        finally {
+            $button.Dispose()
+        }
     }
     It ('checks every section or none with the check box in the header ' +
         'of the export list, and keeps the task folders in step') {

@@ -1993,7 +1993,7 @@ function Start-RestoreWizardJobHC {
     }
 
     try {
-        Start-ConfigurationJobHC @jobParams @restoreOptions
+        $null = Start-ConfigurationJobHC @jobParams @restoreOptions
     }
     catch {
         if ($null -ne $server) {
@@ -2845,6 +2845,7 @@ function Start-ConfigurationJobHC {
 
     $parameters = @{
         FilePath     = 'powershell.exe'
+        PassThru     = $true
         ArgumentList = @(
             '-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand',
             [Convert]::ToBase64String(
@@ -2862,7 +2863,69 @@ function Start-ConfigurationJobHC {
     }
 
     Write-Verbose "Start a new PowerShell process for '$Action'"
+    # The process, so the caller can wait for it without blocking
     Start-Process @parameters
+}
+
+function Wait-WizardProcessHC {
+    <#
+    .SYNOPSIS
+        Keep a button disabled while the process it started runs, and
+        enable it again once the process has ended.
+    .DESCRIPTION
+        Disable the button before starting the process. A timer checks the
+        process on the window thread, so the window stays responsive.
+        Without a running process the button is enabled at once.
+    #>
+    param(
+        [Parameter(Mandatory)][Windows.Forms.Button]$Button,
+        [AllowNull()]$Process,
+        [string]$BusyText,
+        [int]$Interval = 500
+    )
+
+    $isRunning = {
+        param($process)
+        try {
+            # Unknown, such as an inaccessible process, counts as ended
+            $null -ne $process -and $process.HasExited -eq $false
+        }
+        catch {
+            $false
+        }
+    }
+
+    if (-not (& $isRunning $Process)) {
+        $Button.Enabled = $true
+        return
+    }
+
+    $timer = New-Object Windows.Forms.Timer
+    $timer.Interval = $Interval
+    $timer.Tag = @{
+        Button    = $Button
+        Process   = $Process
+        Text      = $Button.Text
+        IsRunning = $isRunning
+    }
+    $Button.Enabled = $false
+    if ($BusyText) {
+        $Button.Text = $BusyText
+    }
+    $timer.Add_Tick({
+        $wait = $this.Tag
+        if (& $wait.IsRunning $wait.Process) {
+            return
+        }
+        $this.Stop()
+        if (-not $wait.Button.IsDisposed) {
+            $wait.Button.Text = $wait.Text
+            $wait.Button.Enabled = $true
+        }
+        $wait.Process.Dispose()
+        $this.Dispose()
+    })
+    $timer.Start()
 }
 #endregion
 
@@ -3014,6 +3077,9 @@ $exportLayout.Controls.Add($options, 0, 5)
 $exportLayout.Controls.Add($exportButtons, 0, 6)
 
 $export.Add_Click({
+    # One export at a time: the button stays disabled until it is done
+    $export.Enabled = $false
+    $process = $null
     try {
         $selectedItems = @(
             $itemList.CheckedItems | ForEach-Object { [string]$_.Tag }
@@ -3040,12 +3106,20 @@ $export.Add_Click({
             OpenReportInBrowser = $openReport.Checked
             RunElevated         = $elevated.Checked
         }
-        Start-ConfigurationJobHC @jobParams @jobOptions
+        $process = Start-ConfigurationJobHC @jobParams @jobOptions
     }
     catch {
         $null = [Windows.Forms.MessageBox]::Show(
             $form, [string]$_, 'Export error', 'OK', 'Error'
         )
+    }
+    finally {
+        $waitParams = @{
+            Button   = $export
+            Process  = $process
+            BusyText = 'Exporting...'
+        }
+        Wait-WizardProcessHC @waitParams
     }
 })
 #endregion

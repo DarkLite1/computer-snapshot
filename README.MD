@@ -23,8 +23,10 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
       a file that answers none of them is grayed out. Click a column header to
       sort by path or date. To start a new answer file, type a name such as
       `Kiosk\Antwerp\Kiosk.json` under the list and click **Create**.
-   4. **Questions** (only for answers the file leaves open): answer them; each
-      field is checked while you type.
+   4. **Questions** (only for answers the file leaves open): a list grouped by
+      section, like the review; click an answer to type it, or choose it when
+      the setting has fixed values. The **Check** column says what is
+      expected or wrong while you type.
    5. **Review:** check the configuration, sections, options and every answer
       with where it comes from (passwords are hidden), then click **Restore**.
       Nothing is changed before that.

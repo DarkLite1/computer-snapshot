@@ -814,7 +814,7 @@ function Update-RestoreWizardButtonsHC {
             )
         }
         'Questions' {
-            Update-RestoreInputPanelHC -Panel $state.InputPanel
+            Update-RestoreAnswerGridHC -Grid $state.AnswerGrid
         }
         default {
             $next.Enabled = $true
@@ -891,8 +891,8 @@ function Show-RestoreWizardStepHC {
     }
 
     # Only the questions step may enable Next for the answers
-    if ($null -ne $state.InputPanel) {
-        $state.InputPanel.Tag.Confirm = if ($Step -eq 'Questions') {
+    if ($null -ne $state.AnswerGrid) {
+        $state.AnswerGrid.Tag.Confirm = if ($Step -eq 'Questions') {
             $next
         }
     }
@@ -910,7 +910,7 @@ function Show-RestoreWizardStepHC {
             Find-RestoreWizardControlHC $Wizard 'AnswerFiles'
         }
         'Questions' {
-            $state.InputPanel.Tag.Inputs | Select-Object -First 1
+            $state.AnswerGrid
         }
         default {
             $next
@@ -1002,10 +1002,10 @@ function Set-RestoreWizardConfigurationHC {
     (Find-RestoreWizardControlHC $Wizard 'OpenReportInBrowser').Checked =
         $settings.OpenReportInBrowser
 
-    if ($null -ne $state.InputPanel) {
-        Clear-RestoreInputPanelHC -Panel $state.InputPanel
-        $state.InputPanel.Parent.Controls.Remove($state.InputPanel)
-        $state.InputPanel.Dispose()
+    if ($null -ne $state.AnswerGrid) {
+        Clear-RestoreAnswerGridHC -Grid $state.AnswerGrid
+        $state.AnswerGrid.Parent.Controls.Remove($state.AnswerGrid)
+        $state.AnswerGrid.Dispose()
     }
 
     $state.ConfigurationFile = $ConfigurationFile
@@ -1015,7 +1015,7 @@ function Set-RestoreWizardConfigurationHC {
     $state.AnswerFile = $null
     $state.FileAnswers = $null
     $state.Answers = $null
-    $state.InputPanel = $null
+    $state.AnswerGrid = $null
 }
 
 function Update-RestoreAnswerFileListHC {
@@ -1218,6 +1218,322 @@ function New-RestoreWizardAnswerFileHC {
     Update-RestoreAnswerFileListHC -Wizard $Wizard -Reload
 }
 
+function Get-RestoreAnswerGridValueHC {
+    # The answer in a row of the answer list, also while it is typed
+    param(
+        [Parameter(Mandatory)]$Grid,
+        [Parameter(Mandatory)]$Row
+    )
+
+    $current = $Grid.CurrentCell
+    if (
+        $Grid.IsCurrentCellInEditMode -and
+        $null -ne $current -and
+        $current.RowIndex -eq $Row.Index -and
+        $current.ColumnIndex -eq 1 -and
+        $Grid.EditingControl -is [Windows.Forms.TextBox]
+    ) {
+        return $Grid.EditingControl.Text
+    }
+
+    [string]$Row.Cells[1].Value
+}
+
+function Update-RestoreAnswerGridHC {
+    <#
+    .SYNOPSIS
+        Check every answer in the answer list, say what is expected or wrong
+        in the Check column, and enable the confirm button only when every
+        answer is valid.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowNull()]$Grid
+    )
+
+    if ($null -eq $Grid) {
+        return
+    }
+
+    $invalid = 0
+    $total = 0
+
+    foreach ($row in $Grid.Rows) {
+        $state = $row.Tag
+        if ($null -eq $state) {
+            continue
+        }
+
+        $total++
+        $question = $state.Question
+        $problemParams = @{
+            Kind  = $question.Kind
+            Value = Get-RestoreAnswerGridValueHC -Grid $Grid -Row $row
+            Rule  = $question.Rule
+        }
+        $problem = Get-RestoreInputProblemHC @problemParams
+        $check = $row.Cells[2]
+
+        if (-not $problem) {
+            $check.Value = [string][char]0x2713
+            $check.Style.ForeColor = [Drawing.Color]::SeaGreen
+            continue
+        }
+
+        $invalid++
+
+        if ($state.Touched) {
+            $check.Value = $problem
+            $check.Style.ForeColor = [Drawing.Color]::Firebrick
+        }
+        else {
+            $hint = Get-RestoreInputHintHC -Kind $question.Kind -Rule (
+                $question.Rule
+            )
+            $check.Value = if ($hint) {
+                $hint
+            }
+            else {
+                'A value is required.'
+            }
+            $check.Style.ForeColor = [Drawing.Color]::DimGray
+        }
+    }
+
+    $Grid.Tag.Invalid = $invalid
+    if ($null -ne $Grid.Tag.Confirm) {
+        $Grid.Tag.Confirm.Enabled = $invalid -eq 0
+    }
+    if ($null -ne $Grid.Tag.Summary) {
+        $Grid.Tag.Summary.Text = if ($invalid) {
+            "$invalid of $total answer(s) still needed"
+        }
+        else {
+            'All answers are valid'
+        }
+    }
+}
+
+function Get-RestoreAnswerGridValuesHC {
+    # The answers in the answer list, by placeholder
+    param(
+        [Parameter(Mandatory)]$Grid
+    )
+
+    if ($Grid.IsCurrentCellInEditMode) {
+        $null = $Grid.EndEdit()
+    }
+
+    $dictionaryType = 'System.Collections.Generic.Dictionary[string,string]'
+    $values = New-Object $dictionaryType ([StringComparer]::Ordinal)
+
+    foreach ($row in $Grid.Rows) {
+        if ($null -ne $row.Tag) {
+            $values[$row.Tag.Question.Placeholder] = [string]$row.Cells[1].Value
+        }
+    }
+
+    return , $values
+}
+
+function Clear-RestoreAnswerGridHC {
+    # Forget the answers in the answer list, passwords included
+    param(
+        [Parameter(Mandatory)][AllowNull()]$Grid
+    )
+
+    if ($null -eq $Grid) {
+        return
+    }
+
+    if ($Grid.IsCurrentCellInEditMode) {
+        $null = $Grid.CancelEdit()
+        $null = $Grid.EndEdit()
+    }
+
+    foreach ($row in $Grid.Rows) {
+        if ($null -ne $row.Tag) {
+            $row.Cells[1].Value = $null
+        }
+    }
+}
+
+function New-RestoreAnswerGridHC {
+    <#
+    .SYNOPSIS
+        The questions of the restore as an editable list, grouped by section
+        like the review: a row per question with its answer and a check.
+    .DESCRIPTION
+        A setting with fixed values gets a list to choose from, and a
+        password is never shown, also not while it is typed. Values fills
+        the answers by placeholder. Set Tag.Confirm to the button that may
+        only be used when every answer is valid, and Tag.Summary to a label
+        that counts the answers still needed.
+    #>
+    param(
+        [Parameter(Mandatory)][object[]]$Questions,
+        [System.Collections.IDictionary]$Values,
+        [Drawing.Font]$Font = (New-Object Drawing.Font 'Segoe UI', 10)
+    )
+
+    $grid = New-Object Windows.Forms.DataGridView
+    $grid.Name = 'AnswerGrid'
+    $grid.Dock = 'Fill'
+    $grid.Font = $Font
+    $grid.AllowUserToAddRows = $false
+    $grid.AllowUserToDeleteRows = $false
+    $grid.AllowUserToResizeRows = $false
+    $grid.RowHeadersVisible = $false
+    $grid.MultiSelect = $false
+    $grid.SelectionMode = 'CellSelect'
+    $grid.EditMode = 'EditOnEnter'
+    $grid.AutoSizeColumnsMode = 'Fill'
+    $grid.BackgroundColor = [Drawing.SystemColors]::Window
+    $grid.CellBorderStyle = 'SingleHorizontal'
+    $grid.GridColor = [Drawing.SystemColors]::ControlLight
+    $grid.ColumnHeadersHeightSizeMode = 'AutoSize'
+    $grid.DefaultCellStyle.SelectionBackColor = [Drawing.SystemColors]::Window
+    $grid.DefaultCellStyle.SelectionForeColor =
+        [Drawing.SystemColors]::WindowText
+    $grid.ShowCellToolTips = $true
+    $grid.Tag = @{
+        Confirm = $null
+        Summary = $null
+        Invalid = 0
+    }
+
+    foreach ($column in @(
+            @('Question', 'Question', 45, $true),
+            @('Answer', 'Answer', 30, $false),
+            @('Check', 'Check', 25, $true)
+        )) {
+        $gridColumn = New-Object Windows.Forms.DataGridViewTextBoxColumn
+        $gridColumn.Name = $column[0]
+        $gridColumn.HeaderText = $column[1]
+        $gridColumn.FillWeight = $column[2]
+        $gridColumn.ReadOnly = $column[3]
+        $gridColumn.SortMode = 'NotSortable'
+        $null = $grid.Columns.Add($gridColumn)
+    }
+    $grid.Columns['Check'].DefaultCellStyle.Font = New-Object Drawing.Font (
+        $Font.FontFamily, 9
+    )
+    $grid.Columns['Check'].DefaultCellStyle.WrapMode = 'True'
+    $grid.AutoSizeRowsMode = 'AllCells'
+
+    $headerFont = New-Object Drawing.Font $Font, ([Drawing.FontStyle]::Bold)
+    $section = $null
+
+    foreach ($question in $Questions) {
+        if ($question.Section -ne $section) {
+            $section = $question.Section
+            $index = $grid.Rows.Add($section, '', '')
+            $header = $grid.Rows[$index]
+            $header.ReadOnly = $true
+            $header.DefaultCellStyle.Font = $headerFont
+            $header.DefaultCellStyle.ForeColor = [Drawing.Color]::DarkSlateBlue
+            $header.DefaultCellStyle.SelectionForeColor =
+                [Drawing.Color]::DarkSlateBlue
+        }
+
+        $value = $null
+        if ($null -ne $Values) {
+            $value = $Values[$question.Placeholder]
+        }
+
+        $index = $grid.Rows.Add($question.Description, $null, '')
+        $row = $grid.Rows[$index]
+
+        if ($question.Rule.Values) {
+            $cell = New-Object Windows.Forms.DataGridViewComboBoxCell
+            $cell.Items.AddRange([object[]]$question.Rule.Values)
+            $cell.FlatStyle = 'Flat'
+            $row.Cells[1] = $cell
+            if ($value -and $cell.Items.Contains($value)) {
+                $cell.Value = $value
+            }
+        }
+        elseif ($value) {
+            $row.Cells[1].Value = $value
+        }
+
+        $location = $question.Path
+        if ($question.OtherSections.Count) {
+            $location += (
+                [Environment]::NewLine +
+                "Also used by: $($question.OtherSections -join ', ')"
+            )
+        }
+        $row.Cells[0].ToolTipText = $location
+        $row.Tag = @{
+            Question = $question
+            Touched  = [bool]$value
+        }
+    }
+
+    # Never show a password, nor how long it is
+    $grid.Add_CellFormatting({
+        param($sender, $eventArgs)
+        $state = $sender.Rows[$eventArgs.RowIndex].Tag
+        if (
+            $eventArgs.ColumnIndex -eq 1 -and
+            $null -ne $state -and
+            $state.Question.Kind -eq 'password' -and
+            -not [string]::IsNullOrEmpty([string]$eventArgs.Value)
+        ) {
+            $eventArgs.Value = [string]([char]0x25CF) * 8
+            $eventArgs.FormattingApplied = $true
+        }
+    })
+    $grid.Add_EditingControlShowing({
+        param($sender, $eventArgs)
+        $box = $eventArgs.Control -as [Windows.Forms.TextBox]
+        if ($null -eq $box) {
+            return
+        }
+        $state = $sender.CurrentRow.Tag
+        $box.UseSystemPasswordChar = (
+            $null -ne $state -and $state.Question.Kind -eq 'password'
+        )
+        # The grid reuses its text box; check while typing, hooked once
+        if (-not $box.Tag) {
+            $box.Tag = 'Checked while typing'
+            $box.Add_TextChanged({
+                Update-RestoreAnswerGridHC -Grid (
+                    $this.EditingControlDataGridView
+                )
+            })
+        }
+    })
+    $grid.Add_CurrentCellDirtyStateChanged({
+        if ($this.CurrentCell -is [Windows.Forms.DataGridViewComboBoxCell]) {
+            $null = $this.CommitEdit('CurrentCellChange')
+        }
+    })
+    $grid.Add_CellValueChanged({
+        param($sender, $eventArgs)
+        if ($eventArgs.ColumnIndex -ne 1 -or $eventArgs.RowIndex -lt 0) {
+            return
+        }
+        $row = $sender.Rows[$eventArgs.RowIndex]
+        if ($null -ne $row.Tag -and $row.Cells[1].Value) {
+            $row.Tag.Touched = $true
+        }
+        Update-RestoreAnswerGridHC -Grid $sender
+    })
+    $grid.Add_CellEndEdit({
+        param($sender, $eventArgs)
+        $state = $sender.Rows[$eventArgs.RowIndex].Tag
+        if ($null -ne $state) {
+            $state.Touched = $true
+        }
+        Update-RestoreAnswerGridHC -Grid $sender
+    })
+
+    Update-RestoreAnswerGridHC -Grid $grid
+
+    return , $grid
+}
+
 function Set-RestoreWizardQuestionsHC {
     <#
     .SYNOPSIS
@@ -1230,28 +1546,27 @@ function Set-RestoreWizardQuestionsHC {
     )
 
     $state = $Wizard.Tag
-    $page = Find-RestoreWizardControlHC $Wizard 'QuestionsStep'
+    $gridHost = Find-RestoreWizardControlHC $Wizard 'AnswerGridHost'
     $earlier = $null
 
-    if ($null -ne $state.InputPanel) {
-        $earlier = Get-RestoreInputPanelValuesHC -Panel $state.InputPanel
-        Clear-RestoreInputPanelHC -Panel $state.InputPanel
-        $page.Controls.Remove($state.InputPanel)
-        $state.InputPanel.Dispose()
+    if ($null -ne $state.AnswerGrid) {
+        $earlier = Get-RestoreAnswerGridValuesHC -Grid $state.AnswerGrid
+        Clear-RestoreAnswerGridHC -Grid $state.AnswerGrid
+        $gridHost.Controls.Remove($state.AnswerGrid)
+        $state.AnswerGrid.Dispose()
     }
 
-    $panelParams = @{
-        Questions    = $Questions
-        Values       = $earlier
-        Font         = $Wizard.Font
-        Introduction = (
-            'Answer the questions that the answer file leaves open. Click ' +
-            'Back to change the sections or the answer file; your answers ' +
-            'are kept.'
-        )
+    $gridParams = @{
+        Questions = $Questions
+        Values    = $earlier
+        Font      = $Wizard.Font
     }
-    $state.InputPanel = New-RestoreInputPanelHC @panelParams
-    $page.Controls.Add($state.InputPanel)
+    $state.AnswerGrid = New-RestoreAnswerGridHC @gridParams
+    $state.AnswerGrid.Tag.Summary = Find-RestoreWizardControlHC $Wizard (
+        'AnswerGridSummary'
+    )
+    $gridHost.Controls.Add($state.AnswerGrid)
+    Update-RestoreAnswerGridHC -Grid $state.AnswerGrid
 
     if ($null -ne $earlier) {
         $earlier.Clear()
@@ -1412,9 +1727,7 @@ function Start-RestoreWizardJobHC {
         $state.Answers.Clear()
         $state.Answers = $null
     }
-    if ($null -ne $state.InputPanel) {
-        Clear-RestoreInputPanelHC -Panel $state.InputPanel
-    }
+    Clear-RestoreAnswerGridHC -Grid $state.AnswerGrid
 
     $state.History.Clear()
     Show-RestoreWizardStepHC -Wizard $Wizard -Step 'Configuration'
@@ -1508,13 +1821,13 @@ function Invoke-RestoreWizardNextHC {
             Show-RestoreWizardStepHC -Wizard $Wizard -Step 'Review'
         }
         'Questions' {
-            Update-RestoreInputPanelHC -Panel $state.InputPanel
+            Update-RestoreAnswerGridHC -Grid $state.AnswerGrid
             if (-not (& $find 'WizardNext').Enabled) {
                 return
             }
 
-            $state.Answers = Get-RestoreInputPanelValuesHC -Panel (
-                $state.InputPanel
+            $state.Answers = Get-RestoreAnswerGridValuesHC -Grid (
+                $state.AnswerGrid
             )
             Update-RestoreWizardReviewHC -Wizard $Wizard
             Show-RestoreWizardStepHC -Wizard $Wizard -Step 'Review'
@@ -1579,7 +1892,7 @@ function New-RestoreWizardHC {
         AnswerFile        = $null
         FileAnswers       = $null
         Answers           = $null
-        InputPanel        = $null
+        AnswerGrid        = $null
         AnswerServers     = New-Object 'System.Collections.Generic.List[object]'
     }
 
@@ -1878,12 +2191,25 @@ function New-RestoreWizardHC {
     $step.Controls.Add($status, 0, 3)
     #endregion
 
-    #region Questions step, filled by Set-RestoreWizardQuestionsHC
-    $questionsStep = New-Object Windows.Forms.Panel
-    $questionsStep.Name = 'QuestionsStep'
-    $questionsStep.Dock = 'Fill'
-    $questionsStep.Visible = $false
-    $pages.Controls.Add($questionsStep)
+    #region Questions step: guidance, answers, summary
+    $step = & $newStep 'QuestionsStep' @(0, 1, 0)
+    $guidance = & $newGuidance 'QuestionsGuidance' (
+        'Answer the questions of the checked sections. Click an answer to ' +
+        'type it or choose it from the list. Click Back to change the ' +
+        'sections or the answer file; your answers are kept.'
+    )
+    $step.Controls.Add($guidance, 0, 0)
+
+    # Filled by Set-RestoreWizardQuestionsHC
+    $gridHost = New-Object Windows.Forms.Panel
+    $gridHost.Name = 'AnswerGridHost'
+    $gridHost.Dock = 'Fill'
+    $gridHost.Margin = New-Object Windows.Forms.Padding 0
+    $step.Controls.Add($gridHost, 0, 1)
+
+    $gridSummary = & $newGuidance 'AnswerGridSummary' ''
+    $gridSummary.Margin = New-Object Windows.Forms.Padding 0, 8, 0, 0
+    $step.Controls.Add($gridSummary, 0, 2)
     #endregion
 
     #region Review step: summary, answers, guidance

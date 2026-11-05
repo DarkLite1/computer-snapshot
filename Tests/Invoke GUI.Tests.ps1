@@ -828,6 +828,9 @@ Describe 'Restore wizard' {
             $item.Selected = $true
             $next.PerformClick()
         }
+        $answerRows = {
+            @($wizard.Tag.AnswerGrid.Rows | Where-Object { $null -ne $_.Tag })
+        }
         $chooseAnswerFile = {
             param($path)
             $item = (& $find 'AnswerFiles').Items | Where-Object Text -eq $path
@@ -1017,6 +1020,79 @@ Describe 'Restore wizard' {
         (& $find 'WizardStepTitle').Text |
             Should -Be 'Step 1: Choose a configuration'
     }
+    It ('shows the questions as an editable list like the review and ' +
+        'checks each answer while it is typed') {
+        Write-TestJsonHC "$root\Configurations\Registry.json" ([ordered]@{
+                SchemaVersion = 3
+                Items         = [ordered]@{
+                    RegistryKeys = [ordered]@{
+                        RunAsCurrentUser = [ordered]@{
+                            RegistryKeys = @(
+                                [ordered]@{
+                                    Path  = 'HKCU:\Software\Example'
+                                    Name  = 'Port'
+                                    Type  = '{{input:Value type}}'
+                                    Value = 1
+                                }
+                            )
+                        }
+                    }
+                }
+            })
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+        $next.PerformClick()
+        $grid = $wizard.Tag.AnswerGrid
+        $rows = & $answerRows
+
+        @($grid.Rows | Where-Object { $null -eq $_.Tag } |
+            ForEach-Object { $_.Cells[0].Value }) |
+            Should -Be @('User accounts', 'Time synchronization')
+        @($grid.Columns.HeaderText) |
+            Should -Be @('Question', 'Answer', 'Check')
+        $rows[0].Cells[2].Value | Should -Be 'A value is required.'
+        $rows[2].Cells[2].Value |
+            Should -Be 'Enter an IPv4 address, such as 192.0.2.10.'
+        $next.Enabled | Should -BeFalse
+
+        $rows[1].Cells[1].Value = 'Typed-secret!42'
+        $rows[1].Cells[1].FormattedValue |
+            Should -Be ([string]([char]0x25CF) * 8)
+        $grid.CurrentCell = $rows[1].Cells[1]
+        $null = $grid.BeginEdit($true)
+        $grid.EditingControl.UseSystemPasswordChar | Should -BeTrue
+        $null = $grid.EndEdit()
+
+        $rows[2].Cells[1].Value = '192.0.2.300'
+        $rows[2].Cells[2].Value |
+            Should -Be 'Enter an IPv4 address, such as 192.0.2.10.'
+        $rows[2].Cells[2].Style.ForeColor |
+            Should -Be ([Drawing.Color]::Firebrick)
+        $rows[2].Cells[1].Value = '192.0.2.30'
+
+        $grid.CurrentCell = $rows[0].Cells[1]
+        $null = $grid.BeginEdit($true)
+        $grid.EditingControl.UseSystemPasswordChar | Should -BeFalse
+        $grid.EditingControl.Text = 'kiosk'
+
+        $rows[0].Cells[2].Value | Should -Be ([string][char]0x2713)
+        $next.Enabled | Should -BeTrue
+        (& $find 'AnswerGridSummary').Text | Should -Be 'All answers are valid'
+
+        foreach ($step in 1..3) {
+            (& $find 'WizardBack').PerformClick()
+        }
+        (& $find 'RefreshConfigurations').PerformClick()
+        & $chooseConfiguration 'Registry'
+        $next.PerformClick()
+        $next.PerformClick()
+
+        $cell = (& $answerRows)[0].Cells[1]
+        $cell | Should -BeOfType [Windows.Forms.DataGridViewComboBoxCell]
+        @($cell.Items) -ccontains 'DWord' | Should -BeTrue
+        $cell.Value = 'DWord'
+        $next.Enabled | Should -BeTrue
+    }
     It ('asks only what the answer file leaves open, keeps typed answers ' +
         'on Back and hands them over by pipe') {
         # The wizard forgets the answers once they are handed over
@@ -1035,16 +1111,16 @@ Describe 'Restore wizard' {
 
         (& $find 'WizardStepTitle').Text |
             Should -Be 'Step 4: Answer the questions'
-        $inputs = $wizard.Tag.InputPanel.Tag.Inputs
-        @($inputs | ForEach-Object { $_.Tag.Question.Placeholder }) |
+        $rows = & $answerRows
+        @($rows | ForEach-Object { $_.Tag.Question.Placeholder }) |
             Should -Be @('{{password:Password}}')
         $next.Enabled | Should -BeFalse
-        $inputs[0].Text = 'Typed-secret!42'
+        $rows[0].Cells[1].Value = 'Typed-secret!42'
 
         (& $find 'WizardBack').PerformClick()
         $next.PerformClick()
 
-        $wizard.Tag.InputPanel.Tag.Inputs[0].Text |
+        (& $answerRows)[0].Cells[1].Value |
             Should -BeExactly 'Typed-secret!42'
 
         $next.PerformClick()
@@ -1070,11 +1146,11 @@ Describe 'Restore wizard' {
         $next.PerformClick()
         $next.PerformClick()
 
-        $inputs = $wizard.Tag.InputPanel.Tag.Inputs
-        $inputs.Count | Should -Be 3
-        $inputs[0].Text = 'kiosk'
-        $inputs[1].Text = 'Typed-secret!42'
-        $inputs[2].Text = '192.0.2.30'
+        $rows = & $answerRows
+        $rows.Count | Should -Be 3
+        $rows[0].Cells[1].Value = 'kiosk'
+        $rows[1].Cells[1].Value = 'Typed-secret!42'
+        $rows[2].Cells[1].Value = '192.0.2.30'
         $next.PerformClick()
 
         @((& $find 'ReviewAnswers').Items |

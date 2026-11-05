@@ -1145,6 +1145,54 @@ Describe 'Restore wizard' {
         }
         Get-Content -LiteralPath $file -Raw | Should -BeExactly $before
     }
+    It ('reloads the answers of the answer file, also after it is edited, ' +
+        'and keeps the answers it leaves open') {
+        Mock Show-WizardErrorHC
+        $reload = & $find 'ReloadAnswerFile'
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+        $reload.Visible | Should -BeFalse
+
+        & $chooseAnswerFile 'Kiosk\Gent\Kiosk.json'
+        $reload.Visible | Should -BeTrue
+        (& $answerRows)[2].Cells[1].Value = '192.0.2.99'
+
+        (& $find 'WizardBack').PerformClick()
+        & $chooseAnswerFile 'Kiosk\Brussels\Kiosk.json'
+        $rows = & $answerRows
+        $rows[2].Cells[1].Value | Should -Be '192.0.2.99'
+        $rows[1].Cells[1].Value = 'Typed-secret!42'
+
+        $reload.PerformClick()
+
+        $rows = & $answerRows
+        @($rows | ForEach-Object { $_.Cells[1].Value }) | Should -Be @(
+            'kiosk-brussels', 'Typed-secret!42', '192.0.2.10'
+        )
+        $rows[2].Cells[2].Value |
+            Should -Be "$([char]0x2713) From the answer file"
+        $next.Enabled | Should -BeTrue
+
+        $file = "$root\Answers\Kiosk\Brussels\Kiosk.json"
+        Write-TestJsonHC $file @{
+            Answers = [ordered]@{
+                '{{input:Account}}' = 'kiosk-brussels'
+                '{{ipv4:Server}}'   = '192.0.2.11'
+            }
+        }
+        $reload.PerformClick()
+        (& $answerRows)[2].Cells[1].Value | Should -Be '192.0.2.11'
+
+        Remove-Item -LiteralPath $file
+        $reload.PerformClick()
+        Should -Invoke Show-WizardErrorHC @once -ParameterFilter {
+            $Caption -eq 'Answer file error'
+        }
+        (& $answerRows)[2].Cells[1].Value | Should -Be '192.0.2.11'
+
+        $next.PerformClick()
+        $reload.Visible | Should -BeFalse
+    }
     It ('shows the questions as an editable list like the review and ' +
         'checks each answer while it is typed') {
         Write-TestJsonHC "$root\Configurations\Registry.json" ([ordered]@{

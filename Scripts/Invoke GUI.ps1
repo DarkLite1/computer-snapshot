@@ -977,6 +977,8 @@ function Show-RestoreWizardStepHC {
         $state.History.Count -gt 1
     (Find-RestoreWizardControlHC $Wizard 'RefreshConfigurations').Visible =
         $Step -eq 'Configuration'
+    (Find-RestoreWizardControlHC $Wizard 'ReloadAnswerFile').Visible =
+        $Step -eq 'Questions' -and [bool]$state.AnswerFile
     foreach ($name in @('SelectAll', 'ClearAll')) {
         (Find-RestoreWizardControlHC $Wizard $name).Visible =
             $Step -eq 'Sections'
@@ -1688,10 +1690,14 @@ function Set-RestoreWizardQuestionsHC {
     .SYNOPSIS
         Fill the questions step. Answers typed earlier are kept for the
         questions that are still asked.
+    .PARAMETER FromAnswerFile
+        Take every answer the answer file gives, also where it was changed;
+        typed answers are only kept for questions the file leaves open.
     #>
     param(
         [Parameter(Mandatory)]$Wizard,
-        [Parameter(Mandatory)][object[]]$Questions
+        [Parameter(Mandatory)][object[]]$Questions,
+        [switch]$FromAnswerFile
     )
 
     $state = $Wizard.Tag
@@ -1704,6 +1710,14 @@ function Set-RestoreWizardQuestionsHC {
         Clear-RestoreAnswerGridHC -Grid $state.AnswerGrid
         $gridHost.Controls.Remove($state.AnswerGrid)
         $state.AnswerGrid.Dispose()
+    }
+
+    if ($FromAnswerFile -and $null -ne $earlier -and $state.FileAnswers) {
+        foreach ($placeholder in @($earlier.Keys)) {
+            if ($state.FileAnswers[$placeholder]) {
+                $earlier.Remove($placeholder)
+            }
+        }
     }
 
     $gridParams = @{
@@ -1722,6 +1736,40 @@ function Set-RestoreWizardQuestionsHC {
     if ($null -ne $earlier) {
         $earlier.Clear()
     }
+}
+
+function Reset-RestoreWizardAnswersHC {
+    <#
+    .SYNOPSIS
+        Read the answer file again and show its answers in the questions
+        step, replacing the answers changed for this restore.
+    .DESCRIPTION
+        For a wrong answer file chosen first, or a file edited meanwhile.
+        Answers typed for questions the file leaves open are kept.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowNull()]$Wizard
+    )
+
+    if ($null -eq $Wizard -or -not $Wizard.Tag.AnswerFile) {
+        return
+    }
+
+    $state = $Wizard.Tag
+    $state.FileAnswers = Read-RestoreAnswerFileHC -Path $state.AnswerFile
+
+    $questionParams = @{
+        Wizard         = $Wizard
+        Questions      = $state.Questions
+        FromAnswerFile = $true
+    }
+    Set-RestoreWizardQuestionsHC @questionParams
+
+    # Next follows the answers of the new list
+    $state.AnswerGrid.Tag.Confirm = Find-RestoreWizardControlHC $Wizard (
+        'WizardNext'
+    )
+    Update-RestoreAnswerGridHC -Grid $state.AnswerGrid
 }
 
 function Update-RestoreWizardReviewHC {
@@ -2366,7 +2414,8 @@ function New-RestoreWizardHC {
         'type it or choose it from the list. Answers from the answer file ' +
         'can be changed for this restore only; the file stays unchanged. ' +
         'Click Back to change the sections or the answer file; your ' +
-        'changes are kept.'
+        'changes are kept. Reload answer file reads the file again and ' +
+        'puts its answers back.'
     )
     $step.Controls.Add($guidance, 0, 0)
 
@@ -2481,6 +2530,24 @@ function New-RestoreWizardHC {
         Show-RestoreWizardStepHC -Wizard (Get-RestoreWizardHC $this) -Back
     })
 
+    $reload = New-Object Windows.Forms.Button
+    $reload.Name = 'ReloadAnswerFile'
+    $reload.Text = 'Reload answer file'
+    $reload.Size = New-Object Drawing.Size 160, 34
+    $reload.Add_Click({
+        try {
+            Reset-RestoreWizardAnswersHC -Wizard (Get-RestoreWizardHC $this)
+        }
+        catch {
+            $errorParams = @{
+                Owner   = $this.FindForm()
+                Text    = [string]$_
+                Caption = 'Answer file error'
+            }
+            Show-WizardErrorHC @errorParams
+        }
+    })
+
     $refresh = New-Object Windows.Forms.Button
     $refresh.Name = 'RefreshConfigurations'
     $refresh.Text = 'Refresh'
@@ -2526,7 +2593,9 @@ function New-RestoreWizardHC {
         Set-SnapshotItemsCheckedHC @checkParams
     })
 
-    $buttons.Controls.AddRange(@($next, $back, $refresh, $clear, $all))
+    $buttons.Controls.AddRange(
+        @($next, $back, $reload, $refresh, $clear, $all)
+    )
     $wizard.Controls.Add($buttons, 0, 2)
     #endregion
 

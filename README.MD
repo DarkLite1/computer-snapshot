@@ -28,8 +28,11 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
       it, or choose it when the setting has fixed values; you can also change
       an answer of the file, for this restore only (the file stays
       unchanged). The **Check** column says what is expected or wrong while
-      you type, and where a valid answer comes from. Skipped when Unattended
-      is checked.
+      you type, and where a valid answer comes from. **Reload answer file**
+      reads the file again (also after you edited it) and puts its answers
+      back, for example after choosing the wrong file first; answers you
+      typed for questions the file leaves open are kept. Skipped when
+      Unattended is checked.
    5. **Review:** a card shows the configuration, the answer file, the
       restart, the report and, when checked, Unattended. Below it every
       checked section is listed in run order with its answers and where each

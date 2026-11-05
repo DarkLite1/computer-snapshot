@@ -42,25 +42,25 @@ Describe '<Name> data contract' -ForEach @(
         function Invoke-CustomScriptHC { param($Path, $Arguments) }
         function Get-RegistryKeyStateHC { param($Path, $Name) }
         function Get-NetFirewallAddressFilter {
-            param([Parameter(ValueFromPipeline)]$InputObject)
+            param([switch]$All, $PolicyStore)
         }
         function Get-NetFirewallPortFilter {
-            param([Parameter(ValueFromPipeline)]$InputObject)
+            param([switch]$All, $PolicyStore)
         }
         function Get-NetFirewallApplicationFilter {
-            param([Parameter(ValueFromPipeline)]$InputObject)
+            param([switch]$All, $PolicyStore)
         }
         function Get-NetFirewallServiceFilter {
-            param([Parameter(ValueFromPipeline)]$InputObject)
+            param([switch]$All, $PolicyStore)
         }
         function Get-NetFirewallInterfaceFilter {
-            param([Parameter(ValueFromPipeline)]$InputObject)
+            param([switch]$All, $PolicyStore)
         }
         function Get-NetFirewallInterfaceTypeFilter {
-            param([Parameter(ValueFromPipeline)]$InputObject)
+            param([switch]$All, $PolicyStore)
         }
         function Get-NetFirewallSecurityFilter {
-            param([Parameter(ValueFromPipeline)]$InputObject)
+            param([switch]$All, $PolicyStore)
         }
         function Remove-NetFirewallRule {
             param([Parameter(ValueFromPipeline)]$InputObject)
@@ -163,21 +163,27 @@ Describe '<Name> data contract' -ForEach @(
         Mock Get-NetFirewallRule {
             [pscustomobject]@{
                 Name        = 'Example'
+                InstanceID  = 'Example'
                 DisplayName = 'Example'
                 Direction   = 'Inbound'
                 Enabled     = 'True'
                 Action      = 'Allow'
             }
         }
-        Mock Get-NetFirewallAddressFilter
-        Mock Get-NetFirewallPortFilter { [pscustomobject]@{ Protocol = 'TCP' } }
-        Mock Get-NetFirewallApplicationFilter {
-            [pscustomobject]@{ Program = 'Any' }
+        # The export reads each filter type once, for every rule
+        foreach ($type in @(
+                'Address', 'Service', 'Interface', 'InterfaceType', 'Security'
+            )) {
+            Mock "Get-NetFirewall${type}Filter" {
+                [pscustomobject]@{ InstanceID = 'Example' }
+            }
         }
-        Mock Get-NetFirewallServiceFilter
-        Mock Get-NetFirewallInterfaceFilter
-        Mock Get-NetFirewallInterfaceTypeFilter
-        Mock Get-NetFirewallSecurityFilter
+        Mock Get-NetFirewallPortFilter {
+            [pscustomobject]@{ InstanceID = 'Example'; Protocol = 'TCP' }
+        }
+        Mock Get-NetFirewallApplicationFilter {
+            [pscustomobject]@{ InstanceID = 'Example'; Program = 'Any' }
+        }
         Mock New-NetFirewallRule
         Mock Remove-NetFirewallRule
         Mock Rename-NetFirewallRule

@@ -93,36 +93,90 @@ Function Export-FirewallRulesHC {
             DisplayName = $Name
             PolicyStore = $PolicyStore
         }
-        $firewallRules = Get-NetFirewallRule @params | Where-Object {
-            $_.Direction -like $Direction -and
-            $_.Enabled -like $RuleState -and
-            $_.Action -like $Action
+        $firewallRules = @(
+            Get-NetFirewallRule @params | Where-Object {
+                $_.Direction -like $Direction -and
+                $_.Enabled -like $RuleState -and
+                $_.Action -like $Action
+            }
+        )
+        #endregion
+
+        #region Get the filters of all rules at once
+        # One query per filter type instead of seven per rule: with
+        # hundreds of rules, asking per rule takes minutes
+        $filters = @{}
+        foreach ($type in @(
+                'Address', 'Port', 'Application', 'Service', 'Interface',
+                'InterfaceType', 'Security'
+            )) {
+            $progressParams = @{
+                Id       = 1
+                ParentId = 0
+                Activity = 'Firewall rules'
+                Status   = (
+                    "Read the $type filters of $($firewallRules.Count) rules"
+                )
+            }
+            Write-Progress @progressParams
+            $filters[$type] = @{}
+            $filterParams = @{
+                All         = $true
+                PolicyStore = $PolicyStore
+            }
+            foreach ($filter in @(
+                    & "Get-NetFirewall${type}Filter" @filterParams
+                )) {
+                $filters[$type][[string]$filter.InstanceID] = $filter
+            }
         }
         #endregion
 
         #region Create firewall rule details for export
+        # Known folders in program paths become environment variables
+        $sysPattern = "$($ENV:SystemRoot.Replace("\","\\"))\\"
+        $x86Folder = ${ENV:ProgramFiles(x86)}.Replace("\", "\\")
+        $x86Folder = $x86Folder.Replace("(", "\(").Replace(")", "\)")
+        $x86Pattern = "$x86Folder\\"
+        $pfPattern = "$($ENV:ProgramFiles.Replace("\","\\"))\\"
+        $ruleNumber = 0
+
         $firewallRuleSet = ForEach ($rule In $firewallRules) {
+            $ruleNumber++
+            if ($ruleNumber % 25 -eq 1) {
+                $progressParams = @{
+                    Id              = 1
+                    ParentId        = 0
+                    Activity        = 'Firewall rules'
+                    Status          = (
+                        "Rule $ruleNumber of $($firewallRules.Count)"
+                    )
+                    PercentComplete = [int](
+                        100 * $ruleNumber / $firewallRules.Count
+                    )
+                }
+                Write-Progress @progressParams
+            }
             Write-Verbose (
                 "Firewall rule `"$($rule.DisplayName)`" ($($rule.Name))"
             )
             try {
-                $AddressFilter = $rule | Get-NetFirewallAddressFilter
-                $PortFilter = $rule | Get-NetFirewallPortFilter
-                $ApplicationFilter = $rule | Get-NetFirewallApplicationFilter
-                $ServiceFilter = $rule | Get-NetFirewallServiceFilter
-                $InterfaceFilter = $rule | Get-NetFirewallInterfaceFilter
-                $InterfaceTypeFilter = (
-                    $rule | Get-NetFirewallInterfaceTypeFilter
+                $id = [string]$rule.InstanceID
+                $missing = @(
+                    $filters.Keys | Where-Object {
+                        -not $filters[$_].ContainsKey($id)
+                    } | Sort-Object
                 )
-                $SecurityFilter = $rule | Get-NetFirewallSecurityFilter
-
-                # Replace known folders in the program path with their
-                # environment variable
-                $sysPattern = "$($ENV:SystemRoot.Replace("\","\\"))\\"
-                $x86Folder = ${ENV:ProgramFiles(x86)}.Replace("\", "\\")
-                $x86Folder = $x86Folder.Replace("(", "\(").Replace(")", "\)")
-                $x86Pattern = "$x86Folder\\"
-                $pfPattern = "$($ENV:ProgramFiles.Replace("\","\\"))\\"
+                if ($missing.Count) {
+                    throw "no $($missing -join ', ') filter found"
+                }
+                $AddressFilter = $filters.Address[$id]
+                $PortFilter = $filters.Port[$id]
+                $ApplicationFilter = $filters.Application[$id]
+                $ServiceFilter = $filters.Service[$id]
+                $InterfaceFilter = $filters.Interface[$id]
+                $InterfaceTypeFilter = $filters.InterfaceType[$id]
+                $SecurityFilter = $filters.Security[$id]
 
                 $prog = $ApplicationFilter.Program
                 $prog = $prog -Replace $sysPattern, "%SystemRoot%\"
@@ -195,6 +249,7 @@ Function Export-FirewallRulesHC {
         }
         #endregion
 
+        Write-Progress -Id 1 -Activity 'Firewall rules' -Completed
         return @($firewallRuleSet)
     }
     Catch {
@@ -425,7 +480,7 @@ if ($Action -eq 'Export') {
     $exportData = @(Export-FirewallRulesHC)
     #endregion
 
-    $messages.Add('Exported Firewall rules')
+    $messages.Add("Exported $($exportData.Count) firewall rules")
 }
 else {
     #region Apply section

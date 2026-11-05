@@ -137,3 +137,87 @@ Describe 'Firewall rules import errors' {
             Should -Be @("Created firewall rule 'Fresh' (Fresh)")
     }
 }
+
+Describe 'Firewall rules export' {
+    BeforeAll {
+        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+            'Firewall rules import export.ps1'
+        $filterTypes = @(
+            'Address', 'Port', 'Application', 'Service', 'Interface',
+            'InterfaceType', 'Security'
+        )
+    }
+    BeforeEach {
+        Mock Get-NetFirewallRule {
+            foreach ($id in @('{A}', '{B}', '{C}')) {
+                [pscustomobject]@{
+                    Name        = $id
+                    InstanceID  = $id
+                    DisplayName = "Rule $id"
+                    Direction   = 'Inbound'
+                    Enabled     = 'True'
+                    Action      = 'Allow'
+                    Profile     = 'Domain, Private'
+                }
+            }
+        }
+        # Every rule has each filter, except rule C its port filter
+        foreach ($type in $filterTypes) {
+            Mock "Get-NetFirewall${type}Filter" {
+                foreach ($id in @('{A}', '{B}', '{C}')) {
+                    [pscustomobject]@{
+                        InstanceID = $id
+                        Protocol   = 'TCP'
+                        LocalPort  = @('80', '443')
+                        Program    = "$env:ProgramFiles\App\app.exe"
+                    }
+                }
+            }
+        }
+        Mock Get-NetFirewallPortFilter {
+            foreach ($id in @('{A}', '{B}')) {
+                [pscustomobject]@{
+                    InstanceID = $id
+                    Protocol   = 'TCP'
+                    LocalPort  = @('80', '443')
+                }
+            }
+        }
+        Mock Write-Progress
+    }
+    It ('reads each filter type once for all rules, and reports a rule ' +
+        'without its filter') {
+        $result = & $scriptPath -Action Export -RootFolder $TestDrive
+
+        $invokeParams = @{
+            Times   = 1
+            Exactly = $true
+        }
+        foreach ($type in $filterTypes) {
+            $command = "Get-NetFirewall${type}Filter"
+            Should -Invoke $command @invokeParams -ParameterFilter {
+                $All -and $PolicyStore -eq 'ActiveStore'
+            }
+        }
+        @($result.Data.Name) | Should -Be @('{A}', '{B}')
+        $result.Data[0].LocalPort | Should -Be '80,443'
+        $result.Data[0].Profile | Should -Be 'Domain,Private'
+        $result.Data[0].Program | Should -Be '%ProgramFiles%\App\app.exe'
+        $result.Errors | Should -Be @(
+            "Failed to export firewall rule 'Rule {C}' ({C}): " +
+            'no Port filter found'
+        )
+        $result.Messages | Should -Be @('Exported 2 firewall rules')
+    }
+    It 'shows the progress of the rules under the progress of the section' {
+        $null = & $scriptPath -Action Export -RootFolder $TestDrive
+
+        Should -Invoke Write-Progress -ParameterFilter {
+            $Id -eq 1 -and $ParentId -eq 0 -and
+            $Status -eq 'Rule 1 of 3' -and $PercentComplete -eq 33
+        }
+        Should -Invoke Write-Progress -Times 1 -Exactly -ParameterFilter {
+            $Id -eq 1 -and $Completed
+        }
+    }
+}

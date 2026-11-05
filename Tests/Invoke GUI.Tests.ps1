@@ -1069,7 +1069,23 @@ Describe 'Restore wizard' {
         @($rows | ForEach-Object { $_.Cells[1].Value }) | Should -Be @(
             'kiosk-brussels', $null, '192.0.2.99'
         )
-        $rows[1].Cells[1].Value = 'Typed-secret!42'
+
+        # A grid that sizes its rows hands over an empty colour after a
+        # password, which painted the next answer black while typed
+        $grid = $wizard.Tag.AnswerGrid
+        $grid.CurrentCell = $rows[1].Cells[1]
+        $null = $grid.BeginEdit($true)
+        $grid.EditingControl.Text = 'Typed-secret!42'
+        [Windows.Forms.Application]::DoEvents()
+        $grid.CurrentCell = $rows[2].Cells[1]
+        $null = $grid.BeginEdit($true)
+        $grid.EditingControl.BackColor |
+            Should -Be ([Drawing.SystemColors]::Window)
+        $grid.EditingPanel.BackColor |
+            Should -Be ([Drawing.SystemColors]::Window)
+        $null = $grid.EndEdit()
+
+        $rows[1].Cells[1].Value | Should -Be 'Typed-secret!42'
         $next.PerformClick()
 
         $review = & $find 'ReviewAnswers'
@@ -1130,7 +1146,6 @@ Describe 'Restore wizard' {
         $null = $grid.BeginEdit($true)
         $grid.EditingControl.UseSystemPasswordChar | Should -BeTrue
         $null = $grid.EndEdit()
-
         $rows[2].Cells[1].Value = '192.0.2.300'
         $rows[2].Cells[2].Value |
             Should -Be 'Enter an IPv4 address, such as 192.0.2.10.'

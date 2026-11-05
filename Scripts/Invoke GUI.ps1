@@ -1542,6 +1542,15 @@ function New-RestoreAnswerGridHC {
         $box.UseSystemPasswordChar = (
             $null -ne $state -and $state.Question.Kind -eq 'password'
         )
+        # A grid that sizes its rows can hand over an empty colour, which
+        # the text box shows as black; the style is applied after this event
+        $style = $eventArgs.CellStyle
+        if ($style.BackColor.A -lt 255) {
+            $style.BackColor = [Drawing.SystemColors]::Window
+        }
+        if ($style.ForeColor.IsEmpty) {
+            $style.ForeColor = [Drawing.SystemColors]::WindowText
+        }
         # The grid reuses its text box; check while typing, hooked once
         if (-not $box.Tag) {
             $box.Tag = 'Checked while typing'

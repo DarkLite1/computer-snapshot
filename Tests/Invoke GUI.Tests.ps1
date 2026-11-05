@@ -618,8 +618,8 @@ Describe 'Export scheduled task folders' {
         }
         finally { $form.Dispose() }
     }
-    It ('selects every section or none with the buttons of the export, ' +
-        'and keeps the task folders in step') {
+    It ('checks every section or none with the check box in the header ' +
+        'of the export list, and keeps the task folders in step') {
         $form = New-Object Windows.Forms.Form
         try {
             $entries = @(
@@ -633,29 +633,62 @@ Describe 'Export scheduled task folders' {
                 Get-SnapshotItemEntriesHC |
                     Where-Object Key -EQ 'ScheduledTasks'
             )
-            $list = New-SnapshotItemListHC -Entries $entries
+            $list = New-SnapshotItemListHC -Entries $entries -SelectAllHeader
             $panel = New-ExportTaskFolderPanelHC -ItemList $list
-            $buttons = @(New-SnapshotItemButtonsHC -ItemList $list)
             $list.Dock = 'Fill'
             $panel.Dock = 'Bottom'
-            $row = New-Object Windows.Forms.FlowLayoutPanel
-            $row.Dock = 'Bottom'
-            $row.Controls.AddRange($buttons)
-            $form.Controls.AddRange(@($list, $panel, $row))
+            $form.Controls.AddRange(@($list, $panel))
             $form.Show()
-
-            @($buttons.Name) | Should -Be @('ClearAll', 'SelectAll')
-            @($buttons.Text) | Should -Be @('Clear all', 'Select all')
             $box = $panel.Controls.Find('ScheduledTaskFolders', $false)[0]
+            $flags = [Reflection.BindingFlags]'Instance, NonPublic'
+            $onColumnClick = [Windows.Forms.ListView].GetMethod(
+                'OnColumnClick', $flags
+            )
+            $clickHeader = {
+                param([int]$Column)
+                $arguments = [object[]]@(
+                    [Windows.Forms.ColumnClickEventArgs]::new($Column)
+                )
+                $null = $onColumnClick.Invoke($list, $arguments)
+            }
+            $available = @($entries.Key | Where-Object { $_ -ne 'Empty' })
 
-            $buttons[0].PerformClick()
+            $list.OwnerDraw | Should -BeTrue
+            Get-SnapshotItemsCheckStateHC $list | Should -Be 'Checked'
+
+            & $clickHeader 0
             $list.CheckedItems.Count | Should -Be 0
+            Get-SnapshotItemsCheckStateHC $list | Should -Be 'Unchecked'
             $box.Enabled | Should -BeFalse
 
-            $buttons[1].PerformClick()
+            & $clickHeader 1
+            $list.CheckedItems.Count | Should -Be 0
+
+            & $clickHeader 0
             @($list.CheckedItems | ForEach-Object { $_.Tag }) |
-                Should -Be @($entries.Key | Where-Object { $_ -ne 'Empty' })
+                Should -Be $available
             $box.Enabled | Should -BeTrue
+
+            $list.Items[0].Checked = $false
+            Get-SnapshotItemsCheckStateHC $list | Should -Be 'Indeterminate'
+            & $clickHeader 0
+            @($list.CheckedItems | ForEach-Object { $_.Tag }) |
+                Should -Be $available
+
+            # Drawing the header must not fail, in every state
+            foreach ($checked in @($true, $false)) {
+                Set-SnapshotItemsCheckedHC -ItemList $list -Checked $checked
+                $bitmap = New-Object Drawing.Bitmap $list.Width, $list.Height
+                try {
+                    $list.DrawToBitmap($bitmap, $list.ClientRectangle)
+                }
+                finally {
+                    $bitmap.Dispose()
+                }
+            }
+
+            (New-SnapshotItemListHC -Entries $entries).OwnerDraw |
+                Should -BeFalse
         }
         finally { $form.Dispose() }
     }

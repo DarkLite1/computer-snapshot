@@ -565,7 +565,12 @@ function Get-RestoreItemEntriesHC {
 }
 
 function New-SnapshotItemListHC {
-    param([object[]]$Entries)
+    param(
+        [object[]]$Entries,
+        # A check box in the header of the first column checks every
+        # section or none
+        [switch]$SelectAllHeader
+    )
 
     $list = New-Object Windows.Forms.ListView
     $list.Name = 'SnapshotItems'
@@ -615,7 +620,97 @@ function New-SnapshotItemListHC {
             $hit.Item.Checked = -not $hit.Item.Checked
         }
     })
+
+    if ($SelectAllHeader) {
+        $list.OwnerDraw = $true
+        $list.Add_DrawItem({
+            param($sender, $eventArgs)
+            $eventArgs.DrawDefault = $true
+        })
+        $list.Add_DrawSubItem({
+            param($sender, $eventArgs)
+            $eventArgs.DrawDefault = $true
+        })
+        $list.Add_DrawColumnHeader({
+            param($sender, $eventArgs)
+            if ($eventArgs.ColumnIndex -ne 0) {
+                $eventArgs.DrawDefault = $true
+                return
+            }
+            $glyph = [Windows.Forms.VisualStyles.CheckBoxState]
+            $state = switch (Get-SnapshotItemsCheckStateHC $sender) {
+                'Checked' {
+                    $glyph::CheckedNormal
+                }
+                'Indeterminate' {
+                    $glyph::MixedNormal
+                }
+                default {
+                    $glyph::UncheckedNormal
+                }
+            }
+            $graphics = $eventArgs.Graphics
+            $bounds = $eventArgs.Bounds
+            $size = [Windows.Forms.CheckBoxRenderer]::GetGlyphSize(
+                $graphics, $state
+            )
+            $point = New-Object Drawing.Point (
+                $bounds.Left + 4
+            ), ($bounds.Top + [int](($bounds.Height - $size.Height) / 2))
+
+            $eventArgs.DrawBackground()
+            [Windows.Forms.CheckBoxRenderer]::DrawCheckBox(
+                $graphics, $point, $state
+            )
+            $left = $point.X + $size.Width + 6
+            $textBounds = New-Object Drawing.Rectangle $left, $bounds.Top, (
+                $bounds.Right - $left
+            ), $bounds.Height
+            $flags = 'VerticalCenter, Left, EndEllipsis'
+            [Windows.Forms.TextRenderer]::DrawText(
+                $graphics, $eventArgs.Header.Text, $sender.Font, $textBounds,
+                [Drawing.SystemColors]::ControlText,
+                [Windows.Forms.TextFormatFlags]$flags
+            )
+        })
+        $list.Add_ColumnClick({
+            param($sender, $eventArgs)
+            if ($eventArgs.Column -ne 0) {
+                return
+            }
+            $checkParams = @{
+                ItemList = $sender
+                Checked  = (Get-SnapshotItemsCheckStateHC $sender) -ne
+                    'Checked'
+            }
+            Set-SnapshotItemsCheckedHC @checkParams
+        })
+        # The header follows every check, also one by one
+        $list.Add_ItemChecked({
+            $this.Invalidate($true)
+        })
+    }
     return ,$list
+}
+
+function Get-SnapshotItemsCheckStateHC {
+    # Checked when every section with data is checked, Unchecked when none
+    param(
+        [Parameter(Mandatory)][Windows.Forms.ListView]$ItemList
+    )
+
+    $available = @(
+        $ItemList.Items | Where-Object { $_.Tag -notin $ItemList.Tag }
+    )
+    $checked = @($available | Where-Object { $_.Checked }).Count
+
+    if ($available.Count -and $checked -eq $available.Count) {
+        return [Windows.Forms.CheckState]::Checked
+    }
+    if ($checked) {
+        return [Windows.Forms.CheckState]::Indeterminate
+    }
+    [Windows.Forms.CheckState]::Unchecked
 }
 
 function Set-SnapshotItemsCheckedHC {
@@ -633,36 +728,6 @@ function Set-SnapshotItemsCheckedHC {
     }
     finally {
         $ItemList.EndUpdate()
-    }
-}
-
-function New-SnapshotItemButtonsHC {
-    <#
-    .SYNOPSIS
-        The Select all and Clear all buttons of a section list, in the
-        order to add them to a right-to-left button row.
-    #>
-    param(
-        [Parameter(Mandatory)][Windows.Forms.ListView]$ItemList
-    )
-
-    foreach ($button in @(
-            @('ClearAll', 'Clear all', $false),
-            @('SelectAll', 'Select all', $true)
-        )) {
-        $control = New-Object Windows.Forms.Button
-        $control.Name = $button[0]
-        $control.Text = $button[1]
-        $control.Size = New-Object Drawing.Size 100, 34
-        $control.Tag = @{
-            ItemList = $ItemList
-            Checked  = $button[2]
-        }
-        $control.Add_Click({
-            $checkParams = $this.Tag
-            Set-SnapshotItemsCheckedHC @checkParams
-        })
-        $control
     }
 }
 
@@ -2914,7 +2979,11 @@ $nameBox = New-Object Windows.Forms.TextBox
 $nameBox.Dock = 'Fill'
 $nameBox.Text = Get-DefaultConfigurationNameHC
 
-$itemList = New-SnapshotItemListHC -Entries @(Get-SnapshotItemEntriesHC)
+$itemListParams = @{
+    Entries         = @(Get-SnapshotItemEntriesHC)
+    SelectAllHeader = $true
+}
+$itemList = New-SnapshotItemListHC @itemListParams
 $taskFolderPanel = New-ExportTaskFolderPanelHC -ItemList $itemList
 
 $options = New-Object Windows.Forms.FlowLayoutPanel
@@ -2936,9 +3005,6 @@ $export.Text = 'Export'
 $export.Size = New-Object Drawing.Size 120, 34
 Set-WizardPrimaryButtonHC $export
 $exportButtons.Controls.Add($export)
-$exportButtons.Controls.AddRange(
-    @(New-SnapshotItemButtonsHC -ItemList $itemList)
-)
 
 $exportLayout.Controls.Add($nameLabel, 0, 1)
 $exportLayout.Controls.Add($nameBox, 0, 2)

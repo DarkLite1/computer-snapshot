@@ -618,6 +618,47 @@ Describe 'Export scheduled task folders' {
         }
         finally { $form.Dispose() }
     }
+    It ('selects every section or none with the buttons of the export, ' +
+        'and keeps the task folders in step') {
+        $form = New-Object Windows.Forms.Form
+        try {
+            $entries = @(
+                Get-SnapshotItemEntriesHC | Select-Object -First 3
+                [pscustomobject]@{
+                    Key         = 'Empty'
+                    Name        = 'Empty'
+                    Description = 'No data'
+                    Available   = $false
+                }
+                Get-SnapshotItemEntriesHC |
+                    Where-Object Key -EQ 'ScheduledTasks'
+            )
+            $list = New-SnapshotItemListHC -Entries $entries
+            $panel = New-ExportTaskFolderPanelHC -ItemList $list
+            $buttons = @(New-SnapshotItemButtonsHC -ItemList $list)
+            $list.Dock = 'Fill'
+            $panel.Dock = 'Bottom'
+            $row = New-Object Windows.Forms.FlowLayoutPanel
+            $row.Dock = 'Bottom'
+            $row.Controls.AddRange($buttons)
+            $form.Controls.AddRange(@($list, $panel, $row))
+            $form.Show()
+
+            @($buttons.Name) | Should -Be @('ClearAll', 'SelectAll')
+            @($buttons.Text) | Should -Be @('Clear all', 'Select all')
+            $box = $panel.Controls.Find('ScheduledTaskFolders', $false)[0]
+
+            $buttons[0].PerformClick()
+            $list.CheckedItems.Count | Should -Be 0
+            $box.Enabled | Should -BeFalse
+
+            $buttons[1].PerformClick()
+            @($list.CheckedItems | ForEach-Object { $_.Tag }) |
+                Should -Be @($entries.Key | Where-Object { $_ -ne 'Empty' })
+            $box.Enabled | Should -BeTrue
+        }
+        finally { $form.Dispose() }
+    }
 }
 
 Describe 'Optional wizard elevation' {

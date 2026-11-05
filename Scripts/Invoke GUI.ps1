@@ -574,6 +574,54 @@ function New-SnapshotItemListHC {
     return ,$list
 }
 
+function Set-SnapshotItemsCheckedHC {
+    # Check or clear every section; one without data can not be checked
+    param(
+        [Parameter(Mandatory)][Windows.Forms.ListView]$ItemList,
+        [Parameter(Mandatory)][bool]$Checked
+    )
+
+    $ItemList.BeginUpdate()
+    try {
+        foreach ($entry in $ItemList.Items) {
+            $entry.Checked = $Checked -and $entry.Tag -notin $ItemList.Tag
+        }
+    }
+    finally {
+        $ItemList.EndUpdate()
+    }
+}
+
+function New-SnapshotItemButtonsHC {
+    <#
+    .SYNOPSIS
+        The Select all and Clear all buttons of a section list, in the
+        order to add them to a right-to-left button row.
+    #>
+    param(
+        [Parameter(Mandatory)][Windows.Forms.ListView]$ItemList
+    )
+
+    foreach ($button in @(
+            @('ClearAll', 'Clear all', $false),
+            @('SelectAll', 'Select all', $true)
+        )) {
+        $control = New-Object Windows.Forms.Button
+        $control.Name = $button[0]
+        $control.Text = $button[1]
+        $control.Size = New-Object Drawing.Size 100, 34
+        $control.Tag = @{
+            ItemList = $ItemList
+            Checked  = $button[2]
+        }
+        $control.Add_Click({
+            $checkParams = $this.Tag
+            Set-SnapshotItemsCheckedHC @checkParams
+        })
+        $control
+    }
+}
+
 function Get-RestoreSettingsHC {
     param([string]$ConfigurationFile)
 
@@ -2414,10 +2462,11 @@ function New-RestoreWizardHC {
     $clear.Size = New-Object Drawing.Size 100, 34
     $clear.Add_Click({
         $owner = Get-RestoreWizardHC $this
-        $list = Find-RestoreWizardControlHC $owner 'SnapshotItems'
-        foreach ($entry in $list.Items) {
-            $entry.Checked = $false
+        $checkParams = @{
+            ItemList = Find-RestoreWizardControlHC $owner 'SnapshotItems'
+            Checked  = $false
         }
+        Set-SnapshotItemsCheckedHC @checkParams
     })
 
     $all = New-Object Windows.Forms.Button
@@ -2426,12 +2475,11 @@ function New-RestoreWizardHC {
     $all.Size = New-Object Drawing.Size 100, 34
     $all.Add_Click({
         $owner = Get-RestoreWizardHC $this
-        $list = Find-RestoreWizardControlHC $owner 'SnapshotItems'
-        foreach ($entry in $list.Items) {
-            if ($entry.Tag -notin $list.Tag) {
-                $entry.Checked = $true
-            }
+        $checkParams = @{
+            ItemList = Find-RestoreWizardControlHC $owner 'SnapshotItems'
+            Checked  = $true
         }
+        Set-SnapshotItemsCheckedHC @checkParams
     })
 
     $buttons.Controls.AddRange(@($next, $back, $refresh, $clear, $all))
@@ -2775,6 +2823,9 @@ $export.Text = 'Export'
 $export.Size = New-Object Drawing.Size 120, 34
 Set-WizardPrimaryButtonHC $export
 $exportButtons.Controls.Add($export)
+$exportButtons.Controls.AddRange(
+    @(New-SnapshotItemButtonsHC -ItemList $itemList)
+)
 
 $exportLayout.Controls.Add($nameLabel, 0, 1)
 $exportLayout.Controls.Add($nameBox, 0, 2)

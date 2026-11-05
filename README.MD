@@ -37,7 +37,7 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
       "No questions". Click **Restore**; nothing is changed before that.
 4. **To save a PC's setup (Export):**
    - Click **Export**.
-   - Choose which sections you want to save (like users, folders, or network settings).
+   - Choose which sections you want to save (like users, folders, or network settings). **Select all** and **Clear all** check or clear every section at once.
    - For **Scheduled tasks**, check the Task Scheduler folders to export under **Scheduled task folders** (default `\HC\`, subfolders included, several separated by commas). Entering `\` exports every task on the computer, including the Windows ones; the wizard asks you to confirm that.
    - Give your file a name. _Tip: The wizard suggests a handy default name like `KIOSK01 2026-10-21 142536.json`_.
 

@@ -239,11 +239,16 @@ function New-WizardHeaderHC {
     <#
     .SYNOPSIS
         The top of the wizard window: the configuration and answer file of
-        the restore, in a large font, and the administrator restart button
-        when it is needed.
+        the restore, in a large font, then the computer and the user the
+        wizard runs as, and the administrator restart button when it is
+        needed.
     #>
     param(
-        $ElevationPanel
+        $ElevationPanel,
+        [string]$ComputerName = $env:COMPUTERNAME,
+        [string]$UserName = (
+            [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        )
     )
 
     $sizeType = [Windows.Forms.SizeType]
@@ -253,13 +258,15 @@ function New-WizardHeaderHC {
     $header.Dock = 'Fill'
     $header.AutoSize = $true
     $header.Padding = New-Object Windows.Forms.Padding 12, 6, 0, 0
-    $header.ColumnCount = 2
+    $header.ColumnCount = 3
     $null = $header.ColumnStyles.Add(
         (New-Object Windows.Forms.ColumnStyle $sizeType::Percent, 100)
     )
-    $null = $header.ColumnStyles.Add(
-        (New-Object Windows.Forms.ColumnStyle $sizeType::AutoSize)
-    )
+    foreach ($column in 1..2) {
+        $null = $header.ColumnStyles.Add(
+            (New-Object Windows.Forms.ColumnStyle $sizeType::AutoSize)
+        )
+    }
     $header.RowCount = 1
 
     $selection = New-Object Windows.Forms.FlowLayoutPanel
@@ -292,8 +299,45 @@ function New-WizardHeaderHC {
     $selection.Controls.AddRange(@($configuration, $answerFile))
     $header.Controls.Add($selection, 0, 0)
 
+    # Where and as whom the wizard runs, so nobody restores the wrong PC
+    $identity = New-Object Windows.Forms.TableLayoutPanel
+    $identity.Name = 'WizardIdentity'
+    $identity.AutoSize = $true
+    $identity.Anchor = 'Right'
+    $identity.ColumnCount = 2
+    $identity.Margin = New-Object Windows.Forms.Padding 12, 0, 6, 0
+    $smallFont = New-Object Drawing.Font 'Segoe UI', 9
+    $row = 0
+    foreach ($line in @(
+            @('Computer', 'WizardComputerName', $ComputerName),
+            @('User', 'WizardUserName', $UserName)
+        )) {
+        $caption = New-Object Windows.Forms.Label
+        $caption.Text = $line[0]
+        $caption.Font = $smallFont
+        $caption.ForeColor = [Drawing.Color]::DimGray
+        $caption.AutoSize = $true
+        $caption.Margin = New-Object Windows.Forms.Padding 0, 1, 8, 1
+
+        $value = New-Object Windows.Forms.Label
+        $value.Name = $line[1]
+        $value.AccessibleName = $line[0]
+        $value.Text = $line[2]
+        $value.Font = New-Object Drawing.Font $smallFont, (
+            [Drawing.FontStyle]::Bold
+        )
+        $value.UseMnemonic = $false
+        $value.AutoSize = $true
+        $value.Margin = New-Object Windows.Forms.Padding 0, 1, 0, 1
+
+        $identity.Controls.Add($caption, 0, $row)
+        $identity.Controls.Add($value, 1, $row)
+        $row++
+    }
+    $header.Controls.Add($identity, 1, 0)
+
     if ($ElevationPanel) {
-        $header.Controls.Add($ElevationPanel, 1, 0)
+        $header.Controls.Add($ElevationPanel, 2, 0)
     }
 
     return , $header

@@ -1437,7 +1437,8 @@ Describe 'Restore wizard' {
         $configuration.Text | Should -Be 'Plain'
         $answerFile.Visible | Should -BeFalse
     }
-    It 'puts the administrator restart button to the right of the header' {
+    It ('shows the computer and user, with the administrator restart ' +
+        'button to the right of the header') {
         $button = New-Object Windows.Forms.Button
         $button.Name = 'RestartAsAdministrator'
         $panel = New-Object Windows.Forms.FlowLayoutPanel
@@ -1446,15 +1447,48 @@ Describe 'Restore wizard' {
         $form = New-Object Windows.Forms.Form
         $form.ClientSize = New-Object Drawing.Size 820, 200
         try {
-            $header = New-WizardHeaderHC -ElevationPanel $panel
+            $headerParams = @{
+                ElevationPanel = $panel
+                ComputerName   = 'KIOSK01'
+                UserName       = 'CONTOSO\R&D user'
+            }
+            $header = New-WizardHeaderHC @headerParams
             $header.Dock = 'Top'
             $form.Controls.Add($header)
             $form.Show()
             Show-WizardHeaderHC -Form $form -Configuration 'Kiosk'
 
             $label = $form.Controls.Find('SelectedConfiguration', $true)[0]
-            $header.GetColumn($panel) | Should -Be 1
-            $label.Parent.Right | Should -BeLessOrEqual $panel.Left
+            $computer = $form.Controls.Find('WizardComputerName', $true)[0]
+            $user = $form.Controls.Find('WizardUserName', $true)[0]
+            $computer.Text | Should -Be 'KIOSK01'
+            $user.Text | Should -Be 'CONTOSO\R&D user'
+            $user.UseMnemonic | Should -BeFalse
+            $identity = $computer.Parent
+            $header.GetColumn($identity) | Should -Be 1
+            $header.GetColumn($panel) | Should -Be 2
+            $label.Parent.Right | Should -BeLessOrEqual $identity.Left
+            $identity.Right | Should -BeLessOrEqual $panel.Left
+
+            # Nothing restored, as on the Export tab: still shown
+            Show-WizardHeaderHC -Form $form
+            $computer.Visible | Should -BeTrue
+            $user.Visible | Should -BeTrue
+        }
+        finally {
+            $form.Dispose()
+        }
+    }
+    It 'shows the computer and user the wizard runs as by default' {
+        $form = New-Object Windows.Forms.Form
+        try {
+            $form.Controls.Add((New-WizardHeaderHC))
+            $form.Controls.Find('WizardComputerName', $true)[0].Text |
+                Should -Be $env:COMPUTERNAME
+            $form.Controls.Find('WizardUserName', $true)[0].Text |
+                Should -Be (
+                    [Security.Principal.WindowsIdentity]::GetCurrent().Name
+                )
         }
         finally {
             $form.Dispose()

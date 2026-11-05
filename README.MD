@@ -44,6 +44,7 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
 **💡 Quick Tips for the Wizard:**
 
 - **Need Admin Rights?** If a task requires it, click the **Restart as administrator** button at the top.
+- **Right PC, right account?** The top of the window shows the computer name and the user the wizard runs as, next to the selected configuration and answer file.
 - **Rebooting & Reports:** At the bottom of the restore screen, you can easily check boxes to automatically **Restart computer after successful restore** (with a countdown in seconds you can change) or **Open report in browser**.
 - **Check Your Results:** Once you run a task, look in the `Log` folder on your USB stick for an easy-to-read HTML report showing exactly what succeeded and what failed.
 

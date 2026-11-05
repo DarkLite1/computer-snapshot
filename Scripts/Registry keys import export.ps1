@@ -426,13 +426,15 @@ if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
 
 if ($Action -eq 'Export') {
     #region Capture section
-    Write-Verbose 'Export Registry keys'
-    $exportData = Read-SectionExampleHC (
-        "$PSScriptRoot\..\Examples\RegistryKeys.json"
-    )
+    # Which values were set on purpose can not be read from the registry
+    Write-Verbose 'Export Registry keys: an empty section to fill in'
+    $exportData = [ordered]@{}
     #endregion
 
-    $messages.Add('Exported Registry keys')
+    $messages.Add(
+        'Nothing to export: add the registry values to set, see ' +
+        'Examples\RegistryKeys.json'
+    )
 }
 else {
     #region Apply section

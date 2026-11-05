@@ -531,13 +531,15 @@ if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
 
 if ($Action -eq 'Export') {
     #region Capture section
-    Write-Verbose 'Export Software'
-    $exportData = Read-SectionExampleHC (
-        "$PSScriptRoot\..\Examples\Software.json"
-    )
+    # Installers and their arguments can not be read from Windows
+    Write-Verbose 'Export Software: an empty section to fill in'
+    $exportData = [ordered]@{}
     #endregion
 
-    $messages.Insert(0, 'Exported Software')
+    $messages.Insert(0, (
+            'Nothing to export: add the software to install or remove, see ' +
+            'Examples\Software.json'
+        ))
 }
 else {
     #region Apply section

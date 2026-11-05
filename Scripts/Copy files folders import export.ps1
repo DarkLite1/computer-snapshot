@@ -186,13 +186,15 @@ if ($Action -eq 'Import' -and (Test-EmptySectionHC $Data)) {
 
 if ($Action -eq 'Export') {
     #region Capture section
-    Write-Verbose 'Export Copy files folders: use the example configuration'
-    $exportData = Read-SectionExampleHC (
-        "$PSScriptRoot\..\Examples\CopyFilesFolders.json"
-    )
+    # Which files were copied on purpose can not be read from Windows
+    Write-Verbose 'Export Copy files folders: an empty section to fill in'
+    $exportData = @()
     #endregion
 
-    $messages.Insert(0, 'Exported Copy files folders')
+    $messages.Insert(0, (
+            'Nothing to export: add the files and folders to copy, see ' +
+            'Examples\CopyFilesFolders.json'
+        ))
 }
 else {
     #region Apply section

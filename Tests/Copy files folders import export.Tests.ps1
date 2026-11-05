@@ -2,8 +2,10 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\Copy files folders import export.ps1"
-    Name       = 'Copy files folders'
+    ScriptPath  = "$PSScriptRoot\..\Scripts\" +
+        'Copy files folders import export.ps1'
+    Name        = 'Copy files folders'
+    EmptyExport = $true
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContract
 

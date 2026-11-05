@@ -114,8 +114,8 @@ Describe 'Main entry point script catalogue' {
     BeforeAll {
         $entryScript = "$PSScriptRoot\..\Scripts\Invoke scripts.ps1"
     }
-    It ('exports a template using the default catalogue without changing ' +
-        'Windows') {
+    It ('exports a selected section without data as an empty entry, using ' +
+        'the default catalogue, without changing Windows') {
         $path = Join-Path $TestDrive 'default.json'
         $params = @{
             Action              = 'CreateSnapshot'
@@ -129,8 +129,10 @@ Describe 'Main entry point script catalogue' {
 
         $result.Success | Should -BeTrue
         $result.ReportFile | Should -Exist
-        $json = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-        $json.Items.CreateFolders.FolderPaths.Count | Should -BeGreaterThan 0
+        $text = Get-Content -LiteralPath $path -Raw
+        $json = $text | ConvertFrom-Json
+        @($json.Items.PSObject.Properties.Name) | Should -Be @('CreateFolders')
+        $text | Should -Match '"CreateFolders": \{\}'
     }
     It 'preserves explicit script-map overrides' {
         $child = Join-Path $TestDrive 'custom.ps1'
@@ -272,11 +274,16 @@ Invoke-OuterHC
         ($result.Results | Where-Object Name -EQ 'CreateFolders').Status |
         Should -Be 'Success'
     }
-    It 'exports only the sections that reported no errors' {
+    It ('exports the data of sections without errors, and a failed section ' +
+        'empty') {
         $null = & $entryScript @params 3>$null
 
         $json = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-        @($json.Items.PSObject.Properties.Name) | Should -Be @('CreateFolders')
+        @($json.Items.PSObject.Properties.Name) |
+            Should -Be @('UserAccounts', 'FirewallRules', 'CreateFolders')
+        @($json.Items.UserAccounts).Count | Should -Be 0
+        @($json.Items.FirewallRules).Count | Should -Be 0
+        $json.Items.CreateFolders.FolderPaths | Should -Not -BeNullOrEmpty
     }
 }
 

@@ -234,9 +234,10 @@ Describe '<Name> data contract' -ForEach @(
         $result.Count | Should -Be 1
         $result[0].PSObject.Properties.Name | Should -Contain 'Data'
         if ($EmptyExport) {
-            # Sections that cannot be read from a computer export an empty list
-            , $result[0].Data | Should -BeOfType [array]
-            @($result[0].Data).Count | Should -Be 0
+            # Sections that cannot be read from a computer export their
+            # empty value: an empty list or an empty object
+            Test-EmptySectionHC $result[0].Data | Should -BeTrue
+            $null -eq $result[0].Data | Should -BeFalse
         }
         else {
             $result[0].Data | Should -Not -BeNullOrEmpty

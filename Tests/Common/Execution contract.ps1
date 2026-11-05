@@ -76,7 +76,9 @@ Describe 'Single-file execution' {
         $result = Invoke-ComputerSnapshotHC @params
         $result.Success | Should -BeFalse
         $loaded = Read-ConfigurationHC $path $TestDrive
-        @($loaded.Items.Keys) | Should -Be @('UserAccounts')
+        @($loaded.Items.Keys) | Should -Be @('UserAccounts', 'CreateFolders')
+        $loaded.Items.CreateFolders | ConvertTo-Json -Compress |
+            Should -Be '{}'
     }
     It 'writes no configuration when all exports fail' {
         Mock Invoke-ChildScriptHC @inModule { throw 'Export failed' }
@@ -1225,21 +1227,22 @@ Describe 'Single-file execution' {
         $result.Results[0].Messages |
             Should -Be @('Updated A', 'ERROR: Failed B', 'ERROR: Failed C')
     }
-    It 'does not export a section that returned errors' {
+    It 'exports a section that returned errors as an empty entry' {
         $params.Script.UserAccounts = Join-Path $PSScriptRoot (
             '..\..\Scripts\User accounts import export.ps1'
         )
         Mock Invoke-ChildScriptHC @inModule {
             [pscustomobject]@{
-                Data     = @()
+                Data     = @(@{ Name = 'Half done' })
                 Messages = [string[]]@('Exported')
                 Errors   = [string[]]@('Failed')
             }
         } -ParameterFilter { $Path -like '*User accounts import export.ps1' }
         $result = Invoke-ComputerSnapshotHC @params
         $result.Success | Should -BeFalse
-        @((Read-ConfigurationHC $path $TestDrive).Items.Keys) |
-            Should -Be @('CreateFolders')
+        $loaded = Read-ConfigurationHC $path $TestDrive
+        @($loaded.Items.Keys) | Should -Be @('UserAccounts', 'CreateFolders')
+        @($loaded.Items.UserAccounts).Count | Should -Be 0
     }
     It 'treats an empty Errors property as success' {
         $params.Items = @('UserAccounts')

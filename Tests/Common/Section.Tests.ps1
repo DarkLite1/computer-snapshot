@@ -5,6 +5,28 @@ BeforeAll {
     . "$PSScriptRoot\..\..\Scripts\Common\Section.ps1"
 }
 
+Describe 'Get-EmptySectionValueHC' {
+    BeforeAll {
+        $configurationModule = "$PSScriptRoot\..\..\Scripts\Common\" +
+            'Configuration.psm1'
+        Import-Module $configurationModule -Force
+    }
+    It ('gives every section an empty value that the schema accepts and ' +
+        'that a restore skips') {
+        foreach ($name in @((Get-SnapshotScriptsHC).Keys)) {
+            $empty = Get-EmptySectionValueHC -Name $name
+
+            Test-EmptySectionHC $empty | Should -BeTrue -Because $name
+            $configuration = @{
+                SchemaVersion = 3
+                Items         = [ordered]@{ $name = $empty }
+            }
+            @(Test-ConfigurationHC $configuration $TestDrive) |
+                Should -BeNullOrEmpty -Because $name
+        }
+    }
+}
+
 Describe 'New-SectionResultHC' {
     It 'returns string arrays for lists, one message and nothing' {
         $messages = New-Object 'System.Collections.Generic.List[string]'

@@ -569,6 +569,8 @@ function Invoke-ComputerSnapshotHC {
     # a script
     $selected = @($knownItems | Where-Object { $_ -in $Items })
     $exportItems = [ordered]@{}
+    # A file is written once at least one section was exported
+    $exported = $false
     $step = 0
 
     foreach ($name in $selected) {
@@ -711,11 +713,24 @@ function Invoke-ComputerSnapshotHC {
                 }
             )
 
+            # Still in the export, empty, so it can be filled in
+            if ($Action -eq 'CreateSnapshot') {
+                $exportItems[$name] = Get-EmptySectionValueHC -Name $name
+            }
+
             continue
         }
 
         if ($Action -eq 'CreateSnapshot') {
-            $exportItems[$name] = $output[0].Data
+            # Every selected section is in the export: its data, or its
+            # empty value when there is nothing to export
+            $exportItems[$name] = if (Test-EmptySectionHC $output[0].Data) {
+                Get-EmptySectionValueHC -Name $name
+            }
+            else {
+                $output[0].Data
+            }
+            $exported = $true
         }
 
         $results.Add(
@@ -730,7 +745,7 @@ function Invoke-ComputerSnapshotHC {
     Write-Progress -Activity $Action -Completed
 
     #region Single-file export
-    if ($Action -eq 'CreateSnapshot' -and $exportItems.Count) {
+    if ($Action -eq 'CreateSnapshot' -and $exported) {
         $document = [ordered]@{
             SchemaVersion = 3
             Description   = 'Exported from {0} on {1}' -f (
@@ -882,7 +897,7 @@ function Invoke-ComputerSnapshotHC {
 
     if (
         $Action -eq 'CreateSnapshot' -and
-        $exportItems.Count -eq 0
+        -not $exported
     ) {
         throw (
             'No items exported. No configuration written. ' +

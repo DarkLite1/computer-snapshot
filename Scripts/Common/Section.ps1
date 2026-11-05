@@ -25,6 +25,29 @@ function Get-SnapshotScriptsHC {
     }
 }
 
+function Get-EmptySectionValueHC {
+    <#
+    .SYNOPSIS
+        The empty value of a section, as the schema allows it: an empty
+        object for the sections that are an object, otherwise an empty
+        list. An export writes it for a selected section with nothing to
+        export, so the section is there to fill in; a restore skips it.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    $objectSections = @(
+        'RegionalSettings', 'CreateFolders', 'NtpTimeServers',
+        'RegistryKeys', 'Software'
+    )
+    if ($Name -in $objectSections) {
+        return , ([ordered]@{})
+    }
+
+    , @()
+}
+
 function Get-SnapshotSectionLabelsHC {
     # The name and description of each section, as the wizard shows them
     @{

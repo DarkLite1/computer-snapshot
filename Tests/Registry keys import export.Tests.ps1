@@ -2,8 +2,9 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContractParams = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\Registry keys import export.ps1"
-    Name       = 'Registry keys'
+    ScriptPath  = "$PSScriptRoot\..\Scripts\Registry keys import export.ps1"
+    Name        = 'Registry keys'
+    EmptyExport = $true
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContractParams
 

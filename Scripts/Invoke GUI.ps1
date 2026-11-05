@@ -3025,9 +3025,9 @@ $exportTab.Controls.Add($exportLayout)
 
 $exportDescription = New-Object Windows.Forms.Label
 $exportDescription.Text = (
-    'Save selected sections to a JSON file in Configurations. Some ' +
-    'sections export editable templates rather than current settings; ' +
-    'review the file before restoring it.'
+    'Save selected sections to a JSON file in Configurations. A section ' +
+    'with nothing to export, such as Software, is saved empty, ready to ' +
+    'fill in (see Examples); an empty section is skipped on restore.'
 )
 $exportDescription.Font = New-Object Drawing.Font $form.Font.FontFamily, 9
 $exportDescription.AutoSize = $true

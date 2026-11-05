@@ -1,9 +1,13 @@
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
-. "$PSScriptRoot\Common\Child contract.ps1" -ScriptPath (
-    "$PSScriptRoot\..\Scripts\Software import export.ps1"
-) -Name 'Software'
+$childContract = @{
+    ScriptPath  = "$PSScriptRoot\..\Scripts\Software import export.ps1"
+    Name        = 'Software'
+    EmptyExport = $true
+}
+. "$PSScriptRoot\Common\Child contract.ps1" @childContract
+
 Describe 'Software import' {
     BeforeAll {
         $scriptPath = "$PSScriptRoot\..\Scripts\Software import export.ps1"

@@ -668,13 +668,14 @@ if ($Action -eq 'Export') {
             Change = $change
         }
     }
-    if (-not $cardsToExport) {
-        Write-Verbose 'No network cards found, use the example'
-        $cardsToExport = Read-SectionExampleHC (
-            "$PSScriptRoot\..\Examples\NetworkCards.json"
+    $exportData = @($cardsToExport)
+    if (-not $exportData.Count) {
+        Write-Verbose 'No network cards found'
+        $messages.Add(
+            'No network cards found; see Examples\NetworkCards.json to ' +
+            'add one'
         )
     }
-    $exportData = @($cardsToExport)
     #endregion
 
     $messages.Insert(0, 'Exported Network cards')

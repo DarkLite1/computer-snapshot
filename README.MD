@@ -23,10 +23,13 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
       a file that answers none of them is grayed out. Click a column header to
       sort by path or date. To start a new answer file, type a name such as
       `Kiosk\Antwerp\Kiosk.json` under the list and click **Create**.
-   4. **Questions** (only for answers the file leaves open): a list grouped by
-      section, like the review; click an answer to type it, or choose it when
-      the setting has fixed values. The **Check** column says what is
-      expected or wrong while you type.
+   4. **Questions:** a list grouped by section, like the review, with the
+      answers of the answer file already filled in. Click an answer to type
+      it, or choose it when the setting has fixed values; you can also change
+      an answer of the file, for this restore only (the file stays
+      unchanged). The **Check** column says what is expected or wrong while
+      you type, and where a valid answer comes from. Skipped when Unattended
+      is checked.
    5. **Review:** check the configuration, sections, options and every answer
       with where it comes from (passwords are hidden), then click **Restore**.
       Nothing is changed before that.
@@ -485,7 +488,7 @@ The text after the colon is the question shown in the input form, with the confi
 }
 ```
 
-Select the configuration, click **Next >**, check the sections, and click **Next >** again. The configuration is checked first: a typo or a missing file is reported before any answer is asked for, and nothing is asked. When the checked sections need answers, the next steps of the same window ask for an answer file and then for the answers it leaves open; **< Back** returns to change the sections or the answer file, and keeps the answers you typed. The last step reviews everything before **Restore**. The questions are grouped under a header for each section, in the order the sections run; a placeholder used in several sections is asked once, under the section that runs first, and names the others. A restore started from the command line asks the same questions in a separate input form, after any required UAC elevation.
+Select the configuration, click **Next >**, check the sections, and click **Next >** again. The configuration is checked first: a typo or a missing file is reported before any answer is asked for, and nothing is asked. When the checked sections need answers, the next steps of the same window ask for an answer file and then show every question with the answers of that file filled in: answer what it leaves open, and change any of its answers for this restore only; the file itself is never changed. **< Back** returns to change the sections or the answer file, and keeps the answers you typed or changed. The last step reviews everything before **Restore**. The questions are grouped under a header for each section, in the order the sections run; a placeholder used in several sections is asked once, under the section that runs first, and names the others. A restore started from the command line asks the same questions in a separate input form, after any required UAC elevation.
 
 Each field is checked while you type, against its placeholder kind and the setting it fills in: `TimeoutMinutes` only accepts 1 to 1440, a prefix length 1 to 32, and a setting with fixed values, such as a registry value `Type`, is a list to choose from. Below each field a grey line says what is expected; after you leave a field with a wrong answer, it turns red and says why. **Continue** is enabled once every answer is valid. **Cancel**, Escape, or closing the form cancels the entire restore before any sections run. The resolved configuration is checked again before applying settings. Windows may still reject an otherwise valid answer, for example because of password policy.
 

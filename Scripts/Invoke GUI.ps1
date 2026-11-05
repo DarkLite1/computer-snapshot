@@ -1265,9 +1265,10 @@ function Update-RestoreAnswerGridHC {
 
         $total++
         $question = $state.Question
+        $value = Get-RestoreAnswerGridValueHC -Grid $Grid -Row $row
         $problemParams = @{
             Kind  = $question.Kind
-            Value = Get-RestoreAnswerGridValueHC -Grid $Grid -Row $row
+            Value = $value
             Rule  = $question.Rule
         }
         $problem = Get-RestoreInputProblemHC @problemParams
@@ -1275,6 +1276,12 @@ function Update-RestoreAnswerGridHC {
 
         if (-not $problem) {
             $check.Value = [string][char]0x2713
+            if ($state.FileValue -and $value -ceq $state.FileValue) {
+                $check.Value += ' From the answer file'
+            }
+            elseif ($state.FileValue) {
+                $check.Value += ' Changed for this restore'
+            }
             $check.Style.ForeColor = [Drawing.Color]::SeaGreen
             continue
         }
@@ -1335,6 +1342,37 @@ function Get-RestoreAnswerGridValuesHC {
     return , $values
 }
 
+function Get-RestoreAnswerGridChangesHC {
+    <#
+    .SYNOPSIS
+        The answers in the answer list that are typed or changed: not empty
+        and not the answer of the answer file. The answer file is never
+        changed; these answers replace its answers for this restore only.
+    #>
+    param(
+        [Parameter(Mandatory)]$Grid
+    )
+
+    $values = Get-RestoreAnswerGridValuesHC -Grid $Grid
+
+    foreach ($row in $Grid.Rows) {
+        $state = $row.Tag
+        if ($null -eq $state) {
+            continue
+        }
+
+        $placeholder = $state.Question.Placeholder
+        if (
+            [string]::IsNullOrEmpty($values[$placeholder]) -or
+            $values[$placeholder] -ceq $state.FileValue
+        ) {
+            $null = $values.Remove($placeholder)
+        }
+    }
+
+    return , $values
+}
+
 function Clear-RestoreAnswerGridHC {
     # Forget the answers in the answer list, passwords included
     param(
@@ -1372,6 +1410,8 @@ function New-RestoreAnswerGridHC {
     param(
         [Parameter(Mandatory)][object[]]$Questions,
         [System.Collections.IDictionary]$Values,
+        # The answers of the answer file; they can be changed in the list
+        [System.Collections.IDictionary]$FileValues,
         [Drawing.Font]$Font = (New-Object Drawing.Font 'Segoe UI', 10)
     )
 
@@ -1436,8 +1476,15 @@ function New-RestoreAnswerGridHC {
         }
 
         $value = $null
+        $fileValue = $null
+        if ($null -ne $FileValues) {
+            $fileValue = $FileValues[$question.Placeholder]
+        }
         if ($null -ne $Values) {
             $value = $Values[$question.Placeholder]
+        }
+        if (-not $value) {
+            $value = $fileValue
         }
 
         $index = $grid.Rows.Add($question.Description, $null, '')
@@ -1465,8 +1512,9 @@ function New-RestoreAnswerGridHC {
         }
         $row.Cells[0].ToolTipText = $location
         $row.Tag = @{
-            Question = $question
-            Touched  = [bool]$value
+            Question  = $question
+            FileValue = $fileValue
+            Touched   = [bool]$value
         }
     }
 
@@ -1549,17 +1597,19 @@ function Set-RestoreWizardQuestionsHC {
     $gridHost = Find-RestoreWizardControlHC $Wizard 'AnswerGridHost'
     $earlier = $null
 
+    # Keep what was typed or changed; the rest comes from the answer file
     if ($null -ne $state.AnswerGrid) {
-        $earlier = Get-RestoreAnswerGridValuesHC -Grid $state.AnswerGrid
+        $earlier = Get-RestoreAnswerGridChangesHC -Grid $state.AnswerGrid
         Clear-RestoreAnswerGridHC -Grid $state.AnswerGrid
         $gridHost.Controls.Remove($state.AnswerGrid)
         $state.AnswerGrid.Dispose()
     }
 
     $gridParams = @{
-        Questions = $Questions
-        Values    = $earlier
-        Font      = $Wizard.Font
+        Questions  = $Questions
+        Values     = $earlier
+        FileValues = $state.FileAnswers
+        Font       = $Wizard.Font
     }
     $state.AnswerGrid = New-RestoreAnswerGridHC @gridParams
     $state.AnswerGrid.Tag.Summary = Find-RestoreWizardControlHC $Wizard (
@@ -1632,7 +1682,13 @@ function Update-RestoreWizardReviewHC {
                 $typed = $state.Answers[$question.Placeholder]
             }
 
-            $value, $source = if ($typed) {
+            $value, $source = if (
+                $typed -and $null -ne $state.FileAnswers -and
+                $state.FileAnswers[$question.Placeholder]
+            ) {
+                $typed, 'Changed'
+            }
+            elseif ($typed) {
                 $typed, 'Typed'
             }
             else {
@@ -1803,15 +1859,14 @@ function Invoke-RestoreWizardNextHC {
                 Read-RestoreAnswerFileHC -Path $state.AnswerFile
             }
 
-            $open = @(
-                $state.Questions | Where-Object {
-                    $null -eq $state.FileAnswers -or
-                    $null -eq $state.FileAnswers[$_.Placeholder]
+            # Every question, also those the file answers, so a single
+            # answer can be changed for this restore
+            if (-not (& $find 'Unattended').Checked) {
+                $questionParams = @{
+                    Wizard    = $Wizard
+                    Questions = $state.Questions
                 }
-            )
-
-            if ($open.Count -and -not (& $find 'Unattended').Checked) {
-                Set-RestoreWizardQuestionsHC -Wizard $Wizard -Questions $open
+                Set-RestoreWizardQuestionsHC @questionParams
                 Show-RestoreWizardStepHC -Wizard $Wizard -Step 'Questions'
                 return
             }
@@ -1826,7 +1881,9 @@ function Invoke-RestoreWizardNextHC {
                 return
             }
 
-            $state.Answers = Get-RestoreAnswerGridValuesHC -Grid (
+            # The answer file is passed by its path, only the other answers
+            # are handed over
+            $state.Answers = Get-RestoreAnswerGridChangesHC -Grid (
                 $state.AnswerGrid
             )
             Update-RestoreWizardReviewHC -Wizard $Wizard
@@ -2080,8 +2137,9 @@ function New-RestoreWizardHC {
     $guidance = & $newGuidance 'AnswerFileGuidance' (
         'Answer files in the Answers folder and its subfolders. A file ' +
         'that answers none of the questions of the checked sections is ' +
-        'grayed out. The questions it leaves open are asked in the next ' +
-        'step. Password answers in a file are plain text; protect it.'
+        'grayed out. The next step shows its answers; you can change them ' +
+        'for this restore and answer what it leaves open. Password ' +
+        'answers in a file are plain text; protect it.'
     )
     $step.Controls.Add($guidance, 0, 0)
 
@@ -2195,8 +2253,10 @@ function New-RestoreWizardHC {
     $step = & $newStep 'QuestionsStep' @(0, 1, 0)
     $guidance = & $newGuidance 'QuestionsGuidance' (
         'Answer the questions of the checked sections. Click an answer to ' +
-        'type it or choose it from the list. Click Back to change the ' +
-        'sections or the answer file; your answers are kept.'
+        'type it or choose it from the list. Answers from the answer file ' +
+        'can be changed for this restore only; the file stays unchanged. ' +
+        'Click Back to change the sections or the answer file; your ' +
+        'changes are kept.'
     )
     $step.Controls.Add($guidance, 0, 0)
 

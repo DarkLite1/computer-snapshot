@@ -984,14 +984,25 @@ Describe 'Restore wizard' {
         @($list.Items.Text)[1] | Should -Be 'Other.json'
         $list.Items[0].Text | Should -BeLike '(None)*'
     }
-    It ('skips the questions that a complete answer file answers and ' +
-        'reviews every answer with its source') {
+    It ('shows the answers of a complete answer file and reviews every ' +
+        'answer with its source') {
         & $chooseConfiguration 'Prompted'
         $next.PerformClick()
         & $chooseAnswerFile 'Kiosk\Gent\Kiosk.json'
 
         (& $find 'WizardStepTitle').Text |
-            Should -Be 'Step 4: Review and restore'
+            Should -Be 'Step 4: Answer the questions'
+        $rows = & $answerRows
+        @($rows | ForEach-Object { $_.Cells[1].Value }) | Should -Be @(
+            'kiosk-gent', 'File-secret!42', '192.0.2.20'
+        )
+        @($rows | ForEach-Object { $_.Cells[2].Value }) |
+            Should -Be (@("$([char]0x2713) From the answer file") * 3)
+        $next.Enabled | Should -BeTrue
+        $next.PerformClick()
+
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 5: Review and restore'
         $next.Text | Should -Be 'Restore'
         (& $find 'ReviewSummary').Text | Should -BeLike (
             '*Answer file: Answers\Kiosk\Gent\Kiosk.json*'
@@ -1019,6 +1030,54 @@ Describe 'Restore wizard' {
         Should -Invoke Start-RestoreAnswerServerHC -Times 0 -Exactly
         (& $find 'WizardStepTitle').Text |
             Should -Be 'Step 1: Choose a configuration'
+    }
+    It ('changes an answer of the answer file for this restore only, and ' +
+        'keeps the change when another file is chosen') {
+        Mock Start-RestoreAnswerServerHC {
+            $script:handedOver = @(
+                $Answers.Keys | ForEach-Object { "$_=$($Answers[$_])" }
+            )
+            [pscustomobject]@{
+                PipeName   = 'ComputerSnapshot-test'
+                PowerShell = $null
+            }
+        }
+        $file = "$root\Answers\Kiosk\Gent\Kiosk.json"
+        $before = Get-Content -LiteralPath $file -Raw
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+        & $chooseAnswerFile 'Kiosk\Gent\Kiosk.json'
+
+        $rows = & $answerRows
+        $rows[2].Cells[1].Value = '192.0.2.99'
+        $rows[2].Cells[2].Value |
+            Should -Be "$([char]0x2713) Changed for this restore"
+
+        (& $find 'WizardBack').PerformClick()
+        & $chooseAnswerFile 'Kiosk\Brussels\Kiosk.json'
+
+        $rows = & $answerRows
+        @($rows | ForEach-Object { $_.Cells[1].Value }) | Should -Be @(
+            'kiosk-brussels', $null, '192.0.2.99'
+        )
+        $rows[1].Cells[1].Value = 'Typed-secret!42'
+        $next.PerformClick()
+
+        $review = & $find 'ReviewAnswers'
+        @($review.Items | ForEach-Object { $_.SubItems[2].Text }) |
+            Should -Be @('Answer file', 'Typed', 'Changed')
+
+        $next.PerformClick()
+
+        $handedOver | Should -Be @(
+            '{{password:Password}}=Typed-secret!42'
+            '{{ipv4:Server}}=192.0.2.99'
+        )
+        Should -Invoke Start-ConfigurationJobHC @once -ParameterFilter {
+            $AnswerPipe -eq 'ComputerSnapshot-test' -and
+            $AnswerFile -like '*\Answers\Kiosk\Brussels\Kiosk.json'
+        }
+        Get-Content -LiteralPath $file -Raw | Should -BeExactly $before
     }
     It ('shows the questions as an editable list like the review and ' +
         'checks each answer while it is typed') {
@@ -1093,8 +1152,8 @@ Describe 'Restore wizard' {
         $cell.Value = 'DWord'
         $next.Enabled | Should -BeTrue
     }
-    It ('asks only what the answer file leaves open, keeps typed answers ' +
-        'on Back and hands them over by pipe') {
+    It ('fills in what the answer file answers, keeps typed answers on ' +
+        'Back and hands only those over by pipe') {
         # The wizard forgets the answers once they are handed over
         Mock Start-RestoreAnswerServerHC {
             $script:handedOver = @(
@@ -1112,15 +1171,16 @@ Describe 'Restore wizard' {
         (& $find 'WizardStepTitle').Text |
             Should -Be 'Step 4: Answer the questions'
         $rows = & $answerRows
-        @($rows | ForEach-Object { $_.Tag.Question.Placeholder }) |
-            Should -Be @('{{password:Password}}')
+        @($rows | ForEach-Object { $_.Cells[1].Value }) |
+            Should -Be @('kiosk-brussels', $null, '192.0.2.10')
+        $rows[1].Cells[2].Value | Should -Be 'A value is required.'
         $next.Enabled | Should -BeFalse
-        $rows[0].Cells[1].Value = 'Typed-secret!42'
+        $rows[1].Cells[1].Value = 'Typed-secret!42'
 
         (& $find 'WizardBack').PerformClick()
         $next.PerformClick()
 
-        (& $answerRows)[0].Cells[1].Value |
+        (& $answerRows)[1].Cells[1].Value |
             Should -BeExactly 'Typed-secret!42'
 
         $next.PerformClick()

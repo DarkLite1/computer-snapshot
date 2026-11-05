@@ -1,1 +1,3 @@
-/Answers/
+# Real answer files can contain passwords; only the examples are shared
+/Answers/*
+!/Answers/Examples/

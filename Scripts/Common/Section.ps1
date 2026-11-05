@@ -25,6 +25,72 @@ function Get-SnapshotScriptsHC {
     }
 }
 
+function Get-SnapshotSectionLabelsHC {
+    # The name and description of each section, as the wizard shows them
+    @{
+        StartCustomScriptsBefore = @(
+            'Custom scripts (before restore)',
+            'Run custom scripts before the other sections.'
+        )
+        RegionalSettings         = @(
+            'Regional settings',
+            'Language, culture, home location and time zone.'
+        )
+        UserAccounts             = @(
+            'User accounts',
+            'Local user accounts to create, update or remove.'
+        )
+        UserGroups               = @(
+            'User groups',
+            'Local groups and group membership.'
+        )
+        FirewallRules            = @(
+            'Firewall rules',
+            'Windows Firewall rules and their settings.'
+        )
+        CreateFolders            = @(
+            'Create folders',
+            'Folder paths to create on the computer.'
+        )
+        SmbShares                = @(
+            'Shared folders (SMB)',
+            'Network shares, share access and NTFS permissions.'
+        )
+        NetworkCards             = @(
+            'Network adapters',
+            'Network adapter, IP address and DNS settings.'
+        )
+        NtpTimeServers           = @(
+            'Time synchronization',
+            'Domain time synchronization or NTP time servers.'
+        )
+        HostsFileEntries         = @(
+            'Hosts file',
+            'Host names and the IP addresses they point to.'
+        )
+        RegistryKeys             = @(
+            'Registry keys',
+            'Registry keys and values to apply.'
+        )
+        ScheduledTasks           = @(
+            'Scheduled tasks',
+            'Task definitions and enabled states.'
+        )
+        CopyFilesFolders         = @(
+            'Copy files and folders',
+            'Source and destination paths for file copies.'
+        )
+        Software                 = @(
+            'Software',
+            'Applications to install or remove.'
+        )
+        StartCustomScriptsAfter  = @(
+            'Custom scripts (after restore)',
+            'Run custom scripts after the other sections.'
+        )
+    }
+}
+
 function Test-ElevatedHC {
     <#
     .SYNOPSIS

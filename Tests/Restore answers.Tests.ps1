@@ -543,24 +543,32 @@ Describe 'Answer template generation' {
             ConvertFrom-Json
         @($document.Answers.PSObject.Properties).Count | Should -Be 3
     }
-    It ('ships a partial example whose keys exactly match the prompted ' +
-        'configuration') {
+    It ('ships partial examples in Answers whose keys exactly match the ' +
+        'prompted configuration, without a password') {
         $repository = Split-Path $PSScriptRoot -Parent
-        $example = Join-Path $repository (
-            'Examples\Answer files\Answers prompted setup.json'
+        $examplesFolder = Join-Path $repository 'Answers\Examples'
+        $examples = @(
+            Get-ChildItem -LiteralPath $examplesFolder -Recurse -File
         )
         $configurationFile = Join-Path $repository (
             'Configurations\Example prompted setup.json'
         )
         $configuration = Read-ConfigurationHC $configurationFile $repository
         $fields = @(Get-RestoreInputFieldsHC -Data $configuration.Items)
-        $document = Get-Content -LiteralPath $example -Raw | ConvertFrom-Json
-        @($document.Answers.PSObject.Properties.Name | Sort-Object) |
-            Should -Be @($fields.Placeholder | Sort-Object)
-        $answers = Read-RestoreAnswerFileHC $example
-        $answers.Count | Should -Be 2
-        foreach ($field in @($fields | Where-Object Kind -eq 'password')) {
-            $document.Answers.($field.Placeholder) | Should -BeNullOrEmpty
+
+        @($examples.Name | Sort-Object -Unique) |
+            Should -Be @('Prompted setup.json')
+        $examples.Count | Should -Be 3
+        foreach ($example in $examples) {
+            $document = Get-Content -LiteralPath $example.FullName -Raw |
+                ConvertFrom-Json
+            @($document.Answers.PSObject.Properties.Name | Sort-Object) |
+                Should -Be @($fields.Placeholder | Sort-Object)
+            $answers = Read-RestoreAnswerFileHC $example.FullName
+            $answers.Count | Should -Be 2
+            foreach ($field in @($fields | Where-Object Kind -eq 'password')) {
+                $document.Answers.($field.Placeholder) | Should -BeNullOrEmpty
+            }
         }
     }
 }

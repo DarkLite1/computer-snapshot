@@ -10,13 +10,24 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
 
 1. **Plug in** your USB stick.
 2. **Open the tool** by double-clicking **`Start wizard.lnk`**.
-3. **To set up a PC (Restore):**
-   - Select a saved configuration and click **Restore**.
-   - Check the boxes next to the settings you want to apply.
-   - Optionally choose an **Answer file**, or click **Create template...** to
-     generate one for the checked sections. **Unattended** fails on missing
-     answers instead of showing the input form; see [Answer files](#answer-files-and-unattended-restores).
-   - Click **Restore selected**. When the checked sections need answers, the same window shows their questions; click **Back** to change the selection (your answers are kept) or **Restore** to start. _(Note: If you change your mind, click Cancel to leave the computer unchanged)._
+3. **To set up a PC (Restore):** the Restore tab guides you through a few
+   steps in the same window. **Next >** goes on and **< Back** returns, keeping
+   what you chose or typed.
+   1. **Configuration:** select a saved configuration.
+   2. **Sections:** check the settings you want to apply, and choose whether
+      to restart and open the report. **Unattended** takes every answer from
+      the answer file and asks nothing.
+   3. **Answer file** (only when the checked sections ask questions): choose an
+      answer file from the `Answers` folder, or **(None)**. The list shows each
+      file's path inside `Answers` and how many of the questions it answers;
+      a file that answers none of them is grayed out. Click a column header to
+      sort by path or date. To start a new answer file, type a name such as
+      `Kiosk\Antwerp\Kiosk.json` under the list and click **Create**.
+   4. **Questions** (only for answers the file leaves open): answer them; each
+      field is checked while you type.
+   5. **Review:** check the configuration, sections, options and every answer
+      with where it comes from (passwords are hidden), then click **Restore**.
+      Nothing is changed before that.
 4. **To save a PC's setup (Export):**
    - Click **Export**.
    - Choose which sections you want to save (like users, folders, or network settings).
@@ -48,7 +59,8 @@ Your USB stick has a specific layout to keep everything organized. Here are the 
 - **`Files/`**: Put any standard files or custom scripts you want copied to the new PC here.
 - **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers.
 - **`Log/`**: Check here for your execution reports.
-- **`Examples/`**: Ready-made sample data for every section. Copy what you need into your own configuration. `Examples/Answer files/` holds an example answer file.
+- **`Examples/`**: Ready-made sample data for every section. Copy what you need into your own configuration.
+- **`Answers/`**: Answer files, also in subfolders such as `Answers/Kiosk/Brussels/`. `Answers/Examples/` holds examples; Git ignores everything else in this folder, because answer files can contain passwords.
 - **`Answers/`**: Optional local answer files for individual PCs. Create this
   folder when needed; Git ignores it because answers can contain passwords.
 - **`Scripts/`**: The tool itself. You normally don't need to touch anything here.
@@ -471,7 +483,7 @@ The text after the colon is the question shown in the input form, with the confi
 }
 ```
 
-Select the configuration, click **Restore**, review the section checklist, and click **Restore selected**. The configuration is checked first: a typo or a missing file is reported before any answer is asked for, and nothing is asked. When the checked sections need answers that the answer file does not supply, the restore window shows them on a questions page, so you never leave the window: **Back** returns to the checklist to uncheck a section you do not want to answer for, and keeps the answers you typed; **Restore** starts the restore once every answer is valid. The questions are grouped under a header for each section, in the order the sections run; a placeholder used in several sections is asked once, under the section that runs first, and names the others. A restore started from the command line asks the same questions in a separate input form, after any required UAC elevation.
+Select the configuration, click **Next >**, check the sections, and click **Next >** again. The configuration is checked first: a typo or a missing file is reported before any answer is asked for, and nothing is asked. When the checked sections need answers, the next steps of the same window ask for an answer file and then for the answers it leaves open; **< Back** returns to change the sections or the answer file, and keeps the answers you typed. The last step reviews everything before **Restore**. The questions are grouped under a header for each section, in the order the sections run; a placeholder used in several sections is asked once, under the section that runs first, and names the others. A restore started from the command line asks the same questions in a separate input form, after any required UAC elevation.
 
 Each field is checked while you type, against its placeholder kind and the setting it fills in: `TimeoutMinutes` only accepts 1 to 1440, a prefix length 1 to 32, and a setting with fixed values, such as a registry value `Type`, is a list to choose from. Below each field a grey line says what is expected; after you leave a field with a wrong answer, it turns red and says why. **Continue** is enabled once every answer is valid. **Cancel**, Escape, or closing the form cancels the entire restore before any sections run. The resolved configuration is checked again before applying settings. Windows may still reject an otherwise valid answer, for example because of password policy.
 
@@ -542,11 +554,13 @@ always fail before any sections run, even in interactive mode.
 }
 ```
 
-This is the bundled [partial answer example](Examples/Answer%20files/Answers%20prompted%20setup.json)
+This is the bundled [partial answer example](Answers/Examples/Prompted%20setup.json)
 for [Example prompted setup](Configurations/Example%20prompted%20setup.json).
 It supplies a name and a documentation-only NTP address, and leaves the password
 to be entered interactively. **Change the address to your real NTP server**
 before using it. It is not a complete unattended answer file.
+`Answers/Examples/Kiosk/Brussels/` and `Answers/Examples/Kiosk/Gent/` show how
+to keep one answer file per site in subfolders.
 
 Identical placeholders share one answer across the selected configuration,
 its shared sections and copied files using `FillPlaceholders`. Valid extra
@@ -581,7 +595,7 @@ The configuration and all source files stay unchanged.
 ```powershell
 & '.\Scripts\Invoke configuration.ps1' `
     -ConfigurationFile 'Configurations\Example prompted setup.json' `
-    -AnswerFile 'Examples\Answer files\Answers prompted setup.json'
+    -AnswerFile 'Answers\Examples\Prompted setup.json'
 ```
 
 This still asks for confirmation, and asks for the missing password after any
@@ -621,22 +635,31 @@ configured to run silently; these switches cannot prevent their own UI.
 
 #### Wizard
 
-The **Restore** section-selection window includes:
+Store answer files in the `Answers` folder; subfolders are fine, for example
+`Answers\Kiosk\Brussels\Kiosk.json` and `Answers\Kiosk\Gent\Kiosk.json`. The
+**Answer file** step of the Restore tab lists every `*.json` file in `Answers`
+and its subfolders, with:
 
-- **Answer file** and **Browse...** to select an existing JSON file. Leave it
-  blank for the existing interactive behavior.
-- **Create template...** to save an empty answer file for the currently checked
-  sections without starting a restore. Edit its `null` values externally.
-- **Unattended: fail on missing answers (no prompts)**. This also unchecks and
-  disables **Open report in browser**. Restart the wizard as administrator
-  first if the configuration requests elevation.
+- its path inside `Answers`, the number of questions of the checked sections
+  it answers (such as `2 of 3`) and its date; click a column header to sort,
+  click it again to reverse. **(None)** asks every question in the next step.
+- files that answer none of the questions, or are not valid answer files,
+  grayed out; they can not be selected. Point at one to see why.
+- **New answer file: Answers\\...** with **Create**, to save an empty answer
+  file for the checked sections, also in a new subfolder. Edit its `null`
+  values in a text editor, then click **Refresh**.
+
+With **Unattended** checked on the sections step, only an answer file that
+answers every question can be selected. Unattended also unchecks and disables
+**Open report in browser**. Restart the wizard as administrator first if the
+configuration requests elevation.
 
 > **Passwords in answer files are plain text.** Keep real files in the
-> Git-ignored `Answers` folder, restrict filesystem access, and protect any USB
-> copies. Git ignoring is not encryption or access control. Only the file path
-> is passed to the restore process; password answers receive the same report
-> redaction as prompted passwords. The bundled example deliberately contains
-> no password.
+> `Answers` folder: Git ignores everything in it except `Answers/Examples`.
+> Restrict filesystem access and protect any USB copies; Git ignoring is not
+> encryption or access control. Only the file path is passed to the restore
+> process; password answers receive the same report redaction as prompted
+> passwords. The bundled examples deliberately contain no password.
 
 ## 💻 Command-Line Use
 

@@ -716,678 +716,489 @@ Describe 'Optional wizard elevation' {
     }
 }
 
-Describe 'Restore selection controls' {
+Describe 'Restore wizard' {
     BeforeAll {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
-    }
-    It ('shows answer-file and template controls and makes unattended mode ' +
-        'disable browser opening') {
-        $file = Join-Path $TestDrive 'answer-controls.json'
-        ('{"SchemaVersion":3,"Items":{"UserAccounts":[]},' +
-            '"Settings":{"OpenReportInBrowser":true}}') |
-            Set-Content -LiteralPath $file
-        $params = @{
-            ConfigurationName = 'Answers'
-            ConfigurationFile = $file
-            RootFolder        = $TestDrive
-            Entries           = @(Get-SnapshotItemEntriesHC)
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            $path = $dialog.Controls.Find('AnswerFile', $true)[0]
-            $path.Text | Should -Be ''
-            $dialog.Controls.Find('BrowseAnswerFile', $true)[0].Enabled |
-                Should -BeTrue
-            $dialog.Controls.Find('CreateAnswerTemplate', $true)[0].Enabled |
-                Should -BeTrue
-            $dialog.Controls.Find('AnswerFileGuidance', $true)[0].Text |
-                Should -Match 'Invalid answers always fail'
 
-            $unattended = $dialog.Controls.Find('Unattended', $true)[0]
-            $report = $dialog.Controls.Find('OpenReportInBrowser', $true)[0]
-            $unattended.Checked | Should -BeFalse
-            $report.Checked | Should -BeTrue
-            $unattended.Checked = $true
-            $report.Checked | Should -BeFalse
-            $report.Enabled | Should -BeFalse
-            $unattended.Checked = $false
-            $report.Enabled | Should -BeTrue
-            $report.Checked | Should -BeTrue
+        function New-TestWizardHC {
+            param([string]$RootFolder)
 
-            $names = @(
-                'AnswerFile', 'BrowseAnswerFile', 'CreateAnswerTemplate',
-                'Unattended', 'AnswerFileGuidance'
+            $form = New-Object Windows.Forms.Form
+            $form.ClientSize = New-Object Drawing.Size 820, 580
+            $form.Font = New-Object Drawing.Font 'Segoe UI', 10
+            $wizard = New-RestoreWizardHC -RootFolder $RootFolder -Font (
+                $form.Font
             )
-            foreach ($name in $names) {
-                $control = $dialog.Controls.Find($name, $true)[0]
-                $control.Visible | Should -BeTrue
-                $control.Right |
-                    Should -BeLessOrEqual $control.Parent.ClientSize.Width
-                $control.Bottom |
-                    Should -BeLessOrEqual $control.Parent.ClientSize.Height
-            }
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('emphasizes the primary restore action and neutralizes it while ' +
-        'disabled') {
-        $params = @{
-            ConfigurationName = 'Primary action'
-            Entries           = @(Get-SnapshotItemEntriesHC -Items UserAccounts)
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
-            if (-not [Windows.Forms.SystemInformation]::HighContrast) {
-                $confirm.BackColor |
-                    Should -Be ([Drawing.Color]::FromArgb(0, 103, 184))
-                $confirm.ForeColor | Should -Be ([Drawing.Color]::White)
-                ($confirm.Parent.Controls |
-                    Where-Object Text -eq 'Clear all').PerformClick()
-                $confirm.Enabled | Should -BeFalse
-                $confirm.BackColor |
-                    Should -Be ([Drawing.SystemColors]::Control)
-                ($confirm.Parent.Controls |
-                    Where-Object Text -eq 'Select all').PerformClick()
-                $confirm.BackColor |
-                    Should -Be ([Drawing.Color]::FromArgb(0, 103, 184))
-            }
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('fits the initial window height to the rendered checklist without ' +
-        'spare rows') {
-        $entrySets = @(
-            @(Get-SnapshotItemEntriesHC -Items UserAccounts, Software),
-            @(Get-SnapshotItemEntriesHC)
-        )
-        foreach ($entries in $entrySets) {
-            $params = @{
-                ConfigurationName = 'Fit checklist'
-                Entries           = $entries
-            }
-            $dialog = New-RestoreSelectionFormHC @params
-            try {
-                $dialog.Show()
-                [Windows.Forms.Application]::DoEvents()
-                $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
-                $lastRow = $list.Items[$list.Items.Count - 1]
-                $remaining = $list.ClientSize.Height - $lastRow.Bounds.Bottom
-                $remaining | Should -BeGreaterOrEqual 0
-                $remaining | Should -BeLessOrEqual 4
-                $report = $dialog.Controls.Find('OpenReportInBrowser', $true)[0]
-                $list.Bottom | Should -BeLessOrEqual $report.Parent.Top
-                $screen = [Windows.Forms.Screen]::FromControl($dialog)
-                $dialog.Height |
-                    Should -BeLessOrEqual $screen.WorkingArea.Height
-            }
-            finally { $dialog.Dispose() }
-        }
-    }
-    It ('caps tall checklists at the available screen height and leaves ' +
-        'them scrollable') {
-        $entries = @(
-            1..100 | ForEach-Object {
-                Get-SnapshotItemEntriesHC -Items UserAccounts
-            }
-        )
-        $params = @{
-            ConfigurationName = 'Tall checklist'
-            Entries           = $entries
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            [Windows.Forms.Application]::DoEvents()
-            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
-            $screen = [Windows.Forms.Screen]::FromControl($dialog)
-            $workingArea = $screen.WorkingArea
-            $dialog.Height | Should -BeLessOrEqual $workingArea.Height
-            $dialog.Top | Should -BeGreaterOrEqual $workingArea.Top
-            $dialog.Bottom | Should -BeLessOrEqual $workingArea.Bottom
-            $list.Items[99].Bounds.Bottom |
-                Should -BeGreaterThan $list.ClientSize.Height
-            $list.EnsureVisible(99)
-            $list.Items[99].Bounds.Bottom |
-                Should -BeLessOrEqual $list.ClientSize.Height
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('frames the selected description without a heading and separates ' +
-        'it from restore guidance') {
-        $path = "$PSScriptRoot\..\Configurations\Example PC1.json"
-        $expected = (
-            Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-        ).Description
-        $params = @{
-            ConfigurationName = 'Example PC1'
-            Entries           = @(
-                Get-RestoreItemEntriesHC -ConfigurationFile $path
-            )
-            ConfigurationFile = $path
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            $description = $dialog.Controls.Find(
-                'ConfigurationDescription', $true
-            )[0]
-            $guidance = $dialog.Controls.Find('RestoreGuidance', $true)[0]
-            $dialog.Controls.Find(
-                'ConfigurationDescriptionHeading', $true
-            ).Count | Should -Be 0
-            $description.BorderStyle |
-                Should -Be ([Windows.Forms.BorderStyle]::FixedSingle)
-            $description.Padding.All | Should -Be 10
-            $description.AccessibleName | Should -Be 'Configuration description'
-            $description.Text | Should -BeExactly $expected
-            $description.Bottom | Should -BeLessThan $guidance.Top
-            $guidance.Text | Should -BeLike 'Choose the sections to apply*'
-            $guidance.Font.Size | Should -BeLessThan $description.Font.Size
-            $guidance.Font.Size | Should -Be 9
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('wraps long descriptions literally and provides a fallback for ' +
-        'missing descriptions') {
-        $path = Join-Path $TestDrive 'Description.json'
-        $text = 'Users & applications for this workstation. ' * 6
-        @{ Description = $text } | ConvertTo-Json |
-            Set-Content -LiteralPath $path
-        $params = @{
-            ConfigurationName = 'Long description'
-            Entries           = @(Get-SnapshotItemEntriesHC)
-            ConfigurationFile = $path
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Size = $dialog.MinimumSize
-            $dialog.Show()
-            $description = $dialog.Controls.Find(
-                'ConfigurationDescription', $true
-            )[0]
-            $guidance = $dialog.Controls.Find('RestoreGuidance', $true)[0]
-            $description.Text | Should -BeExactly $text
-            $description.UseMnemonic | Should -BeFalse
-            $description.Height | Should -BeGreaterThan $description.Font.Height
-            $description.Bottom | Should -BeLessThan $guidance.Top
-            $description.Right |
-                Should -BeLessOrEqual $description.Parent.ClientSize.Width
-        }
-        finally { $dialog.Dispose() }
+            $form.Controls.Add($wizard)
+            $form.Show()
+            Update-RestoreConfigurationListHC -Wizard $wizard
 
-        $params = @{
-            ConfigurationName = 'No description'
-            Entries           = @(Get-SnapshotItemEntriesHC)
+            return , $wizard
         }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Controls.Find('ConfigurationDescription', $true)[0].Text |
-                Should -Be 'No description provided.'
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('initializes separate restore options from the file and permits ' +
-        'unsaved overrides') {
-        $testFile = Join-Path $TestDrive 'Options.json'
-        foreach ($saved in @($false, $true)) {
-            @{
-                SchemaVersion = 3
-                Settings      = @{
-                    RebootComputer      = $saved
-                    OpenReportInBrowser = -not $saved
-                }
-                Items         = @{ UserAccounts = @(@{ Name = 'Example' }) }
-            } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $testFile
-            $before = Get-Content -LiteralPath $testFile -Raw
-            $params = @{
-                ConfigurationName = 'Options'
-                Entries           = @(
-                    Get-RestoreItemEntriesHC -ConfigurationFile $testFile
-                )
-                ConfigurationFile = $testFile
-            }
-            $dialog = New-RestoreSelectionFormHC @params
-            try {
-                $dialog.Show()
-                $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
-                $reboot = $dialog.Controls.Find('RebootComputer', $true)[0]
-                $report = $dialog.Controls.Find('OpenReportInBrowser', $true)[0]
-                $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
-                $reboot.Checked | Should -Be $saved
-                $report.Checked | Should -Be (-not $saved)
-                $reboot.Parent | Should -Not -Be $list
-                $report.Parent | Should -Not -Be $list
 
-                $reboot.Checked = -not $saved
-                $report.Checked = $saved
-                ($confirm.Parent.Controls |
-                    Where-Object Text -eq 'Clear all').PerformClick()
-                ($confirm.Parent.Controls |
-                    Where-Object Text -eq 'Select all').PerformClick()
-                $reboot.Checked | Should -Be (-not $saved)
-                $report.Checked | Should -Be $saved
+        function Write-TestJsonHC {
+            param([string]$Path, $Data)
 
-                $confirm.PerformClick()
-                $dialog.DialogResult |
-                    Should -Be ([Windows.Forms.DialogResult]::OK)
-                (Get-Content -LiteralPath $testFile -Raw) |
-                    Should -BeExactly $before
-            }
-            finally { $dialog.Dispose() }
+            $null = New-Item -Path (Split-Path $Path -Parent) -ItemType (
+                'Directory'
+            ) -Force
+            $Data | ConvertTo-Json -Depth 10 |
+                Set-Content -LiteralPath $Path -Encoding UTF8
         }
-    }
-    It ('shows the saved restart countdown, enabled only while restart is ' +
-        'checked') {
-        $testFile = Join-Path $TestDrive 'Delay.json'
-        @{
-            SchemaVersion = 3
-            Settings      = @{
-                RebootComputer      = $false
-                RestartDelaySeconds = 300
-            }
-            Items         = @{ UserAccounts = @(@{ Name = 'Example' }) }
-        } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $testFile
-        $params = @{
-            ConfigurationName = 'Delay'
-            Entries           = @(
-                Get-RestoreItemEntriesHC -ConfigurationFile $testFile
-            )
-            ConfigurationFile = $testFile
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            $reboot = $dialog.Controls.Find('RebootComputer', $true)[0]
-            $delay = $dialog.Controls.Find('RestartDelaySeconds', $true)[0]
-            $delay.Value | Should -Be 300
-            $delay.Minimum | Should -Be 0
-            $delay.Maximum | Should -Be 600
-            $delay.Enabled | Should -BeFalse
-            $reboot.Checked = $true
-            $delay.Enabled | Should -BeTrue
-            $dialog.Controls.Find('RestartDelayLabel', $true)[0].Enabled |
-                Should -BeTrue
-            $reboot.Checked = $false
-            $delay.Enabled | Should -BeFalse
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('toggles item and description clicks but leaves checkbox clicks ' +
-        'and disabled rows alone') {
-        $entries = @(Get-SnapshotItemEntriesHC -Items UserAccounts, Software)
-        $entries[1].Available = $false
-        $params = @{
-            ConfigurationName = 'Click test'
-            Entries           = $entries
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
-            $mouseClick = $list.GetType().GetMethod(
-                'OnMouseClick', [Reflection.BindingFlags]'Instance, NonPublic'
-            )
-            $left = [Windows.Forms.MouseButtons]::Left
-            $row = $list.Items[0]
-            $rowY = $row.Bounds.Top + [int]($row.Bounds.Height / 2)
-
-            foreach ($columnX in @(80, 300)) {
-                $mouseArgs = $left, 1, $columnX, $rowY, 0
-                $eventArgs = New-Object Windows.Forms.MouseEventArgs $mouseArgs
-                $null = $mouseClick.Invoke(
-                    $list, @($eventArgs.PSObject.BaseObject)
-                )
-                $row.Checked | Should -BeFalse
-                $null = $mouseClick.Invoke(
-                    $list, @($eventArgs.PSObject.BaseObject)
-                )
-                $row.Checked | Should -BeTrue
-            }
-
-            $checkboxX = $row.Bounds.Left + 4
-            $stateImage = [Windows.Forms.ListViewHitTestLocations]::StateImage
-            ($list.HitTest($checkboxX, $rowY).Location -band $stateImage) |
-                Should -Not -Be 0
-            $checkboxClick = [Windows.Forms.MouseEventArgs]::new(
-                $left, 1, $checkboxX, $rowY, 0
-            )
-            $null = $mouseClick.Invoke($list, @($checkboxClick))
-            $row.Checked | Should -BeTrue
-
-            $disabledY = $list.Items[1].Bounds.Top + 2
-            $disabledClick = [Windows.Forms.MouseEventArgs]::new(
-                $left, 1, 300, $disabledY, 0
-            )
-            $null = $mouseClick.Invoke($list, @($disabledClick))
-            $list.Items[1].Checked | Should -BeFalse
-
-            $rightClick = [Windows.Forms.MouseEventArgs]::new(
-                [Windows.Forms.MouseButtons]::Right, 1, 80, $rowY, 0
-            )
-            $null = $mouseClick.Invoke($list, @($rightClick))
-            $row.Checked | Should -BeTrue
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('grays out missing sections and blocks checking them individually ' +
-        'or with Select all') {
-        $testFile = Join-Path $TestDrive 'Partial.json'
-        ('{"SchemaVersion":3,"Items":{"UserAccounts":[{"Name":"Example"}],' +
-            '"Software":{"Install":[{"ExecutablePath":"example.exe"}]}}}') |
-            Set-Content -LiteralPath $testFile
-        $params = @{
-            ConfigurationName = 'Partial'
-            Entries           = @(
-                Get-RestoreItemEntriesHC -ConfigurationFile $testFile
-            )
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
-            $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
-            $list.Items.Count | Should -Be (Get-SnapshotScriptsHC).Count
-            @($list.CheckedItems | ForEach-Object Tag) |
-                Should -Be @('UserAccounts', 'Software')
-            $missing = @(
-                $list.Items | Where-Object {
-                    $_.Tag -notin @('UserAccounts', 'Software')
-                }
-            )
-            foreach ($item in $missing) {
-                $item.ForeColor | Should -Be ([Drawing.SystemColors]::GrayText)
-                $item.ToolTipText |
-                    Should -Be 'No settings to restore in this configuration.'
-                $item.Checked = $true
-                $item.Checked | Should -BeFalse
-            }
-
-            ($confirm.Parent.Controls |
-                Where-Object Text -eq 'Clear all').PerformClick()
-            $confirm.Enabled | Should -BeFalse
-            $missing[0].Checked = $true
-            $confirm.Enabled | Should -BeFalse
-            ($confirm.Parent.Controls |
-                Where-Object Text -eq 'Select all').PerformClick()
-            @($list.CheckedItems | ForEach-Object Tag) |
-                Should -Be @('UserAccounts', 'Software')
-            $confirm.PerformClick()
-            @($dialog.Tag) | Should -Be @('UserAccounts', 'Software')
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('enables only User accounts and Software for the bundled Example ' +
-        'PC1 configuration') {
-        $file = "$PSScriptRoot\..\Configurations\Example PC1.json"
-        $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $file)
-        $params = @{
-            ConfigurationName = 'Example PC1'
-            Entries           = $entries
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
-            $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
-            @($list.CheckedItems | ForEach-Object Tag) |
-                Should -Be @('UserAccounts', 'Software')
-            $unavailable = $list.Items | Where-Object {
-                $_.Tag -notin @('UserAccounts', 'Software')
-            }
-            foreach ($item in $unavailable) {
-                $item.ForeColor | Should -Be ([Drawing.SystemColors]::GrayText)
-                $item.Checked = $true
-                $item.Checked | Should -BeFalse
-            }
-            ($confirm.Parent.Controls |
-                Where-Object Text -eq 'Select all').PerformClick()
-            @($list.CheckedItems | ForEach-Object Tag) |
-                Should -Be @('UserAccounts', 'Software')
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('enables only Create folders and Registry keys for the bundled ' +
-        'combined sections example') {
-        $file = "$PSScriptRoot\..\Configurations\Example combined sections.json"
-        $entries = @(Get-RestoreItemEntriesHC -ConfigurationFile $file)
-        @($entries | Where-Object Available | ForEach-Object Key) |
-            Should -Be @('CreateFolders', 'RegistryKeys')
-    }
-    It 'shows checked names and descriptions and returns only checked keys' {
-        $params = @{
-            ConfigurationName = 'Example'
-            Entries           = @(
-                Get-SnapshotItemEntriesHC -Items UserAccounts, Software
-            )
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
-            $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
-            $list.Columns[1].Text | Should -Be 'Description'
-            $list.CheckedItems.Count | Should -Be 2
-            $list.Items[0].Text | Should -Be 'User accounts'
-
-            $buttons = $confirm.Parent.Controls
-            ($buttons | Where-Object Text -eq 'Clear all').PerformClick()
-            $list.CheckedItems.Count | Should -Be 0
-            $confirm.Enabled | Should -BeFalse
-            ($buttons | Where-Object Text -eq 'Select all').PerformClick()
-            $list.CheckedItems.Count | Should -Be 2
-
-            $list.Items[0].Checked = $false
-            $list.Items[1].Checked = $false
-            $confirm.Enabled | Should -BeFalse
-            $list.Items[1].Checked = $true
-            $confirm.Enabled | Should -BeTrue
-            $confirm.PerformClick()
-            @($dialog.Tag) | Should -Be @('Software')
-            $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
-        }
-        finally { $dialog.Dispose() }
-    }
-    It 'cancels without returning a restore selection' {
-        $params = @{
-            ConfigurationName = 'Example'
-            Entries           = @(Get-SnapshotItemEntriesHC)
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Show()
-            $dialog.CancelButton.PerformClick()
-            $dialog.DialogResult |
-                Should -Be ([Windows.Forms.DialogResult]::Cancel)
-            $dialog.Tag | Should -BeNullOrEmpty
-        }
-        finally { $dialog.Dispose() }
-    }
-    It ('keeps the checklist and restore controls inside the minimum ' +
-        'window size') {
-        $params = @{
-            ConfigurationName = 'Example'
-            Entries           = @(Get-SnapshotItemEntriesHC)
-        }
-        $dialog = New-RestoreSelectionFormHC @params
-        try {
-            $dialog.Size = $dialog.MinimumSize
-            $dialog.Show()
-            [Windows.Forms.Application]::DoEvents()
-            $dialog.Size = $dialog.MinimumSize
-            $dialog.PerformLayout()
-
-            $list = $dialog.Controls.Find('SnapshotItems', $true)[0]
-            $confirm = $dialog.Controls.Find('RestoreSelected', $true)[0]
-            $list.Right | Should -BeLessOrEqual $list.Parent.ClientSize.Width
-            $confirm.Parent.Right |
-                Should -BeLessOrEqual $confirm.Parent.Parent.ClientSize.Width
-            foreach ($button in $confirm.Parent.Controls) {
-                $button.Left | Should -BeGreaterOrEqual 0
-                $button.Right |
-                    Should -BeLessOrEqual $button.Parent.ClientSize.Width
-                $button.Bottom |
-                    Should -BeLessOrEqual $button.Parent.ClientSize.Height
-            }
-
-            $names = @(
-                'RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser',
-                'AnswerFile', 'BrowseAnswerFile', 'CreateAnswerTemplate',
-                'Unattended', 'AnswerFileGuidance'
-            )
-            foreach ($name in $names) {
-                $option = $dialog.Controls.Find($name, $true)[0]
-                $option.Visible | Should -BeTrue
-                $option.Right |
-                    Should -BeLessOrEqual $option.Parent.ClientSize.Width
-                $option.Bottom |
-                    Should -BeLessOrEqual $option.Parent.ClientSize.Height
-            }
-        }
-        finally { $dialog.Dispose() }
-    }
-}
-Describe 'Restore questions in the restore window' {
-    BeforeAll {
-        Add-Type -AssemblyName System.Windows.Forms
-        Add-Type -AssemblyName System.Drawing
     }
     BeforeEach {
         Mock Show-WizardErrorHC
-        $configurationFile = Join-Path $TestDrive 'Prompted.json'
-        [ordered]@{
-            SchemaVersion = 3
-            Items         = [ordered]@{
-                UserAccounts   = @(
-                    [ordered]@{
-                        Name     = '{{input:Account}}'
-                        Password = '{{password:Password}}'
-                    }
-                )
-                NtpTimeServers = [ordered]@{
-                    SyncTimeWithDomain = $false
-                    TimeServerNames    = @('{{ipv4:Server}}')
-                }
+        Mock Start-ConfigurationJobHC
+        $once = @{ Times = 1; Exactly = $true }
+        Mock Start-RestoreAnswerServerHC {
+            [pscustomobject]@{
+                PipeName   = 'ComputerSnapshot-test'
+                PowerShell = $null
             }
-        } | ConvertTo-Json -Depth 10 |
-            Set-Content -LiteralPath $configurationFile
-        $params = @{
-            ConfigurationName = 'Prompted'
-            ConfigurationFile = $configurationFile
-            RootFolder        = $TestDrive
-            Entries           = @(
-                Get-RestoreItemEntriesHC -ConfigurationFile $configurationFile
-            )
         }
-        $dialog = New-RestoreSelectionFormHC @params
-        $dialog.Show()
-        $find = { param($name) $dialog.Controls.Find($name, $true)[0] }
-        $list = & $find 'SnapshotItems'
-        $ntp = $list.Items | Where-Object Tag -eq 'NtpTimeServers'
-        $ntp.Checked = $false
+
+        $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        Write-TestJsonHC "$root\Configurations\Prompted.json" ([ordered]@{
+                SchemaVersion = 3
+                Description   = 'Prompted kiosk'
+                Settings      = [ordered]@{
+                    RebootComputer      = $true
+                    RestartDelaySeconds = 30
+                    OpenReportInBrowser = $false
+                }
+                Items         = [ordered]@{
+                    UserAccounts   = @(
+                        [ordered]@{
+                            Name     = '{{input:Account}}'
+                            Password = '{{password:Password}}'
+                        }
+                    )
+                    NtpTimeServers = [ordered]@{
+                        SyncTimeWithDomain = $false
+                        TimeServerNames    = @('{{ipv4:Server}}')
+                    }
+                }
+            })
+        Write-TestJsonHC "$root\Configurations\Plain.json" ([ordered]@{
+                SchemaVersion = 3
+                Items         = [ordered]@{
+                    UserAccounts = @([ordered]@{ Name = 'Example' })
+                }
+            })
+        Write-TestJsonHC "$root\Answers\Kiosk\Brussels\Kiosk.json" @{
+            Answers = [ordered]@{
+                '{{input:Account}}' = 'kiosk-brussels'
+                '{{ipv4:Server}}'   = '192.0.2.10'
+            }
+        }
+        Write-TestJsonHC "$root\Answers\Kiosk\Gent\Kiosk.json" @{
+            Answers = [ordered]@{
+                '{{input:Account}}'     = 'kiosk-gent'
+                '{{password:Password}}' = 'File-secret!42'
+                '{{ipv4:Server}}'       = '192.0.2.20'
+            }
+        }
+        Write-TestJsonHC "$root\Answers\Other.json" @{
+            Answers = @{ '{{input:Something else}}' = 'x' }
+        }
+        '{"Answers":' | Set-Content -LiteralPath "$root\Answers\Broken.json"
+        (Get-Item "$root\Answers\Other.json").LastWriteTime = (
+            Get-Date '2026-01-01'
+        )
+
+        $wizard = New-TestWizardHC -RootFolder $root
+        $find = { param($name) Find-RestoreWizardControlHC $wizard $name }
+        $next = & $find 'WizardNext'
+        $chooseConfiguration = {
+            param($name)
+            $item = (& $find 'Configurations').Items |
+                Where-Object Text -eq $name
+            $item.Selected = $true
+            $next.PerformClick()
+        }
+        $chooseAnswerFile = {
+            param($path)
+            $item = (& $find 'AnswerFiles').Items | Where-Object Text -eq $path
+            $item.Selected = $true
+            $next.PerformClick()
+        }
     }
     AfterEach {
-        $dialog.Dispose()
+        $wizard.FindForm().Dispose()
     }
-    It 'asks only the questions of the checked sections, in the same window' {
-        (& $find 'RestoreSelected').PerformClick()
+    It ('shows one step at a time in the same window, from the ' +
+        'configuration to the sections and back') {
+        $openForms = [Windows.Forms.Application]::OpenForms.Count
 
-        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::None)
-        (& $find 'SelectionPage').Visible | Should -BeFalse
-        (& $find 'QuestionsPage').Visible | Should -BeTrue
-        (& $find 'RestoreSelected').Visible | Should -BeFalse
-        (& $find 'RestoreWithAnswers').Visible | Should -BeTrue
-        (& $find 'BackToSelection').Visible | Should -BeTrue
-        @($dialog.Controls.Find('SectionHeader', $true).Text) |
-            Should -Be @('User accounts')
-        @($dialog.Controls.Find('QuestionDescription', $true).Text) |
-            Should -Be @('Account', 'Password')
-        (& $find 'RestoreWithAnswers').Enabled | Should -BeFalse
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 1: Choose a configuration'
+        (& $find 'ConfigurationStep').Visible | Should -BeTrue
+        (& $find 'SectionsStep').Visible | Should -BeFalse
+        (& $find 'WizardBack').Enabled | Should -BeFalse
+        (& $find 'RefreshConfigurations').Visible | Should -BeTrue
+        @((& $find 'Configurations').Items.Text) |
+            Should -Be @('Plain', 'Prompted')
+        $next.Enabled | Should -BeFalse
+
+        & $chooseConfiguration 'Prompted'
+
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 2: Choose the sections to restore'
+        (& $find 'ConfigurationStep').Visible | Should -BeFalse
+        (& $find 'SectionsStep').Visible | Should -BeTrue
+        (& $find 'ConfigurationDescription').Text | Should -Be 'Prompted kiosk'
+        (& $find 'RefreshConfigurations').Visible | Should -BeFalse
+        (& $find 'SelectAll').Visible | Should -BeTrue
+        (& $find 'WizardBack').Enabled | Should -BeTrue
+
+        (& $find 'WizardBack').PerformClick()
+
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 1: Choose a configuration'
+        (& $find 'ConfigurationStep').Visible | Should -BeTrue
+        [Windows.Forms.Application]::OpenForms.Count | Should -Be $openForms
     }
-    It 'goes back to the checklist and keeps the answers given' {
-        (& $find 'RestoreSelected').PerformClick()
-        $inputs = (& $find 'QuestionsPage').Tag.Panel.Tag.Inputs
-        $inputs[0].Text = 'kiosk'
+    It ('grays out sections without data and needs at least one checked ' +
+        'section') {
+        & $chooseConfiguration 'Prompted'
+        $list = & $find 'SnapshotItems'
 
-        (& $find 'BackToSelection').PerformClick()
+        @($list.CheckedItems | ForEach-Object Tag) |
+            Should -Be @('UserAccounts', 'NtpTimeServers')
+        $software = $list.Items | Where-Object Tag -eq 'Software'
+        $software.ForeColor | Should -Be ([Drawing.SystemColors]::GrayText)
+        $software.Checked = $true
+        $software.Checked | Should -BeFalse
 
-        (& $find 'SelectionPage').Visible | Should -BeTrue
-        (& $find 'QuestionsPage').Visible | Should -BeFalse
-        (& $find 'RestoreSelected').Visible | Should -BeTrue
+        (& $find 'ClearAll').PerformClick()
+        $next.Enabled | Should -BeFalse
+        if (-not [Windows.Forms.SystemInformation]::HighContrast) {
+            $next.BackColor | Should -Be ([Drawing.SystemColors]::Control)
+        }
 
-        $ntp.Checked = $true
-        (& $find 'RestoreSelected').PerformClick()
-
-        @($dialog.Controls.Find('SectionHeader', $true).Text) |
-            Should -Be @('User accounts', 'NTP time servers')
-        $inputs = (& $find 'QuestionsPage').Tag.Panel.Tag.Inputs
-        $inputs.Count | Should -Be 3
-        $inputs[0].Text | Should -BeExactly 'kiosk'
-        $inputs[1].Text | Should -BeExactly ''
+        (& $find 'SelectAll').PerformClick()
+        @($list.CheckedItems | ForEach-Object Tag) |
+            Should -Be @('UserAccounts', 'NtpTimeServers')
+        $next.Enabled | Should -BeTrue
+        if (-not [Windows.Forms.SystemInformation]::HighContrast) {
+            $next.BackColor |
+                Should -Be ([Drawing.Color]::FromArgb(0, 103, 184))
+        }
     }
-    It ('returns the checked sections and the answers when every answer ' +
-        'is valid') {
-        (& $find 'RestoreSelected').PerformClick()
-        $inputs = (& $find 'QuestionsPage').Tag.Panel.Tag.Inputs
-        $inputs[0].Text = 'kiosk'
-        $inputs[1].Text = 'Test-only password!42'
+    It ('takes the restart and report options from the configuration and ' +
+        'lets unattended turn off the report') {
+        & $chooseConfiguration 'Prompted'
+        $reboot = & $find 'RebootComputer'
+        $delay = & $find 'RestartDelaySeconds'
+        $report = & $find 'OpenReportInBrowser'
+        $unattended = & $find 'Unattended'
 
-        (& $find 'RestoreWithAnswers').PerformClick()
+        $reboot.Checked | Should -BeTrue
+        $delay.Value | Should -Be 30
+        $delay.Enabled | Should -BeTrue
+        $report.Checked | Should -BeFalse
 
-        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
-        @($dialog.Tag) | Should -Be @('UserAccounts')
-        $answers = Get-RestoreSelectionAnswersHC -Form $dialog
-        $answers.Count | Should -Be 2
-        $answers['{{input:Account}}'] | Should -BeExactly 'kiosk'
-        $answers['{{password:Password}}'] |
-            Should -BeExactly 'Test-only password!42'
+        $reboot.Checked = $false
+        $delay.Enabled | Should -BeFalse
+
+        $report.Checked = $true
+        $unattended.Checked = $true
+        $report.Checked | Should -BeFalse
+        $report.Enabled | Should -BeFalse
+        $unattended.Checked = $false
+        $report.Checked | Should -BeTrue
     }
-    It 'asks nothing for answers in the answer file or an unattended restore' {
-        $answerFile = Join-Path $TestDrive 'Prompted.answers.json'
-        ('{"Answers":{"{{input:Account}}":"kiosk",' +
-            '"{{password:Password}}":"Test-only password!42"}}') |
-            Set-Content -LiteralPath $answerFile
-        (& $find 'AnswerFile').Text = $answerFile
+    It ('lists every answer file under Answers with its path and the ' +
+        'questions it answers, and grays out the unusable ones') {
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+        $list = & $find 'AnswerFiles'
 
-        (& $find 'RestoreSelected').PerformClick()
-
-        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
-        (& $find 'QuestionsPage').Visible | Should -BeFalse
-        Get-RestoreSelectionAnswersHC -Form $dialog | Should -BeNullOrEmpty
-
-        $dialog.DialogResult = [Windows.Forms.DialogResult]::None
-        (& $find 'AnswerFile').Text = ''
-        (& $find 'Unattended').Checked = $true
-
-        (& $find 'RestoreSelected').PerformClick()
-
-        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::OK)
-        (& $find 'QuestionsPage').Visible | Should -BeFalse
-    }
-    It 'reports configuration problems before asking anything' {
-        $broken = Join-Path $TestDrive 'Broken.json'
-        ('{"SchemaVersion":3,"Items":{"Software":{"Install":[' +
-            '{"ExecutablePath":"Missing\\setup.exe",' +
-            '"Arguments":"{{input:Arguments}}"}]}}}') |
-            Set-Content -LiteralPath $broken
-        $params.ConfigurationFile = $broken
-        $params.Entries = @(
-            Get-RestoreItemEntriesHC -ConfigurationFile $broken
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 3: Choose an answer file'
+        @($list.Items.Text) | Should -Be @(
+            '(None) - answer the questions in the next step'
+            'Broken.json'
+            'Kiosk\Brussels\Kiosk.json'
+            'Kiosk\Gent\Kiosk.json'
+            'Other.json'
         )
-        $dialog.Dispose()
-        $dialog = New-RestoreSelectionFormHC @params
-        $dialog.Show()
+        @($list.Items | ForEach-Object { $_.SubItems[1].Text }) |
+            Should -Be @('0 of 3', 'Invalid', '2 of 3', '3 of 3', '0 of 3')
+        $list.SelectedItems[0].Index | Should -Be 0
+        $next.Enabled | Should -BeTrue
 
-        (& $find 'RestoreSelected').PerformClick()
+        foreach ($index in 1, 4) {
+            $list.Items[$index].ForeColor |
+                Should -Be ([Drawing.SystemColors]::GrayText)
+            $list.Items[$index].Selected = $true
+            $list.Items[$index].Selected | Should -BeFalse
+            $list.SelectedItems[0].Index | Should -Be 0
+        }
+        $list.Items[1].ToolTipText | Should -BeLike '*not valid JSON*'
+        $list.Items[4].ToolTipText | Should -BeLike '*answers none*'
+    }
+    It 'sorts the answer files by path or date modified, both ways' {
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+        $list = & $find 'AnswerFiles'
+        $click = {
+            param($column)
+            $method = $list.GetType().GetMethod(
+                'OnColumnClick',
+                [Reflection.BindingFlags]'NonPublic, Instance'
+            )
+            $null = $method.Invoke(
+                $list, @([Windows.Forms.ColumnClickEventArgs]::new($column))
+            )
+        }
 
-        $dialog.DialogResult | Should -Be ([Windows.Forms.DialogResult]::None)
-        (& $find 'SelectionPage').Visible | Should -BeTrue
-        Should -Invoke Show-WizardErrorHC -Times 1 -Exactly -ParameterFilter {
+        & $click 0
+
+        $list.Columns[0].Text | Should -BeLike "Answer file *$([char]0x25BC)"
+        @($list.Items.Text)[1..4] | Should -Be @(
+            'Other.json'
+            'Kiosk\Gent\Kiosk.json'
+            'Kiosk\Brussels\Kiosk.json'
+            'Broken.json'
+        )
+
+        & $click 2
+
+        $list.Columns[2].Text | Should -BeLike "Date modified *$([char]0x25B2)"
+        @($list.Items.Text)[1] | Should -Be 'Other.json'
+        $list.Items[0].Text | Should -BeLike '(None)*'
+    }
+    It ('skips the questions that a complete answer file answers and ' +
+        'reviews every answer with its source') {
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+        & $chooseAnswerFile 'Kiosk\Gent\Kiosk.json'
+
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 4: Review and restore'
+        $next.Text | Should -Be 'Restore'
+        (& $find 'ReviewSummary').Text | Should -BeLike (
+            '*Answer file: Answers\Kiosk\Gent\Kiosk.json*'
+        )
+        $review = & $find 'ReviewAnswers'
+        @($review.Items | ForEach-Object { $_.SubItems[1].Text }) |
+            Should -Be @(
+            'kiosk-gent', ([string]([char]0x25CF) * 8), '192.0.2.20'
+        )
+        @($review.Items | ForEach-Object { $_.SubItems[2].Text } |
+            Select-Object -Unique) | Should -Be @('Answer file')
+        @($review.Items | ForEach-Object { $_.Group.Header } |
+            Select-Object -Unique) |
+            Should -Be @('User accounts', 'Time synchronization')
+
+        $next.PerformClick()
+
+        Should -Invoke Start-ConfigurationJobHC @once -ParameterFilter {
+            $AnswerFile -like '*\Answers\Kiosk\Gent\Kiosk.json' -and
+            -not $AnswerPipe -and
+            @($Items) -join ',' -eq 'UserAccounts,NtpTimeServers' -and
+            $RebootComputer -and $RestartDelaySeconds -eq 30 -and
+            -not $OpenReportInBrowser
+        }
+        Should -Invoke Start-RestoreAnswerServerHC -Times 0 -Exactly
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 1: Choose a configuration'
+    }
+    It ('asks only what the answer file leaves open, keeps typed answers ' +
+        'on Back and hands them over by pipe') {
+        # The wizard forgets the answers once they are handed over
+        Mock Start-RestoreAnswerServerHC {
+            $script:handedOver = @(
+                $Answers.Keys | ForEach-Object { "$_=$($Answers[$_])" }
+            )
+            [pscustomobject]@{
+                PipeName   = 'ComputerSnapshot-test'
+                PowerShell = $null
+            }
+        }
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+        & $chooseAnswerFile 'Kiosk\Brussels\Kiosk.json'
+
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 4: Answer the questions'
+        $inputs = $wizard.Tag.InputPanel.Tag.Inputs
+        @($inputs | ForEach-Object { $_.Tag.Question.Placeholder }) |
+            Should -Be @('{{password:Password}}')
+        $next.Enabled | Should -BeFalse
+        $inputs[0].Text = 'Typed-secret!42'
+
+        (& $find 'WizardBack').PerformClick()
+        $next.PerformClick()
+
+        $wizard.Tag.InputPanel.Tag.Inputs[0].Text |
+            Should -BeExactly 'Typed-secret!42'
+
+        $next.PerformClick()
+
+        $review = & $find 'ReviewAnswers'
+        $password = $review.Items[1]
+        $password.SubItems[1].Text | Should -Not -Match 'Typed-secret'
+        $password.SubItems[2].Text | Should -Be 'Typed'
+
+        $next.PerformClick()
+
+        Should -Invoke Start-RestoreAnswerServerHC @once
+        $handedOver | Should -Be @('{{password:Password}}=Typed-secret!42')
+        Should -Invoke Start-ConfigurationJobHC @once -ParameterFilter {
+            $AnswerPipe -eq 'ComputerSnapshot-test' -and
+            $AnswerFile -like '*\Answers\Kiosk\Brussels\Kiosk.json'
+        }
+        $wizard.Tag.Answers | Should -BeNullOrEmpty
+    }
+    It ('asks every question without an answer file, and goes straight to ' +
+        'the review when the checked sections ask nothing') {
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+        $next.PerformClick()
+
+        $inputs = $wizard.Tag.InputPanel.Tag.Inputs
+        $inputs.Count | Should -Be 3
+        $inputs[0].Text = 'kiosk'
+        $inputs[1].Text = 'Typed-secret!42'
+        $inputs[2].Text = '192.0.2.30'
+        $next.PerformClick()
+
+        @((& $find 'ReviewAnswers').Items |
+            ForEach-Object { $_.SubItems[2].Text } | Select-Object -Unique) |
+            Should -Be @('Typed')
+        (& $find 'ReviewSummary').Text | Should -BeLike '*Answer file: None*'
+
+        foreach ($step in 1..4) {
+            (& $find 'WizardBack').PerformClick()
+        }
+        & $chooseConfiguration 'Plain'
+        $next.PerformClick()
+
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 3: Review and restore'
+        (& $find 'ReviewNoAnswers').Visible | Should -BeTrue
+        (& $find 'ReviewAnswers').Visible | Should -BeFalse
+
+        $next.PerformClick()
+
+        Should -Invoke Start-ConfigurationJobHC @once -ParameterFilter {
+            $ConfigurationFile -like '*\Plain.json' -and -not $AnswerFile
+        }
+    }
+    It 'accepts only an answer file that answers everything when unattended' {
+        & $chooseConfiguration 'Prompted'
+        (& $find 'Unattended').Checked = $true
+        $next.PerformClick()
+        $list = & $find 'AnswerFiles'
+
+        $list.SelectedItems.Count | Should -Be 0
+        $next.Enabled | Should -BeFalse
+        foreach ($item in @($list.Items)) {
+            $usable = $item.Text -eq 'Kiosk\Gent\Kiosk.json'
+            $item.Tag.Usable | Should -Be $usable -Because $item.Text
+        }
+
+        & $chooseAnswerFile 'Kiosk\Gent\Kiosk.json'
+        (& $find 'ReviewSummary').Text | Should -BeLike '*Unattended*'
+        $next.PerformClick()
+
+        Should -Invoke Start-ConfigurationJobHC @once -ParameterFilter {
+            $Unattended -and -not $OpenReportInBrowser
+        }
+    }
+    It 'creates a new answer file in a subfolder of Answers' {
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+
+        (& $find 'NewAnswerFile').Text = 'Kiosk\Antwerp\Kiosk'
+        (& $find 'CreateAnswerFile').PerformClick()
+
+        $path = "$root\Answers\Kiosk\Antwerp\Kiosk.json"
+        $path | Should -Exist
+        $document = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        $answers = $document.Answers
+        @($answers.PSObject.Properties.Name | Sort-Object) | Should -Be @(
+            '{{input:Account}}', '{{ipv4:Server}}', '{{password:Password}}'
+        )
+        @($answers.PSObject.Properties.Value | Where-Object { $_ }).Count |
+            Should -Be 0
+        $item = (& $find 'AnswerFiles').Items |
+            Where-Object Text -eq 'Kiosk\Antwerp\Kiosk.json'
+        $item.SubItems[1].Text | Should -Be '0 of 3'
+        (& $find 'AnswerFileStatus').Text |
+            Should -BeLike 'Created Answers\Kiosk\Antwerp\Kiosk.json*'
+
+        foreach ($name in @('..\Escape', 'C:\Escape.json', '')) {
+            (& $find 'NewAnswerFile').Text = $name
+            (& $find 'CreateAnswerFile').PerformClick()
+        }
+        Should -Invoke Show-WizardErrorHC -Times 3 -Exactly -ParameterFilter {
+            $Caption -eq 'Answer file error'
+        }
+        "$root\Escape.json" | Should -Not -Exist
+    }
+    It 'reports configuration problems on Next and stays on the sections' {
+        Write-TestJsonHC "$root\Configurations\Broken.json" @{
+            SchemaVersion = 3
+            Items         = @{
+                Software = @{
+                    Install = @(
+                        @{
+                            ExecutablePath = 'Missing\setup.exe'
+                            Arguments      = '{{input:Arguments}}'
+                        }
+                    )
+                }
+            }
+        }
+        (& $find 'RefreshConfigurations').PerformClick()
+        & $chooseConfiguration 'Broken'
+
+        $next.PerformClick()
+
+        $wizard.Tag.Step | Should -Be 'Sections'
+        Should -Invoke Show-WizardErrorHC @once -ParameterFilter {
             $Caption -eq 'Restore error' -and
             $Text -like "*Install[[]0].ExecutablePath: file 'Missing*"
+        }
+    }
+    It ('ignores the events of controls that are taken out of the wizard ' +
+        'while it closes') {
+        & $chooseConfiguration 'Prompted'
+        $next.PerformClick()
+        $list = & $find 'AnswerFiles'
+        $detached = New-Object Windows.Forms.Label
+
+        Get-RestoreWizardHC $detached | Should -BeNullOrEmpty
+        { Update-RestoreWizardButtonsHC -Wizard $null } | Should -Not -Throw
+        { Update-RestoreAnswerFileListHC -Wizard $null } | Should -Not -Throw
+        { Show-RestoreWizardStepHC -Wizard $null -Step 'Sections' } |
+            Should -Not -Throw
+        Find-RestoreWizardControlHC $null 'WizardNext' | Should -BeNullOrEmpty
+
+        $list.Parent.Controls.Remove($list)
+        { $list.Items[2].Selected = $true } | Should -Not -Throw
+        $list.Dispose()
+        $detached.Dispose()
+    }
+    It 'keeps the steps and buttons inside the minimum window size' {
+        $form = $wizard.FindForm()
+        $form.ClientSize = New-Object Drawing.Size 640, 440
+        & $chooseConfiguration 'Prompted'
+        [Windows.Forms.Application]::DoEvents()
+
+        foreach ($name in @(
+                'SnapshotItems', 'RebootComputer', 'Unattended', 'WizardNext',
+                'WizardBack'
+            )) {
+            $control = & $find $name
+            $control.Right |
+                Should -BeLessOrEqual $control.Parent.ClientSize.Width
+            $control.Bottom |
+                Should -BeLessOrEqual $control.Parent.ClientSize.Height
         }
     }
 }

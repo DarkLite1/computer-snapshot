@@ -249,7 +249,8 @@ function ConvertTo-RestoreInputNumberHC {
 
 function Get-RestoreInputSectionHC {
     # The section of a configuration path such as Items.UserAccounts[0].Name,
-    # named after its script, such as 'User accounts', in execution order
+    # with its name in the wizard, such as 'User accounts', in execution
+    # order
     param(
         [Parameter(Mandatory)][string]$Path
     )
@@ -269,18 +270,9 @@ function Get-RestoreInputSectionHC {
         }
     }
 
-    $name = $scripts[$key] -replace ' import export\.ps1\z', ''
-
-    if ($key -eq 'StartCustomScriptsBefore') {
-        $name += ' before'
-    }
-    elseif ($key -eq 'StartCustomScriptsAfter') {
-        $name += ' after'
-    }
-
     [pscustomobject]@{
         Key   = $key
-        Name  = $name
+        Name  = (Get-SnapshotSectionLabelsHC)[$key][0]
         Order = [array]::IndexOf(@($scripts.Keys), $key)
     }
 }
@@ -809,8 +801,8 @@ function New-RestoreInputPanelHC {
     $intro.Name = 'InputIntro'
     $intro.Text = $Introduction
     $intro.AutoSize = $true
+    $intro.Dock = 'Fill'
     $intro.Margin = New-Object Windows.Forms.Padding 0, 0, 0, 8
-    $panel.Tag.Labels.Add($intro)
     $panel.Controls.Add($intro, 0, 0)
 
     $scroll = New-Object Windows.Forms.Panel
@@ -833,6 +825,7 @@ function New-RestoreInputPanelHC {
     $summary = New-Object Windows.Forms.Label
     $summary.Name = 'InputSummary'
     $summary.AutoSize = $true
+    $summary.Dock = 'Fill'
     $summary.Margin = New-Object Windows.Forms.Padding 0, 8, 0, 0
     $panel.Controls.Add($summary, 0, 2)
 

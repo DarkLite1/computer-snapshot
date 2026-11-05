@@ -371,9 +371,9 @@ Describe 'Restore input questions and their rules' {
             '{{ipv4:Server}}', '{{input:Host}}', '{{number:Minutes}}'
         )
         @($questions.Section) | Should -Be @(
-            'Hosts file entries', 'Hosts file entries', 'Software'
+            'Hosts file', 'Hosts file', 'Software'
         )
-        @($questions[0].OtherSections) | Should -Be @('NTP time servers')
+        @($questions[0].OtherSections) | Should -Be @('Time synchronization')
         $questions[0].Rule | Should -BeNullOrEmpty
         $questions[2].Rule.Maximum | Should -Be 1440
     }

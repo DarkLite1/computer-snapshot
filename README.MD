@@ -79,7 +79,7 @@ Your USB stick has a specific layout to keep everything organized. Here are the 
 - **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers. `Shared/Examples/` holds ready-made sample data for every section; copy what you need, or point to it from your own configuration.
 - **`Log/`**: Check here for your execution reports.
 - **`Answers/`**: Answer files, also in subfolders such as `Answers/Kiosk/Brussels/`. `Answers/Examples/` holds examples; Git ignores everything else in this folder, because answer files can contain passwords.
-- **`Engine/`**: The tool itself; don't change anything here. `Engine/Scripts/` holds the scripts, `Engine/Common/` their shared code, `Engine/Schemas/` the schemas that give editors their hints, and `Engine/Tests/` the automated Pester tests for developers (see [Running the Tests](#-running-the-tests)).
+- **`Engine/`**: The tool itself; don't change anything here. Developers find how it is built, tested and upgraded from older versions in [Engine/README.MD](Engine/README.MD).
 
 ## ✍️ Customizing Your Setups
 
@@ -796,64 +796,3 @@ Export the scheduled tasks of other Task Scheduler folders than the default `\HC
 ```
 
 `Invoke scripts.ps1` is the engine behind everything else. It returns an object with `Success`, `ReportFile` and per-section `Results`, so you can check the outcome from your own scripts.
-
-## 🧩 Writing a Child Script
-
-Each section is handled by one script in `Engine/Scripts/` (for example `User accounts import export.ps1`). The main script calls it with three parameters, `-Action` (`Export` or `Import`), `-Data` (the section's data on import) and `-RootFolder` (the USB stick root), and expects exactly **one** object back:
-
-```powershell
-[pscustomobject]@{
-    Data     = $exportData          # the captured section on Export, $null on Import
-    Messages = [string[]]$messages  # what was done, shown in the report
-    Errors   = [string[]]$errors    # one line per failed entry; empty when all went well
-}
-```
-
-- On export, `-Data` holds the section's export options from `-ExportOptions`, or `$null`.
-- All three properties are required. `Messages` and `Errors` must be string arrays, also when they are empty (`[string[]]@()`); a result without them is reported as **Failed**.
-- Set `$ErrorActionPreference = 'Stop'` at the top, handle each entry in its own `try`/`catch` and add a line to `$errors` in the `catch`. A failed step then skips the rest of that entry only, and the other entries still run.
-- A section with any `Errors` is reported as **Failed**, and on export its data is not saved.
-- Don't let commands write stray output: capture it or discard it with `$null =`, because anything extra breaks the "exactly one object" rule.
-- Errors written with `Write-Error` or a `throw` that escape the script are still caught and reported as a safety net, but report expected problems in `Errors`.
-
-## 🧪 Running the Tests
-
-The tests use Pester 6. They mock all Windows changes and only create files in a temporary folder, so they are safe to run on your own computer. Run them on both Windows PowerShell 5.1 and PowerShell 7; on PowerShell 7 the JSON schema is also checked with `Test-Json`.
-
-**PowerShell 7:**
-
-```powershell
-Install-Module Pester -MinimumVersion 6.0.0 -Scope CurrentUser
-Invoke-Pester -Path .\Engine\Tests
-```
-
-**Windows PowerShell 5.1:** Windows ships with the old Pester 3.4.0, and PowerShell 7 keeps its modules in a separate folder, so install Pester 6 again from a Windows PowerShell window. `-SkipPublisherCheck` is needed because the built-in Pester is signed by a different publisher:
-
-```powershell
-Install-Module Pester -MinimumVersion 6.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
-Import-Module Pester -MinimumVersion 6.0.0 -Force
-Invoke-Pester -Path .\Engine\Tests
-```
-
-Always import Pester 6 explicitly in Windows PowerShell; otherwise `Invoke-Pester` can load 3.4.0, and every test file fails with *the following modules that are specified by the "#requires" statements of the script are missing: Pester*.
-
-If installing fails with a download or NuGet error, run this first and try again:
-
-```powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Install-PackageProvider NuGet -MinimumVersion 2.8.5.201 -Scope CurrentUser -Force
-```
-
-## 🔄 Upgrading from an Older Version?
-
-If you have old configuration files from a previous version of this tool, they won't work right away. But don't worry—there's an automatic converter!
-
-Just open PowerShell from your USB stick and run:
-
-```powershell
-& '.\Engine\Scripts\Convert configuration.ps1' -OldConfigurationFile 'Configurations\Old PC.json' -RootFolder $PWD.Path
-```
-
-This converts an old configuration (version 1, the `StartScript` format) to the current format (version 3). The result is written to `Configurations\<name>.json` and the original is kept as `<name>.v1.json`.
-
-Run the converter once per configuration file; a file that is already version 3 is left alone. Share permissions that belong to a share that isn't in the old share list can't be applied, and are reported.

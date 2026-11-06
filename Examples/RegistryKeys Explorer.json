@@ -1,0 +1,21 @@
+{
+  "Comment": "File Explorer shows file extensions and hidden files. HKCU is the account running the restore; for another account, put the same entries under RunAsOtherUser. Explorer picks up the change after signing in again.",
+  "RunAsCurrentUser": {
+    "RegistryKeys": [
+      {
+        "Comment": "0 shows extensions such as .exe and .pdf.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+        "Name": "HideFileExt",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "1 shows hidden files and folders; protected operating system files stay hidden.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+        "Name": "Hidden",
+        "Type": "DWord",
+        "Value": "1"
+      }
+    ]
+  }
+}

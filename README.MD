@@ -122,6 +122,19 @@ An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*.
 
 Some sections can't be fully captured automatically, so exporting them only gives you a starting example to edit: `CreateFolders`, `CopyFilesFolders`, `RegistryKeys`, `Software` and `Services`. `StartCustomScriptsBefore` and `StartCustomScriptsAfter` export an empty list, so no example script can run by accident; see `Examples\StartCustomScriptsBefore.json` for the format.
 
+### Ready-made examples for common settings
+
+`Examples/` also has ready-made sections for common Windows settings. Copy their entries into your configuration, or point to them like a shared file, such as `"RegistryKeys": ["Shared\\Registry common.json", "Examples\\RegistryKeys Explorer.json"]`:
+
+| File | What it does |
+| ---- | ------------ |
+| `RegistryKeys Remote Desktop.json` and `FirewallRules Remote Desktop.json` | Turn on Remote Desktop with Network Level Authentication and open port 3389 on domain and private networks. Add the users who may connect to the `Remote Desktop Users` group in `UserGroups`. |
+| `RegistryKeys auto logon.json` | Sign in a kiosk account automatically. **Windows keeps the password in plain text in the registry**, readable by every administrator; the restore asks for it. |
+| `RegistryKeys Explorer.json` | Show file extensions and hidden files in File Explorer. |
+| `RegistryKeys Windows suggestions.json` | Turn off suggestions, tips, ads and automatically installed apps on Windows 11. |
+
+The `HKCU` entries apply to the account running the restore; for another account, put them under `RunAsOtherUser`.
+
 ### Reusing sections across computers
 
 Instead of writing a section inline, you can point to a file. The path is relative to the USB stick root:

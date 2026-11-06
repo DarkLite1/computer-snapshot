@@ -1,0 +1,112 @@
+{
+  "Comment": "Turns off suggestions, tips, ads and automatically installed apps on Windows 11, and mostly on Windows 10. HKCU is the account running the restore; for another account, put the HKCU entries under RunAsOtherUser. Takes effect after signing in again.",
+  "RunAsCurrentUser": {
+    "RegistryKeys": [
+      {
+        "Comment": "Policy 'Turn off Microsoft consumer experiences': no suggested apps in Start. Windows only follows it on Enterprise and Education; the HKCU entries below also work on Pro and Home.",
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent",
+        "Name": "DisableWindowsConsumerFeatures",
+        "Type": "DWord",
+        "Value": "1"
+      },
+      {
+        "Comment": "Policy 'Turn off cloud optimized content', also Enterprise and Education only.",
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent",
+        "Name": "DisableCloudOptimizedContent",
+        "Type": "DWord",
+        "Value": "1"
+      },
+      {
+        "Comment": "No apps installed automatically, such as games in Start.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "SilentInstalledAppsEnabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No suggestions in Start.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "SystemPaneSuggestionsEnabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No suggestions in Start (Windows 10).",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "SubscribedContent-338388Enabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No tips and suggestions while using Windows.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "SubscribedContent-338389Enabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No tips and suggestions while using Windows (older builds).",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "SoftLandingEnabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No suggested content in the Settings app.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "SubscribedContent-338393Enabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No suggested content in the Settings app.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "SubscribedContent-353694Enabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No suggested content in the Settings app.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "SubscribedContent-353696Enabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No fun facts and tips on the lock screen.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "RotatingLockScreenOverlayEnabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No fun facts and tips on the lock screen.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager",
+        "Name": "SubscribedContent-338387Enabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No 'Let's finish setting up your device' screen after updates.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\UserProfileEngagement",
+        "Name": "ScoobeSystemSettingEnabled",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "Windows 11: no tips, shortcuts and new apps in the Recommended part of Start.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+        "Name": "Start_IrisRecommendations",
+        "Type": "DWord",
+        "Value": "0"
+      },
+      {
+        "Comment": "No OneDrive and Microsoft 365 notifications in File Explorer.",
+        "Path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+        "Name": "ShowSyncProviderNotifications",
+        "Type": "DWord",
+        "Value": "0"
+      }
+    ]
+  }
+}

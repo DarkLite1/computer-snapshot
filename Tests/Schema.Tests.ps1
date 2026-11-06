@@ -85,6 +85,33 @@ Describe 'Schema contract' {
             ).Count | Should -Be 0 -Because ($problems -join '; ')
         }
     }
+    It ('validates every extra example, such as ' +
+        '"RegistryKeys Remote Desktop.json", as its section') {
+        $extras = @(
+            Get-ChildItem -LiteralPath (Join-Path $root 'Examples') `
+                -Filter '* *.json' -File
+        )
+        $extras.Count | Should -BeGreaterOrEqual 5
+        foreach ($file in $extras) {
+            $name = $file.BaseName.Split(' ')[0]
+            $mapping.Values | Should -Contain $name -Because $file.Name
+            $document = @{
+                SchemaVersion = 3
+                Items         = @{ $name = Read-SectionExampleHC $file.FullName }
+            }
+
+            $problems = @(Test-ConfigurationHC $document $TestDrive)
+
+            @(
+                $problems | Where-Object { $_ -notmatch "file '.+' not found" }
+            ).Count | Should -Be 0 -Because "$($file.Name): $problems"
+            if ($PSVersionTable.PSVersion.Major -ge 7) {
+                $document | ConvertTo-Json -Depth 20 |
+                Test-Json -SchemaFile $schemaPath -ErrorAction Stop |
+                Should -BeTrue -Because $file.Name
+            }
+        }
+    }
     It ('fills the number placeholders of the examples in as numbers that ' +
         'pass the check') {
         $numberFields = 0

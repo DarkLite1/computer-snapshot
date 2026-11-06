@@ -1,0 +1,46 @@
+{
+  "Comment": "Signs in the local account 'kiosk' automatically at every start. WARNING: Windows keeps DefaultPassword in plain text in the registry, readable by every administrator of this PC. Only use it for a kiosk account without other rights, and keep this file and its answers protected. The account itself is created in UserAccounts.",
+  "RunAsCurrentUser": {
+    "RegistryKeys": [
+      {
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+        "Name": "AutoAdminLogon",
+        "Type": "String",
+        "Value": "1"
+      },
+      {
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+        "Name": "DefaultUserName",
+        "Type": "String",
+        "Value": "kiosk"
+      },
+      {
+        "Comment": "For a local account, the name of this computer.",
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+        "Name": "DefaultDomainName",
+        "Type": "String",
+        "Value": "{{input:Computer name of this PC, for the local kiosk account}}"
+      },
+      {
+        "Comment": "Asked for during the restore, but stored in plain text in the registry.",
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+        "Name": "DefaultPassword",
+        "Type": "String",
+        "Value": "{{password:Password of the kiosk account, stored in plain text for auto logon}}"
+      },
+      {
+        "Comment": "Without a count, auto logon keeps working after the first sign-in.",
+        "Action": "RemoveValue",
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+        "Name": "AutoLogonCount"
+      },
+      {
+        "Comment": "0 turns off 'Require Windows Hello sign-in for Microsoft accounts', which hides auto logon on Windows 10 and 11.",
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\PasswordLess\\Device",
+        "Name": "DevicePasswordLessBuildVersion",
+        "Type": "DWord",
+        "Value": "0"
+      }
+    ]
+  }
+}

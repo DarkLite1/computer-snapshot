@@ -1,5 +1,5 @@
 {
-  "Comment": "Turns on Remote Desktop with Network Level Authentication. Use it together with 'Examples\\FirewallRules Remote Desktop.json' to open port 3389, and add the users who may connect to the 'Remote Desktop Users' group in UserGroups; administrators can always connect.",
+  "Comment": "Turns on Remote Desktop with Network Level Authentication. Use it together with 'Shared\\Examples\\FirewallRules Remote Desktop.json' to open port 3389, and add the users who may connect to the 'Remote Desktop Users' group in UserGroups; administrators can always connect.",
   "RunAsCurrentUser": {
     "RegistryKeys": [
       {

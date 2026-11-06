@@ -177,7 +177,7 @@ if ($Action -eq 'Export') {
     $messages.Insert(0, 'Exported Environment variables')
     $messages.Add(
         'Path and PSModulePath are not exported; add AddToList entries ' +
-        'for them, see Examples\EnvironmentVariables.json'
+        'for them, see Shared\Examples\EnvironmentVariables.json'
     )
     #endregion
 }

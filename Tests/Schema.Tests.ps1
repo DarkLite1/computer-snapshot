@@ -18,7 +18,7 @@ BeforeAll {
     )
     $sharedFolder = Join-Path $root 'Shared'
     $shippedSharedSections = @(
-        Get-ChildItem -LiteralPath $sharedFolder -Filter '*.json' -File |
+        Get-ChildItem -LiteralPath $sharedFolder -Filter '*.json' -File -Recurse |
         ForEach-Object FullName
     )
 
@@ -74,7 +74,7 @@ Describe 'Schema contract' {
     }
     It 'validates every component example with the runtime shape validator' {
         foreach ($name in $mapping.Values) {
-            $examplePath = Join-Path $root "Examples\$name.json"
+            $examplePath = Join-Path $root "Shared\Examples\$name.json"
             $data = Read-SectionExampleHC $examplePath
             $document = @{ SchemaVersion = 3; Items = @{ $name = $data } }
 
@@ -88,7 +88,7 @@ Describe 'Schema contract' {
     It ('validates every extra example, such as ' +
         '"RegistryKeys Remote Desktop.json", as its section') {
         $extras = @(
-            Get-ChildItem -LiteralPath (Join-Path $root 'Examples') `
+            Get-ChildItem -LiteralPath (Join-Path $root 'Shared\Examples') `
                 -Filter '* *.json' -File
         )
         $extras.Count | Should -BeGreaterOrEqual 5
@@ -120,7 +120,7 @@ Describe 'Schema contract' {
         )
         $titleCase = '( [A-Z0-9][A-Za-z0-9]*)*'
         $folders = @{
-            Examples                  = (
+            'Shared\Examples'         = (
                 "^($($sections -join '|'))$titleCase\.(json|xml)$"
             )
             Shared                    = (
@@ -143,8 +143,8 @@ Describe 'Schema contract' {
             }
         }
     }
-    It ('gives every section a schema that VS Code uses for its Examples ' +
-        'and Shared files') {
+    It ('gives every section a schema that VS Code uses for its files in ' +
+        'Shared and Shared\Examples') {
         $sections = @(
             $schema.properties.Items.properties.PSObject.Properties.Name |
             Where-Object { $_ -ne 'Comment' }
@@ -163,7 +163,7 @@ Describe 'Schema contract' {
         ) | ConvertFrom-Json
 
         foreach ($file in Get-Item -LiteralPath $shippedSharedSections) {
-            $file.Name.Split(' ')[0] | Should -BeIn $sections -Because (
+            $file.BaseName.Split(' ')[0] | Should -BeIn $sections -Because (
                 "Shared file '$($file.Name)' starts with its section name"
             )
         }
@@ -181,9 +181,8 @@ Describe 'Schema contract' {
             )
             $association.Count | Should -Be 1 -Because $name
             $association[0].fileMatch | Should -Be @(
-                "**/Examples/$name.json"
-                "**/Examples/$name *.json"
-                "**/Shared/$name *.json"
+                "**/Shared/**/$name.json"
+                "**/Shared/**/$name *.json"
             )
         }
     }
@@ -191,7 +190,7 @@ Describe 'Schema contract' {
         'pass the check') {
         $numberFields = 0
         foreach ($name in $mapping.Values | Select-Object -Unique) {
-            $examplePath = Join-Path $root "Examples\$name.json"
+            $examplePath = Join-Path $root "Shared\Examples\$name.json"
             $data = Read-SectionExampleHC $examplePath
             $document = @{ SchemaVersion = 3; Items = @{ $name = $data } }
             $fields = @(
@@ -242,7 +241,7 @@ Describe 'Schema contract' {
     It ('validates every component example using Test-Json on ' +
         'PowerShell 7') -Skip:($PSVersionTable.PSVersion.Major -lt 7) {
         foreach ($name in $mapping.Values) {
-            $examplePath = Join-Path $root "Examples\$name.json"
+            $examplePath = Join-Path $root "Shared\Examples\$name.json"
             $document = @{
                 SchemaVersion = 3
                 Items         = @{ $name = Read-SectionExampleHC $examplePath }

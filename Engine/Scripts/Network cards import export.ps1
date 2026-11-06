@@ -838,8 +838,8 @@ if ($Action -eq 'Export') {
     if (-not $exportData.Count) {
         Write-Verbose 'No network cards found'
         $messages.Add(
-            'No network cards found; see Examples\NetworkCards.json to ' +
-            'add one'
+            'No network cards found; see Shared\Examples\NetworkCards.json ' +
+            'to add one'
         )
     }
     #endregion

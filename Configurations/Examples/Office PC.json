@@ -36,8 +36,8 @@
       "SleepTimeoutMinutes": { "AC": 60, "DC": 15 }
     },
     "RegistryKeys": [
-      "Examples\\RegistryKeys Explorer.json",
-      "Examples\\RegistryKeys Windows Suggestions.json"
+      "Shared\\Examples\\RegistryKeys Explorer.json",
+      "Shared\\Examples\\RegistryKeys Windows Suggestions.json"
     ],
     "Services": [
       { "Name": "Spooler", "StartupType": "Automatic", "Status": "Running" }

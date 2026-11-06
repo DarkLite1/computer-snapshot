@@ -538,7 +538,7 @@ if ($Action -eq 'Export') {
 
     $messages.Insert(0, (
             'Nothing to export: add the software to install or remove, see ' +
-            'Examples\Software.json'
+            'Shared\Examples\Software.json'
         ))
 }
 else {

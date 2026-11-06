@@ -48,7 +48,7 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
    - Click **Export**.
    - Choose which sections you want to save (like users, folders, or network settings). The check box in the **Item** header checks every section or none; it shows a partly filled box when only some are checked.
    - For **Scheduled tasks**, check the Task Scheduler folders to export under **Scheduled task folders** (default `\HC\`, subfolders included, several separated by commas). Entering `\` exports every task on the computer, including the Windows ones; the wizard asks you to confirm that.
-   - Every checked section is in the file. A section with nothing to export is saved with an empty value (`[]` or `{}`), so you can see it is there and fill it in; a restore skips an empty section. Folders to create, files to copy, registry values, software and custom scripts are never read from the computer: these are always empty, see the `Examples` folder for what to fill in.
+   - Every checked section is in the file. A section with nothing to export is saved with an empty value (`[]` or `{}`), so you can see it is there and fill it in; a restore skips an empty section. Folders to create, files to copy, registry values, software and custom scripts are never read from the computer: these are always empty, see the `Shared\Examples` folder for what to fill in.
    - Give your file a name. _Tip: The wizard suggests a handy default name like `KIOSK01 2026-10-21 142536.json`_.
    - Click the **Export** button. It shows **Exporting...** and stays disabled until the export has finished, so the same export can not be started twice.
 
@@ -76,9 +76,8 @@ Your USB stick has a specific layout to keep everything organized. Here are the 
 - **`Configurations/`**: This is where your saved PC setups live (one file per computer), also in subfolders. `Configurations/Examples/` holds the bundled example configurations.
 - **`Software/`**: Place any app installers (like `.exe` files) in here.
 - **`Files/`**: Put any standard files or custom scripts you want copied to the new PC here.
-- **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers.
+- **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers. `Shared/Examples/` holds ready-made sample data for every section; copy what you need, or point to it from your own configuration.
 - **`Log/`**: Check here for your execution reports.
-- **`Examples/`**: Ready-made sample data for every section. Copy what you need into your own configuration.
 - **`Answers/`**: Answer files, also in subfolders such as `Answers/Kiosk/Brussels/`. `Answers/Examples/` holds examples; Git ignores everything else in this folder, because answer files can contain passwords.
 - **`Answers/`**: Optional local answer files for individual PCs. Create this
   folder when needed; Git ignores it because answers can contain passwords.
@@ -120,13 +119,13 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 18    | `Services`                 | Startup type of Windows services, and starting or stopping them.        |
 | 19    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
 
-An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Examples/` folder for the exact format of each section.
+An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Shared/Examples/` folder for the exact format of each section.
 
-Some sections can't be fully captured automatically, so exporting them only gives you a starting example to edit: `CreateFolders`, `CopyFilesFolders`, `RegistryKeys`, `Software` and `Services`. `StartCustomScriptsBefore` and `StartCustomScriptsAfter` export an empty list, so no example script can run by accident; see `Examples\StartCustomScriptsBefore.json` for the format.
+Some sections can't be fully captured automatically, so exporting them only gives you a starting example to edit: `CreateFolders`, `CopyFilesFolders`, `RegistryKeys`, `Software` and `Services`. `StartCustomScriptsBefore` and `StartCustomScriptsAfter` export an empty list, so no example script can run by accident; see `Shared\Examples\StartCustomScriptsBefore.json` for the format.
 
 ### Ready-made examples for common settings
 
-`Examples/` also has ready-made sections for common Windows settings. Copy their entries into your configuration, or point to them like a shared file, such as `"RegistryKeys": ["Shared\\RegistryKeys Common.json", "Examples\\RegistryKeys Explorer.json"]`:
+`Shared/Examples/` also has ready-made sections for common Windows settings. Copy their entries into your configuration, or point to them like any shared file, such as `"RegistryKeys": ["Shared\\Examples\\RegistryKeys Common.json", "Shared\\Examples\\RegistryKeys Explorer.json"]`:
 
 | File | What it does |
 | ---- | ------------ |
@@ -137,7 +136,7 @@ Some sections can't be fully captured automatically, so exporting them only give
 
 The `HKCU` entries apply to the account running the restore; for another account, put them under `RunAsOtherUser`.
 
-File names follow one convention: `Examples\<Section>.json` shows every option of a section, `Examples\<Section> <Topic>.json` and `Shared\<Section> <Topic>.json` are ready-made sections, and the example configurations are in `Configurations\Examples\`, all in Title Case.
+File names follow one convention: `Shared\Examples\<Section>.json` shows every option of a section, `Shared\Examples\<Section> <Topic>.json` and your own `Shared\<Section> <Topic>.json` are ready-made sections, and the example configurations are in `Configurations\Examples\`, all in Title Case.
 
 The example configurations show how the sections fit together. They change the PC they are restored on, except `Combined Sections`; besides `PC1`, `Prompted Setup` and `Combined Sections`, described further on, there are:
 
@@ -152,7 +151,7 @@ Instead of writing a section inline, you can point to a file. The path is relati
 
 ```json
 "Items": {
-  "UserAccounts": "Shared\\UserAccounts Kiosk.json"
+  "UserAccounts": "Shared\\Examples\\UserAccounts Kiosk.json"
 }
 ```
 
@@ -176,7 +175,7 @@ The files are combined in the order you list them:
 
 Name a shared file after its section, such as `Shared\SmbShares Common.json`, so Visual Studio Code shows the hints for that section while you edit it (see [Editing with autocomplete](#editing-with-autocomplete)).
 
-See [Configurations/Examples/Combined Sections.json](Configurations/Examples/Combined%20Sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares Common.json` with the shares of every PC and `Shared\SmbShares Kiosk.json` with the extra kiosk shares.
+See [Configurations/Examples/Combined Sections.json](Configurations/Examples/Combined%20Sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\Examples\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares Common.json` with the shares of every PC and `Shared\SmbShares Kiosk.json` with the extra kiosk shares.
 
 ### Password and lockout policy
 
@@ -266,7 +265,7 @@ Use `Action: "Remove"` in `UserAccounts` instead of a custom removal script:
 - Run as administrator. Removal cannot be undone by this tool; review the
   names before restoring.
 
-See [Examples/UserAccounts.json](Examples/UserAccounts.json) for a mixed
+See [Shared/Examples/UserAccounts.json](Shared/Examples/UserAccounts.json) for a mixed
 create/update/removal example. Exports still capture only existing accounts
 for creation or update; they never generate removal actions.
 
@@ -493,13 +492,13 @@ Installers in `Software` → `Install` work the same way. `0` means success, and
 
 ### Example: Dell driver updates after a restore
 
-[Examples/StartCustomScriptsAfter.json](Examples/StartCustomScriptsAfter.json)
+[Shared/Examples/StartCustomScriptsAfter.json](Shared/Examples/StartCustomScriptsAfter.json)
 runs [Files/Update Dell drivers.ps1](Files/Update%20Dell%20drivers.ps1) after the
 other restore sections. This example is opt-in; it is not enabled in the
 shipped configurations. Add this entry inside your configuration's `Items`:
 
 ```json
-"StartCustomScriptsAfter": "Examples\\StartCustomScriptsAfter.json"
+"StartCustomScriptsAfter": "Shared\\Examples\\StartCustomScriptsAfter.json"
 ```
 
 - Install Dell Command Update first, either beforehand or through
@@ -567,7 +566,7 @@ The tool follows the processes an installer starts by checking every 50 ms for t
 
 Every configuration starts with `"$schema": "../Engine/Schemas/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works; in a subfolder such as `Configurations/Examples/` it is `../../Engine/Schemas/config.schema.json`.
 
-Section files can't have that line, so `.vscode/settings.json` tells Visual Studio Code which schema in `Engine/Schemas/` belongs to which file, by its name: `Examples/RegistryKeys.json`, `Examples/RegistryKeys <anything>.json` and `Shared/RegistryKeys <anything>.json` get the `RegistryKeys` hints, and the same for every other section. Open the computer-snapshot folder itself in Visual Studio Code for this, and name a new shared file after its section, such as `Shared\RegistryKeys Office.json`, to get the hints there too.
+Section files can't have that line, so `.vscode/settings.json` tells Visual Studio Code which schema in `Engine/Schemas/` belongs to which file, by its name: every file in `Shared/` or one of its subfolders named `RegistryKeys.json` or `RegistryKeys <anything>.json` gets the `RegistryKeys` hints, and the same for every other section. Open the computer-snapshot folder itself in Visual Studio Code for this, and name a new shared file after its section, such as `Shared\RegistryKeys Office.json`, to get the hints there too.
 
 > **🔒 Important Security Warning:**
 > When you save settings that include passwords (like user accounts or certain registry keys), **they are saved in plain text**. Please keep your USB stick physically secure, and never upload files containing sensitive passwords to public spaces. Where possible, use a `{{password:...}}` placeholder instead, so the password is asked for during the restore and never stored (see [Restore-Time Input](#restore-time-input)).

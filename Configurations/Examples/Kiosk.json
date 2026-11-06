@@ -54,8 +54,8 @@
       "HibernateEnabled": false
     },
     "RegistryKeys": [
-      "Examples\\RegistryKeys Auto Logon.json",
-      "Examples\\RegistryKeys Windows Suggestions.json"
+      "Shared\\Examples\\RegistryKeys Auto Logon.json",
+      "Shared\\Examples\\RegistryKeys Windows Suggestions.json"
     ],
     "Services": [
       {

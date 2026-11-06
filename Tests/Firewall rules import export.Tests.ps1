@@ -36,7 +36,7 @@ Describe 'Firewall rules import errors' {
     It 'creates the bundled example rule, which leaves most settings empty' {
         $data = @(
             Get-Content -Raw -LiteralPath (
-                "$PSScriptRoot\..\Examples\FirewallRules.json"
+                "$PSScriptRoot\..\Shared\Examples\FirewallRules.json"
             ) | ConvertFrom-Json
         )
 

@@ -8,7 +8,7 @@ Describe 'Dell driver update example' {
             'Engine\Scripts\Start custom scripts import export.ps1'
         )
         $data = Get-Content -Raw -LiteralPath (
-            Join-Path $root 'Examples\StartCustomScriptsAfter.json'
+            Join-Path $root 'Shared\Examples\StartCustomScriptsAfter.json'
         ) | ConvertFrom-Json
     }
     BeforeEach {

@@ -71,7 +71,7 @@ if ($Action -eq 'Export') {
 
     $messages.Insert(0, (
             'Nothing to export: add the folders to create, see ' +
-            'Examples\CreateFolders.json'
+            'Shared\Examples\CreateFolders.json'
         ))
 }
 else {

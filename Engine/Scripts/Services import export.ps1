@@ -87,7 +87,7 @@ if ($Action -eq 'Export') {
     $exportData = @()
     $messages.Add(
         'Nothing to export: add the services to configure, see ' +
-        'Examples\Services.json'
+        'Shared\Examples\Services.json'
     )
     #endregion
 }

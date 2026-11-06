@@ -433,7 +433,7 @@ if ($Action -eq 'Export') {
 
     $messages.Add(
         'Nothing to export: add the registry values to set, see ' +
-        'Examples\RegistryKeys.json'
+        'Shared\Examples\RegistryKeys.json'
     )
 }
 else {

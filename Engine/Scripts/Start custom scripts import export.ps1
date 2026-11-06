@@ -114,7 +114,7 @@ if ($Action -eq 'Export') {
     #endregion
     $messages.Add(
         'Custom scripts cannot be exported; add your own scripts to the ' +
-        'configuration, see Examples\StartCustomScriptsBefore.json'
+        'configuration, see Shared\Examples\StartCustomScriptsBefore.json'
     )
 }
 else {

@@ -1,6 +1,6 @@
 [
   {
-    "Comment": "The built-in Windows rule, enabled for domain and private networks only, not on public networks. It replaces the existing rule with the same Name. Use it together with 'Examples\\RegistryKeys Remote Desktop.json'.",
+    "Comment": "The built-in Windows rule, enabled for domain and private networks only, not on public networks. It replaces the existing rule with the same Name. Use it together with 'Shared\\Examples\\RegistryKeys Remote Desktop.json'.",
     "Name": "RemoteDesktop-UserMode-In-TCP",
     "DisplayName": "Remote Desktop - User Mode (TCP-In)",
     "Description": "Inbound rule for the Remote Desktop service to allow RDP traffic. [TCP 3389]",

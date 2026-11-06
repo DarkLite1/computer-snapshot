@@ -193,7 +193,7 @@ if ($Action -eq 'Export') {
 
     $messages.Insert(0, (
             'Nothing to export: add the files and folders to copy, see ' +
-            'Examples\CopyFilesFolders.json'
+            'Shared\Examples\CopyFilesFolders.json'
         ))
 }
 else {

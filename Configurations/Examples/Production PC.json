@@ -90,7 +90,7 @@
         "TaskName": "Clean up exports",
         "TaskPath": "\\HC\\",
         "Enabled": true,
-        "XmlFile": "Examples\\ScheduledTasks Example Task.xml",
+        "XmlFile": "Shared\\Examples\\ScheduledTasks Example Task.xml",
         "RunAsUser": "operator",
         "RunAsPassword": "{{password:Password of the operator account}}"
       }

@@ -17,7 +17,7 @@
         ]
       }
     ],
-    "FirewallRules": "Examples\\FirewallRules Remote Desktop.json",
+    "FirewallRules": "Shared\\Examples\\FirewallRules Remote Desktop.json",
     "NetworkCards": [
       {
         "Comment": "The firewall rules only allow domain and private networks. Fails on a PC with several wired cards: use Description or Name then.",
@@ -29,6 +29,6 @@
         }
       }
     ],
-    "RegistryKeys": "Examples\\RegistryKeys Remote Desktop.json"
+    "RegistryKeys": "Shared\\Examples\\RegistryKeys Remote Desktop.json"
   }
 }

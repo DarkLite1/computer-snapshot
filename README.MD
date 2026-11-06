@@ -61,13 +61,13 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
 
 ## 🔗 Shortcuts
 
-| Shortcut                           | What it does                                                                                               |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `Start wizard.lnk`                 | Opens the graphical wizard for exporting and restoring.                                                    |
-| `_Start example confirm first.lnk` | Restores `Configurations\Examples\PC1.json` after asking you to confirm with `y`.                         |
-| `_Start example immediately.lnk`   | Restores `Configurations\Examples\PC1.json` straight away, without asking.                                |
+| Shortcut                                                      | What it does                                                                        |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `Start wizard.lnk`                                            | Opens the graphical wizard for exporting and restoring.                             |
+| `Configurations\Examples\Restore PC1 Confirm First.lnk`       | Restores `Configurations\Examples\PC1.json` after asking you to confirm with `y`.   |
+| `Configurations\Examples\Restore PC1 Immediately.lnk`         | Restores `Configurations\Examples\PC1.json` straight away, without asking.          |
 
-Copy one of the `_Start example` shortcuts and change the `-ConfigurationFile` path to make a one-click restore for your own configuration.
+Copy one of the `Restore PC1` shortcuts next to your own configuration and change its `-ConfigurationFile` path to make a one-click restore for it. The shortcut finds the tool relative to its own folder: `..\..\Engine\Scripts\Invoke configuration.ps1` from `Configurations\Examples`, `..\Engine\Scripts\Invoke configuration.ps1` from `Configurations`.
 
 ## 📂 Know Your Folders
 
@@ -79,8 +79,7 @@ Your USB stick has a specific layout to keep everything organized. Here are the 
 - **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers. `Shared/Examples/` holds ready-made sample data for every section; copy what you need, or point to it from your own configuration.
 - **`Log/`**: Check here for your execution reports.
 - **`Answers/`**: Answer files, also in subfolders such as `Answers/Kiosk/Brussels/`. `Answers/Examples/` holds examples; Git ignores everything else in this folder, because answer files can contain passwords.
-- **`Engine/`**: The tool itself; don't change anything here. `Engine/Scripts/` holds the scripts, `Engine/Common/` their shared code and `Engine/Schemas/` the schemas that give editors their hints.
-- **`Tests/`**: Automated Pester tests for developers (see [Running the Tests](#-running-the-tests)).
+- **`Engine/`**: The tool itself; don't change anything here. `Engine/Scripts/` holds the scripts, `Engine/Common/` their shared code, `Engine/Schemas/` the schemas that give editors their hints, and `Engine/Tests/` the automated Pester tests for developers (see [Running the Tests](#-running-the-tests)).
 
 ## ✍️ Customizing Your Setups
 
@@ -825,7 +824,7 @@ The tests use Pester 6. They mock all Windows changes and only create files in a
 
 ```powershell
 Install-Module Pester -MinimumVersion 6.0.0 -Scope CurrentUser
-Invoke-Pester -Path .\Tests
+Invoke-Pester -Path .\Engine\Tests
 ```
 
 **Windows PowerShell 5.1:** Windows ships with the old Pester 3.4.0, and PowerShell 7 keeps its modules in a separate folder, so install Pester 6 again from a Windows PowerShell window. `-SkipPublisherCheck` is needed because the built-in Pester is signed by a different publisher:
@@ -833,7 +832,7 @@ Invoke-Pester -Path .\Tests
 ```powershell
 Install-Module Pester -MinimumVersion 6.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
 Import-Module Pester -MinimumVersion 6.0.0 -Force
-Invoke-Pester -Path .\Tests
+Invoke-Pester -Path .\Engine\Tests
 ```
 
 Always import Pester 6 explicitly in Windows PowerShell; otherwise `Invoke-Pester` can load 3.4.0, and every test file fails with *the following modules that are specified by the "#requires" statements of the script are missing: Pester*.

@@ -27,6 +27,9 @@
 .PARAMETER AnswerPipe
     The named pipe on which the wizard serves the answers of its questions
     page. When they cannot be received, the restore asks for them.
+.PARAMETER SkipSoftwareInstall
+    The Software.Install entries not to run, by their position from 0, such
+    as the ones unchecked in the wizard.
 .PARAMETER Unattended
     Skip confirmation, fail on missing answers, do not open the report
     browser, and fail without administrator rights instead of requesting
@@ -46,6 +49,7 @@ param(
     [bool]$OpenReportInBrowser,
     [string]$AnswerFile,
     [string]$AnswerPipe,
+    [int[]]$SkipSoftwareInstall,
     [switch]$Unattended
 )
 Import-Module "$PSScriptRoot\Common\Configuration.psm1" -Force
@@ -187,6 +191,9 @@ if (
     if ($PSBoundParameters.ContainsKey('AnswerPipe')) {
         $command += " -AnswerPipe '" + $AnswerPipe.Replace("'", "''") + "'"
     }
+    if ($SkipSoftwareInstall.Count) {
+        $command += " -SkipSoftwareInstall @($($SkipSoftwareInstall -join ','))"
+    }
     $encodedCommand = [Convert]::ToBase64String(
         [Text.Encoding]::Unicode.GetBytes($command)
     )
@@ -213,7 +220,7 @@ if ($PSBoundParameters.ContainsKey('AnswerFile')) {
 }
 $settings = @(
     'RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser',
-    'AnswerPipe', 'Unattended'
+    'AnswerPipe', 'SkipSoftwareInstall', 'Unattended'
 )
 foreach ($setting in $settings) {
     if ($PSBoundParameters.ContainsKey($setting)) {

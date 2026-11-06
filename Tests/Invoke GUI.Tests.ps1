@@ -402,6 +402,36 @@ Describe 'Single-file wizard commands' {
         { Start-ConfigurationJobHC @exportParams } |
             Should -Throw '*restore-only*'
     }
+    It ('passes the unchecked installers to the restore, and refuses them ' +
+        'on export') {
+        $testFile = Join-Path $TestDrive 'Example.json'
+        '{}' | Set-Content -LiteralPath $testFile
+        $params = @{
+            Action              = 'RestoreSnapshot'
+            RootFolder          = $TestDrive
+            ConfigurationFile   = $testFile
+            SkipSoftwareInstall = @(1, 3)
+        }
+
+        Start-ConfigurationJobHC @params
+
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString(
+                [Convert]::FromBase64String($ArgumentList[-1])
+            )
+            $command.Contains(' -SkipSoftwareInstall @(1,3)')
+        }
+
+        $exportParams = @{
+            Action              = 'CreateSnapshot'
+            RootFolder          = $TestDrive
+            Name                = 'Example'
+            Items               = 'Software'
+            SkipSoftwareInstall = @(1)
+        }
+        { Start-ConfigurationJobHC @exportParams } |
+            Should -Throw '*restore-only*'
+    }
     It 'rejects an empty restore selection before launching' {
         $testFile = Join-Path $TestDrive 'Example.json'
         '{}' | Set-Content -LiteralPath $testFile
@@ -1288,6 +1318,93 @@ Describe 'Restore wizard' {
 
         $next.PerformClick()
         $reload.Visible | Should -BeFalse
+    }
+    It ('lists the installers under Software to uncheck, hides the ' +
+        'questions of an unchecked one and leaves it out of the restore') {
+        $null = New-Item -Path "$root\Software" -ItemType Directory
+        foreach ($file in @('a.exe', 'b.exe', 'c.exe')) {
+            $null = New-Item -Path "$root\Software\$file" -ItemType File
+        }
+        Write-TestJsonHC "$root\Configurations\Software.json" ([ordered]@{
+                SchemaVersion = 3
+                Items         = [ordered]@{
+                    UserAccounts = @([ordered]@{ Name = '{{input:Account}}' })
+                    Software     = [ordered]@{
+                        Install = @(
+                            [ordered]@{ ExecutablePath = 'Software\a.exe' }
+                            [ordered]@{
+                                ExecutablePath = 'Software\b.exe'
+                                Arguments      = '/S'
+                                TimeoutMinutes = '{{number:Minutes for b}}'
+                            }
+                        )
+                    }
+                }
+            })
+        Write-TestJsonHC "$root\Configurations\Installers.json" ([ordered]@{
+                SchemaVersion = 3
+                Items         = [ordered]@{
+                    Software = [ordered]@{
+                        Install = @(
+                            [ordered]@{ ExecutablePath = 'Software\c.exe' }
+                        )
+                    }
+                }
+            })
+        (& $find 'RefreshConfigurations').PerformClick()
+        & $chooseConfiguration 'Software'
+        $next.PerformClick()
+        $next.PerformClick()
+
+        $grid = $wizard.Tag.AnswerGrid
+        $installers = @($grid.Rows | Where-Object { $_.Tag.Software })
+        @($installers | ForEach-Object { $_.Cells[0].Value }) |
+            Should -Be @('Install a.exe', 'Install b.exe /S')
+        @($installers | ForEach-Object { $_.Cells[1].Value }) |
+            Should -Be @($true, $true)
+        $minutes = $grid.Rows | Where-Object {
+            $_.Tag.Question.Placeholder -eq '{{number:Minutes for b}}'
+        }
+        $minutes.Index | Should -BeLessThan $installers[0].Index
+        (& $find 'AnswerGridSummary').Text |
+            Should -Be ('2 of 2 answer(s) still needed; ' +
+                '2 of 2 installer(s) checked')
+
+        (& $answerRows)[0].Cells[1].Value = 'kiosk'
+        $installers[1].Cells[1].Value = $false
+
+        $minutes.Visible | Should -BeFalse
+        $installers[1].Cells[2].Value | Should -Be 'Not installed'
+        (& $find 'AnswerGridSummary').Text |
+            Should -Be 'All answers are valid; 1 of 2 installer(s) checked'
+        $next.Enabled | Should -BeTrue
+        $next.PerformClick()
+
+        $review = & $find 'ReviewAnswers'
+        @($review.Items | Where-Object { $_.Group.Header -eq 'Software' } |
+            ForEach-Object { $_.SubItems[1].Text }) |
+            Should -Be @('Installs', 'Not installed')
+        $next.PerformClick()
+
+        Should -Invoke Start-ConfigurationJobHC @once -ParameterFilter {
+            ($SkipSoftwareInstall -join ',') -eq '1' -and
+            $AnswerPipe -eq 'ComputerSnapshot-test'
+        }
+
+        # Without questions, the step only chooses the installers
+        & $chooseConfiguration 'Installers'
+        $next.PerformClick()
+        (& $find 'WizardStepTitle').Text |
+            Should -Be 'Step 3: Choose the software to install'
+        $rows = $wizard.Tag.AnswerGrid.Rows
+        @($rows | Where-Object { $_.Tag.Software }).Count | Should -Be 1
+        $next.PerformClick()
+        $next.PerformClick()
+        Should -Invoke Start-ConfigurationJobHC -Times 2 -Exactly
+        Should -Invoke Start-ConfigurationJobHC @once -ParameterFilter {
+            $ConfigurationFile -like '*\Installers.json' -and
+            -not $SkipSoftwareInstall
+        }
     }
     It ('shows the questions as an editable list like the review and ' +
         'checks each answer while it is typed') {

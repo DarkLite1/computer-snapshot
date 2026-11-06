@@ -31,8 +31,12 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
       you type, and where a valid answer comes from. **Reload answer file**
       reads the file again (also after you edited it) and puts its answers
       back, for example after choosing the wrong file first; answers you
-      typed for questions the file leaves open are kept. Skipped when
-      Unattended is checked.
+      typed for questions the file leaves open are kept. When **Software**
+      is checked, its installers are listed under Software with a check box:
+      uncheck one to leave it out of this restore; the questions only that
+      installer uses are then hidden and not asked. Without other questions
+      this step is called **Choose the software to install**. Skipped when
+      Unattended is checked; then every installer runs.
    5. **Review:** a card shows the configuration, the answer file, the
       restart, the report and, when checked, Unattended. Below it every
       checked section is listed in run order with its answers and where each

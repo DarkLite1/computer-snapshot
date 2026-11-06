@@ -441,6 +441,73 @@ function Get-WizardRestoreQuestionsHC {
     Get-RestoreInputQuestionHC -Fields $fields -Answers $answers
 }
 
+function Get-WizardSoftwareInstallHC {
+    <#
+    .SYNOPSIS
+        The Software.Install entries of a configuration, to check or
+        uncheck in the questions step: their position from 0, a label and
+        the comment of the entry.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ConfigurationFile,
+        [Parameter(Mandatory)][string]$RootFolder
+    )
+
+    if (-not (Get-Command Read-ConfigurationHC -ErrorAction Ignore)) {
+        Import-Module "$PSScriptRoot\Common\Configuration.psm1"
+    }
+
+    $readParams = @{
+        Path       = $ConfigurationFile
+        RootFolder = $RootFolder
+        Items      = 'Software'
+    }
+    $configuration = Read-ConfigurationHC @readParams
+    $install = @($configuration.Items['Software'].Install)
+
+    for ($index = 0; $index -lt $install.Count; $index++) {
+        $entry = $install[$index]
+        $path = $null
+        $comment = $null
+        if ($null -ne $entry) {
+            $path = [string]$entry.ExecutablePath
+            $comment = [string]$entry.Comment
+        }
+        [pscustomobject]@{
+            Index   = $index
+            Label   = Get-SoftwareInstallLabelHC -Entry $entry
+            Path    = $path
+            Comment = $comment
+        }
+    }
+}
+
+function Test-RestoreQuestionSkippedHC {
+    <#
+    .SYNOPSIS
+        Whether a question is only used by unchecked software installers,
+        so it is not asked.
+    #>
+    param(
+        [Parameter(Mandatory)]$Question,
+        [int[]]$Skip
+    )
+
+    if (-not $Skip.Count -or -not @($Question.Paths).Count) {
+        return $false
+    }
+
+    foreach ($path in $Question.Paths) {
+        if ($path -notmatch '^Items\.Software\.Install\[(\d+)\]') {
+            return $false
+        }
+        if ([int]$Matches[1] -notin $Skip) {
+            return $false
+        }
+    }
+    $true
+}
+
 function Confirm-WizardTaskFolderHC {
     param([string[]]$Folders, $Owner)
 
@@ -1020,6 +1087,9 @@ function Show-RestoreWizardStepHC {
         Questions     = 'Answer the questions'
         Review        = 'Review and restore'
     }
+    if (-not @($state.Questions).Count) {
+        $titles.Questions = 'Choose the software to install'
+    }
 
     foreach ($name in $titles.Keys) {
         (Find-RestoreWizardControlHC $Wizard "${name}Step").Visible =
@@ -1175,6 +1245,8 @@ function Set-RestoreWizardConfigurationHC {
     $state.FileAnswers = $null
     $state.Answers = $null
     $state.AnswerGrid = $null
+    $state.Software = @()
+    $state.SoftwareSkip = @()
 }
 
 function Update-RestoreAnswerFileListHC {
@@ -1398,12 +1470,37 @@ function Get-RestoreAnswerGridValueHC {
     [string]$Row.Cells[1].Value
 }
 
+function Get-RestoreAnswerGridSkipHC {
+    # The software installers unchecked in the answer list, from 0
+    param(
+        [Parameter(Mandatory)][AllowNull()]$Grid
+    )
+
+    if ($null -eq $Grid) {
+        return , @()
+    }
+
+    $skip = @(
+        foreach ($row in $Grid.Rows) {
+            if ($null -ne $row.Tag -and $null -ne $row.Tag.Software) {
+                if ($row.Cells[1].Value -ne $true) {
+                    [int]$row.Tag.Software.Index
+                }
+            }
+        }
+    )
+    return , [int[]]$skip
+}
+
 function Update-RestoreAnswerGridHC {
     <#
     .SYNOPSIS
         Check every answer in the answer list, say what is expected or wrong
         in the Check column, and enable the confirm button only when every
         answer is valid.
+    .DESCRIPTION
+        A question that only an unchecked software installer uses is hidden
+        and not checked: it is not asked.
     #>
     param(
         [Parameter(Mandatory)][AllowNull()]$Grid
@@ -1415,6 +1512,9 @@ function Update-RestoreAnswerGridHC {
 
     $invalid = 0
     $total = 0
+    $installers = 0
+    $installing = 0
+    $skip = Get-RestoreAnswerGridSkipHC -Grid $Grid
 
     foreach ($row in $Grid.Rows) {
         $state = $row.Tag
@@ -1422,8 +1522,38 @@ function Update-RestoreAnswerGridHC {
             continue
         }
 
-        $total++
+        if ($null -ne $state.Software) {
+            $installers++
+            $check = $row.Cells[2]
+            if ($row.Cells[1].Value -eq $true) {
+                $installing++
+                $check.Value = "$([char]0x2713) Installs"
+                $check.Style.ForeColor = [Drawing.Color]::SeaGreen
+            }
+            else {
+                $check.Value = 'Not installed'
+                $check.Style.ForeColor = [Drawing.Color]::DimGray
+            }
+            continue
+        }
+
         $question = $state.Question
+        $skipped = Test-RestoreQuestionSkippedHC -Question $question -Skip (
+            $skip
+        )
+        if ($row.Visible -eq $skipped) {
+            # A hidden row can not hold the current cell
+            if ($skipped -and $null -ne $Grid.CurrentCell -and
+                $Grid.CurrentCell.RowIndex -eq $row.Index) {
+                $Grid.CurrentCell = $null
+            }
+            $row.Visible = -not $skipped
+        }
+        if ($skipped) {
+            continue
+        }
+
+        $total++
         $value = Get-RestoreAnswerGridValueHC -Grid $Grid -Row $row
         $problemParams = @{
             Kind  = $question.Kind
@@ -1470,12 +1600,18 @@ function Update-RestoreAnswerGridHC {
         $Grid.Tag.Confirm.Enabled = $invalid -eq 0
     }
     if ($null -ne $Grid.Tag.Summary) {
-        $Grid.Tag.Summary.Text = if ($invalid) {
-            "$invalid of $total answer(s) still needed"
-        }
-        else {
-            'All answers are valid'
-        }
+        $summary = @(
+            if ($invalid) {
+                "$invalid of $total answer(s) still needed"
+            }
+            elseif ($total) {
+                'All answers are valid'
+            }
+            if ($installers) {
+                "$installing of $installers installer(s) checked"
+            }
+        )
+        $Grid.Tag.Summary.Text = $summary -join '; '
     }
 }
 
@@ -1493,7 +1629,7 @@ function Get-RestoreAnswerGridValuesHC {
     $values = New-Object $dictionaryType ([StringComparer]::Ordinal)
 
     foreach ($row in $Grid.Rows) {
-        if ($null -ne $row.Tag) {
+        if ($null -ne $row.Tag.Question) {
             $values[$row.Tag.Question.Placeholder] = [string]$row.Cells[1].Value
         }
     }
@@ -1516,7 +1652,7 @@ function Get-RestoreAnswerGridChangesHC {
 
     foreach ($row in $Grid.Rows) {
         $state = $row.Tag
-        if ($null -eq $state) {
+        if ($null -eq $state.Question) {
             continue
         }
 
@@ -1548,7 +1684,7 @@ function Clear-RestoreAnswerGridHC {
     }
 
     foreach ($row in $Grid.Rows) {
-        if ($null -ne $row.Tag) {
+        if ($null -ne $row.Tag.Question) {
             $row.Cells[1].Value = $null
         }
     }
@@ -1567,10 +1703,14 @@ function New-RestoreAnswerGridHC {
         that counts the answers still needed.
     #>
     param(
-        [Parameter(Mandatory)][object[]]$Questions,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Questions,
         [System.Collections.IDictionary]$Values,
         # The answers of the answer file; they can be changed in the list
         [System.Collections.IDictionary]$FileValues,
+        # Software.Install entries to check or uncheck, and the unchecked
+        # ones by their position from 0
+        [object[]]$Software,
+        [int[]]$Skip,
         [Drawing.Font]$Font = (New-Object Drawing.Font 'Segoe UI', 10)
     )
 
@@ -1621,17 +1761,54 @@ function New-RestoreAnswerGridHC {
 
     $headerFont = New-Object Drawing.Font $Font, ([Drawing.FontStyle]::Bold)
     $section = $null
+    $labels = Get-SnapshotSectionLabelsHC
+    $softwareSection = $labels['Software'][0]
+    $afterSoftware = $labels['StartCustomScriptsAfter'][0]
+    $softwareAdded = -not @($Software).Count
+
+    # Dot-sourced, so $section follows the rows that are added
+    $addHeader = {
+        param([string]$Name)
+        $section = $Name
+        $index = $grid.Rows.Add($Name, '', '')
+        $header = $grid.Rows[$index]
+        $header.ReadOnly = $true
+        $header.DefaultCellStyle.Font = $headerFont
+        $header.DefaultCellStyle.ForeColor = [Drawing.Color]::DarkSlateBlue
+        $header.DefaultCellStyle.SelectionForeColor =
+            [Drawing.Color]::DarkSlateBlue
+    }
+
+    # A check box per installer, under the questions of Software
+    $addSoftware = {
+        if ($section -ne $softwareSection) {
+            . $addHeader $softwareSection
+        }
+        foreach ($entry in $Software) {
+            $index = $grid.Rows.Add("Install $($entry.Label)", $null, '')
+            $row = $grid.Rows[$index]
+            $cell = New-Object Windows.Forms.DataGridViewCheckBoxCell
+            $row.Cells[1] = $cell
+            $cell.Value = $entry.Index -notin $Skip
+            $tip = $entry.Path
+            if ($entry.Comment) {
+                $tip += [Environment]::NewLine + $entry.Comment
+            }
+            $row.Cells[0].ToolTipText = $tip
+            $row.Tag = @{
+                Software = $entry
+                Touched  = $true
+            }
+        }
+        $softwareAdded = $true
+    }
 
     foreach ($question in $Questions) {
+        if (-not $softwareAdded -and $question.Section -eq $afterSoftware) {
+            . $addSoftware
+        }
         if ($question.Section -ne $section) {
-            $section = $question.Section
-            $index = $grid.Rows.Add($section, '', '')
-            $header = $grid.Rows[$index]
-            $header.ReadOnly = $true
-            $header.DefaultCellStyle.Font = $headerFont
-            $header.DefaultCellStyle.ForeColor = [Drawing.Color]::DarkSlateBlue
-            $header.DefaultCellStyle.SelectionForeColor =
-                [Drawing.Color]::DarkSlateBlue
+            . $addHeader $question.Section
         }
 
         $value = $null
@@ -1675,6 +1852,10 @@ function New-RestoreAnswerGridHC {
             FileValue = $fileValue
             Touched   = [bool]$value
         }
+    }
+
+    if (-not $softwareAdded) {
+        . $addSoftware
     }
 
     # Never show a password, nor how long it is
@@ -1721,7 +1902,10 @@ function New-RestoreAnswerGridHC {
         }
     })
     $grid.Add_CurrentCellDirtyStateChanged({
-        if ($this.CurrentCell -is [Windows.Forms.DataGridViewComboBoxCell]) {
+        if (
+            $this.CurrentCell -is [Windows.Forms.DataGridViewComboBoxCell] -or
+            $this.CurrentCell -is [Windows.Forms.DataGridViewCheckBoxCell]
+        ) {
             $null = $this.CommitEdit('CurrentCellChange')
         }
     })
@@ -1761,7 +1945,7 @@ function Set-RestoreWizardQuestionsHC {
     #>
     param(
         [Parameter(Mandatory)]$Wizard,
-        [Parameter(Mandatory)][object[]]$Questions,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Questions,
         [switch]$FromAnswerFile
     )
 
@@ -1769,8 +1953,12 @@ function Set-RestoreWizardQuestionsHC {
     $gridHost = Find-RestoreWizardControlHC $Wizard 'AnswerGridHost'
     $earlier = $null
 
-    # Keep what was typed or changed; the rest comes from the answer file
+    # Keep what was typed or changed, and the unchecked installers; the
+    # rest comes from the answer file
     if ($null -ne $state.AnswerGrid) {
+        $state.SoftwareSkip = Get-RestoreAnswerGridSkipHC -Grid (
+            $state.AnswerGrid
+        )
         $earlier = Get-RestoreAnswerGridChangesHC -Grid $state.AnswerGrid
         Clear-RestoreAnswerGridHC -Grid $state.AnswerGrid
         $gridHost.Controls.Remove($state.AnswerGrid)
@@ -1789,6 +1977,8 @@ function Set-RestoreWizardQuestionsHC {
         Questions  = $Questions
         Values     = $earlier
         FileValues = $state.FileAnswers
+        Software   = $state.Software
+        Skip       = $state.SoftwareSkip
         Font       = $Wizard.Font
     }
     $state.AnswerGrid = New-RestoreAnswerGridHC @gridParams
@@ -1797,6 +1987,23 @@ function Set-RestoreWizardQuestionsHC {
     )
     $gridHost.Controls.Add($state.AnswerGrid)
     Update-RestoreAnswerGridHC -Grid $state.AnswerGrid
+
+    $guidance = @(
+        if ($Questions.Count) {
+            'Answer the questions of the checked sections. Click an answer ' +
+            'to type it or choose it from the list. Answers from the ' +
+            'answer file can be changed for this restore only; the file ' +
+            'stays unchanged. Reload answer file reads the file again and ' +
+            'puts its answers back.'
+        }
+        if (@($state.Software).Count) {
+            'Under Software, uncheck an installer to leave it out of this ' +
+            'restore; its questions are then not asked.'
+        }
+        'Click Back to change the sections; your changes are kept.'
+    )
+    (Find-RestoreWizardControlHC $Wizard 'QuestionsGuidance').Text =
+        $guidance -join ' '
 
     if ($null -ne $earlier) {
         $earlier.Clear()
@@ -1893,20 +2100,53 @@ function Update-RestoreWizardReviewHC {
         $list.Groups.Clear()
 
         # Every checked section, in the order the sections run
+        $skip = @()
+        if (-not $unattended) {
+            $skip = @($state.SoftwareSkip)
+        }
         foreach ($key in $state.Items) {
             $section = $labels[$key][0]
             $group = New-Object Windows.Forms.ListViewGroup $section
             $null = $list.Groups.Add($group)
             $questions = @(
-                $state.Questions | Where-Object { $_.Section -eq $section }
+                $state.Questions | Where-Object {
+                    $skipParams = @{
+                        Question = $_
+                        Skip     = $skip
+                    }
+                    $_.Section -eq $section -and
+                    -not (Test-RestoreQuestionSkippedHC @skipParams)
+                }
             )
+            $installers = @()
+            if ($key -eq 'Software') {
+                $installers = @($state.Software)
+            }
 
-            if (-not $questions.Count) {
+            if (-not $questions.Count -and -not $installers.Count) {
                 $item = New-Object Windows.Forms.ListViewItem 'No questions'
                 $item.ForeColor = [Drawing.SystemColors]::GrayText
                 $item.Group = $group
                 $null = $list.Items.Add($item)
                 continue
+            }
+
+            foreach ($installer in $installers) {
+                $install = $installer.Index -notin $skip
+                $item = New-Object Windows.Forms.ListViewItem (
+                    "Install $($installer.Label)"
+                )
+                $answer = 'Not installed'
+                if ($install) {
+                    $answer = 'Installs'
+                }
+                else {
+                    $item.ForeColor = [Drawing.SystemColors]::GrayText
+                }
+                $null = $item.SubItems.Add($answer)
+                $null = $item.SubItems.Add('Software list')
+                $item.Group = $group
+                $null = $list.Items.Add($item)
             }
 
             foreach ($question in $questions) {
@@ -1976,6 +2216,14 @@ function Start-RestoreWizardJobHC {
     }
     if ($state.AnswerFile) {
         $restoreOptions.AnswerFile = $state.AnswerFile
+    }
+    # Unattended asks nothing, so every installer runs
+    if (
+        -not $restoreOptions.Unattended -and
+        $state.Items -contains 'Software' -and
+        @($state.SoftwareSkip).Count
+    ) {
+        $restoreOptions.SkipSoftwareInstall = $state.SoftwareSkip
     }
 
     $server = $null
@@ -2056,6 +2304,16 @@ function Invoke-RestoreWizardNextHC {
             }
             $state.Questions = @(Get-WizardRestoreQuestionsHC @questionParams)
             $state.Items = $checked
+            $state.Software = @()
+            if ($checked -contains 'Software') {
+                $softwareParams = @{
+                    ConfigurationFile = $state.ConfigurationFile
+                    RootFolder        = $state.RootFolder
+                }
+                $state.Software = @(
+                    Get-WizardSoftwareInstallHC @softwareParams
+                )
+            }
 
             if ($state.Questions.Count) {
                 # Fill the list once it is shown, so its selection holds
@@ -2067,6 +2325,19 @@ function Invoke-RestoreWizardNextHC {
             $state.AnswerFile = $null
             $state.FileAnswers = $null
             $state.Answers = $null
+
+            # Nothing to ask, but the installers can still be chosen
+            $unattended = (& $find 'Unattended').Checked
+            if ($state.Software.Count -and -not $unattended) {
+                $questionParams = @{
+                    Wizard    = $Wizard
+                    Questions = @()
+                }
+                Set-RestoreWizardQuestionsHC @questionParams
+                Show-RestoreWizardStepHC -Wizard $Wizard -Step 'Questions'
+                return
+            }
+
             Update-RestoreWizardReviewHC -Wizard $Wizard
             Show-RestoreWizardStepHC -Wizard $Wizard -Step 'Review'
         }
@@ -2105,10 +2376,22 @@ function Invoke-RestoreWizardNextHC {
             }
 
             # The answer file is passed by its path, only the other answers
-            # are handed over
+            # are handed over; none for a question that is not asked
+            $state.SoftwareSkip = Get-RestoreAnswerGridSkipHC -Grid (
+                $state.AnswerGrid
+            )
             $state.Answers = Get-RestoreAnswerGridChangesHC -Grid (
                 $state.AnswerGrid
             )
+            foreach ($question in $state.Questions) {
+                $skipParams = @{
+                    Question = $question
+                    Skip     = $state.SoftwareSkip
+                }
+                if (Test-RestoreQuestionSkippedHC @skipParams) {
+                    $null = $state.Answers.Remove($question.Placeholder)
+                }
+            }
             Update-RestoreWizardReviewHC -Wizard $Wizard
             Show-RestoreWizardStepHC -Wizard $Wizard -Step 'Review'
         }
@@ -2173,6 +2456,10 @@ function New-RestoreWizardHC {
         FileAnswers       = $null
         Answers           = $null
         AnswerGrid        = $null
+        # The Software.Install entries of the configuration, and the ones
+        # unchecked, by their position from 0
+        Software          = @()
+        SoftwareSkip      = @()
         AnswerServers     = New-Object 'System.Collections.Generic.List[object]'
     }
 
@@ -2732,6 +3019,8 @@ function Start-ConfigurationJobHC {
         # The named pipe on which the wizard serves the answers of its
         # questions page
         [string]$AnswerPipe,
+        # The Software.Install entries unchecked in the wizard, from 0
+        [int[]]$SkipSoftwareInstall,
         [switch]$Unattended,
         [switch]$RunElevated,
         [switch]$Force
@@ -2739,10 +3028,13 @@ function Start-ConfigurationJobHC {
 
     if ($Action -eq 'CreateSnapshot') {
         #region Build the export command
-        if ($AnswerFile -or $AnswerPipe -or $Unattended) {
+        if (
+            $AnswerFile -or $AnswerPipe -or $Unattended -or
+            $SkipSoftwareInstall.Count
+        ) {
             throw (
-                'AnswerFile, AnswerPipe and Unattended are restore-only ' +
-                'options.'
+                'AnswerFile, AnswerPipe, SkipSoftwareInstall and Unattended ' +
+                'are restore-only options.'
             )
         }
         if (
@@ -2830,6 +3122,11 @@ function Start-ConfigurationJobHC {
         }
         if (-not [string]::IsNullOrWhiteSpace($AnswerPipe)) {
             $command += " -AnswerPipe '" + $AnswerPipe.Replace("'", "''") + "'"
+        }
+        if ($SkipSoftwareInstall.Count) {
+            $command += (
+                " -SkipSoftwareInstall @($($SkipSoftwareInstall -join ','))"
+            )
         }
         if ($Unattended) {
             $command += ' -Unattended'

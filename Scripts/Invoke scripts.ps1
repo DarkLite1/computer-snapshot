@@ -32,6 +32,9 @@
 .PARAMETER AnswerPipe
     Restore only: the named pipe on which the wizard serves the answers of its
     questions page. When they cannot be received, the restore asks for them.
+.PARAMETER SkipSoftwareInstall
+    Restore only: the Software.Install entries not to run, by their position
+    from 0, such as the ones unchecked in the wizard.
 .PARAMETER Unattended
     Restore only: fail on missing answers, suppress browser opening, and fail
     without administrator rights instead of requesting UAC.
@@ -54,6 +57,7 @@ param(
     [System.Collections.IDictionary]$ExportOptions,
     [string]$AnswerFile,
     [string]$AnswerPipe,
+    [int[]]$SkipSoftwareInstall,
     [switch]$Unattended,
     [System.Collections.IDictionary]$Script
 )
@@ -97,7 +101,8 @@ $arguments = @{
 # provides the defaults for the others
 $optionalSettings = @(
     'RebootComputer', 'RestartDelaySeconds', 'OpenReportInBrowser',
-    'ExportOptions', 'AnswerFile', 'AnswerPipe', 'Unattended'
+    'ExportOptions', 'AnswerFile', 'AnswerPipe', 'SkipSoftwareInstall',
+    'Unattended'
 )
 foreach ($setting in $optionalSettings) {
     if ($PSBoundParameters.ContainsKey($setting)) {

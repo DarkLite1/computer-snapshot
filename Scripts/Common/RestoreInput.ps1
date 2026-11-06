@@ -519,6 +519,7 @@ function Get-RestoreInputQuestionHC {
         $question = $null
 
         if ($lookup.TryGetValue($field.Placeholder, [ref]$question)) {
+            $question.Paths.Add($field.Path)
             $question.Rule = Merge-RestoreInputRuleHC $question.Rule $rule
 
             # Ask it in the section that runs first, and name the others
@@ -545,12 +546,15 @@ function Get-RestoreInputQuestionHC {
             Kind          = $field.Kind
             Description   = $field.Description
             Path          = $field.Path
+            # Every place the placeholder is used
+            Paths         = New-Object 'System.Collections.Generic.List[string]'
             Section       = $section.Name
             SectionOrder  = $section.Order
             Index         = $position
             OtherSections = New-Object 'System.Collections.Generic.List[string]'
             Rule          = $rule
         }
+        $question.Paths.Add($field.Path)
         $lookup.Add($field.Placeholder, $question)
         $questions.Add($question)
     }

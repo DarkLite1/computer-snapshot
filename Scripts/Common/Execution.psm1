@@ -270,6 +270,9 @@ function Invoke-ComputerSnapshotHC {
         # The named pipe on which the wizard serves the answers of its
         # questions page
         [string]$AnswerPipe,
+        # Restore only: the Software.Install entries not to run, by their
+        # position from 0, as unchecked in the wizard
+        [int[]]$SkipSoftwareInstall,
         [switch]$Unattended,
         [switch]$Force
     )
@@ -277,11 +280,15 @@ function Invoke-ComputerSnapshotHC {
     $restoreOnly = (
         $PSBoundParameters.ContainsKey('AnswerFile') -or
         $PSBoundParameters.ContainsKey('AnswerPipe') -or
+        $PSBoundParameters.ContainsKey('SkipSoftwareInstall') -or
         $Unattended
     )
 
     if ($Action -ne 'RestoreSnapshot' -and $restoreOnly) {
-        throw 'AnswerFile, AnswerPipe and Unattended are restore-only options.'
+        throw (
+            'AnswerFile, AnswerPipe, SkipSoftwareInstall and Unattended are ' +
+            'restore-only options.'
+        )
     }
 
     $configurationPath = Resolve-RootPathHC $ConfigurationFile $RootFolder
@@ -306,6 +313,8 @@ function Invoke-ComputerSnapshotHC {
     $problems = @()
     $configuration = $null
     $secretValues = @()
+    # Software.Install entries unchecked in the wizard, for the report
+    $skippedSoftware = @()
 
     #region Preflight
     if ($Action -eq 'RestoreSnapshot') {
@@ -329,6 +338,15 @@ function Invoke-ComputerSnapshotHC {
 
             if ($configuration.Problems.Count) {
                 throw ($configuration.Problems -join [Environment]::NewLine)
+            }
+
+            # Before the answers, so an entry that does not run asks nothing
+            if ($SkipSoftwareInstall.Count) {
+                $skipParams = @{
+                    Items = $configuration.Items
+                    Skip  = $SkipSoftwareInstall
+                }
+                $skippedSoftware = @(Skip-SoftwareInstallHC @skipParams)
             }
 
             $testParams = @{
@@ -593,11 +611,19 @@ function Invoke-ComputerSnapshotHC {
         }
 
         if ($Action -eq 'RestoreSnapshot' -and (Test-EmptySectionHC $data)) {
+            $skippedMessages = @('Nothing to do')
+            if ($name -eq 'Software' -and $skippedSoftware.Count) {
+                $skippedMessages = @(
+                    $skippedSoftware | ForEach-Object {
+                        "Not installed, unchecked in the wizard: $_"
+                    }
+                ) + $skippedMessages
+            }
             $results.Add(
                 [pscustomobject]@{
                     Name     = $name
                     Status   = 'Skipped'
-                    Messages = @('Nothing to do')
+                    Messages = $skippedMessages
                 }
             )
 
@@ -689,6 +715,12 @@ function Invoke-ComputerSnapshotHC {
         #endregion
 
         $messages = New-Object 'System.Collections.Generic.List[string]'
+
+        if ($name -eq 'Software') {
+            foreach ($label in $skippedSoftware) {
+                $messages.Add("Not installed, unchecked in the wizard: $label")
+            }
+        }
 
         if ($isValidResult) {
             foreach ($message in $output[0].Messages) {

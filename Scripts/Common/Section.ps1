@@ -48,6 +48,89 @@ function Get-EmptySectionValueHC {
     , @()
 }
 
+function Get-SoftwareInstallLabelHC {
+    # How an install entry is shown: the installer file and its arguments
+    param(
+        [Parameter(Mandatory)][AllowNull()]$Entry
+    )
+
+    if ($null -eq $Entry) {
+        return '(empty entry)'
+    }
+
+    $label = $null
+    if ($Entry.ExecutablePath) {
+        $label = Split-Path -Path ([string]$Entry.ExecutablePath) -Leaf
+    }
+    if (-not $label) {
+        $label = '(no ExecutablePath)'
+    }
+    if ($Entry.Arguments) {
+        $label += " $($Entry.Arguments)"
+    }
+    $label
+}
+
+function Skip-SoftwareInstallHC {
+    <#
+    .SYNOPSIS
+        Take the Software.Install entries at the given positions, from 0,
+        out of the configuration items, and return their labels.
+    .DESCRIPTION
+        Used for the entries unchecked in the wizard, before any answer is
+        asked, so a placeholder of a skipped installer is not asked for.
+        Throws for a position that is not an install entry.
+    #>
+    param(
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Items,
+        [Parameter(Mandatory)][int[]]$Skip
+    )
+
+    $software = $Items['Software']
+    $install = @($software.Install)
+    $wrong = @(
+        $Skip | Where-Object { $_ -lt 0 -or $_ -ge $install.Count }
+    )
+    if ($null -eq $software -or $wrong.Count) {
+        $position = if ($wrong.Count) {
+            $wrong[0]
+        }
+        else {
+            $Skip[0]
+        }
+        throw (
+            'SkipSoftwareInstall: there is no Software.Install entry ' +
+            "$position in this configuration"
+        )
+    }
+
+    $kept = New-Object 'System.Collections.Generic.List[object]'
+    for ($index = 0; $index -lt $install.Count; $index++) {
+        if ($index -in $Skip) {
+            Get-SoftwareInstallLabelHC -Entry $install[$index]
+        }
+        else {
+            $kept.Add($install[$index])
+        }
+    }
+
+    # Without installers left, an otherwise empty section is skipped
+    if ($software -is [System.Collections.IDictionary]) {
+        if ($kept.Count) {
+            $software['Install'] = $kept.ToArray()
+        }
+        else {
+            $software.Remove('Install')
+        }
+    }
+    elseif ($kept.Count) {
+        $software.Install = $kept.ToArray()
+    }
+    else {
+        $software.PSObject.Properties.Remove('Install')
+    }
+}
+
 function Get-SnapshotSectionLabelsHC {
     # The name and description of each section, as the wizard shows them
     @{

@@ -358,6 +358,33 @@ Describe 'Configuration launcher' {
             $command.Contains(" -AnswerPipe 'ComputerSnapshot-0123'")
         }
     }
+    It ('passes the unchecked installers to the main script and through ' +
+        'elevation') {
+        $testParams = @{
+            ConfigurationFile   = $testConfigurationFile
+            StartScript         = $testStartScript
+            SkipSoftwareInstall = @(0, 2)
+            SkipConfirmation    = $true
+        }
+        . $testScript @testParams
+
+        Should -Invoke Invoke-ScriptHC -Times 1 -Exactly -ParameterFilter {
+            ($Arguments.SkipSoftwareInstall -join ',') -eq '0,2'
+        }
+
+        $document.Settings.RunElevated = $true
+        $document | ConvertTo-Json -Depth 20 |
+            Set-Content -LiteralPath $testConfigurationFile -Encoding UTF8
+
+        . $testScript @testParams
+
+        Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
+            $command = [Text.Encoding]::Unicode.GetString(
+                [Convert]::FromBase64String($ArgumentList[-1])
+            )
+            $command.Contains(' -SkipSoftwareInstall @(0,2)')
+        }
+    }
     It 'never displays a picker or UAC prompt in unattended mode' {
         $testParams = @{
             StartScript = $testStartScript

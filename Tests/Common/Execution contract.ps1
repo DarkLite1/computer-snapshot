@@ -1169,6 +1169,99 @@ Describe 'Single-file execution' {
         $params.Remove('AnswerFile')
         $params.Unattended = $true
         { Invoke-ComputerSnapshotHC @params } | Should -Throw '*restore-only*'
+        $params.Remove('Unattended')
+        $params.SkipSoftwareInstall = @(0)
+        { Invoke-ComputerSnapshotHC @params } | Should -Throw '*restore-only*'
+        Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
+    }
+    It ('leaves out the installers unchecked in the wizard, asks nothing ' +
+        'for them and names them in the report') {
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{
+                Software = @{
+                    Install = @(
+                        @{ ExecutablePath = 'Software\a.exe' }
+                        @{
+                            ExecutablePath = 'Software\b.exe'
+                            Arguments      = '/S'
+                            TimeoutMinutes = '{{number:Minutes for b}}'
+                        }
+                        @{ ExecutablePath = 'Software\c.exe' }
+                    )
+                }
+            }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('Software')
+        $params.Script.Software = $scriptPath
+        $params.SkipSoftwareInstall = @(1)
+        Mock Test-ConfigurationBeforeInputHC @inModule
+        Mock Test-ConfigurationHC @inModule
+        Mock Invoke-ChildScriptHC @inModule {
+            @($Data.Install.ExecutablePath) |
+                Should -Be @('Software\a.exe', 'Software\c.exe')
+            [pscustomobject]@{
+                Data     = $null
+                Messages = [string[]]@('Installed')
+                Errors   = [string[]]@()
+            }
+        }
+
+        $result = Invoke-ComputerSnapshotHC @params
+
+        $result.Success | Should -BeTrue
+        $result.Results[0].Messages | Should -Be @(
+            'Not installed, unchecked in the wizard: b.exe /S'
+            'Installed'
+        )
+        Should -Invoke Read-RestoreInputHC @inModule -Times 0 -Exactly
+        Should -Invoke Invoke-ChildScriptHC @inModule -Times 1 -Exactly
+    }
+    It 'skips Software when every installer is unchecked, and says why' {
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{
+                Software = @{
+                    Install = @(@{ ExecutablePath = 'Software\a.exe' })
+                }
+            }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('Software')
+        $params.Script.Software = $scriptPath
+        $params.SkipSoftwareInstall = @(0)
+        Mock Test-ConfigurationBeforeInputHC @inModule
+
+        $result = Invoke-ComputerSnapshotHC @params
+
+        $result.Results[0].Status | Should -Be 'Skipped'
+        $result.Results[0].Messages | Should -Be @(
+            'Not installed, unchecked in the wizard: a.exe'
+            'Nothing to do'
+        )
+        Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
+    }
+    It 'refuses an installer that is not in the configuration' {
+        Write-ConfigurationHC @{
+            SchemaVersion = 3
+            Items         = @{
+                Software = @{
+                    Install = @(@{ ExecutablePath = 'Software\a.exe' })
+                }
+            }
+        } $path
+        $params.Action = 'RestoreSnapshot'
+        $params.Items = @('Software')
+        $params.Script.Software = $scriptPath
+        $params.SkipSoftwareInstall = @(3)
+
+        { Invoke-ComputerSnapshotHC @params } |
+            Should -Throw '*No items executed*'
+        Should -Invoke Write-SnapshotReportHC @inModule -ParameterFilter {
+            ($Results | ConvertTo-Json -Depth 5) -match
+            'no Software.Install entry 3'
+        }
         Should -Invoke Invoke-ChildScriptHC @inModule -Times 0 -Exactly
     }
     It 'rejects an empty or unavailable restore selection' {

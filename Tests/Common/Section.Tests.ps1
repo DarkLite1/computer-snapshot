@@ -5,6 +5,54 @@ BeforeAll {
     . "$PSScriptRoot\..\..\Scripts\Common\Section.ps1"
 }
 
+Describe 'Software installers to skip' {
+    It 'shows an install entry by its installer file and arguments' {
+        $entry = @{
+            ExecutablePath = 'Software\Setup tool.exe'
+            Arguments      = '/S'
+        }
+        Get-SoftwareInstallLabelHC -Entry $entry |
+            Should -Be 'Setup tool.exe /S'
+        Get-SoftwareInstallLabelHC -Entry @{} |
+            Should -Be '(no ExecutablePath)'
+        Get-SoftwareInstallLabelHC -Entry $null | Should -Be '(empty entry)'
+    }
+    It ('takes the install entries out at their position and returns ' +
+        'their labels, for an object or a dictionary') {
+        foreach ($software in @(
+                [ordered]@{
+                    Install = @(
+                        @{ ExecutablePath = 'a.exe' }
+                        @{ ExecutablePath = 'b.exe' }
+                        @{ ExecutablePath = 'c.exe' }
+                    )
+                }
+                [pscustomobject]@{
+                    Install = @(
+                        [pscustomobject]@{ ExecutablePath = 'a.exe' }
+                        [pscustomobject]@{ ExecutablePath = 'b.exe' }
+                        [pscustomobject]@{ ExecutablePath = 'c.exe' }
+                    )
+                }
+            )) {
+            $items = [ordered]@{ Software = $software }
+
+            Skip-SoftwareInstallHC -Items $items -Skip 0, 2 |
+                Should -Be @('a.exe', 'c.exe')
+            @($items.Software.Install.ExecutablePath) | Should -Be @('b.exe')
+        }
+    }
+    It 'refuses a position that is not an install entry' {
+        $items = [ordered]@{
+            Software = @{ Install = @(@{ ExecutablePath = 'a.exe' }) }
+        }
+        { Skip-SoftwareInstallHC -Items $items -Skip 1 } |
+            Should -Throw '*no Software.Install entry 1*'
+        { Skip-SoftwareInstallHC -Items ([ordered]@{}) -Skip 0 } |
+            Should -Throw '*no Software.Install entry 0*'
+    }
+}
+
 Describe 'Get-EmptySectionValueHC' {
     BeforeAll {
         $configurationModule = "$PSScriptRoot\..\..\Scripts\Common\" +

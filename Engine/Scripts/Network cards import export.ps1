@@ -782,12 +782,19 @@ if ($Action -eq 'Export') {
     $cardsToExport = foreach ($adapter in $netAdapters) {
         Write-Verbose "Network card '$($adapter.Name)': export"
         $index = [int]$adapter.InterfaceIndex
-        $networkCategory = @($profilesByIndex[$index]).NetworkCategory |
-            Select-Object -First 1
+        # The category is an enum; a card without a connection profile,
+        # such as a disconnected one, has none and exports '' (unchanged)
+        $networkCategory = ''
+        foreach ($connectionProfile in @($profilesByIndex[$index])) {
+            if ($null -ne $connectionProfile.NetworkCategory) {
+                $networkCategory = [String]$connectionProfile.NetworkCategory
+                break
+            }
+        }
         $dnsSuffix = $dnsClientByIndex[$index].ConnectionSpecificSuffix
         $change = [ordered]@{
             NewName         = $adapter.Name
-            NetworkCategory = [String]$networkCategory
+            NetworkCategory = $networkCategory
             DnsSuffix       = $dnsSuffix
         }
         if ($dnsClientByIndex.ContainsKey($index)) {

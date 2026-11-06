@@ -1020,6 +1020,24 @@ Describe 'Finding the card and IPv4 settings' {
         Should -Invoke Get-NetIPInterface -Times 2 -Exactly
         Should -Invoke Get-NetIPAddress -Times 2 -Exactly
     }
+    It ('exports the category as text, and as empty text for a card ' +
+        'without a connection profile') {
+        Mock Get-NetConnectionProfile {
+            [pscustomobject]@{
+                InterfaceAlias  = 'Ethernet'
+                InterfaceIndex  = 7
+                NetworkCategory = [DayOfWeek]::Monday
+            }
+        }
+
+        $result = . $scriptPath -Action Export -RootFolder $TestDrive
+
+        $ethernet, $wifi = @($result.Data.Change)
+        $ethernet.NetworkCategory | Should -BeOfType [string]
+        $ethernet.NetworkCategory | Should -Be 'Monday'
+        $wifi.NetworkCategory | Should -BeOfType [string]
+        $wifi.NetworkCategory | Should -Be ''
+    }
 }
 
 Describe 'DNS registration, NetBIOS and IPv6' {

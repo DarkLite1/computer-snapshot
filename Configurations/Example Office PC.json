@@ -1,0 +1,46 @@
+{
+  "$schema": "../Scripts/config.schema.json",
+  "SchemaVersion": 3,
+  "Description": "Office PC example: domain time, a tools folder in Path, the print server in the hosts file, power timeouts for a laptop, File Explorer showing extensions and hidden files, and Windows without suggestions. Asks for the print server address. Changes this PC.",
+  "Settings": {
+    "RebootComputer": false,
+    "RestartDelaySeconds": 60,
+    "OpenReportInBrowser": true,
+    "RunElevated": true
+  },
+  "Items": {
+    "EnvironmentVariables": [
+      { "Name": "TOOLS_HOME", "Value": "%ProgramData%\\Tools" },
+      {
+        "Name": "Path",
+        "Action": "AddToList",
+        "Values": ["%ProgramData%\\Tools\\bin"]
+      }
+    ],
+    "CreateFolders": {
+      "FolderPaths": ["%ProgramData%\\Tools\\bin"]
+    },
+    "HostsFileEntries": [
+      {
+        "IPAddress": "{{ipv4:IP address of the print server}}",
+        "Hostnames": ["printserver", "printserver.contoso.com"]
+      }
+    ],
+    "NtpTimeServers": {
+      "SyncTimeWithDomain": true,
+      "TimeServerNames": []
+    },
+    "PowerSettings": {
+      "ActivePlan": "Balanced",
+      "MonitorTimeoutMinutes": { "AC": 15, "DC": 5 },
+      "SleepTimeoutMinutes": { "AC": 60, "DC": 15 }
+    },
+    "RegistryKeys": [
+      "Examples\\RegistryKeys Explorer.json",
+      "Examples\\RegistryKeys Windows Suggestions.json"
+    ],
+    "Services": [
+      { "Name": "Spooler", "StartupType": "Automatic", "Status": "Running" }
+    ]
+  }
+}

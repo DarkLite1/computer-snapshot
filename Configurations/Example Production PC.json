@@ -1,0 +1,107 @@
+{
+  "$schema": "../Scripts/config.schema.json",
+  "SchemaVersion": 3,
+  "Description": "Production PC example: an 'operator' account, a static IP address on the wired card, the PLC in the hosts file, an NTP time server, an Exports share, a clean-up task running as the operator, a power plan that never sleeps and Windows Search turned off. Asks for the operator password and the addresses. Changes this PC.",
+  "Settings": {
+    "RebootComputer": false,
+    "RestartDelaySeconds": 60,
+    "OpenReportInBrowser": true,
+    "RunElevated": true
+  },
+  "Items": {
+    "Comment": "The operator password is asked for once: the account and the scheduled task use the same placeholder.",
+    "AccountPolicy": {
+      "Comment": "No lockout, so a mistyped password never stops production.",
+      "MinimumPasswordLength": 8,
+      "MaximumPasswordAgeDays": 0,
+      "LockoutThreshold": 0
+    },
+    "UserAccounts": [
+      {
+        "Name": "operator",
+        "FullName": "Machine operator",
+        "Enabled": true,
+        "PasswordExpires": null,
+        "UserMayChangePassword": false,
+        "Password": "{{password:Password of the operator account}}"
+      }
+    ],
+    "CreateFolders": {
+      "FolderPaths": ["C:\\Data\\Exports"]
+    },
+    "SmbShares": [
+      {
+        "Name": "Exports",
+        "Path": "C:\\Data\\Exports",
+        "Description": "Production exports, read-only on the network",
+        "Access": [
+          {
+            "AccountName": "BUILTIN\\Administrators",
+            "AccessControlType": "Allow",
+            "AccessRight": "Full"
+          },
+          {
+            "AccountName": "NT AUTHORITY\\Authenticated Users",
+            "AccessControlType": "Allow",
+            "AccessRight": "Read"
+          }
+        ]
+      }
+    ],
+    "NetworkCards": [
+      {
+        "Comment": "The one wired card; fails on a PC with several, use Description or Name then.",
+        "FindBy": { "OnlyCard": "Wired" },
+        "Change": {
+          "NewName": "LAN PRODUCTION",
+          "NetworkCategory": "Private",
+          "RegisterInDns": false,
+          "NetBios": "Disabled",
+          "IPv6Enabled": false,
+          "IPSettings": {
+            "IPAddress": "{{ipv4:IP address of this production PC}}",
+            "PrefixLength": "{{prefix:Prefix length of the production network, such as 24}}",
+            "DefaultGateway": "{{ipv4:Default gateway of the production network}}"
+          }
+        }
+      }
+    ],
+    "HostsFileEntries": [
+      {
+        "IPAddress": "{{ipv4:IP address of the PLC}}",
+        "Hostnames": ["plc01"]
+      }
+    ],
+    "NtpTimeServers": {
+      "SyncTimeWithDomain": false,
+      "TimeServerNames": ["{{ipv4:IP address of the NTP time server}}"]
+    },
+    "PowerSettings": {
+      "ActivePlan": "HighPerformance",
+      "MonitorTimeoutMinutes": { "AC": 0 },
+      "SleepTimeoutMinutes": { "AC": 0 },
+      "HibernateTimeoutMinutes": { "AC": 0 },
+      "DiskTimeoutMinutes": { "AC": 0 },
+      "HibernateEnabled": false
+    },
+    "ScheduledTasks": [
+      {
+        "Comment": "Runs whether or not the operator is signed in; the restore gives the operator 'Log on as a batch job'.",
+        "TaskName": "Clean up exports",
+        "TaskPath": "\\HC\\",
+        "Enabled": true,
+        "XmlFile": "Examples\\ScheduledTasks Example Task.xml",
+        "RunAsUser": "operator",
+        "RunAsPassword": "{{password:Password of the operator account}}"
+      }
+    ],
+    "Services": [
+      {
+        "Comment": "Windows Search indexing is not needed on a production PC.",
+        "Name": "WSearch",
+        "StartupType": "Disabled",
+        "Status": "Stopped"
+      }
+    ]
+  }
+}

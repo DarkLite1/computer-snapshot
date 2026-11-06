@@ -748,6 +748,110 @@ Describe 'Finding the card and IPv4 settings' {
         )
         Should -Invoke Rename-NetAdapter -Times 1 -Exactly
     }
+    It ('finds the only Wi-Fi or wired card of a laptop, never counting ' +
+        'Bluetooth or VPN adapters') {
+        Mock Get-NetAdapter {
+            [pscustomobject]@{
+                Name                 = 'Ethernet'
+                InterfaceDescription = 'Intel(R) Ethernet Connection'
+                InterfaceIndex       = 7
+                HardwareInterface    = $true
+                NdisPhysicalMedium   = 14
+            }
+            [pscustomobject]@{
+                Name                 = 'Wi-Fi'
+                InterfaceDescription = 'Intel(R) Wi-Fi 6 AX201'
+                InterfaceIndex       = 8
+                HardwareInterface    = $true
+                NdisPhysicalMedium   = 9
+            }
+            [pscustomobject]@{
+                Name                 = 'Bluetooth Network Connection'
+                InterfaceDescription = 'Bluetooth Device (PAN)'
+                InterfaceIndex       = 10
+                HardwareInterface    = $true
+                NdisPhysicalMedium   = 10
+            }
+            [pscustomobject]@{
+                Name                 = 'VPN'
+                InterfaceDescription = 'Fortinet Virtual Ethernet Adapter'
+                InterfaceIndex       = 11
+                HardwareInterface    = $false
+                NdisPhysicalMedium   = 14
+            }
+        }
+        $data = @(
+            [pscustomobject]@{
+                FindBy = [pscustomobject]@{ OnlyCard = 'Wired' }
+                Change = [pscustomobject]@{ NewName = 'LAN' }
+            }
+            [pscustomobject]@{
+                FindBy = [pscustomobject]@{ OnlyCard = 'WiFi' }
+                Change = [pscustomobject]@{ NewName = 'WLAN' }
+            }
+            [pscustomobject]@{
+                FindBy = [pscustomobject]@{ OnlyCard = $true }
+                Change = [pscustomobject]@{}
+            }
+            [pscustomobject]@{
+                FindBy = [pscustomobject]@{ OnlyCard = 'Cable' }
+                Change = [pscustomobject]@{}
+            }
+        )
+        $importParams = @{
+            Action     = 'Import'
+            Data       = $data
+            RootFolder = $TestDrive
+        }
+
+        $result = . $scriptPath @importParams
+
+        Should -Invoke Rename-NetAdapter -Times 1 -Exactly -ParameterFilter {
+            $Name -eq 'Ethernet' -and $NewName -eq 'LAN'
+        }
+        Should -Invoke Rename-NetAdapter -Times 1 -Exactly -ParameterFilter {
+            $Name -eq 'Wi-Fi' -and $NewName -eq 'WLAN'
+        }
+        $result.Errors | Should -Be @(
+            ('Failed to configure network card (the only physical card): ' +
+                'FindBy OnlyCard: this computer has 2 physical network ' +
+                "cards ('Ethernet' (Intel(R) Ethernet Connection), 'Wi-Fi' " +
+                '(Intel(R) Wi-Fi 6 AX201)); use Description or Name instead')
+            ('Failed to configure network card (the only Cable card): ' +
+                "FindBy OnlyCard 'Cable' is unknown; use true, 'WiFi' or " +
+                "'Wired'")
+        )
+    }
+    It 'reports a missing Wi-Fi card' {
+        Mock Get-NetAdapter {
+            [pscustomobject]@{
+                Name                 = 'Ethernet'
+                InterfaceDescription = 'Intel(R) Ethernet Connection'
+                InterfaceIndex       = 7
+                HardwareInterface    = $true
+                NdisPhysicalMedium   = 14
+            }
+        }
+        $data = @(
+            [pscustomobject]@{
+                FindBy = [pscustomobject]@{ OnlyCard = 'WiFi' }
+                Change = [pscustomobject]@{ NewName = 'WLAN' }
+            }
+        )
+        $importParams = @{
+            Action     = 'Import'
+            Data       = $data
+            RootFolder = $TestDrive
+        }
+
+        $result = . $scriptPath @importParams
+
+        $result.Errors | Should -Be @(
+            "Failed to configure network card 'WLAN': FindBy OnlyCard: " +
+            'this computer has no Wi-Fi network card'
+        )
+        Should -Invoke Rename-NetAdapter -Times 0 -Exactly
+    }
     It 'renames a card found by FindBy.Name' {
         $data = @(
             [pscustomobject]@{

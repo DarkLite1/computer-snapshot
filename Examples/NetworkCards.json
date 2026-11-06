@@ -28,8 +28,8 @@
     }
   },
   {
-    "Comment": "On a PC with a single network card: that card, whatever its name or driver. VPN and virtual adapters do not count.",
-    "FindBy": { "OnlyCard": true },
+    "Comment": "On a laptop with one Ethernet and one Wi-Fi card: the Ethernet card, whatever its name or driver. Use \"WiFi\" for the Wi-Fi card, or true on a PC with a single card. VPN, virtual and Bluetooth adapters do not count.",
+    "FindBy": { "OnlyCard": "Wired" },
     "Change": {
       "NewName": "LAN",
       "NetworkCategory": "Private"

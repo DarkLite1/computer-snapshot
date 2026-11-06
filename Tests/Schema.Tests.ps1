@@ -563,6 +563,16 @@ Describe 'Schema contract' {
             FindBy = @{ OnlyCard = $false }
             Change = @{ NewName = 'LAN' }
         } | Should -Match 'FindBy\.OnlyCard: expected True'
+        foreach ($kind in @('WiFi', 'Wired')) {
+            & $test @{
+                FindBy = @{ OnlyCard = $kind }
+                Change = @{ NewName = 'LAN' }
+            } | Should -BeNullOrEmpty -Because $kind
+        }
+        & $test @{
+            FindBy = @{ OnlyCard = 'Cable' }
+            Change = @{ NewName = 'LAN' }
+        } | Should -Match "FindBy\.OnlyCard: invalid value 'Cable'"
         & $test @{
             FindBy = @{ OnlyCard = $true; Name = 'Ethernet' }
             Change = @{}

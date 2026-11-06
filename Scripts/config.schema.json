@@ -1076,9 +1076,19 @@
                 "description": "The card's current name, such as 'Ethernet', before any rename. Names can differ per computer."
               },
               "OnlyCard": {
-                "type": "boolean",
-                "const": true,
-                "description": "true: the one physical network card of the computer, for computers with a single card. VPN and virtual adapters do not count; with no or several physical cards the entry fails."
+                "description": "true: the one physical network card of the computer, for computers with a single card. 'WiFi' or 'Wired': the one card of that kind, such as the Ethernet card of a laptop that also has Wi-Fi. VPN, virtual and Bluetooth adapters do not count; with no or several such cards the entry fails.",
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "const": true,
+                    "description": "true, for the only physical card"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["WiFi", "Wired"],
+                    "description": "WiFi or Wired, for the only card of that kind"
+                  }
+                ]
               },
               "Comment": {
                 "type": "string",

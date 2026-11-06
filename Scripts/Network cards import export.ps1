@@ -10,8 +10,10 @@
       description comes from the driver and cannot be changed.
     - Name: the card with this current name, such as 'Ethernet'.
     - OnlyCard: true: the one physical card of the computer, for computers
-      with a single network card. VPN and virtual adapters do not count;
-      with no or several physical cards the entry is reported.
+      with a single network card; 'WiFi' or 'Wired': the one card of that
+      kind, such as the Ethernet card of a laptop that also has Wi-Fi.
+      VPN, virtual and Bluetooth adapters do not count; with no or several
+      such cards the entry is reported.
     Change renames the card (NewName), sets its DnsSuffix, NetworkCategory
     and IPSettings, in that order. When a step fails, the remaining steps
     for that card are skipped. Entries that match no card or more than one
@@ -94,24 +96,70 @@ function Find-NetAdapterHC {
     $partial[0]
 }
 
+function Get-NetAdapterKindHC {
+    <#
+    .SYNOPSIS
+        WiFi, Wired, or nothing for a card that OnlyCard never counts: no
+        hardware (VPN and virtual adapters, such as a Hyper-V switch) or
+        Bluetooth.
+    .DESCRIPTION
+        NdisPhysicalMedium says what a card is: 9 Native 802.11 and 1
+        Wireless LAN are Wi-Fi, 10 is Bluetooth. Every other physical
+        card, such as 14 (802.3) for Ethernet, is wired.
+    #>
+    param([Parameter(Mandatory)]$Adapter)
+    if (-not $Adapter.HardwareInterface) {
+        return
+    }
+    switch ([int]$Adapter.NdisPhysicalMedium) {
+        { $_ -in 1, 9 } {
+            return 'WiFi'
+        }
+        10 {
+            return
+        }
+        default {
+            return 'Wired'
+        }
+    }
+}
+
 function Find-OnlyNetAdapterHC {
-    # The one physical card of the computer. VPN and virtual adapters, such
-    # as a Hyper-V switch, are no hardware and do not count.
-    $physical = @($netAdapters | Where-Object { $_.HardwareInterface })
-    if ($physical.Count -eq 1) {
-        return $physical[0]
+    # The one physical card of the computer, or of one kind: WiFi or Wired
+    param(
+        [ValidateSet('Any', 'WiFi', 'Wired')][string]$Kind = 'Any'
+    )
+    $cards = @(
+        $netAdapters | Where-Object {
+            $cardKind = Get-NetAdapterKindHC -Adapter $_
+            $cardKind -and ($Kind -eq 'Any' -or $cardKind -eq $Kind)
+        }
+    )
+    if ($cards.Count -eq 1) {
+        return $cards[0]
     }
-    if (-not $physical.Count) {
-        throw 'FindBy OnlyCard: this computer has no physical network card'
+    $what = switch ($Kind) {
+        'WiFi' {
+            'Wi-Fi network card'
+        }
+        'Wired' {
+            'wired network card'
+        }
+        default {
+            'physical network card'
+        }
     }
-    $cards = (
-        $physical | ForEach-Object {
+    if (-not $cards.Count) {
+        throw "FindBy OnlyCard: this computer has no $what"
+    }
+    $list = (
+        $cards | ForEach-Object {
             "'$($_.Name)' ($($_.InterfaceDescription))"
         }
     ) -join ', '
     throw (
-        "FindBy OnlyCard: this computer has $($physical.Count) physical " +
-        "network cards ($cards); use Description or Name instead"
+        "FindBy OnlyCard: this computer has $($cards.Count) ${what}s " +
+        "($list); use Description or Name instead"
     )
 }
 
@@ -121,13 +169,25 @@ function Find-CardHC {
     param($FindBy)
     $hasDescription = -not [string]::IsNullOrWhiteSpace($FindBy.Description)
     $hasName = -not [string]::IsNullOrWhiteSpace($FindBy.Name)
-    $onlyCard = $FindBy.OnlyCard -eq $true
+    $onlyCard = $null -ne $FindBy.OnlyCard -and $FindBy.OnlyCard -ne $false
     $ways = @($hasDescription, $hasName, $onlyCard) -eq $true
     if ($ways.Count -gt 1) {
         throw 'FindBy has more than one of Description, Name and OnlyCard'
     }
     if ($onlyCard) {
-        return Find-OnlyNetAdapterHC
+        $kind = if ($FindBy.OnlyCard -is [bool]) {
+            'Any'
+        }
+        else {
+            [string]$FindBy.OnlyCard
+        }
+        if ($kind -notin @('Any', 'WiFi', 'Wired')) {
+            throw (
+                "FindBy OnlyCard '$kind' is unknown; use true, " +
+                "'WiFi' or 'Wired'"
+            )
+        }
+        return Find-OnlyNetAdapterHC -Kind $kind
     }
     if ($hasDescription) {
         return Find-NetAdapterHC -Description $FindBy.Description
@@ -724,8 +784,11 @@ else {
         elseif ($card.FindBy.Name) {
             "'$($card.FindBy.Name)'"
         }
-        elseif ($card.FindBy.OnlyCard -eq $true) {
+        elseif ($card.FindBy.OnlyCard -is [bool] -and $card.FindBy.OnlyCard) {
             '(the only physical card)'
+        }
+        elseif ($card.FindBy.OnlyCard) {
+            "(the only $($card.FindBy.OnlyCard) card)"
         }
         else {
             "with description '$($card.FindBy.Description)'"

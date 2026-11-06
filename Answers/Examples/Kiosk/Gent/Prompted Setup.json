@@ -1,5 +1,5 @@
 {
-  "Comment": "Partial answers for Configurations\\Example Prompted Setup.json on a kiosk in Gent. The password remains null, so the restore asks for it. The NTP address is for documentation only; change it to the time server of the site.",
+  "Comment": "Partial answers for Configurations\\Examples\\Prompted Setup.json on a kiosk in Gent. The password remains null, so the restore asks for it. The NTP address is for documentation only; change it to the time server of the site.",
   "Answers": {
     "{{input:Enter the local account name to create or update}}": "kiosk-gent",
     "{{password:Enter the password for this local account}}": null,

@@ -13,7 +13,7 @@ BeforeAll {
 
     $configFolder = Join-Path $root 'Configurations'
     $shippedConfigurations = @(
-        Get-ChildItem -LiteralPath $configFolder -Filter '*.json' -File |
+        Get-ChildItem -LiteralPath $configFolder -Filter '*.json' -File -Recurse |
         ForEach-Object FullName
     )
     $sharedFolder = Join-Path $root 'Shared'
@@ -48,7 +48,7 @@ BeforeAll {
 Describe 'Schema contract' {
     It ('resolves the prompted setup example into valid data without ' +
         'changing its file or applying settings') {
-        $file = Join-Path $root 'Configurations\Example Prompted Setup.json'
+        $file = Join-Path $root 'Configurations\Examples\Prompted Setup.json'
         $before = Get-Content -LiteralPath $file -Raw
 
         $loaded = Read-ConfigurationHC $file $root
@@ -112,18 +112,25 @@ Describe 'Schema contract' {
             }
         }
     }
-    It ('names examples and shared files after their section and example ' +
-        'configurations "Example ...", in Title Case') {
+    It ('names examples and shared files after their section, and keeps ' +
+        'example configurations in Configurations\Examples, in Title Case') {
         $sections = @(
             $schema.properties.Items.properties.PSObject.Properties.Name |
             Where-Object { $_ -ne 'Comment' }
         )
         $titleCase = '( [A-Z0-9][A-Za-z0-9]*)*'
         $folders = @{
-            Examples       = "^($($sections -join '|'))$titleCase\.(json|xml)$"
-            Shared         = "^($($sections -join '|'))$titleCase\.json$"
-            Configurations = "^Example$titleCase\.json$"
+            Examples                  = (
+                "^($($sections -join '|'))$titleCase\.(json|xml)$"
+            )
+            Shared                    = (
+                "^($($sections -join '|'))$titleCase\.json$"
+            )
+            'Configurations\Examples' = '^[A-Z0-9][A-Za-z0-9]*' +
+                "$titleCase\.json$"
         }
+        @(Get-ChildItem -LiteralPath $configFolder -File).Count |
+            Should -Be 0 -Because 'shipped configurations are examples'
         foreach ($folder in $folders.Keys) {
             $names = @(
                 Get-ChildItem -LiteralPath (Join-Path $root $folder) -File |
@@ -826,7 +833,7 @@ Describe 'Schema contract' {
     }
     It ('combines the shared files of the combined sections example in ' +
         'order, only below safe example locations') {
-        $file = Join-Path $root 'Configurations\Example Combined Sections.json'
+        $file = Join-Path $root 'Configurations\Examples\Combined Sections.json'
 
         $loaded = Read-ConfigurationHC $file $root
 

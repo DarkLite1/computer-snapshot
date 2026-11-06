@@ -1040,6 +1040,21 @@ Describe 'Restore wizard' {
         (& $find 'ConfigurationStep').Visible | Should -BeTrue
         [Windows.Forms.Application]::OpenForms.Count | Should -Be $openForms
     }
+    It ('lists configurations in subfolders after the own ones, by their ' +
+        'path inside Configurations') {
+        Write-TestJsonHC "$root\Configurations\Examples\Kiosk.json" @{
+            SchemaVersion = 3
+            Description   = 'Example kiosk'
+            Items         = @{ UserAccounts = @(@{ Name = 'kiosk' }) }
+        }
+
+        (& $find 'RefreshConfigurations').PerformClick()
+
+        @((& $find 'Configurations').Items.Text) |
+            Should -Be @('Plain', 'Prompted', 'Examples\Kiosk')
+        & $chooseConfiguration 'Examples\Kiosk'
+        (& $find 'ConfigurationDescription').Text | Should -Be 'Example kiosk'
+    }
     It ('grays out sections without data and needs at least one checked ' +
         'section') {
         & $chooseConfiguration 'Prompted'

@@ -29,6 +29,49 @@ function Get-SnapshotScriptsHC {
     }
 }
 
+function Get-ConfigurationEntriesHC {
+    # Configurations in the folder and its subfolders, own files first; the
+    # name is the path inside the folder, such as 'Examples\Kiosk'
+    param([Parameter(Mandatory)][string]$Folder)
+
+    $folderPath = (Get-Item -LiteralPath $Folder -ErrorAction Stop).FullName
+    $listParams = @{
+        LiteralPath = $folderPath
+        Filter      = '*.json'
+        File        = $true
+        Recurse     = $true
+        ErrorAction = 'Stop'
+    }
+    $files = Get-ChildItem @listParams |
+        Where-Object { $_.Name -notlike '*.v1.json' } |
+        Sort-Object -Property @(
+            @{ Expression = { $_.DirectoryName -ne $folderPath } }
+            @{ Expression = { $_.FullName } }
+        )
+    foreach ($file in $files) {
+        try {
+            $readParams = @{
+                LiteralPath = $file.FullName
+                Raw         = $true
+                Encoding    = 'UTF8'
+            }
+            $description = (
+                Get-Content @readParams | ConvertFrom-Json -ErrorAction Stop
+            ).Description
+        }
+        catch {
+            Write-Verbose "Configuration '$($file.Name)': invalid JSON"
+            $description = 'Invalid JSON'
+        }
+        $relative = $file.FullName.Substring($folderPath.Length).TrimStart('\')
+        [pscustomobject]@{
+            Name        = $relative.Substring(0, $relative.Length - 5)
+            Description = $description
+            Path        = $file.FullName
+        }
+    }
+}
+
 function Get-EmptySectionValueHC {
     <#
     .SYNOPSIS

@@ -13,7 +13,9 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
 3. **To set up a PC (Restore):** the Restore tab guides you through a few
    steps in the same window. **Next >** goes on and **< Back** returns, keeping
    what you chose or typed.
-   1. **Configuration:** select a saved configuration.
+   1. **Configuration:** select a saved configuration. Configurations in a
+      subfolder show their path, such as `Examples\Kiosk` for the bundled
+      examples in `Configurations\Examples`.
    2. **Sections:** check the settings you want to apply, and choose whether
       to restart and open the report. **Unattended** takes every answer from
       the answer file and asks nothing.
@@ -62,8 +64,8 @@ The easiest way to use Computer Snapshot is through the built-in graphical wizar
 | Shortcut                           | What it does                                                                                               |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `Start wizard.lnk`                 | Opens the graphical wizard for exporting and restoring.                                                    |
-| `_Start example confirm first.lnk` | Restores `Configurations\Example PC1.json` after asking you to confirm with `y`.                           |
-| `_Start example immediately.lnk`   | Restores `Configurations\Example PC1.json` straight away, without asking.                                  |
+| `_Start example confirm first.lnk` | Restores `Configurations\Examples\PC1.json` after asking you to confirm with `y`.                         |
+| `_Start example immediately.lnk`   | Restores `Configurations\Examples\PC1.json` straight away, without asking.                                |
 
 Copy one of the `_Start example` shortcuts and change the `-ConfigurationFile` path to make a one-click restore for your own configuration.
 
@@ -71,7 +73,7 @@ Copy one of the `_Start example` shortcuts and change the `-ConfigurationFile` p
 
 Your USB stick has a specific layout to keep everything organized. Here are the main folders you will use:
 
-- **`Configurations/`**: This is where your saved PC setups live (one file per computer).
+- **`Configurations/`**: This is where your saved PC setups live (one file per computer), also in subfolders. `Configurations/Examples/` holds the bundled example configurations.
 - **`Software/`**: Place any app installers (like `.exe` files) in here.
 - **`Files/`**: Put any standard files or custom scripts you want copied to the new PC here.
 - **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers.
@@ -135,12 +137,14 @@ Some sections can't be fully captured automatically, so exporting them only give
 
 The `HKCU` entries apply to the account running the restore; for another account, put them under `RunAsOtherUser`.
 
-File names follow one convention: `Examples\<Section>.json` shows every option of a section, `Examples\<Section> <Topic>.json` and `Shared\<Section> <Topic>.json` are ready-made sections, and example configurations are named `Example <Topic>.json`, all in Title Case.
+File names follow one convention: `Examples\<Section>.json` shows every option of a section, `Examples\<Section> <Topic>.json` and `Shared\<Section> <Topic>.json` are ready-made sections, and the example configurations are in `Configurations\Examples\`, all in Title Case.
 
-Two configurations show how they fit together with the other sections. Both change the PC they are restored on:
+The example configurations show how the sections fit together. They change the PC they are restored on, except `Combined Sections`; besides `PC1`, `Prompted Setup` and `Combined Sections`, described further on, there are:
 
-- [Configurations/Example Kiosk.json](Configurations/Example%20Kiosk.json): Belgian regional settings with a Belgian keyboard, password rules, a `kiosk` account that signs in automatically, an environment variable, a power plan that never sleeps, services, and Windows without suggestions. It asks for the kiosk password once, for both the account and auto logon, and for the computer name.
-- [Configurations/Example Remote Desktop.json](Configurations/Example%20Remote%20Desktop.json): Remote Desktop with its firewall rules, the account that may connect, and the wired network card made private.
+- [Configurations/Examples/Office PC.json](Configurations/Examples/Office%20PC.json): domain time, a tools folder in `Path`, the print server in the hosts file, power timeouts for a laptop, File Explorer showing extensions and hidden files, and Windows without suggestions.
+- [Configurations/Examples/Production PC.json](Configurations/Examples/Production%20PC.json): an `operator` account, a static IP address on the wired card, the PLC in the hosts file, an NTP time server, an `Exports` share, a clean-up task running as the operator, a power plan that never sleeps and Windows Search off. It asks for the operator password once, for both the account and the task.
+- [Configurations/Examples/Kiosk.json](Configurations/Examples/Kiosk.json): Belgian regional settings with a Belgian keyboard, password rules, a `kiosk` account that signs in automatically, an environment variable, a power plan that never sleeps, services, and Windows without suggestions. It asks for the kiosk password once, for both the account and auto logon, and for the computer name.
+- [Configurations/Examples/Remote Desktop.json](Configurations/Examples/Remote%20Desktop.json): Remote Desktop with its firewall rules, the account that may connect, and the wired network card made private.
 
 ### Reusing sections across computers
 
@@ -172,7 +176,7 @@ The files are combined in the order you list them:
 
 Name a shared file after its section, such as `Shared\SmbShares Common.json`, so Visual Studio Code shows the hints for that section while you edit it (see [Editing with autocomplete](#editing-with-autocomplete)).
 
-See [Configurations/Example Combined Sections.json](Configurations/Example%20Combined%20Sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares Common.json` with the shares of every PC and `Shared\SmbShares Kiosk.json` with the extra kiosk shares.
+See [Configurations/Examples/Combined Sections.json](Configurations/Examples/Combined%20Sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares Common.json` with the shares of every PC and `Shared\SmbShares Kiosk.json` with the extra kiosk shares.
 
 ### Password and lockout policy
 
@@ -561,7 +565,7 @@ The tool follows the processes an installer starts by checking every 50 ms for t
 
 ### Editing with autocomplete
 
-Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works.
+Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works; in a subfolder such as `Configurations/Examples/` it is `../../Scripts/config.schema.json`.
 
 Section files can't have that line, so `.vscode/settings.json` tells Visual Studio Code which schema in `Scripts/Schemas/` belongs to which file, by its name: `Examples/RegistryKeys.json`, `Examples/RegistryKeys <anything>.json` and `Shared/RegistryKeys <anything>.json` get the `RegistryKeys` hints, and the same for every other section. Open the computer-snapshot folder itself in Visual Studio Code for this, and name a new shared file after its section, such as `Shared\RegistryKeys Office.json`, to get the hints there too.
 
@@ -625,7 +629,7 @@ $ArgumentList = '--kiosk http://{{ipv4:IP address of the terminal server}}:1353/
 
 Interactive command-line restores use the same input form for missing answers and require an interactive Windows desktop. Browsing configurations and exporting do not ask for placeholder values. Use `-Unattended` to forbid the input form.
 
-See [Configurations/Example Prompted Setup.json](Configurations/Example%20Prompted%20Setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [Network cards and IP settings](#network-cards-and-ip-settings).
+See [Configurations/Examples/Prompted Setup.json](Configurations/Examples/Prompted%20Setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [Network cards and IP settings](#network-cards-and-ip-settings).
 
 **Password handling:** Answers are kept in memory for the current run. The original configuration and shared files are not rewritten, and answers are not written to disk or included in process-launch arguments. The wizard hands the answers of its questions page to the restore process over a one-time named pipe: it has a random name, admits only your account and the Administrators group, serves the answers once and then closes. If the restore cannot receive them, for example because the wizard was closed first, it says so and asks for them in the input form. Password placeholders mask typing and redact exact matches from the tool's generated results, HTML reports and captured PowerShell child output. This is not encrypted storage: the restore scripts receive plain strings in memory, and custom scripts or external programs can independently log, persist or transform them. Only run trusted scripts and use `password` placeholders for sensitive values. Ordinary `input` answers are not redacted.
 
@@ -661,8 +665,8 @@ always fail before any sections run, even in interactive mode.
 }
 ```
 
-This is the bundled [partial answer example](Answers/Examples/Example%20Prompted%20Setup.json)
-for [Example Prompted Setup](Configurations/Example%20Prompted%20Setup.json).
+This is the bundled [partial answer example](Answers/Examples/Prompted%20Setup.json)
+for [Prompted Setup](Configurations/Examples/Prompted%20Setup.json).
 It supplies a name and a documentation-only NTP address, and leaves the password
 to be entered interactively. **Change the address to your real NTP server**
 before using it. It is not a complete unattended answer file.
@@ -682,7 +686,7 @@ From the tool's root folder:
 ```powershell
 New-Item -Path '.\Answers' -ItemType Directory -Force | Out-Null
 & '.\Scripts\New answer file.ps1' `
-    -ConfigurationFile 'Configurations\Example Prompted Setup.json' `
+    -ConfigurationFile 'Configurations\Examples\Prompted Setup.json' `
     -AnswerFile 'Answers\KIOSK01.json'
 ```
 
@@ -701,8 +705,8 @@ The configuration and all source files stay unchanged.
 
 ```powershell
 & '.\Scripts\Invoke configuration.ps1' `
-    -ConfigurationFile 'Configurations\Example Prompted Setup.json' `
-    -AnswerFile 'Answers\Examples\Example Prompted Setup.json'
+    -ConfigurationFile 'Configurations\Examples\Prompted Setup.json' `
+    -AnswerFile 'Answers\Examples\Prompted Setup.json'
 ```
 
 This still asks for confirmation, and asks for the missing password after any
@@ -715,7 +719,7 @@ After filling in your local answer file:
 
 ```powershell
 $result = & '.\Scripts\Invoke configuration.ps1' `
-    -ConfigurationFile 'Configurations\Example Prompted Setup.json' `
+    -ConfigurationFile 'Configurations\Examples\Prompted Setup.json' `
     -AnswerFile 'Answers\KIOSK01.json' `
     -Unattended
 
@@ -775,13 +779,13 @@ For scripting or one-off runs, open PowerShell in the root of the USB stick.
 Restore a configuration (asks for confirmation; add `-SkipConfirmation` to skip the question, or leave out `-ConfigurationFile` to pick from a list). The old name `-Confirm` still works, so existing shortcuts keep working:
 
 ```powershell
-& '.\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Example PC1.json'
+& '.\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Examples\PC1.json'
 ```
 
 Restore only some sections, and override saved settings for this run:
 
 ```powershell
-& '.\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Example PC1.json' -Items UserAccounts, Software -RebootComputer $true -RestartDelaySeconds 300
+& '.\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Examples\PC1.json' -Items UserAccounts, Software -RebootComputer $true -RestartDelaySeconds 300
 ```
 
 Export this computer to a new configuration file (add `-Force` to overwrite an existing file):

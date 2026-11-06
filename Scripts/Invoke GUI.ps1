@@ -529,39 +529,12 @@ function Confirm-WizardTaskFolderHC {
         [Windows.Forms.DialogResult]::Yes
 }
 
-function Get-ConfigurationEntriesHC {
+function Get-WizardConfigurationEntriesHC {
     param([string]$RootFolder)
 
     $folder = Join-Path $RootFolder 'Configurations'
     Write-Verbose "Get configurations in '$folder'"
-    $listParams = @{
-        LiteralPath = $folder
-        Filter      = '*.json'
-        File        = $true
-        ErrorAction = 'Stop'
-    }
-    $files = Get-ChildItem @listParams |
-        Where-Object { $_.Name -notlike '*.v1.json' }
-    foreach ($file in $files) {
-        try {
-            $readParams = @{
-                LiteralPath = $file.FullName
-                Raw         = $true
-                Encoding    = 'UTF8'
-            }
-            $document = Get-Content @readParams |
-                ConvertFrom-Json -ErrorAction Stop
-        }
-        catch {
-            Write-Verbose "Configuration '$($file.Name)': invalid JSON"
-            $document = @{ Description = 'Invalid JSON' }
-        }
-        [pscustomobject]@{
-            Name        = $file.BaseName
-            Description = $document.Description
-            Path        = $file.FullName
-        }
-    }
+    Get-ConfigurationEntriesHC -Folder $folder
 }
 
 function Get-SnapshotItemEntriesHC {
@@ -1163,7 +1136,7 @@ function Update-RestoreConfigurationListHC {
     try {
         $list.Items.Clear()
 
-        foreach ($entry in Get-ConfigurationEntriesHC $Wizard.Tag.RootFolder) {
+        foreach ($entry in Get-WizardConfigurationEntriesHC $Wizard.Tag.RootFolder) {
             $item = New-Object Windows.Forms.ListViewItem $entry.Name
             $null = $item.SubItems.Add([string]$entry.Description)
             $item.Tag = $entry.Path

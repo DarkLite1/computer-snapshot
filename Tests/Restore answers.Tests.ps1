@@ -534,7 +534,7 @@ Describe 'Answer template generation' {
         $repository = Split-Path $PSScriptRoot -Parent
         $params = @{
             ConfigurationFile = (
-                "$repository\Configurations\Example Prompted Setup.json"
+                "$repository\Configurations\Examples\Prompted Setup.json"
             )
             AnswerFile        = $answerPath
         }
@@ -551,13 +551,13 @@ Describe 'Answer template generation' {
             Get-ChildItem -LiteralPath $examplesFolder -Recurse -File
         )
         $configurationFile = Join-Path $repository (
-            'Configurations\Example Prompted Setup.json'
+            'Configurations\Examples\Prompted Setup.json'
         )
         $configuration = Read-ConfigurationHC $configurationFile $repository
         $fields = @(Get-RestoreInputFieldsHC -Data $configuration.Items)
 
         @($examples.Name | Sort-Object -Unique) |
-            Should -Be @('Example Prompted Setup.json')
+            Should -Be @('Prompted Setup.json')
         $examples.Count | Should -Be 3
         foreach ($example in $examples) {
             $document = Get-Content -LiteralPath $example.FullName -Raw |

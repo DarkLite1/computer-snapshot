@@ -1,5 +1,5 @@
 {
-  "$schema": "../Scripts/config.schema.json",
+  "$schema": "../../Scripts/config.schema.json",
   "SchemaVersion": 3,
   "Description": "Office PC example: domain time, a tools folder in Path, the print server in the hosts file, power timeouts for a laptop, File Explorer showing extensions and hidden files, and Windows without suggestions. Asks for the print server address. Changes this PC.",
   "Settings": {

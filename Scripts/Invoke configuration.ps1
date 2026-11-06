@@ -78,32 +78,7 @@ if (-not $ConfigurationFile) {
         $ConfigurationsFolder = Join-Path $rootFolder 'Configurations'
     }
     Write-Verbose "List configurations in '$ConfigurationsFolder'"
-    $params = @{
-        LiteralPath = $ConfigurationsFolder
-        Filter      = '*.json'
-        File        = $true
-        ErrorAction = 'Stop'
-    }
-    $files = Get-ChildItem @params |
-    Where-Object { $_.Name -notlike '*.v1.json' }
-    $entries = @(foreach ($file in $files) {
-            try {
-                $params = @{
-                    LiteralPath = $file.FullName
-                    Raw         = $true
-                    Encoding    = 'UTF8'
-                }
-                $description = (
-                    Get-Content @params | ConvertFrom-Json -ErrorAction Stop
-                ).Description
-            }
-            catch { $description = 'Invalid JSON' }
-            [pscustomobject]@{
-                Name        = $file.BaseName
-                Description = $description
-                Path        = $file.FullName
-            }
-        })
+    $entries = @(Get-ConfigurationEntriesHC -Folder $ConfigurationsFolder)
     if (-not $entries.Count) {
         throw "No configurations found in '$ConfigurationsFolder'"
     }

@@ -1,5 +1,5 @@
 {
-  "$schema": "../Scripts/config.schema.json",
+  "$schema": "../../Scripts/config.schema.json",
   "SchemaVersion": 3,
   "Description": "Prompted setup example: creates or updates a local account and configures an NTP time server. Requests the account name, password and time-server IPv4 address before applying any settings.",
   "Settings": {

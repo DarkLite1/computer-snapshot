@@ -104,7 +104,9 @@ Function Export-FirewallRulesHC {
 
         #region Get the filters of all rules at once
         # One query per filter type instead of seven per rule: with
-        # hundreds of rules, asking per rule takes minutes
+        # hundreds of rules, asking per rule takes minutes. Without
+        # administrator rights Windows denies some of these queries; the
+        # filters they miss are then asked per rule, which is allowed
         $filters = @{}
         foreach ($type in @(
                 'Address', 'Port', 'Application', 'Service', 'Interface',
@@ -123,11 +125,17 @@ Function Export-FirewallRulesHC {
             $filterParams = @{
                 All         = $true
                 PolicyStore = $PolicyStore
+                ErrorAction = 'Stop'
             }
-            foreach ($filter in @(
-                    & "Get-NetFirewall${type}Filter" @filterParams
-                )) {
-                $filters[$type][[string]$filter.InstanceID] = $filter
+            try {
+                foreach ($filter in @(
+                        & "Get-NetFirewall${type}Filter" @filterParams
+                    )) {
+                    $filters[$type][[string]$filter.InstanceID] = $filter
+                }
+            }
+            catch {
+                Write-Verbose "Read the $type filters per rule: $_"
             }
         }
         #endregion
@@ -162,6 +170,22 @@ Function Export-FirewallRulesHC {
             )
             try {
                 $id = [string]$rule.InstanceID
+                foreach ($type in @($filters.Keys)) {
+                    if ($filters[$type].ContainsKey($id)) { continue }
+                    $filterParams = @{
+                        AssociatedNetFirewallRule = $rule
+                        ErrorAction               = 'Stop'
+                    }
+                    try {
+                        $filter = @(
+                            & "Get-NetFirewall${type}Filter" @filterParams
+                        ) | Select-Object -First 1
+                        if ($filter) { $filters[$type][$id] = $filter }
+                    }
+                    catch {
+                        Write-Verbose "No $type filter for rule '$id': $_"
+                    }
+                }
                 $missing = @(
                     $filters.Keys | Where-Object {
                         -not $filters[$_].ContainsKey($id)

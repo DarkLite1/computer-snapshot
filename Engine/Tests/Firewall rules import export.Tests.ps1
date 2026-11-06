@@ -148,17 +148,29 @@ Describe 'Firewall rules export' {
         )
     }
     BeforeEach {
+        # Real CIM instances, so a rule binds to -AssociatedNetFirewallRule
         Mock Get-NetFirewallRule {
             foreach ($id in @('{A}', '{B}', '{C}')) {
-                [pscustomobject]@{
-                    Name        = $id
-                    InstanceID  = $id
-                    DisplayName = "Rule $id"
-                    Direction   = 'Inbound'
-                    Enabled     = 'True'
-                    Action      = 'Allow'
-                    Profile     = 'Domain, Private'
+                $ruleParams = @{
+                    ClassName  = 'TestFirewallRule'
+                    Namespace  = 'root/standardcimv2'
+                    ClientOnly = $true
+                    Property   = @{
+                        Name        = $id
+                        InstanceID  = $id
+                        DisplayName = "Rule $id"
+                        Direction   = 'Inbound'
+                        Enabled     = 'True'
+                        Action      = 'Allow'
+                        Profile     = 'Domain, Private'
+                    }
                 }
+                $rule = New-CimInstance @ruleParams
+                $rule.PSObject.TypeNames.Insert(0, (
+                        'Microsoft.Management.Infrastructure.CimInstance#' +
+                        'root/standardcimv2/MSFT_NetFirewallRule'
+                    ))
+                $rule
             }
         }
         # Every rule has each filter, except rule C its port filter
@@ -182,6 +194,9 @@ Describe 'Firewall rules export' {
                     LocalPort  = @('80', '443')
                 }
             }
+        } -ParameterFilter { $All }
+        Mock Get-NetFirewallPortFilter { } -ParameterFilter {
+            $AssociatedNetFirewallRule
         }
         Mock Write-Progress
     }
@@ -208,6 +223,34 @@ Describe 'Firewall rules export' {
             'no Port filter found'
         )
         $result.Messages | Should -Be @('Exported 2 firewall rules')
+        Should -Invoke Get-NetFirewallPortFilter -Times 1 -Exactly `
+            -ParameterFilter {
+                $AssociatedNetFirewallRule.InstanceID -eq '{C}'
+            }
+    }
+    It ('reads a filter per rule when Windows denies reading all at once, ' +
+        'as it does without administrator rights') {
+        Mock Get-NetFirewallPortFilter {
+            throw 'Access is denied.'
+        } -ParameterFilter { $All }
+        Mock Get-NetFirewallPortFilter {
+            [pscustomobject]@{
+                InstanceID = $AssociatedNetFirewallRule.InstanceID
+                Protocol   = 'UDP'
+                LocalPort  = @("$($AssociatedNetFirewallRule.InstanceID)")
+            }
+        } -ParameterFilter { $AssociatedNetFirewallRule }
+
+        $result = & $scriptPath -Action Export -RootFolder $TestDrive
+
+        $result.Errors | Should -BeNullOrEmpty
+        @($result.Data.Name) | Should -Be @('{A}', '{B}', '{C}')
+        @($result.Data.LocalPort) | Should -Be @('{A}', '{B}', '{C}')
+        $result.Data[0].Protocol | Should -Be 'UDP'
+        Should -Invoke Get-NetFirewallPortFilter -Times 3 -Exactly `
+            -ParameterFilter { $AssociatedNetFirewallRule }
+        Should -Invoke Get-NetFirewallAddressFilter -Times 0 -Exactly `
+            -ParameterFilter { $AssociatedNetFirewallRule }
     }
     It 'shows the progress of the rules under the progress of the section' {
         $null = & $scriptPath -Action Export -RootFolder $TestDrive

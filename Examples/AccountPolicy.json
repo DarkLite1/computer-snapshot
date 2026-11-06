@@ -1,0 +1,11 @@
+{
+  "Comment": "Settings that are left out stay as they are. MaximumPasswordAgeDays 0: passwords never expire.",
+  "MinimumPasswordLength": 12,
+  "PasswordComplexity": true,
+  "PasswordHistorySize": 5,
+  "MinimumPasswordAgeDays": 0,
+  "MaximumPasswordAgeDays": 0,
+  "LockoutThreshold": 5,
+  "LockoutDurationMinutes": 15,
+  "ResetLockoutCounterMinutes": 15
+}

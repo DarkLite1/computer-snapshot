@@ -29,6 +29,7 @@ BeforeAll {
         'Hosts file entries'         = 'HostsFileEntries'
         'Network cards'              = 'NetworkCards'
         'Regional settings'          = 'RegionalSettings'
+        'Account policy'             = 'AccountPolicy'
         'Software'                   = 'Software'
         'User accounts'              = 'UserAccounts'
         'User groups'                = 'UserGroups'

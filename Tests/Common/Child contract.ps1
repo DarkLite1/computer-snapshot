@@ -19,6 +19,7 @@ Describe '<Name> data contract' -ForEach @(
             'Hosts file entries'   = 'HostsFileEntries'
             'Network cards'        = 'NetworkCards'
             'Regional settings'    = 'RegionalSettings'
+            'Account policy'       = 'AccountPolicy'
             Software               = 'Software'
             'User accounts'        = 'UserAccounts'
             'User groups'          = 'UserGroups'
@@ -39,6 +40,8 @@ Describe '<Name> data contract' -ForEach @(
         function Get-HostsFilePathHC {}
         function Wait-ProcessTreeHC { param($Process, $TimeoutSeconds, $What) }
         function Start-ScriptHC { param($Path) }
+        function Get-SecurityPolicyHC {}
+        function Set-SecurityPolicyHC { param($Values) }
         function Get-NetBiosSettingHC { param($Adapter) }
         function Set-NetBiosSettingHC { param($Adapter, $Setting) }
         function Get-UserLanguageListHC {}
@@ -163,6 +166,11 @@ Describe '<Name> data contract' -ForEach @(
         Mock Set-UserLanguageListHC
         Mock Set-UILanguageOverrideHC
         Mock Start-ScriptHC
+        $fakePolicy = @{ MinimumPasswordLength = 8; PasswordComplexity = 1 }
+        Mock Get-SecurityPolicyHC { $fakePolicy.Clone() }
+        Mock Set-SecurityPolicyHC {
+            foreach ($key in $Values.Keys) { $fakePolicy[$key] = $Values[$key] }
+        }
         #endregion
 
         #region Scheduled tasks
@@ -347,6 +355,10 @@ Describe '<Name> data contract' -ForEach @(
                     CultureName          = 'en-US'
                 }
                 $command = 'Start-ScriptHC'
+            }
+            'Account policy' {
+                $data = [pscustomobject]@{ MinimumPasswordLength = 12 }
+                $command = 'Set-SecurityPolicyHC'
             }
             'User accounts' {
                 $data = @(

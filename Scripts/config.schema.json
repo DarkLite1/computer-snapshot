@@ -103,6 +103,29 @@
             }
           ]
         },
+        "AccountPolicy": {
+          "description": "Inline AccountPolicy data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline AccountPolicy data.",
+              "$ref": "#/$defs/AccountPolicy"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
         "UserAccounts": {
           "description": "Inline UserAccounts data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
@@ -415,6 +438,9 @@
           "required": ["RegionalSettings"]
         },
         {
+          "required": ["AccountPolicy"]
+        },
+        {
           "required": ["UserAccounts"]
         },
         {
@@ -648,6 +674,63 @@
           "required": ["Comment"]
         }
       ]
+    },
+    "AccountPolicy": {
+      "type": "object",
+      "description": "Local password and account lockout policy. Each setting that is left out stays as it is. In a domain, a group policy can overwrite these settings.",
+      "additionalProperties": false,
+      "properties": {
+        "MinimumPasswordLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 14,
+          "description": "Minimum number of characters in a password; 0 allows an empty password."
+        },
+        "PasswordComplexity": {
+          "type": "boolean",
+          "description": "Passwords must contain characters of three kinds: upper case, lower case, digits or symbols."
+        },
+        "PasswordHistorySize": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 24,
+          "description": "Number of earlier passwords that cannot be used again."
+        },
+        "MinimumPasswordAgeDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 998,
+          "description": "Days before a password can be changed again; less than MaximumPasswordAgeDays."
+        },
+        "MaximumPasswordAgeDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999,
+          "description": "Days after which a password expires; 0 means passwords never expire."
+        },
+        "LockoutThreshold": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999,
+          "description": "Failed sign-ins before an account is locked; 0 never locks an account."
+        },
+        "LockoutDurationMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99999,
+          "description": "Minutes an account stays locked; 0 keeps it locked until an administrator unlocks it. At least ResetLockoutCounterMinutes. Needs a LockoutThreshold."
+        },
+        "ResetLockoutCounterMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99999,
+          "description": "Minutes after which the failed sign-in count starts at 0 again. Needs a LockoutThreshold."
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
     },
     "UserAccounts": {
       "type": "array",

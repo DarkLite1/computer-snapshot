@@ -9,6 +9,7 @@ function Get-SnapshotScriptsHC {
     return [ordered]@{
         StartCustomScriptsBefore = 'Start custom scripts import export.ps1'
         RegionalSettings         = 'Regional settings import export.ps1'
+        AccountPolicy            = 'Account policy import export.ps1'
         UserAccounts             = 'User accounts import export.ps1'
         UserGroups               = 'User groups import export.ps1'
         FirewallRules            = 'Firewall rules import export.ps1'
@@ -38,7 +39,7 @@ function Get-EmptySectionValueHC {
     )
 
     $objectSections = @(
-        'RegionalSettings', 'CreateFolders', 'NtpTimeServers',
+        'RegionalSettings', 'AccountPolicy', 'CreateFolders', 'NtpTimeServers',
         'RegistryKeys', 'Software'
     )
     if ($Name -in $objectSections) {
@@ -141,6 +142,10 @@ function Get-SnapshotSectionLabelsHC {
         RegionalSettings         = @(
             'Regional settings',
             'Language, keyboards, culture, home location and time zone.'
+        )
+        AccountPolicy            = @(
+            'Password and lockout policy',
+            'Local password rules and account lockout.'
         )
         UserAccounts             = @(
             'User accounts',

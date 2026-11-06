@@ -100,19 +100,20 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | ----- | -------------------------- | ----------------------------------------------------------------------- |
 | 1     | `StartCustomScriptsBefore` | Your own PowerShell scripts (from `Files/`) to run before everything else. |
 | 2     | `RegionalSettings`         | System locale, time zone, home location, culture, languages with keyboards and display language. |
-| 3     | `UserAccounts`             | Local user accounts to create, update or remove.                         |
-| 4     | `UserGroups`               | Local groups and their members.                                         |
-| 5     | `FirewallRules`            | Windows Defender Firewall rules.                                        |
-| 6     | `CreateFolders`            | Folders to create.                                                      |
-| 7     | `SmbShares`                | SMB shares, each with its share and NTFS permissions.                   |
-| 8     | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and registration, IPv4 settings, NetBIOS and IPv6. |
-| 9     | `HostsFileEntries`         | Host names in the Windows hosts file and the IP addresses they point to. |
-| 10    | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
-| 11    | `RegistryKeys`             | Registry values to set.                                                 |
-| 12    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
-| 13    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
-| 14    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
-| 15    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
+| 3     | `AccountPolicy`            | Local password rules and account lockout.                               |
+| 4     | `UserAccounts`             | Local user accounts to create, update or remove.                         |
+| 5     | `UserGroups`               | Local groups and their members.                                         |
+| 6     | `FirewallRules`            | Windows Defender Firewall rules.                                        |
+| 7     | `CreateFolders`            | Folders to create.                                                      |
+| 8     | `SmbShares`                | SMB shares, each with its share and NTFS permissions.                   |
+| 9     | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and registration, IPv4 settings, NetBIOS and IPv6. |
+| 10    | `HostsFileEntries`         | Host names in the Windows hosts file and the IP addresses they point to. |
+| 11    | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
+| 12    | `RegistryKeys`             | Registry values to set.                                                 |
+| 13    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
+| 14    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
+| 15    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
+| 16    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
 
 An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Examples/` folder for the exact format of each section.
 
@@ -147,6 +148,23 @@ The files are combined in the order you list them:
 - The combined section is checked as a whole, so the same share or user in two files is reported as well.
 
 See [Configurations/Example combined sections.json](Configurations/Example%20combined%20sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares common.json` with the shares of every PC and `Shared\SmbShares kiosk.json` with the extra kiosk shares.
+
+### Password and lockout policy
+
+`AccountPolicy` sets the local password rules and account lockout, before `UserAccounts` creates accounts with passwords that must meet them. Leave out a setting to keep it as it is:
+
+```json
+"AccountPolicy": {
+  "MinimumPasswordLength": 12,
+  "PasswordComplexity": true,
+  "MaximumPasswordAgeDays": 0,
+  "LockoutThreshold": 5,
+  "LockoutDurationMinutes": 15,
+  "ResetLockoutCounterMinutes": 15
+}
+```
+
+`MaximumPasswordAgeDays` 0 means passwords never expire, `LockoutThreshold` 0 never locks an account and `LockoutDurationMinutes` 0 keeps an account locked until an administrator unlocks it. The policy is read back after the change; a setting Windows refused, such as a lockout duration shorter than `ResetLockoutCounterMinutes`, is reported as an error. On a computer in a domain, a group policy can overwrite these local settings.
 
 ### Removing local user accounts
 

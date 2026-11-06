@@ -625,9 +625,9 @@ Describe 'Shared snapshot catalogue' {
         'existing script') {
         $scripts = Get-SnapshotScriptsHC
         @($scripts.Keys) | Should -Be @(
-            'StartCustomScriptsBefore', 'RegionalSettings', 'UserAccounts',
-            'UserGroups', 'FirewallRules', 'CreateFolders', 'SmbShares',
-            'NetworkCards', 'HostsFileEntries', 'NtpTimeServers',
+            'StartCustomScriptsBefore', 'RegionalSettings', 'AccountPolicy',
+            'UserAccounts', 'UserGroups', 'FirewallRules', 'CreateFolders',
+            'SmbShares', 'NetworkCards', 'HostsFileEntries', 'NtpTimeServers',
             'RegistryKeys', 'ScheduledTasks', 'CopyFilesFolders', 'Software',
             'StartCustomScriptsAfter'
         )

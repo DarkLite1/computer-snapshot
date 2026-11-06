@@ -1338,6 +1338,24 @@ Describe 'Single-file execution' {
         @($loaded.Items.Keys) | Should -Be @('UserAccounts', 'CreateFolders')
         @($loaded.Items.UserAccounts).Count | Should -Be 0
     }
+    It 'exports a list of one entry as a list' {
+        $params.Script.UserAccounts = Join-Path $PSScriptRoot (
+            '..\..\Scripts\User accounts import export.ps1'
+        )
+        $params.Items = @('UserAccounts')
+        Mock Invoke-ChildScriptHC @inModule {
+            [pscustomobject]@{
+                Data     = @([ordered]@{ Name = 'Only' })
+                Messages = [string[]]@('Exported')
+                Errors   = [string[]]@()
+            }
+        }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeTrue
+        $loaded = Read-ConfigurationHC $path $TestDrive
+        $loaded.Items.UserAccounts -is [array] | Should -BeTrue
+        @(Test-ConfigurationHC $loaded $TestDrive) | Should -BeNullOrEmpty
+    }
     It 'treats an empty Errors property as success' {
         $params.Items = @('UserAccounts')
         Mock Invoke-ChildScriptHC @inModule {

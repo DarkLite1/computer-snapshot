@@ -755,12 +755,13 @@ function Invoke-ComputerSnapshotHC {
 
         if ($Action -eq 'CreateSnapshot') {
             # Every selected section is in the export: its data, or its
-            # empty value when there is nothing to export
-            $exportItems[$name] = if (Test-EmptySectionHC $output[0].Data) {
-                Get-EmptySectionValueHC -Name $name
+            # empty value when there is nothing to export. No if-expression:
+            # it would unroll a list of one entry into that entry
+            if (Test-EmptySectionHC $output[0].Data) {
+                $exportItems[$name] = Get-EmptySectionValueHC -Name $name
             }
             else {
-                $output[0].Data
+                $exportItems[$name] = $output[0].Data
             }
             $exported = $true
         }

@@ -112,6 +112,42 @@ Describe 'Schema contract' {
             }
         }
     }
+    It ('gives every section a schema that VS Code uses for its Examples ' +
+        'and Shared files') {
+        $sections = @(
+            $schema.properties.Items.properties.PSObject.Properties.Name |
+            Where-Object { $_ -ne 'Comment' }
+        )
+        $wrapperFolder = Join-Path $root 'Scripts\Schemas'
+        @(Get-ChildItem -LiteralPath $wrapperFolder -File).Name |
+            Sort-Object |
+            Should -Be @($sections | Sort-Object | ForEach-Object {
+                    "$_.schema.json"
+                })
+        $settings = Get-Content -Raw -LiteralPath (
+            Join-Path $root '.vscode\settings.json'
+        ) | ConvertFrom-Json
+
+        foreach ($name in $sections) {
+            $schema.'$defs'.$name | Should -Not -BeNullOrEmpty -Because $name
+            $wrapper = Get-Content -Raw -LiteralPath (
+                Join-Path $wrapperFolder "$name.schema.json"
+            ) | ConvertFrom-Json
+            $wrapper.'$ref' |
+                Should -BeExactly "../config.schema.json#/`$defs/$name"
+            $association = @(
+                $settings.'json.schemas' | Where-Object {
+                    $_.url -eq "./Scripts/Schemas/$name.schema.json"
+                }
+            )
+            $association.Count | Should -Be 1 -Because $name
+            $association[0].fileMatch | Should -Be @(
+                "**/Examples/$name.json"
+                "**/Examples/$name *.json"
+                "**/Shared/$name *.json"
+            )
+        }
+    }
     It ('fills the number placeholders of the examples in as numbers that ' +
         'pass the check') {
         $numberFields = 0

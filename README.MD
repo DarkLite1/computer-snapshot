@@ -559,6 +559,8 @@ The tool follows the processes an installer starts by checking every 50 ms for t
 
 Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works.
 
+Section files can't have that line, so `.vscode/settings.json` tells Visual Studio Code which schema in `Scripts/Schemas/` belongs to which file, by its name: `Examples/RegistryKeys.json`, `Examples/RegistryKeys <anything>.json` and `Shared/RegistryKeys <anything>.json` get the `RegistryKeys` hints, and the same for every other section. Open the computer-snapshot folder itself in Visual Studio Code for this, and name a new shared file after its section, such as `Shared\RegistryKeys office.json`, to get the hints there too.
+
 > **🔒 Important Security Warning:**
 > When you save settings that include passwords (like user accounts or certain registry keys), **they are saved in plain text**. Please keep your USB stick physically secure, and never upload files containing sensitive passwords to public spaces. Where possible, use a `{{password:...}}` placeholder instead, so the password is asked for during the restore and never stored (see [Restore-Time Input](#restore-time-input)).
 

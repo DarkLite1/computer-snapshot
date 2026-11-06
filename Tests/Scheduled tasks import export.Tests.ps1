@@ -252,8 +252,14 @@ Describe 'Scheduled task accounts' {
             'Scheduled tasks import export.ps1'
         function Convert-AccountNameHC { param($Name) }
         function ConvertTo-PortableAccountNameHC { param($Name, $Sid) }
+        function Get-AccountSidHC { param($Name) }
+        function Get-AccountRightsHC { param($Sid) }
+        function Add-AccountRightHC { param($Sid, $Right) }
     }
     BeforeEach {
+        Mock Get-AccountSidHC { 'S-1-5-21-1-2-3-1001' }
+        Mock Get-AccountRightsHC { 'SeBatchLogonRight' }
+        Mock Add-AccountRightHC
         Mock Convert-AccountNameHC { $Name -replace '^PC1\\', 'PC2\' }
         Mock ConvertTo-PortableAccountNameHC {
             if ($Name -eq 'SYSTEM') { 'S-1-5-18' } else { $Name }
@@ -321,6 +327,43 @@ Describe 'Scheduled task accounts' {
         Should -Invoke @invokeParams -ParameterFilter {
             $TaskName -eq 'Default' -and $User -eq 'NT AUTHORITY\SYSTEM'
         }
+    }
+    It ('grants Log on as a batch job to an account with a saved password ' +
+        'that does not have it') {
+        Mock Get-AccountRightsHC { 'SeInteractiveLogonRight' }
+        $data = @(
+            [pscustomobject]@{
+                TaskName      = 'Saved'
+                TaskPath      = '\HC\'
+                Enabled       = $true
+                Xml           = '<Task/>'
+                RunAsUser     = 'kiosk'
+                RunAsPassword = 'S3cret!'
+            }
+            [pscustomobject]@{
+                TaskName  = 'Service'
+                TaskPath  = '\HC\'
+                Enabled   = $true
+                Xml       = '<Task/>'
+                RunAsUser = 'S-1-5-19'
+            }
+        )
+
+        $result = @(
+            & $scriptPath -Action Import -Data $data -RootFolder $TestDrive
+        )
+
+        $result[0].Errors | Should -BeNullOrEmpty
+        Should -Invoke Add-AccountRightHC -ParameterFilter {
+            $Sid -eq 'S-1-5-21-1-2-3-1001' -and $Right -eq 'SeBatchLogonRight'
+        } -Times 1 -Exactly
+        Should -Invoke Get-AccountSidHC -ParameterFilter {
+            $Name -eq 'kiosk'
+        } -Times 1 -Exactly
+        $result[0].Messages[0] | Should -Be (
+            "Granted 'Log on as a batch job' to 'kiosk', needed for " +
+            "scheduled task '\HC\Saved'"
+        )
     }
     It 'reports a wrong password and a password without a user' {
         $data = @(

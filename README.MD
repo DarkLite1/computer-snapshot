@@ -431,6 +431,8 @@ The account a task runs as:
 
 Use a `{{password:...}}` placeholder for `RunAsPassword`, so the password is asked for during the restore and never stored in the configuration. An export does exactly that for each task with a saved password. A task that runs for a group can't be exported with its account and is restored as SYSTEM; the export report says so.
 
+A task with a saved password needs the user right *Log on as a batch job* for its account. When the account doesn't have that right itself, the restore grants it before registering the task and says so in the report. A right that comes through a group, such as Administrators, isn't looked at, so the account then gets it directly as well. On a computer in a domain, a group policy that sets *Log on as a batch job* replaces the local list at the next policy refresh: add the account there instead.
+
 ```json
 "ScheduledTasks": [
   {

@@ -18,7 +18,10 @@
 
     The account a task runs as:
     - RunAsUser and RunAsPassword: that user, whether or not the user is
-      signed in, with the password saved in Task Scheduler.
+      signed in, with the password saved in Task Scheduler. Such a task
+      needs the user right 'Log on as a batch job' (SeBatchLogonRight);
+      an account without it gets it before the task is registered. A
+      domain group policy that sets this right overrides the local one.
     - RunAsUser only: that account, for example a service account such as
       LOCAL SERVICE, or a user when the task only runs while signed in.
     - Neither: SYSTEM.
@@ -46,6 +49,143 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
+
+#region Windows helpers
+function Initialize-LsaRightsHC {
+    if ('ComputerSnapshot.LsaRights' -as [type]) { return }
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
+
+namespace ComputerSnapshot {
+    public static class LsaRights {
+        [StructLayout(LayoutKind.Sequential)]
+        struct LSA_UNICODE_STRING {
+            public ushort Length;
+            public ushort MaximumLength;
+            public IntPtr Buffer;
+        }
+        [StructLayout(LayoutKind.Sequential)]
+        struct LSA_OBJECT_ATTRIBUTES {
+            public int Length;
+            public IntPtr RootDirectory;
+            public IntPtr ObjectName;
+            public uint Attributes;
+            public IntPtr SecurityDescriptor;
+            public IntPtr SecurityQualityOfService;
+        }
+        [DllImport("advapi32.dll")]
+        static extern uint LsaOpenPolicy(IntPtr systemName,
+            ref LSA_OBJECT_ATTRIBUTES attributes, uint access,
+            out IntPtr policy);
+        [DllImport("advapi32.dll")]
+        static extern uint LsaEnumerateAccountRights(IntPtr policy,
+            byte[] sid, out IntPtr rights, out uint count);
+        [DllImport("advapi32.dll")]
+        static extern uint LsaAddAccountRights(IntPtr policy, byte[] sid,
+            LSA_UNICODE_STRING[] rights, uint count);
+        [DllImport("advapi32.dll")]
+        static extern uint LsaClose(IntPtr handle);
+        [DllImport("advapi32.dll")]
+        static extern uint LsaFreeMemory(IntPtr buffer);
+        [DllImport("advapi32.dll")]
+        static extern int LsaNtStatusToWinError(uint status);
+
+        // POLICY_LOOKUP_NAMES | POLICY_CREATE_ACCOUNT
+        const uint Access = 0x00000810;
+        const uint ObjectNameNotFound = 0xC0000034;
+
+        static IntPtr Open() {
+            var attributes = new LSA_OBJECT_ATTRIBUTES();
+            IntPtr policy;
+            Check(LsaOpenPolicy(IntPtr.Zero, ref attributes, Access,
+                out policy));
+            return policy;
+        }
+        static void Check(uint status) {
+            if (status != 0) {
+                throw new Win32Exception(LsaNtStatusToWinError(status));
+            }
+        }
+        static byte[] Binary(string sid) {
+            var identifier = new SecurityIdentifier(sid);
+            var binary = new byte[identifier.BinaryLength];
+            identifier.GetBinaryForm(binary, 0);
+            return binary;
+        }
+
+        public static string[] Get(string sid) {
+            IntPtr policy = Open();
+            try {
+                IntPtr rights;
+                uint count;
+                uint status = LsaEnumerateAccountRights(policy, Binary(sid),
+                    out rights, out count);
+                if (status == ObjectNameNotFound) { return new string[0]; }
+                Check(status);
+                try {
+                    var result = new string[count];
+                    int size = Marshal.SizeOf(typeof(LSA_UNICODE_STRING));
+                    for (int i = 0; i < count; i++) {
+                        var right = (LSA_UNICODE_STRING)Marshal.PtrToStructure(
+                            new IntPtr(rights.ToInt64() + i * size),
+                            typeof(LSA_UNICODE_STRING));
+                        result[i] = Marshal.PtrToStringUni(
+                            right.Buffer, right.Length / 2);
+                    }
+                    return result;
+                }
+                finally { LsaFreeMemory(rights); }
+            }
+            finally { LsaClose(policy); }
+        }
+
+        public static void Add(string sid, string name) {
+            IntPtr policy = Open();
+            IntPtr buffer = Marshal.StringToHGlobalUni(name);
+            try {
+                var right = new LSA_UNICODE_STRING();
+                right.Buffer = buffer;
+                right.Length = (ushort)(name.Length * 2);
+                right.MaximumLength = (ushort)((name.Length + 1) * 2);
+                Check(LsaAddAccountRights(policy, Binary(sid),
+                    new LSA_UNICODE_STRING[] { right }, 1));
+            }
+            finally {
+                Marshal.FreeHGlobal(buffer);
+                LsaClose(policy);
+            }
+        }
+    }
+}
+'@
+}
+
+function Get-AccountSidHC {
+    param([Parameter(Mandatory)][string]$Name)
+    ([Security.Principal.NTAccount]$Name).Translate(
+        [Security.Principal.SecurityIdentifier]
+    ).Value
+}
+
+function Get-AccountRightsHC {
+    # The rights given to the account itself, not through its groups
+    param([Parameter(Mandatory)][string]$Sid)
+    Initialize-LsaRightsHC
+    [ComputerSnapshot.LsaRights]::Get($Sid)
+}
+
+function Add-AccountRightHC {
+    param(
+        [Parameter(Mandatory)][string]$Sid,
+        [Parameter(Mandatory)][string]$Right
+    )
+    Initialize-LsaRightsHC
+    [ComputerSnapshot.LsaRights]::Add($Sid, $Right)
+}
+#endregion
 
 #region Helpers
 function Get-TaskRunAsHC {
@@ -234,6 +374,22 @@ else {
                 if ($task.RunAsPassword) {
                     $registerParams.Password = [string]$task.RunAsPassword
                     $runAs += ' with saved password'
+
+                    # Task Scheduler refuses the account without this right
+                    $sid = Get-AccountSidHC -Name $registerParams.User
+                    $right = 'SeBatchLogonRight'
+                    if (@(Get-AccountRightsHC -Sid $sid) -notcontains $right) {
+                        Write-Verbose (
+                            "Task '$fullName': grant '$right' to " +
+                            "'$($registerParams.User)'"
+                        )
+                        Add-AccountRightHC -Sid $sid -Right $right
+                        $messages.Add(
+                            "Granted 'Log on as a batch job' to " +
+                            "'$($registerParams.User)', needed for " +
+                            "scheduled task '$fullName'"
+                        )
+                    }
                 }
             }
 

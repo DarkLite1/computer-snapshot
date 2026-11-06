@@ -121,7 +121,7 @@ Describe 'Schema contract' {
         $titleCase = '( [A-Z0-9][A-Za-z0-9]*)*'
         $folders = @{
             'Shared\Examples'         = (
-                "^($($sections -join '|'))$titleCase\.(json|xml)$"
+                "^($($sections -join '|'))$titleCase\.(json|xml|md)$"
             )
             Shared                    = (
                 "^($($sections -join '|'))$titleCase\.json$"

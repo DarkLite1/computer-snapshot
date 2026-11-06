@@ -91,29 +91,29 @@ All configurations are saved as standard JSON files. You can open and edit them 
 
 ### What can be exported and restored?
 
-Each configuration has an `Items` object with one entry per section. Sections always run in this order, regardless of the order in your file:
+Each configuration has an `Items` object with one entry per section. Sections always run in this order, regardless of the order in your file. Each section links to its example in `Shared/Examples/`, or to a page with more details and the pitfalls when it has one:
 
-| Order | Section                    | What it covers                                                          |
-| ----- | -------------------------- | ----------------------------------------------------------------------- |
-| 1     | `StartCustomScriptsBefore` | Your own PowerShell scripts (from `Files/`) to run before everything else. |
-| 2     | `RegionalSettings`         | System locale, time zone, home location, culture, languages with keyboards and display language. |
-| 3     | `AccountPolicy`            | Local password rules and account lockout.                               |
-| 4     | `UserAccounts`             | Local user accounts to create, update or remove.                         |
-| 5     | `UserGroups`               | Local groups and their members.                                         |
-| 6     | `FirewallRules`            | Windows Defender Firewall rules.                                        |
-| 7     | `EnvironmentVariables`     | Environment variables, and entries in lists such as `Path`.             |
-| 8     | `CreateFolders`            | Folders to create.                                                      |
-| 9     | `SmbShares`                | SMB shares, each with its share and NTFS permissions.                   |
-| 10    | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and registration, IPv4 settings, NetBIOS and IPv6. |
-| 11    | `HostsFileEntries`         | Host names in the Windows hosts file and the IP addresses they point to. |
-| 12    | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
-| 13    | `PowerSettings`            | Active power plan, display, sleep, hibernate and disk timeouts, and hibernation. |
-| 14    | `RegistryKeys`             | Registry values to set.                                                 |
-| 15    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
-| 16    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
-| 17    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
-| 18    | `Services`                 | Startup type of Windows services, and starting or stopping them.        |
-| 19    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
+| Order | Section | What it covers |
+| ----- | ------- | -------------- |
+| 1     | [`StartCustomScriptsBefore`](Shared/Examples/StartCustomScriptsAfter.md) | Your own PowerShell scripts (from `Files/`) to run before everything else. |
+| 2     | [`RegionalSettings`](Shared/Examples/RegionalSettings.json) | System locale, time zone, home location, culture, languages with keyboards and display language. |
+| 3     | [`AccountPolicy`](Shared/Examples/AccountPolicy.md) | Local password rules and account lockout. |
+| 4     | [`UserAccounts`](Shared/Examples/UserAccounts.md) | Local user accounts to create, update or remove. |
+| 5     | [`UserGroups`](Shared/Examples/UserGroups.json) | Local groups and their members. |
+| 6     | [`FirewallRules`](Shared/Examples/FirewallRules.json) | Windows Defender Firewall rules. |
+| 7     | [`EnvironmentVariables`](Shared/Examples/EnvironmentVariables.md) | Environment variables, and entries in lists such as `Path`. |
+| 8     | [`CreateFolders`](Shared/Examples/CreateFolders.json) | Folders to create. |
+| 9     | [`SmbShares`](Shared/Examples/SmbShares.md) | SMB shares, each with its share and NTFS permissions. |
+| 10    | [`NetworkCards`](Shared/Examples/NetworkCards.md) | Network adapter names, network profile (category), DNS suffix and registration, IPv4 settings, NetBIOS and IPv6. |
+| 11    | [`HostsFileEntries`](Shared/Examples/HostsFileEntries.md) | Host names in the Windows hosts file and the IP addresses they point to. |
+| 12    | [`NtpTimeServers`](Shared/Examples/NtpTimeServers.json) | Time synchronization (domain or specific NTP servers). |
+| 13    | [`PowerSettings`](Shared/Examples/PowerSettings.md) | Active power plan, display, sleep, hibernate and disk timeouts, and hibernation. |
+| 14    | [`RegistryKeys`](Shared/Examples/RegistryKeys.md) | Registry values to set, remove or clear. |
+| 15    | [`ScheduledTasks`](Shared/Examples/ScheduledTasks.md) | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
+| 16    | [`CopyFilesFolders`](Shared/Examples/CopyFilesFolders.json) | Files or folders to copy from the USB stick to the computer. |
+| 17    | [`Software`](Shared/Examples/Software.md) | Software to uninstall and installers (from `Software/`) to run. |
+| 18    | [`Services`](Shared/Examples/Services.md) | Startup type of Windows services, and starting or stopping them. |
+| 19    | [`StartCustomScriptsAfter`](Shared/Examples/StartCustomScriptsAfter.md) | Your own PowerShell scripts to run after everything else. |
 
 An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Shared/Examples/` folder for the exact format of each section.
 
@@ -173,98 +173,6 @@ Name a shared file after its section, such as `Shared\SmbShares Common.json`, so
 
 See [Configurations/Examples/Combined Sections.json](Configurations/Examples/Combined%20Sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\Examples\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares Common.json` with the shares of every PC and `Shared\SmbShares Kiosk.json` with the extra kiosk shares.
 
-### Password and lockout policy
-
-`AccountPolicy` sets the local password rules and account lockout, before `UserAccounts` creates accounts with passwords that must meet them. Leave out a setting to keep it as it is:
-
-```json
-"AccountPolicy": {
-  "MinimumPasswordLength": 12,
-  "PasswordComplexity": true,
-  "MaximumPasswordAgeDays": 0,
-  "LockoutThreshold": 5,
-  "LockoutDurationMinutes": 15,
-  "ResetLockoutCounterMinutes": 15
-}
-```
-
-`MaximumPasswordAgeDays` 0 means passwords never expire, `LockoutThreshold` 0 never locks an account and `LockoutDurationMinutes` 0 keeps an account locked until an administrator unlocks it. The policy is read back after the change; a setting Windows refused, such as a lockout duration shorter than `ResetLockoutCounterMinutes`, is reported as an error. On a computer in a domain, a group policy can overwrite these local settings.
-
-### Environment variables
-
-`EnvironmentVariables` changes variables of the computer (`Scope` `Machine`, the default) or of the account running the restore (`User`). Use `AddToList` and `RemoveFromList` for lists such as `Path`, so the rest of the list stays as it is:
-
-```json
-"EnvironmentVariables": [
-  { "Name": "TOOLS_HOME", "Value": "%ProgramData%\\Tools" },
-  { "Name": "Path", "Action": "AddToList", "Values": ["%ProgramData%\\Tools\\bin"] },
-  { "Name": "OLD_VENDOR", "Action": "Remove" }
-]
-```
-
-`%VARIABLE%` in a value is kept as it is and expanded when used, like Windows does for `Path`. Programs started after the restore see the changes, and so do the sections that run after this one, such as `CreateFolders` and `Software`. The export writes the computer variables that are not part of Windows; `Path` is not exported, add `AddToList` entries for it. A variable whose name looks like a secret, such as `SMTP_PASSWORD` or `API_TOKEN`, is exported as a `{{password:...}}` placeholder, so its value is never written to the file and the restore asks for it.
-
-### Services
-
-`Services` sets how Windows starts a service and, with `Status`, starts or stops it right away. It runs after `Software`, so the services of software installed by the restore can be set too. Use the service name, not the display name; `Get-Service` shows both:
-
-```json
-"Services": [
-  { "Name": "wuauserv", "StartupType": "AutomaticDelayedStart" },
-  { "Name": "Spooler", "StartupType": "Disabled", "Status": "Stopped" }
-]
-```
-
-`StartupType` is `Automatic`, `AutomaticDelayedStart`, `Manual` or `Disabled`. Stopping a service also stops the services that depend on it. A service listed twice, or `Disabled` together with `Running`, is reported before anything is changed.
-
-### Power settings
-
-`PowerSettings` chooses the active power plan and sets its timeouts, in minutes where 0 means never, for `AC` (plugged in) and `DC` (on battery):
-
-```json
-"PowerSettings": {
-  "ActivePlan": "HighPerformance",
-  "MonitorTimeoutMinutes": { "AC": 30, "DC": 10 },
-  "SleepTimeoutMinutes": { "AC": 0, "DC": 30 },
-  "HibernateEnabled": false
-}
-```
-
-`ActivePlan` is `Balanced`, `HighPerformance` or `PowerSaver`, which work in every Windows language, a plan name as `powercfg /list` shows it, or a plan GUID. Laptops with modern standby often only have `Balanced`. The timeouts are set on the plan that is active after `ActivePlan`. `HibernateEnabled` false also turns off fast startup.
-
-### Removing local user accounts
-
-Use `Action: "Remove"` in `UserAccounts` instead of a custom removal script:
-
-```json
-"UserAccounts": [
-  { "Name": "bob", "Action": "Remove" }
-]
-```
-
-- Without `Action`, or with `Action: "Set"`, the existing create/update
-  behavior is unchanged.
-- Removal accepts only `Name`, `Action` and an optional `Comment`. Do not
-  include a password or other account settings.
-- Use an exact local account name (case-insensitive), not a wildcard,
-  domain-qualified name or SID. Only named accounts are removed.
-- Windows built-in accounts (even renamed ones) and the account running the
-  restore are protected by SID; attempts to remove them are reported as errors.
-- The last enabled local administrator is never removed. Another enabled
-  local account, or a domain or Azure AD user or group, in the
-  Administrators group counts as another administrator. When the members of
-  that group cannot be read, removal is refused.
-- An account that is already absent is reported as nothing to remove.
-  Other failures are reported, and remaining entries are still processed.
-- This deletes the account, **not its Windows profile or files**. Recreating
-  the same name creates a different SID and does not restore its old permissions.
-- Run as administrator. Removal cannot be undone by this tool; review the
-  names before restoring.
-
-See [Shared/Examples/UserAccounts.json](Shared/Examples/UserAccounts.json) for a mixed
-create/update/removal example. Exports still capture only existing accounts
-for creation or update; they never generate removal actions.
-
 ### Accounts in other Windows languages
 
 Built-in accounts and groups have a different name in each Windows language: *Everyone* is *Iedereen* in Dutch and *Jeder* in German. So exports write them with their **English name**, such as `Everyone`, `BUILTIN\Administrators` or `NT AUTHORITY\Authenticated Users`. A restore looks the English name up in a fixed list of built-in accounts, whose security IDs (SIDs) are the same on every Windows, and uses the name of that computer's language. The prefix is optional: `Administrators` works too. This applies to user group names and members, share permissions, folder permissions and the account of scheduled tasks.
@@ -281,282 +189,6 @@ All paths in a configuration (installers, files to copy, custom scripts, shared 
 | `RestartDelaySeconds` | `60`    | Length of that countdown, from `0` to `600` seconds.                      |
 | `OpenReportInBrowser` | `true`  | Open the HTML report when the run is finished.                            |
 | `RunElevated`         | `false` | When restoring from a shortcut or the command line, restart as administrator first (UAC prompt). |
-
-### SMB shares
-
-`SmbShares` is a list with one entry per share. Each share has its settings, its share permissions in `Access`, and the permissions of its folder in `NTFS`:
-
-```json
-"SmbShares": [
-  {
-    "Name": "Data",
-    "Path": "C:\\Data",
-    "Access": [
-      { "AccountName": "BUILTIN\\Administrators", "AccessControlType": "Allow", "AccessRight": "Full" },
-      { "AccountName": "NT AUTHORITY\\Authenticated Users", "AccessControlType": "Allow", "AccessRight": "Change" }
-    ],
-    "NTFS": {
-      "Owner": "BUILTIN\\Administrators",
-      "AreAccessRulesProtected": false,
-      "Access": [
-        { "IdentityReference": "BUILTIN\\Users", "AccessControlType": "Allow", "FileSystemRights": "Modify, Synchronize", "InheritanceFlags": "ContainerInherit, ObjectInherit", "PropagationFlags": "None" }
-      ]
-    }
-  },
-  {
-    "Name": "Scans",
-    "Path": "D:\\Scans",
-    "Access": [ { "AccountName": "BUILTIN\\Users", "AccessControlType": "Allow", "AccessRight": "Read" } ]
-  }
-]
-```
-
-- A share without `Access` keeps its current share permissions; a share without `NTFS` keeps the current permissions of its folder.
-- Configured permissions are applied first. Existing share permissions that aren't configured are only removed when every configured one could be applied, so a share never ends up with less access than configured.
-- Each share name may appear only once.
-
-### Network cards and IP settings
-
-Each entry in `NetworkCards` has two parts: `FindBy` says how to find the card, `Change` says what to change on it. Nothing in `FindBy` is ever changed.
-
-```json
-"NetworkCards": [
-  {
-    "FindBy": { "Name": "Ethernet" },
-    "Change": {
-      "NewName": "LAN",
-      "IPSettings": {
-        "IPAddress": "{{ipv4:IP address of this PC}}",
-        "PrefixLength": "{{prefix:Prefix length, such as 24}}",
-        "DefaultGateway": "{{ipv4:Default gateway}}",
-        "DNSServers": ["10.75.38.23", "10.75.38.22"]
-      }
-    }
-  },
-  {
-    "FindBy": { "Description": "Broadcom" },
-    "Change": { "IPSettings": { "Dhcp": true } }
-  }
-]
-```
-
-`FindBy` has exactly one of:
-
-| `FindBy`      | Finds the card                                                                                                                   |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `Description` | by its description, the name in Device Manager: an exact match first, otherwise the one card containing the text. The driver sets the description; it can't be changed. |
-| `Name`        | by its current name, such as `Ethernet`, before any rename; names can differ per computer                                         |
-| `OnlyCard`    | `true`: the one physical card of the computer, for PCs with a single network card. `"Wired"` or `"WiFi"`: the one card of that kind, such as the Ethernet card of a laptop that also has Wi-Fi. VPN, virtual (such as a Hyper-V switch) and Bluetooth adapters don't count; with no or several such cards the entry fails and lists the cards. |
-
-`Change` can hold, applied in this order; anything left out stays as it is:
-
-| `Change`          | Does                                                                     |
-| ----------------- | ------------------------------------------------------------------------ |
-| `NewName`         | renames the card                                                         |
-| `DnsSuffix`       | sets the connection-specific DNS suffix; an empty string clears it        |
-| `NetworkCategory` | sets the network profile, such as `Private` or `Public`                  |
-| `IPSettings`      | sets the IPv4 address, gateway and DNS servers, see below                |
-
-- A static address needs `IPAddress` and `PrefixLength`. It turns DHCP off and replaces all IPv4 addresses and the default gateway of the card. `DefaultGateway` is optional and must be in the same subnet.
-- `{ "Dhcp": true }` makes the address automatic again; static addresses and the gateway are removed, and hand-set DNS servers too unless `DNSServers` is given.
-- `DNSServers` replaces the DNS servers, in order of use. An empty list makes DNS automatic; leaving it out keeps the current DNS servers.
-- Use `{{ipv4:...}}` and `{{prefix:...}}` placeholders to ask for the values during the restore (see [Restore-Time Input](#restore-time-input)).
-- When a change to the IPv4 settings fails, for example because the address is already in use, the previous settings are put back: DHCP on or off, the addresses, the default gateway and the DNS servers. The report names the failure and says whether restoring them worked.
-- An export finds each card by its description and writes its current name in `NewName`, with its settings: `Dhcp: true`, or its static address, prefix and gateway, plus DNS servers that were set by hand. A card with several IPv4 addresses exports the first one; the report says so.
-- A static address is exported as a placeholder that shows the exported address, for example `"IPAddress": "{{ipv4:IP address of network card 'Ethernet' (was 192.168.1.20)}}"`, so restoring on several PCs never gives them all the same address. Restoring on the same PC means retyping the address shown; for an unattended restore, put it in the answer file (`New answer file.ps1` lists it). `PrefixLength`, `DefaultGateway` and `DNSServers` are exported as they are, because they are normally the same for every PC on that network. The export report names each card that got a placeholder.
-
-> Changing the IP address of the card you are connected through, for example over remote desktop, ends that connection. Restore network settings at the computer itself.
-
-### Hosts file
-
-`HostsFileEntries` lists host names per IP address, for the Windows hosts file (`C:\Windows\System32\drivers\etc\hosts`):
-
-```json
-"HostsFileEntries": [
-  { "IPAddress": "10.20.60.47", "Hostnames": ["belsdaise0001", "belsdaise0001.grouphc.net"] },
-  { "IPAddress": "fd00::47", "Hostnames": ["belsdaise0001-v6.grouphc.net"] },
-  { "IPAddress": "{{ipv4:IP address of the print server}}", "Hostnames": ["printserver"] },
-  { "Action": "Remove", "Hostnames": ["oldserver", "oldserver.grouphc.net"] }
-]
-```
-
-- Each host name is made to point to its `IPAddress` (IPv4 or IPv6). A name that already does is left alone; a name that points to another address is moved, and the report says from which address; a missing name is added on a new line.
-- `"Action": "Remove"` removes the host names, whatever address they point to. It has no `IPAddress`.
-- Comments, empty lines and all other entries in the hosts file are kept as they are. A line whose names were all moved or removed is dropped.
-- The file is only written when something changed. The previous version is kept as `hosts.bak`, and the DNS cache is cleared so the change works straight away.
-- A host name may point to one address only, across the whole section, also when it is combined from several files in `Shared\`.
-- An export writes every active line of the hosts file, one entry per address.
-
-### Registry changes
-
-Each entry in `RegistryKeys` has an `Action`; without one, it sets a value.
-
-| `Action`        | Needs                      | Does                                                                 |
-| --------------- | -------------------------- | -------------------------------------------------------------------- |
-| `Set`           | `Path`, `Name`, `Type`, `Value` | creates or changes a value, including missing keys               |
-| `RemoveValue`   | `Path`, `Name`             | removes one value                                                    |
-| `ClearValues`   | `Path`                     | removes all values of the key, keeps its subkeys                     |
-| `ClearKey`      | `Path`                     | removes all values and subkeys, keeps the key                        |
-| `RemoveKey`     | `Path`                     | removes the key with everything in it                                |
-
-| `Type`                      | `Value`                                                       |
-| --------------------------- | ------------------------------------------------------------- |
-| `String`, `ExpandString`    | text; `%variables%` in an `ExpandString` stay as written       |
-| `MultiString`               | a list: `["one", "two"]`                                       |
-| `Binary`                    | hex text `"01 0A FF"`, or a list of numbers `[1, 10, 255]`     |
-| `DWord`, `QWord`            | a number (`16`), or text in decimal (`"16"`) or hex (`"0x10"`) |
-
-- `"Name": ""` is the key's (Default) value. `Path` can be `HKLM:\...`, `HKCU:\...` or `HKEY_LOCAL_MACHINE\...`.
-- An unchanged value isn't rewritten, and removing something that doesn't exist is reported, not an error, so a configuration can be restored again.
-- `ClearValues`, `ClearKey` and `RemoveKey` are refused for a hive root or a key directly below it, such as `HKLM:\SOFTWARE`.
-- In `RunAsOtherUser`, `HKCU` means that user's registry.
-
-```json
-"RegistryKeys": [
-  { "Path": "HKLM:\\SOFTWARE\\Vendor", "Name": "Servers", "Type": "MultiString", "Value": ["srv1", "srv2"] },
-  { "Path": "HKLM:\\SOFTWARE\\Vendor", "Name": "Flags", "Type": "DWord", "Value": "0x10" },
-  { "Action": "RemoveValue", "Path": "HKLM:\\SOFTWARE\\Vendor", "Name": "Obsolete" },
-  { "Action": "ClearKey", "Path": "HKLM:\\SOFTWARE\\Vendor\\Cache" }
-]
-```
-
-### Scheduled tasks
-
-An export captures the tasks in the Task Scheduler folder `\HC\` and its subfolders. To export other folders, enter them in the wizard under **Scheduled task folders**, or use `-ExportOptions` on the command line (see [Command-Line Use](#-command-line-use)).
-
-Each task needs its XML definition, in one of two ways:
-
-- `Xml`: the complete XML inline, as an export writes it.
-- `XmlFile`: a file exported from Task Scheduler (right-click a task, **Export...**), relative to the USB stick root unless it is a full path. This is easier to edit and review than XML inside JSON.
-
-The account a task runs as:
-
-| Properties                       | The task runs                                                                          |
-| -------------------------------- | -------------------------------------------------------------------------------------- |
-| `RunAsUser` and `RunAsPassword`  | as that user, whether or not the user is signed in; the password is saved in Task Scheduler |
-| `RunAsUser` only                 | as that account: a service account such as `NT AUTHORITY\LOCAL SERVICE`, or a user while signed in |
-| neither                          | as SYSTEM                                                                              |
-
-Use a `{{password:...}}` placeholder for `RunAsPassword`, so the password is asked for during the restore and never stored in the configuration. An export does exactly that for each task with a saved password. A task that runs for a group can't be exported with its account and is restored as SYSTEM; the export report says so.
-
-A task with a saved password needs the user right *Log on as a batch job* for its account. When the account doesn't have that right itself, the restore grants it before registering the task and says so in the report. A right that comes through a group, such as Administrators, isn't looked at, so the account then gets it directly as well. On a computer in a domain, a group policy that sets *Log on as a batch job* replaces the local list at the next policy refresh: add the account there instead.
-
-```json
-"ScheduledTasks": [
-  {
-    "TaskName": "Clean up logs",
-    "TaskPath": "\\HC\\",
-    "Enabled": true,
-    "XmlFile": "Files\\Clean up logs.xml",
-    "RunAsUser": "svc-cleanup",
-    "RunAsPassword": "{{password:Password of svc-cleanup for the clean-up task}}"
-  }
-]
-```
-
-### Exit codes of custom scripts and installers
-
-`StartCustomScriptsBefore` and `StartCustomScriptsAfter` run your own
-PowerShell scripts. A script fails when it writes an error, throws, or ends
-with an exit code other than `0`. The exit code is the one from `exit <code>`,
-or from the program the script ran last.
-
-Some programs use other codes for success. `robocopy`, for example, returns
-`1` to `7` when it copied files, and only `8` and higher mean failure. List
-those codes in `SuccessExitCodes` for a script that ends with robocopy:
-
-```json
-"StartCustomScriptsAfter": [
-  {
-    "Path": "Files\\Copy logs.ps1",
-    "SuccessExitCodes": [0, 1, 2, 3, 4, 5, 6, 7]
-  }
-]
-```
-
-Installers in `Software` → `Install` work the same way. `0` means success, and `3010` and `1641` always mean "success, a restart is needed". An installer that uses other codes for success, such as `1` for "already installed", lists them in `SuccessExitCodes`:
-
-```json
-"Install": [
-  {
-    "ExecutablePath": "Software\\VendorTool.exe",
-    "Arguments": "/silent",
-    "SuccessExitCodes": [0, 1]
-  }
-]
-```
-
-### Example: Dell driver updates after a restore
-
-[Shared/Examples/StartCustomScriptsAfter.json](Shared/Examples/StartCustomScriptsAfter.json)
-runs [Files/Update Dell drivers.ps1](Files/Update%20Dell%20drivers.ps1) after the
-other restore sections. This example is opt-in; it is not enabled in the
-shipped configurations. Add this entry inside your configuration's `Items`:
-
-```json
-"StartCustomScriptsAfter": "Shared\\Examples\\StartCustomScriptsAfter.json"
-```
-
-- Install Dell Command Update first, either beforehand or through
-  `Software.Install` using your reviewed installer and its silent arguments.
-  The wrapper does not download or install Command Update itself.
-- Run the restore as administrator on a supported Dell computer, with access
-  to Command Update's configured update source.
-- Only drivers are selected (`-updateType=driver`); BIOS and firmware updates
-  are deliberately excluded.
-- The script waits for Command Update and disables its automatic restart.
-  Also leave **Restart computer after successful restore** unchecked
-  (`Settings.RebootComputer: false`) if you want to restart manually.
-- Each run writes a separate log under
-  `%ProgramData%\ComputerSnapshot\Logs` and includes its path in the restore
-  report.
-- Dell exit codes `0` (success), `1` (restart required) and `500` (no applicable
-  updates) become successful script outcomes. Code `1` adds a warning to the
-  report; it does not schedule a restart. Code `5` (a restart is already
-  pending) and all other codes fail the action instead of pretending updates
-  were installed. After a pending restart, reboot and rerun the action.
-
-Review the CLI options and exit codes for the Dell Command Update version
-you deploy. Driver installation can temporarily interrupt network access, so
-prefer running this locally rather than relying on a remote connection.
-
-### Removing software
-
-Each entry in `Software` → `Remove` names an application as it appears in Programs and Features. Removals run before the installers.
-
-```json
-"Remove": [
-  { "DisplayName": "7-Zip 23.01 (x64)" },
-  { "DisplayName": "Vendor Tool*", "UninstallArguments": "/S" },
-  { "DisplayName": "Old Agent", "UninstallCommand": "\"C:\\Program Files\\Old Agent\\uninstall.exe\" /quiet", "SuccessExitCodes": [0, 1] }
-]
-```
-
-- `*` in `DisplayName` matches any text, so `Vendor Tool*` removes every version. Every matching application is removed, also when the same name is installed twice (32 and 64 bit). A name that matches more than 5 applications is refused, so a pattern that is too broad removes nothing; set `"AllowMultiple": true` when that many is intended.
-- Without other settings, the application's quiet uninstall command from the registry is used. Windows Installer (MSI) uninstalls are made silent. Other uninstallers without a quiet command may show a window and wait for a click.
-- `UninstallArguments` are added to the application's own uninstall command, to make it silent: `/S` for most NSIS uninstallers, `/VERYSILENT /NORESTART` for Inno Setup.
-- `UninstallCommand` replaces the uninstall command completely. It runs once, also when several applications match.
-- Exit codes work as for installers: `0`, `3010` and `1641` mean success, others can be listed in `SuccessExitCodes`.
-- Applications installed for one user only, such as some Zoom or Teams installs, are found for every user who is signed in, and the report names the user. Their uninstaller runs as the account that runs the restore, which not every per-user uninstaller supports. Users who are signed out are not searched.
-- Some uninstallers start a second process and end straight away. The tool gives the processes an uninstaller starts 60 seconds to finish (see below), and afterwards gives the application up to 60 seconds to disappear from Programs and Features.
-
-### Time limit for installers and uninstallers
-
-Each entry in `Install` and `Remove` gets `TimeoutMinutes` to finish, by default 15, from 1 to 1440. An installer or uninstaller that is still running then, for example because it waits for a click, is stopped with the processes it started and reported as failed; the next entries still run.
-
-```json
-{ "ExecutablePath": "Software\\BigSuite.exe", "Arguments": "/quiet", "TimeoutMinutes": 60 }
-```
-
-Many installers start the installed application, a tray tool or an updater when they finish. So once the installer or uninstaller itself has ended, the processes it started get 60 more seconds to finish. Those still running then are left running, and the report names them, for example *Installed 'Software\X.exe'; 'XApp.exe' started by the installer is still running and was left alone*. That is not an error.
-
-An installer that does its real work in a child process and ends straight away needs `"WaitForAllProcesses": true`: then every process it starts must also finish within `TimeoutMinutes`, or they are all stopped and the entry fails. The setting works the same for `Remove` entries.
-
-```json
-{ "ExecutablePath": "Software\\Bootstrapper.exe", "Arguments": "/quiet", "WaitForAllProcesses": true }
-```
-
-The tool follows the processes an installer starts by checking every 50 ms for the first 3 seconds, then every 500 ms. Windows reuses process IDs, so a process is only stopped when both its ID and its start time match the one that was seen; an unrelated process that got the same ID is never stopped. Limit: a process that starts another one and exits within about 50 ms is never seen, so the process it started can't be linked to the installer. That process is not waited for, not named in the report and not stopped when the time limit is reached.
 
 ### Editing with autocomplete
 
@@ -624,7 +256,7 @@ $ArgumentList = '--kiosk http://{{ipv4:IP address of the terminal server}}:1353/
 
 Interactive command-line restores use the same input form for missing answers and require an interactive Windows desktop. Browsing configurations and exporting do not ask for placeholder values. Use `-Unattended` to forbid the input form.
 
-See [Configurations/Examples/Prompted Setup.json](Configurations/Examples/Prompted%20Setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [Network cards and IP settings](#network-cards-and-ip-settings).
+See [Configurations/Examples/Prompted Setup.json](Configurations/Examples/Prompted%20Setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [NetworkCards](Shared/Examples/NetworkCards.md).
 
 **Password handling:** Answers are kept in memory for the current run. The original configuration and shared files are not rewritten, and answers are not written to disk or included in process-launch arguments. The wizard hands the answers of its questions page to the restore process over a one-time named pipe: it has a random name, admits only your account and the Administrators group, serves the answers once and then closes. If the restore cannot receive them, for example because the wizard was closed first, it says so and asks for them in the input form. Password placeholders mask typing and redact exact matches from the tool's generated results, HTML reports and captured PowerShell child output. This is not encrypted storage: the restore scripts receive plain strings in memory, and custom scripts or external programs can independently log, persist or transform them. Only run trusted scripts and use `password` placeholders for sensitive values. Ordinary `input` answers are not redacted.
 

@@ -20,7 +20,7 @@ A new section touches these places:
 - `Engine/Common/Section.ps1`: the script and its place in the run order in `Get-SnapshotScriptsHC`, the wizard name and description in `Get-SnapshotSectionLabelsHC`, and `Get-EmptySectionValueHC` when the section is an object instead of a list.
 - `Engine/Common/Configuration.psm1`: `$script:ArrayItems` when the section is a list, and checks the schema can't express in `Test-ConfigurationHC`.
 - `Engine/Schemas/config.schema.json`: the section under `Items`, in the `anyOf` list of `Items` and in `$defs`; plus `Engine/Schemas/<Section>.schema.json` and its entry in `.vscode/settings.json`.
-- `Shared/Examples/<Section>.json` and the section in the root [README](../README.MD).
+- `Shared/Examples/<Section>.json`, a `Shared/Examples/<Section>.md` page when the section needs more explanation than the schema descriptions give, and the section's row in the table of the root [README](../README.MD).
 - Tests: the run order in `Configuration.Tests.ps1`, `$mapping` in `Schema.Tests.ps1`, the child contract in `Engine/Tests/Common/Child contract.ps1` and a test file for the script itself.
 
 ## 🧩 Writing a Child Script

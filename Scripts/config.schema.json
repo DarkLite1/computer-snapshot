@@ -1155,9 +1155,26 @@
                 "type": ["string", "null"],
                 "description": "Connection-specific DNS suffix. An empty string clears it; null or omission leaves it unchanged."
               },
+              "RegisterInDns": {
+                "type": "boolean",
+                "description": "Register this connection's addresses in DNS. Omit to leave it unchanged."
+              },
+              "UseDnsSuffixWhenRegistering": {
+                "type": "boolean",
+                "description": "Use this connection's DNS suffix in DNS registration. Omit to leave it unchanged."
+              },
               "IPSettings": {
                 "description": "IPv4 settings: { \"Dhcp\": true }, or a static IPAddress with PrefixLength. Omit to leave them unchanged.",
                 "$ref": "#/$defs/NetworkIPSettings"
+              },
+              "NetBios": {
+                "type": "string",
+                "enum": ["Default", "Enabled", "Disabled"],
+                "description": "NetBIOS over TCP/IP: Default uses the DHCP setting. Omit to leave it unchanged."
+              },
+              "IPv6Enabled": {
+                "type": "boolean",
+                "description": "Turn IPv6 on or off for this card. Omit to leave it unchanged."
               },
               "Comment": {
                 "type": "string",

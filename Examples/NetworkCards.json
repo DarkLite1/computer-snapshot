@@ -28,11 +28,15 @@
     }
   },
   {
-    "Comment": "On a laptop with one Ethernet and one Wi-Fi card: the Ethernet card, whatever its name or driver. Use \"WiFi\" for the Wi-Fi card, or true on a PC with a single card. VPN, virtual and Bluetooth adapters do not count.",
+    "Comment": "On a laptop with one Ethernet and one Wi-Fi card: the Ethernet card, whatever its name or driver. Use \"WiFi\" for the Wi-Fi card, or true on a PC with a single card. VPN, virtual and Bluetooth adapters do not count. NetBIOS and IPv6 are turned off and the card does not register itself in DNS.",
     "FindBy": { "OnlyCard": "Wired" },
     "Change": {
       "NewName": "LAN",
-      "NetworkCategory": "Private"
+      "NetworkCategory": "Private",
+      "RegisterInDns": false,
+      "UseDnsSuffixWhenRegistering": false,
+      "NetBios": "Disabled",
+      "IPv6Enabled": false
     }
   },
   {

@@ -105,7 +105,7 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 5     | `FirewallRules`            | Windows Defender Firewall rules.                                        |
 | 6     | `CreateFolders`            | Folders to create.                                                      |
 | 7     | `SmbShares`                | SMB shares, each with its share and NTFS permissions.                   |
-| 8     | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and IPv4 settings. |
+| 8     | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and registration, IPv4 settings, NetBIOS and IPv6. |
 | 9     | `HostsFileEntries`         | Host names in the Windows hosts file and the IP addresses they point to. |
 | 10    | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
 | 11    | `RegistryKeys`             | Registry values to set.                                                 |

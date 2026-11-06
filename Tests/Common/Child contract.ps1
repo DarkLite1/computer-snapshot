@@ -39,6 +39,8 @@ Describe '<Name> data contract' -ForEach @(
         function Get-HostsFilePathHC {}
         function Wait-ProcessTreeHC { param($Process, $TimeoutSeconds, $What) }
         function Start-ScriptHC { param($Path) }
+        function Get-NetBiosSettingHC { param($Adapter) }
+        function Set-NetBiosSettingHC { param($Adapter, $Setting) }
         function Get-UserLanguageListHC {}
         function Set-UserLanguageListHC { param($Languages) }
         function Get-UILanguageOverrideHC {}
@@ -128,6 +130,11 @@ Describe '<Name> data contract' -ForEach @(
         Mock Get-NetRoute
         Mock Set-DnsClient
         Mock Set-NetConnectionProfile
+        Mock Get-NetBiosSettingHC { 'Default' }
+        Mock Set-NetBiosSettingHC
+        Mock Get-NetAdapterBinding { [pscustomobject]@{ Enabled = $true } }
+        Mock Enable-NetAdapterBinding
+        Mock Disable-NetAdapterBinding
         #endregion
 
         #region Time and regional settings

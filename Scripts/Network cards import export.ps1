@@ -14,11 +14,12 @@
       kind, such as the Ethernet card of a laptop that also has Wi-Fi.
       VPN, virtual and Bluetooth adapters do not count; with no or several
       such cards the entry is reported.
-    Change renames the card (NewName), sets its DnsSuffix, NetworkCategory
-    and IPSettings, in that order. When a step fails, the remaining steps
-    for that card are skipped. Entries that match no card or more than one
-    card are reported. Each problem is reported in Errors and the remaining
-    cards are still processed.
+    Change renames the card (NewName), sets its DnsSuffix, DNS registration
+    (RegisterInDns, UseDnsSuffixWhenRegistering), NetworkCategory,
+    IPSettings, NetBios and IPv6Enabled, in that order. When a step fails,
+    the remaining steps for that card are skipped. Entries that match no
+    card or more than one card are reported. Each problem is reported in
+    Errors and the remaining cards are still processed.
 
     IPSettings either makes the card use DHCP ({ Dhcp = $true }), or gives it
     one static IPAddress with PrefixLength, an optional DefaultGateway and
@@ -56,6 +57,61 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\Common\Section.ps1"
 
 #region Windows helpers
+$netBiosSettings = @('Default', 'Enabled', 'Disabled')
+
+function Get-NetBiosSettingHC {
+    # Default (from DHCP), Enabled or Disabled
+    param([Parameter(Mandatory)]$Adapter)
+    $params = @{
+        LiteralPath = (
+            'HKLM:\SYSTEM\CurrentControlSet\Services\NetBT\Parameters\' +
+            "Interfaces\Tcpip_$($Adapter.InterfaceGuid)"
+        )
+        Name        = 'NetbiosOptions'
+        ErrorAction = 'SilentlyContinue'
+    }
+    $netBiosSettings[[int](Get-ItemProperty @params).NetbiosOptions]
+}
+
+function Set-NetBiosSettingHC {
+    param(
+        [Parameter(Mandatory)]$Adapter,
+        [Parameter(Mandatory)][ValidateSet('Default', 'Enabled', 'Disabled')]
+        [string]$Setting
+    )
+    $option = [uint32]$netBiosSettings.IndexOf($Setting)
+    $params = @{
+        ClassName = 'Win32_NetworkAdapterConfiguration'
+        Filter    = "InterfaceIndex = $([int]$Adapter.InterfaceIndex)"
+    }
+    $configuration = Get-CimInstance @params
+    if ($configuration.IPEnabled) {
+        $params = @{
+            InputObject = $configuration
+            MethodName  = 'SetTcpipNetbios'
+            Arguments   = @{ TcpipNetbiosOptions = $option }
+        }
+        $result = Invoke-CimMethod @params
+        # 1 means the change needs a restart
+        if ($result.ReturnValue -notin 0, 1) {
+            throw "SetTcpipNetbios returned $($result.ReturnValue)"
+        }
+    }
+    else {
+        # Windows refuses the method without IP, the card reads this later
+        $params = @{
+            LiteralPath = (
+                'HKLM:\SYSTEM\CurrentControlSet\Services\NetBT\Parameters\' +
+                "Interfaces\Tcpip_$($Adapter.InterfaceGuid)"
+            )
+            Name        = 'NetbiosOptions'
+            Value       = $option
+            Type        = 'DWord'
+        }
+        Set-ItemProperty @params
+    }
+}
+
 function Find-NetAdapterHC {
     # Exact description first, so identical cards such as 'Intel(R) Ethernet'
     # and 'Intel(R) Ethernet #2' are never confused; otherwise a single
@@ -734,6 +790,15 @@ if ($Action -eq 'Export') {
             NetworkCategory = [String]$networkCategory
             DnsSuffix       = $dnsSuffix
         }
+        if ($dnsClientByIndex.ContainsKey($index)) {
+            $dnsClient = $dnsClientByIndex[$index]
+            $change.RegisterInDns = [bool](
+                $dnsClient.RegisterThisConnectionsAddress
+            )
+            $change.UseDnsSuffixWhenRegistering = [bool](
+                $dnsClient.UseSuffixWhenRegistering
+            )
+        }
         $state = Get-IPv4StateHC -Adapter $adapter
         $ipSettings = Get-IPv4SettingsHC -Adapter $adapter -State $state
         if ($ipSettings) {
@@ -754,6 +819,14 @@ if ($Action -eq 'Export') {
                 }
             }
         }
+        $change.NetBios = Get-NetBiosSettingHC -Adapter $adapter
+        $bindingParams = @{
+            InterfaceDescription = $adapter.InterfaceDescription
+            ComponentID          = 'ms_tcpip6'
+            ErrorAction          = 'SilentlyContinue'
+        }
+        $ipv6 = Get-NetAdapterBinding @bindingParams
+        if ($ipv6) { $change.IPv6Enabled = [bool]$ipv6.Enabled }
         [ordered]@{
             FindBy = [ordered]@{
                 Description = $adapter.InterfaceDescription
@@ -834,6 +907,42 @@ else {
             }
             #endregion
 
+            #region Set DNS registration
+            $registration = @(
+                @{
+                    Name      = 'RegisterInDns'
+                    Parameter = 'RegisterThisConnectionsAddress'
+                    Text      = "Register this connection's addresses in DNS"
+                }
+                @{
+                    Name      = 'UseDnsSuffixWhenRegistering'
+                    Parameter = 'UseSuffixWhenRegistering'
+                    Text      = (
+                        "Use this connection's DNS suffix in DNS registration"
+                    )
+                }
+            )
+            foreach ($setting in $registration) {
+                $wanted = $change.($setting.Name)
+                if (
+                    $null -ne $wanted -and
+                    [bool]$dnsClient.($setting.Parameter) -ne $wanted
+                ) {
+                    Write-Verbose "Network card $($label): $($setting.Name)"
+                    $dnsClientParams = @{
+                        InterfaceIndex = $adapter.InterfaceIndex
+                    }
+                    $dnsClientParams[$setting.Parameter] = [bool]$wanted
+                    Set-DnsClient @dnsClientParams
+                    $messages.Add(
+                        $(if ($wanted) { 'Turned on' } else { 'Turned off' }) +
+                        " '$($setting.Text)' for network card $label"
+                    )
+                    $changes++
+                }
+            }
+            #endregion
+
             #region Set network category
             if ($change.NetworkCategory) {
                 $adapterProfiles = @(
@@ -887,6 +996,47 @@ else {
                 }
                 foreach ($message in @(Set-IPv4SettingsHC @ipParams)) {
                     $messages.Add($message)
+                    $changes++
+                }
+            }
+            #endregion
+
+            #region Set NetBIOS over TCP/IP
+            if ($change.NetBios) {
+                $old = Get-NetBiosSettingHC -Adapter $adapter
+                if ($old -ne $change.NetBios) {
+                    Write-Verbose "Network card $($label): set NetBIOS"
+                    $netBiosParams = @{
+                        Adapter = $adapter
+                        Setting = $change.NetBios
+                    }
+                    Set-NetBiosSettingHC @netBiosParams
+                    $messages.Add(
+                        "Changed NetBIOS over TCP/IP of network card $label " +
+                        "from '$old' to '$($change.NetBios)'"
+                    )
+                    $changes++
+                }
+            }
+            #endregion
+
+            #region Enable or disable IPv6
+            if ($null -ne $change.IPv6Enabled) {
+                $bindingParams = @{
+                    InterfaceDescription = $adapter.InterfaceDescription
+                    ComponentID          = 'ms_tcpip6'
+                }
+                $binding = Get-NetAdapterBinding @bindingParams
+                if ([bool]$binding.Enabled -ne $change.IPv6Enabled) {
+                    Write-Verbose "Network card $($label): set IPv6"
+                    if ($change.IPv6Enabled) {
+                        Enable-NetAdapterBinding @bindingParams
+                        $messages.Add("Enabled IPv6 on network card $label")
+                    }
+                    else {
+                        Disable-NetAdapterBinding @bindingParams
+                        $messages.Add("Disabled IPv6 on network card $label")
+                    }
                     $changes++
                 }
             }

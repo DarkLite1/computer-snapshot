@@ -503,6 +503,7 @@ Describe 'Finding the card and IPv4 settings' {
         Mock New-NetIPAddress
         Mock Set-DnsClientServerAddress
         Mock Rename-NetAdapter
+        Mock Get-NetAdapterBinding
         $staticSettings = [pscustomobject]@{
             IPAddress      = '10.20.67.2'
             PrefixLength   = 24
@@ -1018,6 +1019,112 @@ Describe 'Finding the card and IPv4 settings' {
         $wifi.DnsSuffix | Should -Be 'wifi.example'
         Should -Invoke Get-NetIPInterface -Times 2 -Exactly
         Should -Invoke Get-NetIPAddress -Times 2 -Exactly
+    }
+}
+
+Describe 'DNS registration, NetBIOS and IPv6' {
+    BeforeAll {
+        $scriptPath = "$PSScriptRoot\..\Scripts\Network cards import export.ps1"
+        function Get-NetBiosSettingHC { param($Adapter) }
+        function Set-NetBiosSettingHC { param($Adapter, $Setting) }
+    }
+    BeforeEach {
+        Mock Get-NetAdapter {
+            [pscustomobject]@{
+                Name                 = 'LAN'
+                InterfaceDescription = 'Intel(R) Ethernet'
+                InterfaceIndex       = 7
+            }
+        }
+        Mock Get-DnsClient {
+            [pscustomobject]@{
+                InterfaceIndex                 = 7
+                ConnectionSpecificSuffix       = ''
+                RegisterThisConnectionsAddress = $true
+                UseSuffixWhenRegistering       = $false
+            }
+        }
+        Mock Get-NetConnectionProfile
+        Mock Get-NetIPInterface
+        Mock Set-DnsClient
+        Mock Get-NetBiosSettingHC { 'Default' }
+        Mock Set-NetBiosSettingHC
+        Mock Get-NetAdapterBinding { [pscustomobject]@{ Enabled = $true } }
+        Mock Enable-NetAdapterBinding
+        Mock Disable-NetAdapterBinding
+        $importParams = @{
+            Action     = 'Import'
+            RootFolder = $TestDrive
+            Data       = @(
+                [pscustomobject]@{
+                    FindBy = [pscustomobject]@{ Name = 'LAN' }
+                    Change = [pscustomobject]@{
+                        RegisterInDns               = $false
+                        UseDnsSuffixWhenRegistering = $true
+                        NetBios                     = 'Disabled'
+                        IPv6Enabled                 = $false
+                    }
+                }
+            )
+        }
+    }
+    It 'changes each setting that differs' {
+        $result = . $scriptPath @importParams
+
+        $result.Errors.Count | Should -Be 0 -Because ($result.Errors -join '; ')
+        Should -Invoke Set-DnsClient -Times 1 -Exactly -ParameterFilter {
+            $InterfaceIndex -eq 7 -and
+            $RegisterThisConnectionsAddress -eq $false -and
+            $null -eq $UseSuffixWhenRegistering
+        }
+        Should -Invoke Set-DnsClient -Times 1 -Exactly -ParameterFilter {
+            $InterfaceIndex -eq 7 -and $UseSuffixWhenRegistering -eq $true
+        }
+        Should -Invoke Set-NetBiosSettingHC -ParameterFilter {
+            $Setting -eq 'Disabled' -and $Adapter.InterfaceIndex -eq 7
+        } -Times 1 -Exactly
+        Should -Invoke Disable-NetAdapterBinding -ParameterFilter {
+            $InterfaceDescription -eq 'Intel(R) Ethernet' -and
+            $ComponentID -eq 'ms_tcpip6'
+        } -Times 1 -Exactly
+        $result.Messages | Should -Be @(
+            ("Turned off 'Register this connection's addresses in DNS' " +
+                "for network card 'LAN'")
+            ("Turned on 'Use this connection's DNS suffix in DNS " +
+                "registration' for network card 'LAN'")
+            ("Changed NetBIOS over TCP/IP of network card 'LAN' from " +
+                "'Default' to 'Disabled'")
+            "Disabled IPv6 on network card 'LAN'"
+        )
+    }
+    It 'changes nothing when the settings are already correct' {
+        $change = $importParams.Data[0].Change
+        $change.RegisterInDns = $true
+        $change.UseDnsSuffixWhenRegistering = $false
+        $change.NetBios = 'Default'
+        $change.IPv6Enabled = $true
+
+        $result = . $scriptPath @importParams
+
+        Should -Invoke Set-DnsClient -Times 0 -Exactly
+        Should -Invoke Set-NetBiosSettingHC -Times 0 -Exactly
+        Should -Invoke Enable-NetAdapterBinding -Times 0 -Exactly
+        Should -Invoke Disable-NetAdapterBinding -Times 0 -Exactly
+        $result.Messages | Should -Be @(
+            "Network card 'LAN' is already correct"
+        )
+    }
+    It 'exports DNS registration, NetBIOS and IPv6' {
+        Mock Get-NetBiosSettingHC { 'Disabled' }
+        Mock Get-NetAdapterBinding { [pscustomobject]@{ Enabled = $false } }
+
+        $result = . $scriptPath -Action Export -RootFolder $TestDrive
+
+        $change = @($result.Data)[0].Change
+        $change.RegisterInDns | Should -BeTrue
+        $change.UseDnsSuffixWhenRegistering | Should -BeFalse
+        $change.NetBios | Should -Be 'Disabled'
+        $change.IPv6Enabled | Should -BeFalse
     }
 }
 

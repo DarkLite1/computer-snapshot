@@ -124,21 +124,23 @@ Some sections can't be fully captured automatically, so exporting them only give
 
 ### Ready-made examples for common settings
 
-`Examples/` also has ready-made sections for common Windows settings. Copy their entries into your configuration, or point to them like a shared file, such as `"RegistryKeys": ["Shared\\RegistryKeys common.json", "Examples\\RegistryKeys Explorer.json"]`:
+`Examples/` also has ready-made sections for common Windows settings. Copy their entries into your configuration, or point to them like a shared file, such as `"RegistryKeys": ["Shared\\RegistryKeys Common.json", "Examples\\RegistryKeys Explorer.json"]`:
 
 | File | What it does |
 | ---- | ------------ |
 | `RegistryKeys Remote Desktop.json` and `FirewallRules Remote Desktop.json` | Turn on Remote Desktop with Network Level Authentication and open port 3389 on domain and private networks. Add the users who may connect to the `Remote Desktop Users` group in `UserGroups`. |
-| `RegistryKeys auto logon.json` | Sign in a kiosk account automatically. **Windows keeps the password in plain text in the registry**, readable by every administrator; the restore asks for it. |
+| `RegistryKeys Auto Logon.json` | Sign in a kiosk account automatically. **Windows keeps the password in plain text in the registry**, readable by every administrator; the restore asks for it. |
 | `RegistryKeys Explorer.json` | Show file extensions and hidden files in File Explorer. |
-| `RegistryKeys Windows suggestions.json` | Turn off suggestions, tips, ads and automatically installed apps on Windows 11. |
+| `RegistryKeys Windows Suggestions.json` | Turn off suggestions, tips, ads and automatically installed apps on Windows 11. |
 
 The `HKCU` entries apply to the account running the restore; for another account, put them under `RunAsOtherUser`.
 
+File names follow one convention: `Examples\<Section>.json` shows every option of a section, `Examples\<Section> <Topic>.json` and `Shared\<Section> <Topic>.json` are ready-made sections, and example configurations are named `Example <Topic>.json`, all in Title Case.
+
 Two configurations show how they fit together with the other sections. Both change the PC they are restored on:
 
-- [Configurations/Example kiosk.json](Configurations/Example%20kiosk.json): Belgian regional settings with a Belgian keyboard, password rules, a `kiosk` account that signs in automatically, an environment variable, a power plan that never sleeps, services, and Windows without suggestions. It asks for the kiosk password once, for both the account and auto logon, and for the computer name.
-- [Configurations/Example remote desktop.json](Configurations/Example%20remote%20desktop.json): Remote Desktop with its firewall rules, the account that may connect, and the wired network card made private.
+- [Configurations/Example Kiosk.json](Configurations/Example%20Kiosk.json): Belgian regional settings with a Belgian keyboard, password rules, a `kiosk` account that signs in automatically, an environment variable, a power plan that never sleeps, services, and Windows without suggestions. It asks for the kiosk password once, for both the account and auto logon, and for the computer name.
+- [Configurations/Example Remote Desktop.json](Configurations/Example%20Remote%20Desktop.json): Remote Desktop with its firewall rules, the account that may connect, and the wired network card made private.
 
 ### Reusing sections across computers
 
@@ -146,7 +148,7 @@ Instead of writing a section inline, you can point to a file. The path is relati
 
 ```json
 "Items": {
-  "UserAccounts": "Shared\\UserAccounts kiosk.json"
+  "UserAccounts": "Shared\\UserAccounts Kiosk.json"
 }
 ```
 
@@ -156,8 +158,8 @@ A section can also be built from **several files**, so you can combine reusable 
 
 ```json
 "Items": {
-  "SmbShares": [ "Shared\\SmbShares common.json", "Shared\\SmbShares scanner.json" ],
-  "RegistryKeys": [ "Shared\\RegistryKeys office.json", "Shared\\RegistryKeys kiosk.json" ]
+  "SmbShares": [ "Shared\\SmbShares Common.json", "Shared\\SmbShares Scanner.json" ],
+  "RegistryKeys": [ "Shared\\RegistryKeys Office.json", "Shared\\RegistryKeys Kiosk.json" ]
 }
 ```
 
@@ -168,9 +170,9 @@ The files are combined in the order you list them:
 - A single setting may appear in several files only with the same value. Two different values, such as two time zones in `RegionalSettings`, are reported as an error naming both files, instead of one silently winning.
 - The combined section is checked as a whole, so the same share or user in two files is reported as well.
 
-Name a shared file after its section, such as `Shared\SmbShares common.json`, so Visual Studio Code shows the hints for that section while you edit it (see [Editing with autocomplete](#editing-with-autocomplete)).
+Name a shared file after its section, such as `Shared\SmbShares Common.json`, so Visual Studio Code shows the hints for that section while you edit it (see [Editing with autocomplete](#editing-with-autocomplete)).
 
-See [Configurations/Example combined sections.json](Configurations/Example%20combined%20sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares common.json` with the shares of every PC and `Shared\SmbShares kiosk.json` with the extra kiosk shares.
+See [Configurations/Example Combined Sections.json](Configurations/Example%20Combined%20Sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares Common.json` with the shares of every PC and `Shared\SmbShares Kiosk.json` with the extra kiosk shares.
 
 ### Password and lockout policy
 
@@ -561,7 +563,7 @@ The tool follows the processes an installer starts by checking every 50 ms for t
 
 Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works.
 
-Section files can't have that line, so `.vscode/settings.json` tells Visual Studio Code which schema in `Scripts/Schemas/` belongs to which file, by its name: `Examples/RegistryKeys.json`, `Examples/RegistryKeys <anything>.json` and `Shared/RegistryKeys <anything>.json` get the `RegistryKeys` hints, and the same for every other section. Open the computer-snapshot folder itself in Visual Studio Code for this, and name a new shared file after its section, such as `Shared\RegistryKeys office.json`, to get the hints there too.
+Section files can't have that line, so `.vscode/settings.json` tells Visual Studio Code which schema in `Scripts/Schemas/` belongs to which file, by its name: `Examples/RegistryKeys.json`, `Examples/RegistryKeys <anything>.json` and `Shared/RegistryKeys <anything>.json` get the `RegistryKeys` hints, and the same for every other section. Open the computer-snapshot folder itself in Visual Studio Code for this, and name a new shared file after its section, such as `Shared\RegistryKeys Office.json`, to get the hints there too.
 
 > **🔒 Important Security Warning:**
 > When you save settings that include passwords (like user accounts or certain registry keys), **they are saved in plain text**. Please keep your USB stick physically secure, and never upload files containing sensitive passwords to public spaces. Where possible, use a `{{password:...}}` placeholder instead, so the password is asked for during the restore and never stored (see [Restore-Time Input](#restore-time-input)).
@@ -623,7 +625,7 @@ $ArgumentList = '--kiosk http://{{ipv4:IP address of the terminal server}}:1353/
 
 Interactive command-line restores use the same input form for missing answers and require an interactive Windows desktop. Browsing configurations and exporting do not ask for placeholder values. Use `-Unattended` to forbid the input form.
 
-See [Configurations/Example prompted setup.json](Configurations/Example%20prompted%20setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [Network cards and IP settings](#network-cards-and-ip-settings).
+See [Configurations/Example Prompted Setup.json](Configurations/Example%20Prompted%20Setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [Network cards and IP settings](#network-cards-and-ip-settings).
 
 **Password handling:** Answers are kept in memory for the current run. The original configuration and shared files are not rewritten, and answers are not written to disk or included in process-launch arguments. The wizard hands the answers of its questions page to the restore process over a one-time named pipe: it has a random name, admits only your account and the Administrators group, serves the answers once and then closes. If the restore cannot receive them, for example because the wizard was closed first, it says so and asks for them in the input form. Password placeholders mask typing and redact exact matches from the tool's generated results, HTML reports and captured PowerShell child output. This is not encrypted storage: the restore scripts receive plain strings in memory, and custom scripts or external programs can independently log, persist or transform them. Only run trusted scripts and use `password` placeholders for sensitive values. Ordinary `input` answers are not redacted.
 
@@ -659,8 +661,8 @@ always fail before any sections run, even in interactive mode.
 }
 ```
 
-This is the bundled [partial answer example](Answers/Examples/Prompted%20setup.json)
-for [Example prompted setup](Configurations/Example%20prompted%20setup.json).
+This is the bundled [partial answer example](Answers/Examples/Example%20Prompted%20Setup.json)
+for [Example Prompted Setup](Configurations/Example%20Prompted%20Setup.json).
 It supplies a name and a documentation-only NTP address, and leaves the password
 to be entered interactively. **Change the address to your real NTP server**
 before using it. It is not a complete unattended answer file.
@@ -680,7 +682,7 @@ From the tool's root folder:
 ```powershell
 New-Item -Path '.\Answers' -ItemType Directory -Force | Out-Null
 & '.\Scripts\New answer file.ps1' `
-    -ConfigurationFile 'Configurations\Example prompted setup.json' `
+    -ConfigurationFile 'Configurations\Example Prompted Setup.json' `
     -AnswerFile 'Answers\KIOSK01.json'
 ```
 
@@ -699,8 +701,8 @@ The configuration and all source files stay unchanged.
 
 ```powershell
 & '.\Scripts\Invoke configuration.ps1' `
-    -ConfigurationFile 'Configurations\Example prompted setup.json' `
-    -AnswerFile 'Answers\Examples\Prompted setup.json'
+    -ConfigurationFile 'Configurations\Example Prompted Setup.json' `
+    -AnswerFile 'Answers\Examples\Example Prompted Setup.json'
 ```
 
 This still asks for confirmation, and asks for the missing password after any
@@ -713,7 +715,7 @@ After filling in your local answer file:
 
 ```powershell
 $result = & '.\Scripts\Invoke configuration.ps1' `
-    -ConfigurationFile 'Configurations\Example prompted setup.json' `
+    -ConfigurationFile 'Configurations\Example Prompted Setup.json' `
     -AnswerFile 'Answers\KIOSK01.json' `
     -Unattended
 

@@ -11,7 +11,7 @@
   "Items": {
     "StartCustomScriptsBefore": [],
     "RegionalSettings": {},
-    "UserAccounts": "Shared\\UserAccounts kiosk.json",
+    "UserAccounts": "Shared\\UserAccounts Kiosk.json",
     "UserGroups": [],
     "FirewallRules": [],
     "CreateFolders": {},

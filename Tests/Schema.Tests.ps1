@@ -48,7 +48,7 @@ BeforeAll {
 Describe 'Schema contract' {
     It ('resolves the prompted setup example into valid data without ' +
         'changing its file or applying settings') {
-        $file = Join-Path $root 'Configurations\Example prompted setup.json'
+        $file = Join-Path $root 'Configurations\Example Prompted Setup.json'
         $before = Get-Content -LiteralPath $file -Raw
 
         $loaded = Read-ConfigurationHC $file $root
@@ -109,6 +109,30 @@ Describe 'Schema contract' {
                 $document | ConvertTo-Json -Depth 20 |
                 Test-Json -SchemaFile $schemaPath -ErrorAction Stop |
                 Should -BeTrue -Because $file.Name
+            }
+        }
+    }
+    It ('names examples and shared files after their section and example ' +
+        'configurations "Example ...", in Title Case') {
+        $sections = @(
+            $schema.properties.Items.properties.PSObject.Properties.Name |
+            Where-Object { $_ -ne 'Comment' }
+        )
+        $titleCase = '( [A-Z0-9][A-Za-z0-9]*)*'
+        $folders = @{
+            Examples       = "^($($sections -join '|'))$titleCase\.(json|xml)$"
+            Shared         = "^($($sections -join '|'))$titleCase\.json$"
+            Configurations = "^Example$titleCase\.json$"
+        }
+        foreach ($folder in $folders.Keys) {
+            $names = @(
+                Get-ChildItem -LiteralPath (Join-Path $root $folder) -File |
+                ForEach-Object Name
+            )
+            foreach ($name in $names) {
+                $name | Should -MatchExactly $folders[$folder] -Because (
+                    "$folder\$name"
+                )
             }
         }
     }
@@ -802,7 +826,7 @@ Describe 'Schema contract' {
     }
     It ('combines the shared files of the combined sections example in ' +
         'order, only below safe example locations') {
-        $file = Join-Path $root 'Configurations\Example combined sections.json'
+        $file = Join-Path $root 'Configurations\Example Combined Sections.json'
 
         $loaded = Read-ConfigurationHC $file $root
 

@@ -11,7 +11,7 @@
     "TaskName": "Clean up logs",
     "TaskPath": "\\HC\\",
     "Enabled": true,
-    "XmlFile": "Files\\Example task.xml",
+    "XmlFile": "Examples\\ScheduledTasks Example Task.xml",
     "RunAsUser": "svc-cleanup",
     "RunAsPassword": "{{password:Password of 'svc-cleanup' for the clean-up task}}"
   },
@@ -20,7 +20,7 @@
     "TaskName": "Collect inventory",
     "TaskPath": "\\HC\\",
     "Enabled": false,
-    "XmlFile": "Files\\Example task.xml",
+    "XmlFile": "Examples\\ScheduledTasks Example Task.xml",
     "RunAsUser": "NT AUTHORITY\\LOCAL SERVICE"
   }
 ]

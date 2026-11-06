@@ -637,6 +637,28 @@ function Invoke-ComputerSnapshotHC {
             'Import'
         }
 
+        if (
+            $name -in (Get-ElevatedSectionsHC) -and -not (Test-ElevatedHC)
+        ) {
+            $results.Add(
+                [pscustomobject]@{
+                    Name     = $name
+                    Status   = 'Failed'
+                    Messages = @(
+                        "ERROR: $name requires administrator rights; " +
+                        'restart as administrator'
+                    )
+                }
+            )
+
+            # Still in the export, empty, so it can be filled in
+            if ($Action -eq 'CreateSnapshot') {
+                $exportItems[$name] = Get-EmptySectionValueHC -Name $name
+            }
+
+            continue
+        }
+
         $errors = New-Object 'System.Collections.Generic.List[object]'
         $output = New-Object 'System.Collections.Generic.List[object]'
         $terminatingError = $null

@@ -97,7 +97,7 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | ----- | ------- | -------------- |
 | 1     | [`StartCustomScriptsBefore`](Shared/Examples/StartCustomScriptsAfter.md) | Your own PowerShell scripts (from `Files/`) to run before everything else. |
 | 2     | [`RegionalSettings`](Shared/Examples/RegionalSettings.json) | System locale, time zone, home location, culture, languages with keyboards and display language. |
-| 3     | [`AccountPolicy`](Shared/Examples/AccountPolicy.md) | Local password rules and account lockout. |
+| 3     | [`AccountPolicy`](Shared/Examples/AccountPolicy.md) | Local password rules and account lockout. Needs administrator rights, also to export: without them the section is not run and is reported as failed. |
 | 4     | [`UserAccounts`](Shared/Examples/UserAccounts.md) | Local user accounts to create, update or remove. |
 | 5     | [`UserGroups`](Shared/Examples/UserGroups.json) | Local groups and their members. |
 | 6     | [`FirewallRules`](Shared/Examples/FirewallRules.json) | Windows Defender Firewall rules. |

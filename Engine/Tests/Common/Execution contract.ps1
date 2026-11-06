@@ -1356,6 +1356,27 @@ Describe 'Single-file execution' {
         $loaded.Items.UserAccounts -is [array] | Should -BeTrue
         @(Test-ConfigurationHC $loaded $TestDrive) | Should -BeNullOrEmpty
     }
+    It ('does not run a section that needs administrator rights without ' +
+        'them, and exports it empty') {
+        $params.Script = [ordered]@{
+            AccountPolicy = $scriptPath
+            CreateFolders = $scriptPath
+        }
+        $params.Items = @('AccountPolicy', 'CreateFolders')
+        Mock Test-ElevatedHC @inModule { $false }
+        $result = Invoke-ComputerSnapshotHC @params
+        $result.Success | Should -BeFalse
+        $result.Results[0].Name | Should -Be 'AccountPolicy'
+        $result.Results[0].Status | Should -Be 'Failed'
+        $result.Results[0].Messages | Should -Be @(
+            'ERROR: AccountPolicy requires administrator rights; ' +
+            'restart as administrator'
+        )
+        Should -Invoke Invoke-ChildScriptHC @inModule -Times 1 -Exactly
+        $loaded = Read-ConfigurationHC $path $TestDrive
+        $loaded.Items.AccountPolicy | ConvertTo-Json -Compress |
+            Should -Be '{}'
+    }
     It 'treats an empty Errors property as success' {
         $params.Items = @('UserAccounts')
         Mock Invoke-ChildScriptHC @inModule {

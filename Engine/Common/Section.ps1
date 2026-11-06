@@ -29,6 +29,15 @@ function Get-SnapshotScriptsHC {
     }
 }
 
+function Get-ElevatedSectionsHC {
+    <#
+    .SYNOPSIS
+        Sections that need administrator rights, for export and restore.
+        Without them the section does not run and is reported as failed.
+    #>
+    @('AccountPolicy')
+}
+
 function Get-ConfigurationEntriesHC {
     # Configurations in the folder and its subfolders, own files first; the
     # name is the path inside the folder, such as 'Examples\Kiosk'

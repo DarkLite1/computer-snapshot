@@ -1,0 +1,19 @@
+[
+  {
+    "Comment": "Windows Update starts a little after the other services.",
+    "Name": "wuauserv",
+    "StartupType": "AutomaticDelayedStart"
+  },
+  {
+    "Comment": "Disabled and stopped now.",
+    "Name": "Spooler",
+    "StartupType": "Disabled",
+    "Status": "Stopped"
+  },
+  {
+    "Comment": "Started now and at every boot.",
+    "Name": "W32Time",
+    "StartupType": "Automatic",
+    "Status": "Running"
+  }
+]

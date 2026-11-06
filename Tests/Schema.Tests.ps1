@@ -31,6 +31,7 @@ BeforeAll {
         'Regional settings'          = 'RegionalSettings'
         'Account policy'             = 'AccountPolicy'
         'Environment variables'      = 'EnvironmentVariables'
+        'Services'                   = 'Services'
         'Software'                   = 'Software'
         'User accounts'              = 'UserAccounts'
         'User groups'                = 'UserGroups'

@@ -630,7 +630,7 @@ Describe 'Shared snapshot catalogue' {
             'EnvironmentVariables', 'CreateFolders',
             'SmbShares', 'NetworkCards', 'HostsFileEntries', 'NtpTimeServers',
             'RegistryKeys', 'ScheduledTasks', 'CopyFilesFolders', 'Software',
-            'StartCustomScriptsAfter'
+            'Services', 'StartCustomScriptsAfter'
         )
         foreach ($script in $scripts.Values) {
             Join-Path "$PSScriptRoot\..\Scripts" $script | Should -Exist

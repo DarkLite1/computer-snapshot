@@ -23,6 +23,7 @@ function Get-SnapshotScriptsHC {
         ScheduledTasks           = 'Scheduled tasks import export.ps1'
         CopyFilesFolders         = 'Copy files folders import export.ps1'
         Software                 = 'Software import export.ps1'
+        Services                 = 'Services import export.ps1'
         StartCustomScriptsAfter  = 'Start custom scripts import export.ps1'
     }
 }
@@ -199,6 +200,10 @@ function Get-SnapshotSectionLabelsHC {
         Software                 = @(
             'Software',
             'Applications to install or remove.'
+        )
+        Services                 = @(
+            'Services',
+            'Startup type of Windows services, and start or stop them.'
         )
         StartCustomScriptsAfter  = @(
             'Custom scripts (after restore)',

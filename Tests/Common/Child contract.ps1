@@ -21,6 +21,7 @@ Describe '<Name> data contract' -ForEach @(
             'Regional settings'    = 'RegionalSettings'
             'Account policy'       = 'AccountPolicy'
             'Environment variables' = 'EnvironmentVariables'
+            Services               = 'Services'
             Software               = 'Software'
             'User accounts'        = 'UserAccounts'
             'User groups'          = 'UserGroups'
@@ -48,6 +49,8 @@ Describe '<Name> data contract' -ForEach @(
             param($Scope, $Name, $Value, $Kind)
         }
         function Send-EnvironmentChangeHC {}
+        function Get-ServiceStartupTypeHC { param($Name) }
+        function Set-ServiceStartupTypeHC { param($Name, $StartupType) }
         function Get-NetBiosSettingHC { param($Adapter) }
         function Set-NetBiosSettingHC { param($Adapter, $Setting) }
         function Get-UserLanguageListHC {}
@@ -186,6 +189,17 @@ Describe '<Name> data contract' -ForEach @(
         }
         Mock Set-EnvironmentVariableHC
         Mock Send-EnvironmentChangeHC
+        Mock Get-Service {
+            [pscustomobject]@{
+                Name        = 'Example'
+                DisplayName = 'Example service'
+                Status      = 'Running'
+            }
+        }
+        Mock Get-ServiceStartupTypeHC { 'Manual' }
+        Mock Set-ServiceStartupTypeHC
+        Mock Start-Service
+        Mock Stop-Service
         #endregion
 
         #region Scheduled tasks
@@ -383,6 +397,16 @@ Describe '<Name> data contract' -ForEach @(
                     }
                 )
                 $command = 'Set-EnvironmentVariableHC'
+            }
+            'Services' {
+                $data = @(
+                    [pscustomobject]@{
+                        Name        = 'Example'
+                        StartupType = 'Disabled'
+                        Status      = 'Stopped'
+                    }
+                )
+                $command = 'Set-ServiceStartupTypeHC'
             }
             'User accounts' {
                 $data = @(

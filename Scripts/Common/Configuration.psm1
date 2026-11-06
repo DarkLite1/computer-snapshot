@@ -21,6 +21,7 @@ $script:ArrayItems = @(
     'ScheduledTasks',
     'SmbShares',
     'CopyFilesFolders',
+    'Services',
     'StartCustomScriptsAfter'
 )
 
@@ -645,6 +646,31 @@ function Test-ConfigurationHC {
         $assets = New-Object 'System.Collections.Generic.List[hashtable]'
 
         switch ($name) {
+            'Services' {
+                $seen = @{}
+                for ($index = 0; $index -lt $data.Count; $index++) {
+                    $entry = $data[$index]
+                    $key = ([string]$entry.Name).ToLowerInvariant()
+                    if ($seen.ContainsKey($key)) {
+                        $problems.Add(
+                            "${location}[$index].Name: '$($entry.Name)' is " +
+                            "already configured in [$($seen[$key])]"
+                        )
+                    }
+                    else {
+                        $seen[$key] = $index
+                    }
+                    if (
+                        $entry.StartupType -eq 'Disabled' -and
+                        $entry.Status -eq 'Running'
+                    ) {
+                        $problems.Add(
+                            "${location}[$index].Status: a Disabled " +
+                            'service cannot be Running'
+                        )
+                    }
+                }
+            }
             'EnvironmentVariables' {
                 for ($index = 0; $index -lt $data.Count; $index++) {
                     $entry = $data[$index]

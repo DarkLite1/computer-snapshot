@@ -114,11 +114,12 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 14    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
 | 15    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
 | 16    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
-| 17    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
+| 17    | `Services`                 | Startup type of Windows services, and starting or stopping them.        |
+| 18    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
 
 An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Examples/` folder for the exact format of each section.
 
-Some sections can't be fully captured automatically, so exporting them only gives you a starting example to edit: `CreateFolders`, `CopyFilesFolders`, `RegistryKeys` and `Software`. `StartCustomScriptsBefore` and `StartCustomScriptsAfter` export an empty list, so no example script can run by accident; see `Examples\StartCustomScriptsBefore.json` for the format.
+Some sections can't be fully captured automatically, so exporting them only gives you a starting example to edit: `CreateFolders`, `CopyFilesFolders`, `RegistryKeys`, `Software` and `Services`. `StartCustomScriptsBefore` and `StartCustomScriptsAfter` export an empty list, so no example script can run by accident; see `Examples\StartCustomScriptsBefore.json` for the format.
 
 ### Reusing sections across computers
 
@@ -180,6 +181,19 @@ See [Configurations/Example combined sections.json](Configurations/Example%20com
 ```
 
 `%VARIABLE%` in a value is kept as it is and expanded when used, like Windows does for `Path`. Programs started after the restore see the changes, and so do the sections that run after this one, such as `CreateFolders` and `Software`. The export writes the computer variables that are not part of Windows; `Path` is not exported, add `AddToList` entries for it. A variable whose name looks like a secret, such as `SMTP_PASSWORD` or `API_TOKEN`, is exported as a `{{password:...}}` placeholder, so its value is never written to the file and the restore asks for it.
+
+### Services
+
+`Services` sets how Windows starts a service and, with `Status`, starts or stops it right away. It runs after `Software`, so the services of software installed by the restore can be set too. Use the service name, not the display name; `Get-Service` shows both:
+
+```json
+"Services": [
+  { "Name": "wuauserv", "StartupType": "AutomaticDelayedStart" },
+  { "Name": "Spooler", "StartupType": "Disabled", "Status": "Stopped" }
+]
+```
+
+`StartupType` is `Automatic`, `AutomaticDelayedStart`, `Manual` or `Disabled`. Stopping a service also stops the services that depend on it. A service listed twice, or `Disabled` together with `Running`, is reported before anything is changed.
 
 ### Removing local user accounts
 

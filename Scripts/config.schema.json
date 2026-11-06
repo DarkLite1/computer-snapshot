@@ -425,6 +425,29 @@
             }
           ]
         },
+        "Services": {
+          "description": "Inline Services data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline Services data.",
+              "$ref": "#/$defs/Services"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
         "StartCustomScriptsAfter": {
           "description": "Inline StartCustomScriptsAfter data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
@@ -503,6 +526,9 @@
           "required": ["Software"]
         },
         {
+          "required": ["Services"]
+        },
+        {
           "required": ["StartCustomScriptsAfter"]
         }
       ]
@@ -561,6 +587,37 @@
           }
         },
         "required": ["Path"]
+      }
+    },
+    "Services": {
+      "type": "array",
+      "description": "Windows services: their startup type and whether they run. Configured after Software, so services of installed software can be set too.",
+      "items": {
+        "type": "object",
+        "description": "One service.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "the exact service name, such as wuauserv, without wildcards",
+            "pattern": "^[^*?\\[\\]]+$"
+          },
+          "StartupType": {
+            "type": "string",
+            "enum": ["Automatic", "AutomaticDelayedStart", "Manual", "Disabled"],
+            "description": "How Windows starts the service. Omit to leave it unchanged."
+          },
+          "Status": {
+            "type": "string",
+            "enum": ["Running", "Stopped"],
+            "description": "Start or stop the service now; stopping also stops the services that depend on it. Omit to leave it unchanged."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Name"]
       }
     },
     "StartCustomScriptsAfter": {

@@ -13,6 +13,7 @@ function Get-SnapshotScriptsHC {
         UserAccounts             = 'User accounts import export.ps1'
         UserGroups               = 'User groups import export.ps1'
         FirewallRules            = 'Firewall rules import export.ps1'
+        EnvironmentVariables     = 'Environment variables import export.ps1'
         CreateFolders            = 'Folders import export.ps1'
         SmbShares                = 'Smb shares import export.ps1'
         NetworkCards             = 'Network cards import export.ps1'
@@ -158,6 +159,10 @@ function Get-SnapshotSectionLabelsHC {
         FirewallRules            = @(
             'Firewall rules',
             'Windows Firewall rules and their settings.'
+        )
+        EnvironmentVariables     = @(
+            'Environment variables',
+            'Variables such as JAVA_HOME and entries in Path.'
         )
         CreateFolders            = @(
             'Create folders',

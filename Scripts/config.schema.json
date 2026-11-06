@@ -195,6 +195,29 @@
             }
           ]
         },
+        "EnvironmentVariables": {
+          "description": "Inline EnvironmentVariables data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline EnvironmentVariables data.",
+              "$ref": "#/$defs/EnvironmentVariables"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
         "CreateFolders": {
           "description": "Inline CreateFolders data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
@@ -448,6 +471,9 @@
         },
         {
           "required": ["FirewallRules"]
+        },
+        {
+          "required": ["EnvironmentVariables"]
         },
         {
           "required": ["CreateFolders"]
@@ -955,6 +981,51 @@
           }
         },
         "required": ["Name", "DisplayName"]
+      }
+    },
+    "EnvironmentVariables": {
+      "type": "array",
+      "description": "Environment variables of the computer or of the account running the restore.",
+      "items": {
+        "type": "object",
+        "description": "One change to one variable.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "a variable name without '='",
+            "pattern": "^[^=]+$"
+          },
+          "Scope": {
+            "type": "string",
+            "enum": ["Machine", "User"],
+            "description": "Machine (default): for every account. User: for the account running the restore."
+          },
+          "Action": {
+            "type": "string",
+            "enum": ["Set", "Remove", "AddToList", "RemoveFromList"],
+            "description": "Set (default): give the variable Value. Remove: delete it. AddToList, RemoveFromList: add or remove each of Values in a ';' list such as Path."
+          },
+          "Value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Value for Set; %VARIABLE% stays unexpanded, such as %ProgramData%\\Tools."
+          },
+          "Values": {
+            "type": "array",
+            "description": "Entries for AddToList or RemoveFromList, such as C:\\Tools. Case and a trailing '\\' are ignored.",
+            "items": {
+              "type": "string",
+              "description": "a list entry without ';'",
+              "pattern": "^[^;]+$"
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Name"]
       }
     },
     "CreateFolders": {

@@ -15,6 +15,7 @@ $script:ArrayItems = @(
     'UserAccounts',
     'UserGroups',
     'FirewallRules',
+    'EnvironmentVariables',
     'NetworkCards',
     'HostsFileEntries',
     'ScheduledTasks',
@@ -644,6 +645,39 @@ function Test-ConfigurationHC {
         $assets = New-Object 'System.Collections.Generic.List[hashtable]'
 
         switch ($name) {
+            'EnvironmentVariables' {
+                for ($index = 0; $index -lt $data.Count; $index++) {
+                    $entry = $data[$index]
+                    $entryProperties = @(Get-PropertiesHC $entry)
+                    $entryAction = if ($entry.Action) {
+                        $entry.Action
+                    }
+                    else { 'Set' }
+                    $needs = switch ($entryAction) {
+                        'Set' { 'Value' }
+                        'Remove' { $null }
+                        default { 'Values' }
+                    }
+                    foreach ($property in @('Value', 'Values')) {
+                        if ($property -eq $needs) {
+                            if (@($entry.$property).Count -eq 0 -or
+                                $null -eq $entry.$property
+                            ) {
+                                $problems.Add(
+                                    "${location}[$index].${property}: " +
+                                    "required for Action $entryAction"
+                                )
+                            }
+                        }
+                        elseif ($entryProperties -contains $property) {
+                            $problems.Add(
+                                "${location}[$index].${property}: not used " +
+                                "with Action $entryAction; remove it"
+                            )
+                        }
+                    }
+                }
+            }
             'UserAccounts' {
                 for ($index = 0; $index -lt $data.Count; $index++) {
                     $entryProblems = @(Test-UserAccountEntryHC $data[$index])

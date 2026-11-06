@@ -20,6 +20,7 @@ Describe '<Name> data contract' -ForEach @(
             'Network cards'        = 'NetworkCards'
             'Regional settings'    = 'RegionalSettings'
             'Account policy'       = 'AccountPolicy'
+            'Environment variables' = 'EnvironmentVariables'
             Software               = 'Software'
             'User accounts'        = 'UserAccounts'
             'User groups'          = 'UserGroups'
@@ -42,6 +43,11 @@ Describe '<Name> data contract' -ForEach @(
         function Start-ScriptHC { param($Path) }
         function Get-SecurityPolicyHC {}
         function Set-SecurityPolicyHC { param($Values) }
+        function Get-EnvironmentVariablesHC { param($Scope) }
+        function Set-EnvironmentVariableHC {
+            param($Scope, $Name, $Value, $Kind)
+        }
+        function Send-EnvironmentChangeHC {}
         function Get-NetBiosSettingHC { param($Adapter) }
         function Set-NetBiosSettingHC { param($Adapter, $Setting) }
         function Get-UserLanguageListHC {}
@@ -171,6 +177,15 @@ Describe '<Name> data contract' -ForEach @(
         Mock Set-SecurityPolicyHC {
             foreach ($key in $Values.Keys) { $fakePolicy[$key] = $Values[$key] }
         }
+        Mock Get-EnvironmentVariablesHC {
+            [pscustomobject]@{
+                Name  = 'EXAMPLE_HOME'
+                Value = 'C:\Example'
+                Kind  = 'String'
+            }
+        }
+        Mock Set-EnvironmentVariableHC
+        Mock Send-EnvironmentChangeHC
         #endregion
 
         #region Scheduled tasks
@@ -359,6 +374,15 @@ Describe '<Name> data contract' -ForEach @(
             'Account policy' {
                 $data = [pscustomobject]@{ MinimumPasswordLength = 12 }
                 $command = 'Set-SecurityPolicyHC'
+            }
+            'Environment variables' {
+                $data = @(
+                    [pscustomobject]@{
+                        Name  = 'EXAMPLE_HOME'
+                        Value = 'C:\New'
+                    }
+                )
+                $command = 'Set-EnvironmentVariableHC'
             }
             'User accounts' {
                 $data = @(

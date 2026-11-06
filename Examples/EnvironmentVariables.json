@@ -1,0 +1,24 @@
+[
+  {
+    "Comment": "For every account; %ProgramData% stays in the value, unexpanded.",
+    "Name": "TOOLS_HOME",
+    "Value": "%ProgramData%\\Tools"
+  },
+  {
+    "Comment": "Added at the end of Path when they are not in it yet.",
+    "Name": "Path",
+    "Action": "AddToList",
+    "Values": ["%ProgramData%\\Tools\\bin", "C:\\Program Files\\Vendor"]
+  },
+  {
+    "Name": "Path",
+    "Action": "RemoveFromList",
+    "Values": ["C:\\Old vendor"]
+  },
+  {
+    "Comment": "For the account running the restore only.",
+    "Name": "VENDOR_DEBUG",
+    "Scope": "User",
+    "Action": "Remove"
+  }
+]

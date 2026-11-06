@@ -30,6 +30,7 @@ BeforeAll {
         'Network cards'              = 'NetworkCards'
         'Regional settings'          = 'RegionalSettings'
         'Account policy'             = 'AccountPolicy'
+        'Environment variables'      = 'EnvironmentVariables'
         'Software'                   = 'Software'
         'User accounts'              = 'UserAccounts'
         'User groups'                = 'UserGroups'

@@ -104,16 +104,17 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 4     | `UserAccounts`             | Local user accounts to create, update or remove.                         |
 | 5     | `UserGroups`               | Local groups and their members.                                         |
 | 6     | `FirewallRules`            | Windows Defender Firewall rules.                                        |
-| 7     | `CreateFolders`            | Folders to create.                                                      |
-| 8     | `SmbShares`                | SMB shares, each with its share and NTFS permissions.                   |
-| 9     | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and registration, IPv4 settings, NetBIOS and IPv6. |
-| 10    | `HostsFileEntries`         | Host names in the Windows hosts file and the IP addresses they point to. |
-| 11    | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
-| 12    | `RegistryKeys`             | Registry values to set.                                                 |
-| 13    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
-| 14    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
-| 15    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
-| 16    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
+| 7     | `EnvironmentVariables`     | Environment variables, and entries in lists such as `Path`.             |
+| 8     | `CreateFolders`            | Folders to create.                                                      |
+| 9     | `SmbShares`                | SMB shares, each with its share and NTFS permissions.                   |
+| 10    | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and registration, IPv4 settings, NetBIOS and IPv6. |
+| 11    | `HostsFileEntries`         | Host names in the Windows hosts file and the IP addresses they point to. |
+| 12    | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
+| 13    | `RegistryKeys`             | Registry values to set.                                                 |
+| 14    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
+| 15    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
+| 16    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
+| 17    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
 
 An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Examples/` folder for the exact format of each section.
 
@@ -165,6 +166,20 @@ See [Configurations/Example combined sections.json](Configurations/Example%20com
 ```
 
 `MaximumPasswordAgeDays` 0 means passwords never expire, `LockoutThreshold` 0 never locks an account and `LockoutDurationMinutes` 0 keeps an account locked until an administrator unlocks it. The policy is read back after the change; a setting Windows refused, such as a lockout duration shorter than `ResetLockoutCounterMinutes`, is reported as an error. On a computer in a domain, a group policy can overwrite these local settings.
+
+### Environment variables
+
+`EnvironmentVariables` changes variables of the computer (`Scope` `Machine`, the default) or of the account running the restore (`User`). Use `AddToList` and `RemoveFromList` for lists such as `Path`, so the rest of the list stays as it is:
+
+```json
+"EnvironmentVariables": [
+  { "Name": "TOOLS_HOME", "Value": "%ProgramData%\\Tools" },
+  { "Name": "Path", "Action": "AddToList", "Values": ["%ProgramData%\\Tools\\bin"] },
+  { "Name": "OLD_VENDOR", "Action": "Remove" }
+]
+```
+
+`%VARIABLE%` in a value is kept as it is and expanded when used, like Windows does for `Path`. Programs started after the restore see the changes, and so do the sections that run after this one, such as `CreateFolders` and `Software`. The export writes the computer variables that are not part of Windows; `Path` is not exported, add `AddToList` entries for it. A variable whose name looks like a secret, such as `SMTP_PASSWORD` or `API_TOKEN`, is exported as a `{{password:...}}` placeholder, so its value is never written to the file and the restore asks for it.
 
 ### Removing local user accounts
 

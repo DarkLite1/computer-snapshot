@@ -135,6 +135,11 @@ Some sections can't be fully captured automatically, so exporting them only give
 
 The `HKCU` entries apply to the account running the restore; for another account, put them under `RunAsOtherUser`.
 
+Two configurations show how they fit together with the other sections. Both change the PC they are restored on:
+
+- [Configurations/Example kiosk.json](Configurations/Example%20kiosk.json): Belgian regional settings with a Belgian keyboard, password rules, a `kiosk` account that signs in automatically, an environment variable, a power plan that never sleeps, services, and Windows without suggestions. It asks for the kiosk password once, for both the account and auto logon, and for the computer name.
+- [Configurations/Example remote desktop.json](Configurations/Example%20remote%20desktop.json): Remote Desktop with its firewall rules, the account that may connect, and the wired network card made private.
+
 ### Reusing sections across computers
 
 Instead of writing a section inline, you can point to a file. The path is relative to the USB stick root:

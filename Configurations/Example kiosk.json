@@ -1,0 +1,70 @@
+{
+  "$schema": "../Scripts/config.schema.json",
+  "SchemaVersion": 3,
+  "Description": "Kiosk PC example: Belgian regional settings with a Belgian keyboard, password rules, the 'kiosk' account that signs in automatically, a never-sleeping power plan, and Windows without suggestions. Asks for the kiosk password and the computer name. Changes this PC; restart afterwards.",
+  "Settings": {
+    "RebootComputer": false,
+    "RestartDelaySeconds": 60,
+    "OpenReportInBrowser": true,
+    "RunElevated": true
+  },
+  "Items": {
+    "Comment": "The RegistryKeys files in Examples are combined in this order.",
+    "RegionalSettings": {
+      "WinSystemLocaleName": "nl-BE",
+      "TimeZoneId": "Romance Standard Time",
+      "WinHomeLocationGeoId": 21,
+      "CultureName": "nl-BE",
+      "WinUserLanguageList": [
+        { "LanguageTag": "nl-BE", "InputMethodTips": ["0813:0000080C"] },
+        { "LanguageTag": "en-US" }
+      ]
+    },
+    "AccountPolicy": {
+      "Comment": "Set before UserAccounts, so the kiosk password must meet these rules.",
+      "MinimumPasswordLength": 12,
+      "PasswordComplexity": true,
+      "MaximumPasswordAgeDays": 0,
+      "LockoutThreshold": 10,
+      "LockoutDurationMinutes": 15,
+      "ResetLockoutCounterMinutes": 15
+    },
+    "UserAccounts": [
+      {
+        "Name": "kiosk",
+        "FullName": "Kiosk",
+        "Description": "Signs in automatically",
+        "Enabled": true,
+        "PasswordExpires": null,
+        "UserMayChangePassword": false,
+        "Password": "{{password:Password of the kiosk account, stored in plain text for auto logon}}"
+      }
+    ],
+    "EnvironmentVariables": [
+      { "Name": "KIOSK_HOME", "Value": "%ProgramData%\\Kiosk" }
+    ],
+    "CreateFolders": {
+      "FolderPaths": ["%ProgramData%\\Kiosk\\Logs"]
+    },
+    "PowerSettings": {
+      "ActivePlan": "Balanced",
+      "MonitorTimeoutMinutes": { "AC": 0 },
+      "SleepTimeoutMinutes": { "AC": 0 },
+      "HibernateTimeoutMinutes": { "AC": 0 },
+      "HibernateEnabled": false
+    },
+    "RegistryKeys": [
+      "Examples\\RegistryKeys auto logon.json",
+      "Examples\\RegistryKeys Windows suggestions.json"
+    ],
+    "Services": [
+      {
+        "Comment": "Connected User Experiences and Telemetry.",
+        "Name": "DiagTrack",
+        "StartupType": "Disabled",
+        "Status": "Stopped"
+      },
+      { "Name": "W32Time", "StartupType": "Automatic", "Status": "Running" }
+    ]
+  }
+}

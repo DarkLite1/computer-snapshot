@@ -1,0 +1,34 @@
+{
+  "$schema": "../Scripts/config.schema.json",
+  "SchemaVersion": 3,
+  "Description": "Remote Desktop example: turns on Remote Desktop with Network Level Authentication, opens port 3389 on domain and private networks, makes the wired network private, and lets one account connect. Asks for that account. Changes this PC.",
+  "Settings": {
+    "RebootComputer": false,
+    "RestartDelaySeconds": 60,
+    "OpenReportInBrowser": true,
+    "RunElevated": true
+  },
+  "Items": {
+    "UserGroups": [
+      {
+        "Name": "Remote Desktop Users",
+        "Members": [
+          "{{input:Account that may connect with Remote Desktop, such as CONTOSO\\jdoe}}"
+        ]
+      }
+    ],
+    "FirewallRules": "Examples\\FirewallRules Remote Desktop.json",
+    "NetworkCards": [
+      {
+        "Comment": "The firewall rules only allow domain and private networks. Fails on a PC with several wired cards: use Description or Name then.",
+        "FindBy": { "OnlyCard": "Wired" },
+        "Change": {
+          "NetworkCategory": "Private",
+          "RegisterInDns": true,
+          "NetBios": "Disabled"
+        }
+      }
+    ],
+    "RegistryKeys": "Examples\\RegistryKeys Remote Desktop.json"
+  }
+}

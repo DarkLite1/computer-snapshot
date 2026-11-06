@@ -2,15 +2,15 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\Smb shares import export.ps1"
+    ScriptPath = "$PSScriptRoot\..\Engine\Scripts\Smb shares import export.ps1"
     Name       = 'Smb shares'
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContract
 
 Describe 'Inline NTFS permissions' {
     BeforeAll {
-        $testScript = "$PSScriptRoot\..\Scripts\Smb shares import export.ps1"
-        $testModule = "$PSScriptRoot\..\Scripts\Common\Configuration.psm1"
+        $testScript = "$PSScriptRoot\..\Engine\Scripts\Smb shares import export.ps1"
+        $testModule = "$PSScriptRoot\..\Engine\Common\Configuration.psm1"
         Import-Module $testModule -Force
         function Test-AccountExistsHC { param($Name) }
     }
@@ -109,7 +109,7 @@ Describe 'Inline NTFS permissions' {
 
 Describe 'Smb shares import' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Smb shares import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Smb shares import export.ps1"
         # Resolve well-known names from their SID, so the tests also pass on
         # Windows in another language ('Everyone' is 'Iedereen' in Dutch)
         $everyone = (

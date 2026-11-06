@@ -2,14 +2,14 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\Firewall rules import export.ps1"
+    ScriptPath = "$PSScriptRoot\..\Engine\Scripts\Firewall rules import export.ps1"
     Name       = 'Firewall rules'
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContract
 
 Describe 'Firewall rules import errors' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Firewall rules import export.ps1'
         # Pipeline-friendly stand-ins, like in the shared child contract tests
         function Remove-NetFirewallRule {
@@ -140,7 +140,7 @@ Describe 'Firewall rules import errors' {
 
 Describe 'Firewall rules export' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Firewall rules import export.ps1'
         $filterTypes = @(
             'Address', 'Port', 'Application', 'Service', 'Interface',

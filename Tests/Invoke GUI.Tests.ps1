@@ -1,8 +1,8 @@
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 BeforeAll {
-    . "$PSScriptRoot\..\Scripts\Invoke GUI.ps1" -NoShow
-    . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+    . "$PSScriptRoot\..\Engine\Scripts\Invoke GUI.ps1" -NoShow
+    . "$PSScriptRoot\..\Engine\Common\RestoreInput.ps1"
 }
 
 Describe 'Restore input form' {
@@ -193,7 +193,7 @@ Describe 'Wizard console welcome' {
         Should -Invoke Write-Host -Times 3 -Exactly
     }
     It 'does not clear or print a welcome when loading with NoShow' {
-        . "$PSScriptRoot\..\Scripts\Invoke GUI.ps1" -NoShow
+        . "$PSScriptRoot\..\Engine\Scripts\Invoke GUI.ps1" -NoShow
         Should -Invoke Clear-Host -Times 0 -Exactly
         Should -Invoke Write-Host -Times 0 -Exactly
     }
@@ -799,7 +799,7 @@ Describe 'Optional wizard elevation' {
     It ('requests native UAC elevation and preserves quoted script and ' +
         'root paths') {
         $root = "C:\Snapshot user's files"
-        $scriptPath = "$root\Scripts\Invoke GUI.ps1"
+        $scriptPath = "$root\Engine\Scripts\Invoke GUI.ps1"
         Restart-WizardElevatedHC -RootFolder $root -WizardScript $scriptPath |
             Should -BeTrue
         Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter {
@@ -809,7 +809,7 @@ Describe 'Optional wizard elevation' {
             $Verb -eq 'RunAs' -and $ArgumentList -contains '-STA' -and
             $ErrorAction -eq 'Stop' -and
             $command -eq (
-                "& 'C:\Snapshot user''s files\Scripts\Invoke GUI.ps1' " +
+                "& 'C:\Snapshot user''s files\Engine\Scripts\Invoke GUI.ps1' " +
                 "-RootFolder 'C:\Snapshot user''s files'"
             )
         }

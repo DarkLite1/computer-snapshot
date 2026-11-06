@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 BeforeAll {
-    $scriptPath = "$PSScriptRoot\..\Scripts\Regional settings new accounts.ps1"
+    $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Regional settings new accounts.ps1"
 }
 
 Describe 'Regional settings resource cleanup' {

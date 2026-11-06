@@ -2,14 +2,14 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\Power settings import export.ps1"
+    ScriptPath = "$PSScriptRoot\..\Engine\Scripts\Power settings import export.ps1"
     Name       = 'Power settings'
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContract
 
 Describe 'Power settings' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Power settings import export.ps1'
         function Invoke-PowerCfgHC { param([string[]]$Arguments) }
         function Get-HibernateEnabledHC {}

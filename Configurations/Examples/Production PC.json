@@ -1,5 +1,5 @@
 {
-  "$schema": "../../Scripts/config.schema.json",
+  "$schema": "../../Engine/Schemas/config.schema.json",
   "SchemaVersion": 3,
   "Description": "Production PC example: an 'operator' account, a static IP address on the wired card, the PLC in the hosts file, an NTP time server, an Exports share, a clean-up task running as the operator, a power plan that never sleeps and Windows Search turned off. Asks for the operator password and the addresses. Changes this PC.",
   "Settings": {

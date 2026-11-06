@@ -2,14 +2,14 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\User groups import export.ps1"
+    ScriptPath = "$PSScriptRoot\..\Engine\Scripts\User groups import export.ps1"
     Name       = 'User groups'
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContract
 
 Describe 'User groups errors' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\User groups import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\User groups import export.ps1"
         function Get-GroupMemberAdsiHC { param($GroupName) }
         function New-LocalAccountsErrorHC {
             param([string]$Message, [string]$Id)
@@ -179,7 +179,7 @@ Describe 'User groups errors' {
 
 Describe 'User groups member names' {
     It 'reports a local account of the exported computer under its new name' {
-        $scriptPath = "$PSScriptRoot\..\Scripts\User groups import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\User groups import export.ps1"
         function Convert-AccountNameHC { param($Name) }
         Mock Convert-AccountNameHC { $Name -replace '^PC1\\', 'PC2\' }
         Mock Get-LocalGroup {
@@ -208,7 +208,7 @@ Describe 'User groups member names' {
 
 Describe 'User groups across Windows languages' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\User groups import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\User groups import export.ps1"
     }
     BeforeEach {
         Mock Get-LocalGroup {
@@ -289,7 +289,7 @@ Describe 'User groups across Windows languages' {
 
 Describe 'User groups with orphaned members' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\User groups import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\User groups import export.ps1"
         function Get-GroupMemberAdsiHC { param($GroupName) }
     }
     BeforeEach {

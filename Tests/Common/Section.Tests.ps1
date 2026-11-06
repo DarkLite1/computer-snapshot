@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 BeforeAll {
-    . "$PSScriptRoot\..\..\Scripts\Common\Section.ps1"
+    . "$PSScriptRoot\..\..\Engine\Common\Section.ps1"
 }
 
 Describe 'Software installers to skip' {
@@ -55,7 +55,7 @@ Describe 'Software installers to skip' {
 
 Describe 'Get-EmptySectionValueHC' {
     BeforeAll {
-        $configurationModule = "$PSScriptRoot\..\..\Scripts\Common\" +
+        $configurationModule = "$PSScriptRoot\..\..\Engine\Common\" +
             'Configuration.psm1'
         Import-Module $configurationModule -Force
     }

@@ -1,0 +1,1949 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Computer snapshot configuration",
+  "description": "Version 2 single-file Windows computer configuration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["SchemaVersion", "Items"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Schema location for editor completion and validation."
+    },
+    "SchemaVersion": {
+      "description": "Configuration format version. Must be 3; convert older files with Engine\\Scripts\\Convert configuration.ps1.",
+      "type": "integer",
+      "const": 3
+    },
+    "Description": {
+      "type": "string",
+      "description": "Description shown to technicians in the configuration picker."
+    },
+    "Settings": {
+      "type": "object",
+      "description": "Optional runtime settings; defaults apply when omitted.",
+      "additionalProperties": false,
+      "properties": {
+        "RebootComputer": {
+          "description": "Restart after a successful restore.",
+          "default": false,
+          "type": "boolean"
+        },
+        "RestartDelaySeconds": {
+          "description": "Seconds before the restart, 0 to 600; 'shutdown /a' cancels it meanwhile.",
+          "default": 60,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600
+        },
+        "OpenReportInBrowser": {
+          "description": "Open the HTML report after execution.",
+          "default": true,
+          "type": "boolean"
+        },
+        "RunElevated": {
+          "description": "Ask the launcher to run the restore as administrator.",
+          "default": false,
+          "type": "boolean"
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    },
+    "Items": {
+      "type": "object",
+      "description": "Present items are restored in fixed execution order. Missing items are skipped.",
+      "additionalProperties": false,
+      "properties": {
+        "StartCustomScriptsBefore": {
+          "description": "Inline StartCustomScriptsBefore data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline StartCustomScriptsBefore data.",
+              "$ref": "#/$defs/StartCustomScriptsBefore"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "RegionalSettings": {
+          "description": "Inline RegionalSettings data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline RegionalSettings data.",
+              "$ref": "#/$defs/RegionalSettings"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "AccountPolicy": {
+          "description": "Inline AccountPolicy data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline AccountPolicy data.",
+              "$ref": "#/$defs/AccountPolicy"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "UserAccounts": {
+          "description": "Inline UserAccounts data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline UserAccounts data.",
+              "$ref": "#/$defs/UserAccounts"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "UserGroups": {
+          "description": "Inline UserGroups data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline UserGroups data.",
+              "$ref": "#/$defs/UserGroups"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "FirewallRules": {
+          "description": "Inline FirewallRules data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline FirewallRules data.",
+              "$ref": "#/$defs/FirewallRules"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "EnvironmentVariables": {
+          "description": "Inline EnvironmentVariables data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline EnvironmentVariables data.",
+              "$ref": "#/$defs/EnvironmentVariables"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "CreateFolders": {
+          "description": "Inline CreateFolders data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline CreateFolders data.",
+              "$ref": "#/$defs/CreateFolders"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "SmbShares": {
+          "description": "Inline SmbShares data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline SmbShares data.",
+              "$ref": "#/$defs/SmbShares"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "NetworkCards": {
+          "description": "Inline NetworkCards data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline NetworkCards data.",
+              "$ref": "#/$defs/NetworkCards"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "HostsFileEntries": {
+          "description": "Inline HostsFileEntries data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline HostsFileEntries data.",
+              "$ref": "#/$defs/HostsFileEntries"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "NtpTimeServers": {
+          "description": "Inline NtpTimeServers data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline NtpTimeServers data.",
+              "$ref": "#/$defs/NtpTimeServers"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "PowerSettings": {
+          "description": "Inline PowerSettings data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline PowerSettings data.",
+              "$ref": "#/$defs/PowerSettings"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "RegistryKeys": {
+          "description": "Inline RegistryKeys data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline RegistryKeys data.",
+              "$ref": "#/$defs/RegistryKeys"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "ScheduledTasks": {
+          "description": "Inline ScheduledTasks data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline ScheduledTasks data.",
+              "$ref": "#/$defs/ScheduledTasks"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "CopyFilesFolders": {
+          "description": "Inline CopyFilesFolders data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline CopyFilesFolders data.",
+              "$ref": "#/$defs/CopyFilesFolders"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "Software": {
+          "description": "Inline Software data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline Software data.",
+              "$ref": "#/$defs/Software"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "Services": {
+          "description": "Inline Services data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline Services data.",
+              "$ref": "#/$defs/Services"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "StartCustomScriptsAfter": {
+          "description": "Inline StartCustomScriptsAfter data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline StartCustomScriptsAfter data.",
+              "$ref": "#/$defs/StartCustomScriptsAfter"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["StartCustomScriptsBefore"]
+        },
+        {
+          "required": ["RegionalSettings"]
+        },
+        {
+          "required": ["AccountPolicy"]
+        },
+        {
+          "required": ["UserAccounts"]
+        },
+        {
+          "required": ["UserGroups"]
+        },
+        {
+          "required": ["FirewallRules"]
+        },
+        {
+          "required": ["EnvironmentVariables"]
+        },
+        {
+          "required": ["CreateFolders"]
+        },
+        {
+          "required": ["SmbShares"]
+        },
+        {
+          "required": ["NetworkCards"]
+        },
+        {
+          "required": ["HostsFileEntries"]
+        },
+        {
+          "required": ["NtpTimeServers"]
+        },
+        {
+          "required": ["PowerSettings"]
+        },
+        {
+          "required": ["RegistryKeys"]
+        },
+        {
+          "required": ["ScheduledTasks"]
+        },
+        {
+          "required": ["CopyFilesFolders"]
+        },
+        {
+          "required": ["Software"]
+        },
+        {
+          "required": ["Services"]
+        },
+        {
+          "required": ["StartCustomScriptsAfter"]
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "StartCustomScriptsBefore": {
+      "type": "array",
+      "description": "Custom scripts executed first, in array order.",
+      "items": {
+        "type": "object",
+        "description": "A reviewed custom PowerShell script to execute.",
+        "additionalProperties": false,
+        "properties": {
+          "Path": {
+            "type": "string",
+            "description": "PowerShell script path, relative to the USB root or absolute."
+          },
+          "Arguments": {
+            "type": "object",
+            "description": "Named PowerShell parameters passed to a custom script.",
+            "additionalProperties": false,
+            "properties": {
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "patternProperties": {
+              "^(?!Comment$).+$": {
+                "description": "Named script parameter value."
+              }
+            }
+          },
+          "SuccessExitCodes": {
+            "type": "array",
+            "description": "Exit codes that mean the script succeeded; defaults to [0]. A script that ends with robocopy needs [0, 1, 2, 3, 4, 5, 6, 7], because robocopy uses 1 to 7 for success.",
+            "minItems": 1,
+            "items": {
+              "description": "An exit code that means success; or {{number:Description}} to ask for it.",
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string",
+                  "description": "a whole number or {{number:Description}}",
+                  "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                }
+              ]
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Path"]
+      }
+    },
+    "Services": {
+      "type": "array",
+      "description": "Windows services: their startup type and whether they run. Configured after Software, so services of installed software can be set too.",
+      "items": {
+        "type": "object",
+        "description": "One service.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "the exact service name, such as wuauserv, without wildcards",
+            "pattern": "^[^*?\\[\\]]+$"
+          },
+          "StartupType": {
+            "type": "string",
+            "enum": ["Automatic", "AutomaticDelayedStart", "Manual", "Disabled"],
+            "description": "How Windows starts the service. Omit to leave it unchanged."
+          },
+          "Status": {
+            "type": "string",
+            "enum": ["Running", "Stopped"],
+            "description": "Start or stop the service now; stopping also stops the services that depend on it. Omit to leave it unchanged."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Name"]
+      }
+    },
+    "StartCustomScriptsAfter": {
+      "type": "array",
+      "description": "Custom scripts executed last, in array order.",
+      "items": {
+        "type": "object",
+        "description": "A reviewed custom PowerShell script to execute.",
+        "additionalProperties": false,
+        "properties": {
+          "Path": {
+            "type": "string",
+            "description": "PowerShell script path, relative to the USB root or absolute."
+          },
+          "Arguments": {
+            "type": "object",
+            "description": "Named PowerShell parameters passed to a custom script.",
+            "additionalProperties": false,
+            "properties": {
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "patternProperties": {
+              "^(?!Comment$).+$": {
+                "description": "Named script parameter value."
+              }
+            }
+          },
+          "SuccessExitCodes": {
+            "type": "array",
+            "description": "Exit codes that mean the script succeeded; defaults to [0]. A script that ends with robocopy needs [0, 1, 2, 3, 4, 5, 6, 7], because robocopy uses 1 to 7 for success.",
+            "minItems": 1,
+            "items": {
+              "description": "An exit code that means success; or {{number:Description}} to ask for it.",
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string",
+                  "description": "a whole number or {{number:Description}}",
+                  "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                }
+              ]
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Path"]
+      }
+    },
+    "RegionalSettings": {
+      "type": "object",
+      "description": "Regional settings for the computer and current user.",
+      "additionalProperties": false,
+      "properties": {
+        "WinSystemLocaleName": {
+          "type": "string",
+          "description": "Windows system locale name, for example en-US."
+        },
+        "TimeZoneId": {
+          "type": "string",
+          "description": "Windows time-zone identifier."
+        },
+        "WinHomeLocationGeoId": {
+          "description": "Windows geographic location identifier; or {{number:Description}} to ask for it.",
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string",
+              "description": "a whole number or {{number:Description}}",
+              "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+            }
+          ]
+        },
+        "CultureName": {
+          "type": "string",
+          "description": "Current user culture name."
+        },
+        "WinUserLanguageList": {
+          "type": "array",
+          "description": "Current user's languages with their keyboards, in order of preference; copied to accounts created later. Omit to leave unchanged.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "LanguageTag": {
+                "type": "string",
+                "description": "Language tag, such as nl-BE or en-US.",
+                "minLength": 2
+              },
+              "InputMethodTips": {
+                "type": "array",
+                "description": "Keyboards for this language, such as 0813:0000080C for Belgian French under Dutch (Belgium). Omit for the default keyboard of the language.",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "description": "a keyboard identifier, such as 0813:0000080C",
+                  "pattern": "^[0-9A-Fa-f]{4}:([0-9A-Fa-f]{8}|\\{[0-9A-Fa-f-]{36}\\}\\{[0-9A-Fa-f-]{36}\\})$"
+                }
+              }
+            },
+            "required": ["LanguageTag"]
+          }
+        },
+        "WinUILanguageOverride": {
+          "type": ["string", "null"],
+          "description": "Current user's Windows display language, such as nl-NL; the language pack must be installed. null removes the override. Omit to leave unchanged."
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "anyOf": [
+        {
+          "maxProperties": 0
+        },
+        {
+          "required": [
+            "WinSystemLocaleName",
+            "TimeZoneId",
+            "WinHomeLocationGeoId",
+            "CultureName"
+          ]
+        },
+        {
+          "maxProperties": 1,
+          "required": ["Comment"]
+        }
+      ]
+    },
+    "AccountPolicy": {
+      "type": "object",
+      "description": "Local password and account lockout policy. Each setting that is left out stays as it is. In a domain, a group policy can overwrite these settings.",
+      "additionalProperties": false,
+      "properties": {
+        "MinimumPasswordLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 14,
+          "description": "Minimum number of characters in a password; 0 allows an empty password."
+        },
+        "PasswordComplexity": {
+          "type": "boolean",
+          "description": "Passwords must contain characters of three kinds: upper case, lower case, digits or symbols."
+        },
+        "PasswordHistorySize": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 24,
+          "description": "Number of earlier passwords that cannot be used again."
+        },
+        "MinimumPasswordAgeDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 998,
+          "description": "Days before a password can be changed again; less than MaximumPasswordAgeDays."
+        },
+        "MaximumPasswordAgeDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999,
+          "description": "Days after which a password expires; 0 means passwords never expire."
+        },
+        "LockoutThreshold": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999,
+          "description": "Failed sign-ins before an account is locked; 0 never locks an account."
+        },
+        "LockoutDurationMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99999,
+          "description": "Minutes an account stays locked; 0 keeps it locked until an administrator unlocks it. At least ResetLockoutCounterMinutes. Needs a LockoutThreshold."
+        },
+        "ResetLockoutCounterMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99999,
+          "description": "Minutes after which the failed sign-in count starts at 0 again. Needs a LockoutThreshold."
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    },
+    "UserAccounts": {
+      "type": "array",
+      "description": "Local user accounts to create, update or remove.",
+      "items": {
+        "type": "object",
+        "description": "A local account. Keep sensitive sections in protected Shared files.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "Local account name. Removal requires an exact name without wildcards or a domain prefix."
+          },
+          "Action": {
+            "type": "string",
+            "enum": ["Set", "Remove"],
+            "description": "Set (default): create or update the account. Remove: delete only the account, leaving profile files intact. With Remove, only Name, Action and Comment are allowed. Built-in accounts and the account running the restore are protected."
+          },
+          "FullName": {
+            "type": ["string", "null"],
+            "description": "Display name."
+          },
+          "Description": {
+            "type": ["string", "null"],
+            "description": "Account description."
+          },
+          "Enabled": {
+            "type": "boolean",
+            "description": "Whether the account is enabled."
+          },
+          "PasswordExpires": {
+            "type": ["string", "null", "boolean"],
+            "description": "Existing password expiry value; null means no expiry. Omit to leave the setting unchanged."
+          },
+          "AccountExpires": {
+            "type": ["string", "null"],
+            "description": "Optional account expiry date; null means no expiry. Omit to leave the setting unchanged."
+          },
+          "UserMayChangePassword": {
+            "type": "boolean",
+            "description": "Whether the user may change their password."
+          },
+          "Password": {
+            "type": "string",
+            "description": "Plain-text password. Required to create a new user; empty keeps the current password of an existing user. Use a {{password:...}} placeholder to ask for it at restore time."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Name"]
+      }
+    },
+    "UserGroups": {
+      "type": "array",
+      "description": "Local groups.",
+      "items": {
+        "type": "object",
+        "description": "Local group and its members.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "Local group name. A built-in group by its English name, such as Administrators, or its SID, such as S-1-5-32-544, works in every Windows language."
+          },
+          "Description": {
+            "type": "string",
+            "description": "Local group description."
+          },
+          "Members": {
+            "type": "array",
+            "description": "Members to add to this group.",
+            "items": {
+              "type": ["string", "null"],
+              "description": "Account name in local or domain notation. A built-in account by its English name, such as Everyone or NT AUTHORITY\\Authenticated Users, or its SID works in every Windows language."
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Name"]
+      }
+    },
+    "FirewallRules": {
+      "type": "array",
+      "description": "Windows firewall rules.",
+      "items": {
+        "type": "object",
+        "description": "A complete Windows firewall rule.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Name setting, as captured by the firewall export."
+          },
+          "DisplayName": {
+            "type": ["string", "null"],
+            "description": "Windows firewall DisplayName setting, as captured by the firewall export."
+          },
+          "Description": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Description setting, as captured by the firewall export."
+          },
+          "Action": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Action setting, as captured by the firewall export."
+          },
+          "Direction": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Direction setting, as captured by the firewall export."
+          },
+          "Profile": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Profile setting, as captured by the firewall export."
+          },
+          "Protocol": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Protocol setting, as captured by the firewall export."
+          },
+          "LocalPort": {
+            "type": ["string", "null"],
+            "description": "Windows firewall LocalPort setting, as captured by the firewall export."
+          },
+          "RemotePort": {
+            "type": ["string", "null"],
+            "description": "Windows firewall RemotePort setting, as captured by the firewall export."
+          },
+          "IcmpType": {
+            "type": ["string", "null"],
+            "description": "Windows firewall IcmpType setting, as captured by the firewall export."
+          },
+          "DynamicTarget": {
+            "type": ["string", "null"],
+            "description": "Windows firewall DynamicTarget setting, as captured by the firewall export."
+          },
+          "Group": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Group setting, as captured by the firewall export."
+          },
+          "Platform": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Platform setting, as captured by the firewall export."
+          },
+          "EdgeTraversalPolicy": {
+            "type": ["string", "null"],
+            "description": "Windows firewall EdgeTraversalPolicy setting, as captured by the firewall export."
+          },
+          "Owner": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Owner setting, as captured by the firewall export."
+          },
+          "LocalAddress": {
+            "type": ["string", "null"],
+            "description": "Windows firewall LocalAddress setting, as captured by the firewall export."
+          },
+          "RemoteAddress": {
+            "type": ["string", "null"],
+            "description": "Windows firewall RemoteAddress setting, as captured by the firewall export."
+          },
+          "Program": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Program setting, as captured by the firewall export."
+          },
+          "Package": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Package setting, as captured by the firewall export."
+          },
+          "Service": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Service setting, as captured by the firewall export."
+          },
+          "InterfaceAlias": {
+            "type": ["string", "null"],
+            "description": "Windows firewall InterfaceAlias setting, as captured by the firewall export."
+          },
+          "InterfaceType": {
+            "type": ["string", "null"],
+            "description": "Windows firewall InterfaceType setting, as captured by the firewall export."
+          },
+          "LocalUser": {
+            "type": ["string", "null"],
+            "description": "Windows firewall LocalUser setting, as captured by the firewall export."
+          },
+          "RemoteUser": {
+            "type": ["string", "null"],
+            "description": "Windows firewall RemoteUser setting, as captured by the firewall export."
+          },
+          "RemoteMachine": {
+            "type": ["string", "null"],
+            "description": "Windows firewall RemoteMachine setting, as captured by the firewall export."
+          },
+          "Authentication": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Authentication setting, as captured by the firewall export."
+          },
+          "Encryption": {
+            "type": ["string", "null"],
+            "description": "Windows firewall Encryption setting, as captured by the firewall export."
+          },
+          "Enabled": {
+            "type": "boolean",
+            "description": "Windows firewall Enabled flag."
+          },
+          "LooseSourceMapping": {
+            "type": "boolean",
+            "description": "Windows firewall LooseSourceMapping flag."
+          },
+          "LocalOnlyMapping": {
+            "type": "boolean",
+            "description": "Windows firewall LocalOnlyMapping flag."
+          },
+          "OverrideBlockRules": {
+            "type": "boolean",
+            "description": "Windows firewall OverrideBlockRules flag."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Name", "DisplayName"]
+      }
+    },
+    "EnvironmentVariables": {
+      "type": "array",
+      "description": "Environment variables of the computer or of the account running the restore.",
+      "items": {
+        "type": "object",
+        "description": "One change to one variable.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "a variable name without '='",
+            "pattern": "^[^=]+$"
+          },
+          "Scope": {
+            "type": "string",
+            "enum": ["Machine", "User"],
+            "description": "Machine (default): for every account. User: for the account running the restore."
+          },
+          "Action": {
+            "type": "string",
+            "enum": ["Set", "Remove", "AddToList", "RemoveFromList"],
+            "description": "Set (default): give the variable Value. Remove: delete it. AddToList, RemoveFromList: add or remove each of Values in a ';' list such as Path."
+          },
+          "Value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Value for Set; %VARIABLE% stays unexpanded, such as %ProgramData%\\Tools."
+          },
+          "Values": {
+            "type": "array",
+            "description": "Entries for AddToList or RemoveFromList, such as C:\\Tools. Case and a trailing '\\' are ignored.",
+            "items": {
+              "type": "string",
+              "description": "a list entry without ';'",
+              "pattern": "^[^;]+$"
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Name"]
+      }
+    },
+    "CreateFolders": {
+      "type": "object",
+      "description": "Folders to create.",
+      "additionalProperties": false,
+      "properties": {
+        "FolderPaths": {
+          "type": "array",
+          "description": "Folders to create; existing folders are left intact.",
+          "items": {
+            "type": "string",
+            "description": "Absolute folder path to create."
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "anyOf": [
+        {
+          "maxProperties": 0
+        },
+        {
+          "required": ["FolderPaths"]
+        },
+        {
+          "maxProperties": 1,
+          "required": ["Comment"]
+        }
+      ]
+    },
+    "SmbShares": {
+      "type": "array",
+      "description": "SMB shares, each with its share permissions (Access) and the NTFS permissions of its folder (NTFS).",
+      "items": {
+        "type": "object",
+        "description": "One SMB share.",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": ["string", "null"],
+            "description": "Share name."
+          },
+          "Description": {
+            "type": ["string", "null"],
+            "description": "SMB share Description setting."
+          },
+          "Path": {
+            "type": ["string", "null"],
+            "description": "Folder to share; created when it does not exist."
+          },
+          "ScopeName": {
+            "type": ["string", "null"],
+            "description": "SMB share ScopeName setting."
+          },
+          "CachingMode": {
+            "type": ["string", "null"],
+            "description": "SMB share CachingMode setting."
+          },
+          "SmbInstance": {
+            "type": ["string", "null"],
+            "description": "SMB share SmbInstance setting."
+          },
+          "FolderEnumerationMode": {
+            "type": ["string", "null"],
+            "description": "SMB share FolderEnumerationMode setting."
+          },
+          "CATimeout": {
+            "description": "SMB share CATimeout value; or {{number:Description}} to ask for it.",
+            "anyOf": [
+              {
+                "type": ["integer", "null"]
+              },
+              {
+                "type": "string",
+                "description": "a whole number or {{number:Description}}",
+                "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+              }
+            ]
+          },
+          "ThrottleLimit": {
+            "description": "SMB share ThrottleLimit value; or {{number:Description}} to ask for it.",
+            "anyOf": [
+              {
+                "type": ["integer", "null"]
+              },
+              {
+                "type": "string",
+                "description": "a whole number or {{number:Description}}",
+                "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+              }
+            ]
+          },
+          "ConcurrentUserLimit": {
+            "description": "SMB share ConcurrentUserLimit value; or {{number:Description}} to ask for it.",
+            "anyOf": [
+              {
+                "type": ["integer", "null"]
+              },
+              {
+                "type": "string",
+                "description": "a whole number or {{number:Description}}",
+                "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+              }
+            ]
+          },
+          "EncryptData": {
+            "type": ["boolean", "null"],
+            "description": "SMB share EncryptData flag."
+          },
+          "ContinuouslyAvailable": {
+            "type": ["boolean", "null"],
+            "description": "SMB share ContinuouslyAvailable flag."
+          },
+          "Access": {
+            "type": "array",
+            "description": "Share permissions. Without it, the share's permissions are left unchanged.",
+            "items": {
+              "type": "object",
+              "description": "Share permission for one account.",
+              "additionalProperties": false,
+              "properties": {
+                "ScopeName": {
+                  "type": ["string", "null"],
+                  "description": "SMB access ScopeName value."
+                },
+                "AccountName": {
+                  "type": ["string", "null"],
+                  "description": "Account name. A built-in account by its English name, such as Everyone or BUILTIN\\Users, or its SID works in every Windows language."
+                },
+                "AccessControlType": {
+                  "type": ["string", "null"],
+                  "description": "SMB access AccessControlType value."
+                },
+                "AccessRight": {
+                  "type": ["string", "null"],
+                  "description": "SMB access AccessRight value."
+                },
+                "Comment": {
+                  "type": "string",
+                  "description": "Technician notes; ignored when applying the configuration."
+                }
+              },
+              "required": ["AccountName", "AccessRight"]
+            }
+          },
+          "NTFS": {
+            "type": "object",
+            "description": "NTFS permissions of the shared folder. Without it, the folder's permissions are left unchanged.",
+            "additionalProperties": false,
+            "properties": {
+              "Owner": {
+                "type": "string",
+                "description": "Folder owner: account name. A built-in account by its English name, such as BUILTIN\\Administrators, or its SID works in every Windows language."
+              },
+              "AreAccessRulesProtected": {
+                "type": "boolean",
+                "description": "Whether inherited access rules are disabled."
+              },
+              "Access": {
+                "type": "array",
+                "description": "Non-inherited NTFS access rules.",
+                "items": {
+                  "type": "object",
+                  "description": "Explicit NTFS permission.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "IdentityReference": {
+                      "type": "string",
+                      "description": "Account name. A built-in account by its English name, such as Everyone or BUILTIN\\Users, or its SID works in every Windows language."
+                    },
+                    "AccessControlType": {
+                      "type": "string",
+                      "description": "NTFS access-rule AccessControlType value."
+                    },
+                    "FileSystemRights": {
+                      "type": "string",
+                      "description": "NTFS access-rule FileSystemRights value."
+                    },
+                    "InheritanceFlags": {
+                      "type": "string",
+                      "description": "NTFS access-rule InheritanceFlags value."
+                    },
+                    "PropagationFlags": {
+                      "type": "string",
+                      "description": "NTFS access-rule PropagationFlags value."
+                    },
+                    "Comment": {
+                      "type": "string",
+                      "description": "Technician notes; ignored when applying the configuration."
+                    }
+                  }
+                }
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "required": ["Owner", "AreAccessRulesProtected", "Access"]
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Name", "Path"]
+      }
+    },
+    "NetworkCards": {
+      "type": "array",
+      "description": "Network adapters. Each entry finds one card with FindBy and changes it as described in Change.",
+      "items": {
+        "type": "object",
+        "description": "One network card: how to find it, and what to change.",
+        "additionalProperties": false,
+        "properties": {
+          "FindBy": {
+            "type": "object",
+            "description": "How to find the card; nothing here is changed. Use exactly one of Description, Name and OnlyCard.",
+            "additionalProperties": false,
+            "properties": {
+              "Description": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The card's description (Device Manager name), which comes from the driver: a card with exactly this description is used first, otherwise the one card whose description contains this text."
+              },
+              "Name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The card's current name, such as 'Ethernet', before any rename. Names can differ per computer."
+              },
+              "OnlyCard": {
+                "description": "true: the one physical network card of the computer, for computers with a single card. 'WiFi' or 'Wired': the one card of that kind, such as the Ethernet card of a laptop that also has Wi-Fi. VPN, virtual and Bluetooth adapters do not count; with no or several such cards the entry fails.",
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "const": true,
+                    "description": "true, for the only physical card"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["WiFi", "Wired"],
+                    "description": "WiFi or Wired, for the only card of that kind"
+                  }
+                ]
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "oneOf": [
+              {
+                "required": ["Description"]
+              },
+              {
+                "required": ["Name"]
+              },
+              {
+                "required": ["OnlyCard"]
+              }
+            ]
+          },
+          "Change": {
+            "type": "object",
+            "description": "What to change on the card. Each setting that is left out stays as it is.",
+            "additionalProperties": false,
+            "properties": {
+              "NewName": {
+                "type": "string",
+                "description": "New name for the card; empty or omitted keeps the current name."
+              },
+              "NetworkCategory": {
+                "type": "string",
+                "description": "Network profile, such as Private or Public; empty or omitted leaves it unchanged."
+              },
+              "DnsSuffix": {
+                "type": ["string", "null"],
+                "description": "Connection-specific DNS suffix. An empty string clears it; null or omission leaves it unchanged."
+              },
+              "RegisterInDns": {
+                "type": "boolean",
+                "description": "Register this connection's addresses in DNS. Omit to leave it unchanged."
+              },
+              "UseDnsSuffixWhenRegistering": {
+                "type": "boolean",
+                "description": "Use this connection's DNS suffix in DNS registration. Omit to leave it unchanged."
+              },
+              "IPSettings": {
+                "description": "IPv4 settings: { \"Dhcp\": true }, or a static IPAddress with PrefixLength. Omit to leave them unchanged.",
+                "$ref": "#/$defs/NetworkIPSettings"
+              },
+              "NetBios": {
+                "type": "string",
+                "enum": ["Default", "Enabled", "Disabled"],
+                "description": "NetBIOS over TCP/IP: Default uses the DHCP setting. Omit to leave it unchanged."
+              },
+              "IPv6Enabled": {
+                "type": "boolean",
+                "description": "Turn IPv6 on or off for this card. Omit to leave it unchanged."
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["FindBy", "Change"]
+      }
+    },
+    "NetworkIPSettings": {
+      "type": "object",
+      "description": "IPv4 settings. Either { \"Dhcp\": true } for an automatic address, or a static IPAddress with PrefixLength. Omit to leave the IP settings unchanged.",
+      "additionalProperties": false,
+      "properties": {
+        "Dhcp": {
+          "type": "boolean",
+          "description": "true: get the address from DHCP; the static addresses and default gateway are removed. Leave out for a static address."
+        },
+        "IPAddress": {
+          "type": "string",
+          "description": "Static IPv4 address, such as 10.20.67.2, or {{ipv4:Description}} to ask for it. Replaces all IPv4 addresses of the card."
+        },
+        "PrefixLength": {
+          "description": "Subnet prefix length from 1 to 32, such as 24 for 255.255.255.0, or {{prefix:Description}} to ask for it.",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            {
+              "type": "string",
+              "description": "a number from 1 to 32, or {{prefix:Description}}",
+              "pattern": "^\\{\\{prefix:[^{}\\r\\n]+\\}\\}$"
+            }
+          ]
+        },
+        "DefaultGateway": {
+          "type": "string",
+          "description": "Default gateway in the same subnet, or {{ipv4:Description}}. Omit for no default gateway."
+        },
+        "DNSServers": {
+          "type": "array",
+          "description": "DNS servers in order of use. An empty list makes DNS automatic again; omit to leave DNS unchanged.",
+          "items": {
+            "type": "string",
+            "description": "DNS server IPv4 address, or {{ipv4:Description}}."
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    },
+    "HostsFileEntries": {
+      "type": "array",
+      "description": "Entries for the Windows hosts file, one per IP address. Other lines of the hosts file are kept.",
+      "items": {
+        "type": "object",
+        "description": "Host names that point to one IP address, or host names to remove.",
+        "additionalProperties": false,
+        "properties": {
+          "Action": {
+            "type": "string",
+            "enum": ["Set", "Remove"],
+            "description": "Set (default): make each host name point to IPAddress; a name that points elsewhere is moved. Remove: remove the host names from the hosts file."
+          },
+          "IPAddress": {
+            "type": "string",
+            "description": "IPv4 or IPv6 address, such as 10.20.60.47 or fd00::47, or {{ipv4:Description}}. Required for Set, not used for Remove."
+          },
+          "Hostnames": {
+            "type": "array",
+            "description": "Host names, such as server01 and server01.contoso.com.",
+            "items": {
+              "type": "string",
+              "description": "Host name: letters, digits, '-' and '_', in labels separated by dots."
+            }
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["Hostnames"]
+      }
+    },
+    "NtpTimeServers": {
+      "type": "object",
+      "description": "Windows time synchronization.",
+      "additionalProperties": false,
+      "properties": {
+        "SyncTimeWithDomain": {
+          "type": "boolean",
+          "description": "Use domain time synchronization instead of custom servers."
+        },
+        "TimeServerNames": {
+          "type": "array",
+          "description": "Custom NTP servers, ignored when domain synchronization is enabled.",
+          "items": {
+            "type": "string",
+            "description": "NTP server hostname."
+          }
+        },
+        "Reliable": {
+          "type": "boolean",
+          "description": "Announce this computer as a reliable time source for other computers (w32tm /reliable:YES). Only for domain controllers and dedicated time servers; defaults to false."
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "anyOf": [
+        {
+          "maxProperties": 0
+        },
+        {
+          "required": ["SyncTimeWithDomain", "TimeServerNames"]
+        },
+        {
+          "maxProperties": 1,
+          "required": ["Comment"]
+        }
+      ]
+    },
+    "PowerSettings": {
+      "type": "object",
+      "description": "Active power plan, its timeouts and hibernation. Each setting that is left out stays as it is.",
+      "additionalProperties": false,
+      "properties": {
+        "ActivePlan": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Balanced, HighPerformance or PowerSaver, which work in every Windows language; the name of a plan as 'powercfg /list' shows it; or a plan GUID."
+        },
+        "MonitorTimeoutMinutes": {
+          "description": "Turn off the display after this many minutes; 0 is never.",
+          "$ref": "#/$defs/PowerTimeout"
+        },
+        "SleepTimeoutMinutes": {
+          "description": "Sleep after this many minutes; 0 is never.",
+          "$ref": "#/$defs/PowerTimeout"
+        },
+        "HibernateTimeoutMinutes": {
+          "description": "Hibernate after this many minutes; 0 is never.",
+          "$ref": "#/$defs/PowerTimeout"
+        },
+        "DiskTimeoutMinutes": {
+          "description": "Turn off hard disks after this many minutes; 0 is never.",
+          "$ref": "#/$defs/PowerTimeout"
+        },
+        "HibernateEnabled": {
+          "type": "boolean",
+          "description": "Hibernation, and with it fast startup, on or off."
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    },
+    "PowerTimeout": {
+      "type": "object",
+      "description": "Minutes when plugged in (AC) and on battery (DC); 0 is never. Leave one out to keep it.",
+      "additionalProperties": false,
+      "properties": {
+        "AC": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 71582788,
+          "description": "Minutes when plugged in; 0 is never."
+        },
+        "DC": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 71582788,
+          "description": "Minutes on battery; 0 is never."
+        }
+      }
+    },
+    "RegistryKeys": {
+      "type": "object",
+      "description": "Registry changes. Protect files containing alternate-user credentials.",
+      "additionalProperties": false,
+      "properties": {
+        "RunAsCurrentUser": {
+          "type": "object",
+          "description": "Current-user registry changes.",
+          "additionalProperties": false,
+          "properties": {
+            "RegistryKeys": {
+              "type": "array",
+              "description": "Registry changes applied in the current user context.",
+              "items": {
+                "$ref": "#/$defs/RegistryEntry"
+              }
+            },
+            "Comment": {
+              "type": "string",
+              "description": "Technician notes; ignored when applying the configuration."
+            }
+          }
+        },
+        "RunAsOtherUser": {
+          "type": "array",
+          "description": "Other local users to configure.",
+          "items": {
+            "type": "object",
+            "description": "Alternate-user registry changes.",
+            "additionalProperties": false,
+            "properties": {
+              "UserName": {
+                "type": "string",
+                "description": "Local user whose registry hive will be loaded."
+              },
+              "UserPassword": {
+                "type": "string",
+                "description": "Plain-text password used to initialize a missing profile."
+              },
+              "RegistryKeys": {
+                "type": "array",
+                "description": "Registry changes for this user; HKCU paths point to this user's registry.",
+                "items": {
+                  "$ref": "#/$defs/RegistryEntry"
+                }
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "required": ["UserName", "RegistryKeys"]
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    },
+    "RegistryEntry": {
+      "type": "object",
+      "description": "A registry change. Action decides what happens; without Action, a value is set.",
+      "additionalProperties": false,
+      "properties": {
+        "Action": {
+          "type": "string",
+          "enum": [
+            "Set",
+            "RemoveValue",
+            "ClearValues",
+            "ClearKey",
+            "RemoveKey"
+          ],
+          "description": "Set (default): create or change a value. RemoveValue: remove one value. ClearValues: remove all values of the key, keep its subkeys. ClearKey: remove all values and subkeys, keep the key. RemoveKey: remove the key with everything in it. ClearValues, ClearKey and RemoveKey are refused for a hive root or a key directly below it."
+        },
+        "Path": {
+          "type": "string",
+          "description": "Registry key, for example HKLM:\\SOFTWARE\\Example, HKCU:\\Software\\Example or HKEY_LOCAL_MACHINE\\SOFTWARE\\Example."
+        },
+        "Name": {
+          "type": "string",
+          "description": "Value name; an empty string is the key's (Default) value. Required for Set and RemoveValue."
+        },
+        "Type": {
+          "type": "string",
+          "enum": [
+            "String",
+            "ExpandString",
+            "MultiString",
+            "Binary",
+            "DWord",
+            "QWord",
+            "STRING",
+            "EXPANDSTRING",
+            "MULTISTRING",
+            "BINARY",
+            "DWORD",
+            "QWORD",
+            "REG_SZ",
+            "REG_EXPAND_SZ",
+            "REG_MULTI_SZ",
+            "REG_BINARY",
+            "REG_DWORD",
+            "REG_QWORD"
+          ],
+          "description": "Value type, required for Set: String, ExpandString, MultiString, Binary, DWord or QWord."
+        },
+        "Value": {
+          "type": ["string", "integer", "array"],
+          "description": "Value data, required for Set. String and ExpandString: text. MultiString: a list of texts. Binary: hex text such as '01 0A FF' or a list of numbers 0-255. DWord and QWord: a number, or text in decimal ('16') or hexadecimal ('0x10')."
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      },
+      "required": ["Path"]
+    },
+    "ScheduledTasks": {
+      "type": "array",
+      "description": "Scheduled tasks, each with its XML inline or in a file exported from Task Scheduler.",
+      "items": {
+        "type": "object",
+        "description": "Task definition and enabled state.",
+        "additionalProperties": false,
+        "properties": {
+          "TaskName": {
+            "type": "string",
+            "description": "Task Scheduler task name."
+          },
+          "TaskPath": {
+            "type": "string",
+            "description": "Task Scheduler folder, for example \\HC\\."
+          },
+          "Enabled": {
+            "type": "boolean",
+            "description": "Whether the registered task is enabled."
+          },
+          "Xml": {
+            "type": "string",
+            "description": "Complete task XML, as returned by Export-ScheduledTask. Use either Xml or XmlFile."
+          },
+          "XmlFile": {
+            "type": "string",
+            "description": "Task XML file exported from Task Scheduler (right-click a task, Export...), relative to the USB root unless it is a full path. Use either Xml or XmlFile."
+          },
+          "RunAsUser": {
+            "type": "string",
+            "description": "Account the task runs as, such as 'kiosk', 'CONTOSO\\svc-backup' or a built-in account by its English name, such as NT AUTHORITY\\LOCAL SERVICE, which works in every Windows language. Without it, the task runs as SYSTEM."
+          },
+          "RunAsPassword": {
+            "type": "string",
+            "description": "Password of RunAsUser. The task then runs whether or not the user is signed in, with the password saved in Task Scheduler. Use a {{password:...}} placeholder to ask for it at restore time instead of storing it in this file."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["TaskName", "TaskPath", "Enabled"],
+        "oneOf": [
+          {
+            "required": ["Xml"]
+          },
+          {
+            "required": ["XmlFile"]
+          }
+        ]
+      }
+    },
+    "CopyFilesFolders": {
+      "type": "array",
+      "description": "Files and folders to copy.",
+      "items": {
+        "type": "object",
+        "description": "One copy operation.",
+        "additionalProperties": false,
+        "properties": {
+          "From": {
+            "type": "string",
+            "description": "Source file or folder, relative to the USB root or absolute."
+          },
+          "To": {
+            "type": "string",
+            "description": "Absolute destination file or folder path."
+          },
+          "FillPlaceholders": {
+            "type": "boolean",
+            "description": "true: From is a text file whose {{input:...}}, {{ipv4:...}}, {{prefix:...}} and {{number:...}} placeholders are asked for at the start of the restore and filled in on the copy. {{password:...}} is not allowed in a file."
+          },
+          "Comment": {
+            "type": "string",
+            "description": "Technician notes; ignored when applying the configuration."
+          }
+        },
+        "required": ["From", "To"]
+      }
+    },
+    "Software": {
+      "type": "object",
+      "description": "Software uninstall and install operations.",
+      "additionalProperties": false,
+      "properties": {
+        "Remove": {
+          "type": "array",
+          "description": "Applications to remove first.",
+          "items": {
+            "type": "object",
+            "description": "Application to uninstall, found by its display name in Programs and Features.",
+            "additionalProperties": false,
+            "properties": {
+              "DisplayName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Display name in Programs and Features. * matches any text, for example 'Vendor Tool*'; every match is removed."
+              },
+              "UninstallArguments": {
+                "type": "string",
+                "description": "Arguments added to the application's own uninstall command (UninstallString), for example /S or /VERYSILENT /NORESTART. Use either UninstallArguments or UninstallCommand."
+              },
+              "UninstallCommand": {
+                "type": "string",
+                "description": "Command to run instead of the uninstall command in the registry; it runs once, also when several applications match. Use either UninstallArguments or UninstallCommand."
+              },
+              "SuccessExitCodes": {
+                "type": "array",
+                "description": "Exit codes that mean the removal succeeded; defaults to [0]. 3010 and 1641 always mean success with a restart needed.",
+                "minItems": 1,
+                "items": {
+                  "description": "An exit code that means success; or {{number:Description}} to ask for it.",
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string",
+                      "description": "a whole number or {{number:Description}}",
+                      "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                    }
+                  ]
+                }
+              },
+              "AllowMultiple": {
+                "type": "boolean",
+                "description": "Allow DisplayName to match more than 5 applications. Without it, such a removal is refused to protect against a too broad pattern."
+              },
+              "TimeoutMinutes": {
+                "default": 15,
+                "description": "Minutes the uninstaller may run; then it is stopped, with the processes it started, and the removal fails; or {{number:Description}} to ask for it.",
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
+                  },
+                  {
+                    "type": "string",
+                    "description": "a whole number or {{number:Description}}",
+                    "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                  }
+                ]
+              },
+              "WaitForAllProcesses": {
+                "type": "boolean",
+                "default": false,
+                "description": "Also wait, up to TimeoutMinutes, for every process the uninstaller starts, and fail when one is still running then. Without it, those processes get 60 seconds after the uninstaller ends and are then left running and named in the report."
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "required": ["DisplayName"]
+          }
+        },
+        "Install": {
+          "type": "array",
+          "description": "Installers to execute in array order.",
+          "items": {
+            "type": "object",
+            "description": "Installer to execute and wait for.",
+            "additionalProperties": false,
+            "properties": {
+              "ExecutablePath": {
+                "type": "string",
+                "description": "Installer path, relative to the USB root or absolute."
+              },
+              "Arguments": {
+                "type": ["string", "null"],
+                "description": "Command-line arguments passed to the installer."
+              },
+              "SuccessExitCodes": {
+                "type": "array",
+                "description": "Exit codes that mean the installation succeeded; defaults to [0]. 3010 and 1641 always mean success with a restart needed.",
+                "minItems": 1,
+                "items": {
+                  "description": "An exit code that means success; or {{number:Description}} to ask for it.",
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string",
+                      "description": "a whole number or {{number:Description}}",
+                      "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                    }
+                  ]
+                }
+              },
+              "TimeoutMinutes": {
+                "default": 15,
+                "description": "Minutes the installer may run; then it is stopped, with the processes it started, and the installation fails; or {{number:Description}} to ask for it.",
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
+                  },
+                  {
+                    "type": "string",
+                    "description": "a whole number or {{number:Description}}",
+                    "pattern": "^\\{\\{number:[^{}\\r\\n]+\\}\\}$"
+                  }
+                ]
+              },
+              "WaitForAllProcesses": {
+                "type": "boolean",
+                "default": false,
+                "description": "Also wait, up to TimeoutMinutes, for every process the installer starts, for installers that finish their work in a child process; fail when one is still running then. Without it, those processes get 60 seconds after the installer ends and are then left running and named in the report, such as the installed application or an updater."
+              },
+              "Comment": {
+                "type": "string",
+                "description": "Technician notes; ignored when applying the configuration."
+              }
+            },
+            "required": ["ExecutablePath"]
+          }
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    }
+  }
+}

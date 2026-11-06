@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContractParams = @{
-    ScriptPath  = "$PSScriptRoot\..\Scripts\Registry keys import export.ps1"
+    ScriptPath  = "$PSScriptRoot\..\Engine\Scripts\Registry keys import export.ps1"
     Name        = 'Registry keys'
     EmptyExport = $true
 }
@@ -10,7 +10,7 @@ $childContractParams = @{
 
 Describe 'Registry keys import' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Registry keys import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Registry keys import export.ps1"
 
         # Stand-ins so the script's own helpers can be mocked
         function Get-UserSidHC { param($UserName) }
@@ -280,7 +280,7 @@ Describe 'Registry keys import' {
 Describe 'Registry keys on the real registry' {
     # Works in a temporary key below HKCU, which only affects the current user
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Registry keys import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Registry keys import export.ps1"
     }
     BeforeEach {
         $testKey = (

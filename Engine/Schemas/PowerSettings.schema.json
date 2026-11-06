@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PowerSettings section",
+  "$ref": "config.schema.json#/$defs/PowerSettings"
+}

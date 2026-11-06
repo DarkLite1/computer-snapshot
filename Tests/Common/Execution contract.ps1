@@ -1,8 +1,9 @@
 Describe 'Single-file execution' {
     BeforeAll {
-        $scriptsFolder = Join-Path $PSScriptRoot '..\..\Scripts'
-        Import-Module "$scriptsFolder\Common\Execution.psm1" -Force
-        Import-Module "$scriptsFolder\Common\Configuration.psm1" -Force
+        $engineFolder = Join-Path $PSScriptRoot '..\..\Engine'
+        $scriptsFolder = Join-Path $engineFolder 'Scripts'
+        Import-Module "$engineFolder\Common\Execution.psm1" -Force
+        Import-Module "$engineFolder\Common\Configuration.psm1" -Force
         $scriptPath = Join-Path $scriptsFolder 'Folders import export.ps1'
         $inModule = @{ ModuleName = 'Execution' }
         . "$PSScriptRoot\Restore input.ps1"
@@ -66,7 +67,7 @@ Describe 'Single-file execution' {
     }
     It 'keeps successful sections when another export throws' {
         $params.Script.CreateFolders = Join-Path $PSScriptRoot (
-            '..\..\Scripts\User accounts import export.ps1'
+            '..\..\Engine\Scripts\User accounts import export.ps1'
         )
         Mock Invoke-ChildScriptHC @inModule -ParameterFilter {
             $Path -like '*User accounts import export.ps1'
@@ -158,7 +159,7 @@ Describe 'Single-file execution' {
         $params.Remove('Items')
         $params.Script = [ordered]@{
             NtpTimeServers = Join-Path $PSScriptRoot (
-                '..\..\Scripts\NTP time servers import export.ps1'
+                '..\..\Engine\Scripts\NTP time servers import export.ps1'
             )
         }
         Mock Invoke-ChildScriptHC @inModule {
@@ -1322,7 +1323,7 @@ Describe 'Single-file execution' {
     }
     It 'exports a section that returned errors as an empty entry' {
         $params.Script.UserAccounts = Join-Path $PSScriptRoot (
-            '..\..\Scripts\User accounts import export.ps1'
+            '..\..\Engine\Scripts\User accounts import export.ps1'
         )
         Mock Invoke-ChildScriptHC @inModule {
             [pscustomobject]@{

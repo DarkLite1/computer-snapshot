@@ -2,14 +2,14 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\Account policy import export.ps1"
+    ScriptPath = "$PSScriptRoot\..\Engine\Scripts\Account policy import export.ps1"
     Name       = 'Account policy'
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContract
 
 Describe 'Account policy' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Account policy import export.ps1'
         function Get-SecurityPolicyHC {}
         function Set-SecurityPolicyHC { param($Values) }

@@ -2,12 +2,12 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 . "$PSScriptRoot\Common\Child contract.ps1" -ScriptPath (
-    "$PSScriptRoot\..\Scripts\Network cards import export.ps1"
+    "$PSScriptRoot\..\Engine\Scripts\Network cards import export.ps1"
 ) -Name 'Network cards'
 
 Describe 'Network profile restoration' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Network cards import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Network cards import export.ps1"
     }
     BeforeEach {
         Mock Get-NetAdapter {
@@ -457,7 +457,7 @@ Describe 'Network profile restoration' {
 
 Describe 'Finding the card and IPv4 settings' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Network cards import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Network cards import export.ps1"
     }
     BeforeEach {
         Mock Get-NetAdapter {
@@ -946,7 +946,7 @@ Describe 'Finding the card and IPv4 settings' {
         $result = . $scriptPath -Action Export -RootFolder $TestDrive
 
         Import-Module (
-            "$PSScriptRoot\..\Scripts\Common\Configuration.psm1"
+            "$PSScriptRoot\..\Engine\Common\Configuration.psm1"
         ) -Force
         $fakeConfigurationPath = Join-Path $TestDrive 'exported network.json'
         $fakeAnswerPath = Join-Path $TestDrive 'exported network.answers.json'
@@ -959,7 +959,7 @@ Describe 'Finding the card and IPv4 settings' {
             ConfigurationFile = $fakeConfigurationPath
             AnswerFile        = $fakeAnswerPath
         }
-        $answerFileScript = "$PSScriptRoot\..\Scripts\New answer file.ps1"
+        $answerFileScript = "$PSScriptRoot\..\Engine\Scripts\New answer file.ps1"
         $null = & $answerFileScript @answerFileParams
 
         $answers = (
@@ -1024,7 +1024,7 @@ Describe 'Finding the card and IPv4 settings' {
 
 Describe 'DNS registration, NetBIOS and IPv6' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Network cards import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Network cards import export.ps1"
         function Get-NetBiosSettingHC { param($Adapter) }
         function Set-NetBiosSettingHC { param($Adapter, $Setting) }
     }
@@ -1130,7 +1130,7 @@ Describe 'DNS registration, NetBIOS and IPv6' {
 
 Describe 'Keeping the old IPv4 settings when a change fails' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Network cards import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Network cards import export.ps1"
     }
     BeforeEach {
         Mock Get-NetAdapter {

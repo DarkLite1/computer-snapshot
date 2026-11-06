@@ -1,5 +1,5 @@
 {
-  "$schema": "../../Scripts/config.schema.json",
+  "$schema": "../../Engine/Schemas/config.schema.json",
   "SchemaVersion": 3,
   "Description": "Example PC1: bundled hello-world applications and a reusable user section",
   "Settings": {

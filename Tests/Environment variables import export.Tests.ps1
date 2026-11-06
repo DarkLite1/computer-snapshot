@@ -3,7 +3,7 @@
 
 $childContract = @{
     ScriptPath = (
-        "$PSScriptRoot\..\Scripts\Environment variables import export.ps1"
+        "$PSScriptRoot\..\Engine\Scripts\Environment variables import export.ps1"
     )
     Name       = 'Environment variables'
 }
@@ -11,7 +11,7 @@ $childContract = @{
 
 Describe 'Environment variables' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Environment variables import export.ps1'
         function Get-EnvironmentVariablesHC { param($Scope) }
         function Set-EnvironmentVariableHC {
@@ -156,7 +156,7 @@ Describe 'Environment variables' {
     }
     It 'checks Value and Values against the Action' {
         Import-Module (
-            "$PSScriptRoot\..\Scripts\Common\Configuration.psm1"
+            "$PSScriptRoot\..\Engine\Common\Configuration.psm1"
         ) -Force
         $test = {
             param([object[]]$Entries)

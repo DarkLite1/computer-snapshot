@@ -2,14 +2,14 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\Regional settings import export.ps1"
+    ScriptPath = "$PSScriptRoot\..\Engine\Scripts\Regional settings import export.ps1"
     Name       = 'Regional settings'
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContract
 
 Describe 'Regional settings import' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Regional settings import export.ps1'
         function Start-ScriptHC { param($Path) }
         function Get-InstalledUILanguageHC {}

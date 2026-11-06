@@ -1,9 +1,9 @@
 #Requires -Version 5.1
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 BeforeAll {
-    Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
-    . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
-    . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+    Import-Module "$PSScriptRoot\..\Engine\Common\Configuration.psm1" -Force
+    . "$PSScriptRoot\..\Engine\Common\Section.ps1"
+    . "$PSScriptRoot\..\Engine\Common\RestoreInput.ps1"
     . "$PSScriptRoot\Common\Restore input.ps1"
 }
 
@@ -270,7 +270,7 @@ Describe 'Restore input placeholders' {
 Describe 'Restore input questions and their rules' {
     BeforeAll {
         $schema = Get-Content -Raw -LiteralPath (
-            "$PSScriptRoot\..\Scripts\config.schema.json"
+            "$PSScriptRoot\..\Engine\Schemas\config.schema.json"
         ) | ConvertFrom-Json
     }
     It 'finds the range of <Path>' -ForEach @(
@@ -634,7 +634,7 @@ Describe 'Shared snapshot catalogue' {
             'Services', 'StartCustomScriptsAfter'
         )
         foreach ($script in $scripts.Values) {
-            Join-Path "$PSScriptRoot\..\Scripts" $script | Should -Exist
+            Join-Path "$PSScriptRoot\..\Engine\Scripts" $script | Should -Exist
         }
     }
     It ('returns an independent map so caller overrides cannot change the ' +
@@ -645,7 +645,7 @@ Describe 'Shared snapshot catalogue' {
             Should -Be 'User accounts import export.ps1'
     }
     It 'matches the items supported by the JSON schema' {
-        $schemaPath = "$PSScriptRoot\..\Scripts\config.schema.json"
+        $schemaPath = "$PSScriptRoot\..\Engine\Schemas\config.schema.json"
         $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
         $names = @(
             $schema.properties.Items.properties.PSObject.Properties.Name |
@@ -654,7 +654,7 @@ Describe 'Shared snapshot catalogue' {
         @((Get-SnapshotScriptsHC).Keys | Sort-Object) | Should -Be $names
     }
     It 'loads all empty sections in catalogue order regardless of JSON order' {
-        $schemaPath = "$PSScriptRoot\..\Scripts\config.schema.json"
+        $schemaPath = "$PSScriptRoot\..\Engine\Schemas\config.schema.json"
         $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
         $items = [ordered]@{}
         $names = (Get-SnapshotScriptsHC).Keys | Sort-Object -Descending

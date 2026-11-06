@@ -2,14 +2,14 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\Scheduled tasks import export.ps1"
+    ScriptPath = "$PSScriptRoot\..\Engine\Scripts\Scheduled tasks import export.ps1"
     Name       = 'Scheduled tasks'
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContract
 
 Describe 'Scheduled tasks import and export' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Scheduled tasks import export.ps1'
     }
     BeforeEach {
@@ -113,7 +113,7 @@ Describe 'Scheduled tasks import and export' {
 
 Describe 'Scheduled task folders and XML files' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Scheduled tasks import export.ps1'
     }
     BeforeEach {
@@ -248,7 +248,7 @@ Describe 'Scheduled task folders and XML files' {
 
 Describe 'Scheduled task accounts' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Scheduled tasks import export.ps1'
         function Convert-AccountNameHC { param($Name) }
         function ConvertTo-PortableAccountNameHC { param($Name, $Sid) }

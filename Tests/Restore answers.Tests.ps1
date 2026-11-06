@@ -2,9 +2,9 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 BeforeAll {
-    Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
-    . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
-    . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+    Import-Module "$PSScriptRoot\..\Engine\Common\Configuration.psm1" -Force
+    . "$PSScriptRoot\..\Engine\Common\Section.ps1"
+    . "$PSScriptRoot\..\Engine\Common\RestoreInput.ps1"
     . "$PSScriptRoot\Common\Restore input.ps1"
 }
 
@@ -478,7 +478,7 @@ Describe 'Answer template generation' {
                 )
             }
         } $configurationPath
-        $script = Join-Path $PSScriptRoot '..\Scripts\New answer file.ps1'
+        $script = Join-Path $PSScriptRoot '..\Engine\Scripts\New answer file.ps1'
 
         $null = & $script -ConfigurationFile $configurationPath -AnswerFile (
             $answerPath
@@ -538,7 +538,7 @@ Describe 'Answer template generation' {
             )
             AnswerFile        = $answerPath
         }
-        $null = & "$repository\Scripts\New answer file.ps1" @params
+        $null = & "$repository\Engine\Scripts\New answer file.ps1" @params
         $document = Get-Content -LiteralPath $answerPath -Raw |
             ConvertFrom-Json
         @($document.Answers.PSObject.Properties).Count | Should -Be 3

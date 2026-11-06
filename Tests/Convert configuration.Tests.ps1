@@ -2,8 +2,8 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 BeforeAll {
-    Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
-    $testScript = "$PSScriptRoot\..\Scripts\Convert configuration.ps1"
+    Import-Module "$PSScriptRoot\..\Engine\Common\Configuration.psm1" -Force
+    $testScript = "$PSScriptRoot\..\Engine\Scripts\Convert configuration.ps1"
     $repositoryRoot = Split-Path $PSScriptRoot -Parent
 }
 

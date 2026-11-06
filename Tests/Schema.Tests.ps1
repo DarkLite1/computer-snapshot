@@ -2,12 +2,12 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 BeforeAll {
-    Import-Module "$PSScriptRoot\..\Scripts\Common\Configuration.psm1" -Force
-    . "$PSScriptRoot\..\Scripts\Common\Section.ps1"
-    . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+    Import-Module "$PSScriptRoot\..\Engine\Common\Configuration.psm1" -Force
+    . "$PSScriptRoot\..\Engine\Common\Section.ps1"
+    . "$PSScriptRoot\..\Engine\Common\RestoreInput.ps1"
     . "$PSScriptRoot\Common\Restore input.ps1"
 
-    $schemaPath = Join-Path $PSScriptRoot '..\Scripts\config.schema.json'
+    $schemaPath = Join-Path $PSScriptRoot '..\Engine\Schemas\config.schema.json'
     $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
     $root = Split-Path $PSScriptRoot -Parent
 
@@ -149,8 +149,11 @@ Describe 'Schema contract' {
             $schema.properties.Items.properties.PSObject.Properties.Name |
             Where-Object { $_ -ne 'Comment' }
         )
-        $wrapperFolder = Join-Path $root 'Scripts\Schemas'
-        @(Get-ChildItem -LiteralPath $wrapperFolder -File).Name |
+        $wrapperFolder = Join-Path $root 'Engine\Schemas'
+        @(
+            Get-ChildItem -LiteralPath $wrapperFolder -File |
+            Where-Object Name -NE 'config.schema.json'
+        ).Name |
             Sort-Object |
             Should -Be @($sections | Sort-Object | ForEach-Object {
                     "$_.schema.json"
@@ -170,10 +173,10 @@ Describe 'Schema contract' {
                 Join-Path $wrapperFolder "$name.schema.json"
             ) | ConvertFrom-Json
             $wrapper.'$ref' |
-                Should -BeExactly "../config.schema.json#/`$defs/$name"
+                Should -BeExactly "config.schema.json#/`$defs/$name"
             $association = @(
                 $settings.'json.schemas' | Where-Object {
-                    $_.url -eq "./Scripts/Schemas/$name.schema.json"
+                    $_.url -eq "./Engine/Schemas/$name.schema.json"
                 }
             )
             $association.Count | Should -Be 1 -Because $name

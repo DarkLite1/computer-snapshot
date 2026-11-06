@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath  = "$PSScriptRoot\..\Scripts\Services import export.ps1"
+    ScriptPath  = "$PSScriptRoot\..\Engine\Scripts\Services import export.ps1"
     Name        = 'Services'
     EmptyExport = $true
 }
@@ -10,7 +10,7 @@ $childContract = @{
 
 Describe 'Services' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Services import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Services import export.ps1"
         function Get-ServiceStartupTypeHC { param($Name) }
         function Set-ServiceStartupTypeHC { param($Name, $StartupType) }
     }
@@ -99,7 +99,7 @@ Describe 'Services' {
     }
     It 'refuses a service listed twice or Disabled and Running' {
         Import-Module (
-            "$PSScriptRoot\..\Scripts\Common\Configuration.psm1"
+            "$PSScriptRoot\..\Engine\Common\Configuration.psm1"
         ) -Force
         $configuration = @{
             SchemaVersion = 3

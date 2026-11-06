@@ -5,7 +5,7 @@ Describe 'Dell driver update example' {
     BeforeAll {
         $root = Split-Path $PSScriptRoot -Parent
         $runner = Join-Path $root (
-            'Scripts\Start custom scripts import export.ps1'
+            'Engine\Scripts\Start custom scripts import export.ps1'
         )
         $data = Get-Content -Raw -LiteralPath (
             Join-Path $root 'Examples\StartCustomScriptsAfter.json'

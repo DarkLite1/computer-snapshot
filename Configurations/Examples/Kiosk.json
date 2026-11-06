@@ -1,5 +1,5 @@
 {
-  "$schema": "../../Scripts/config.schema.json",
+  "$schema": "../../Engine/Schemas/config.schema.json",
   "SchemaVersion": 3,
   "Description": "Kiosk PC example: Belgian regional settings with a Belgian keyboard, password rules, the 'kiosk' account that signs in automatically, a never-sleeping power plan, and Windows without suggestions. Asks for the kiosk password and the computer name. Changes this PC; restart afterwards.",
   "Settings": {

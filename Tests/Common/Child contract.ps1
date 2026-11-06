@@ -9,7 +9,7 @@ Describe '<Name> data contract' -ForEach @(
 ) {
     BeforeAll {
         $modulePath = Join-Path $PSScriptRoot (
-            '..\..\Scripts\Common\Configuration.psm1'
+            '..\..\Engine\Common\Configuration.psm1'
         )
         Import-Module $modulePath -Force
         $itemNames = @{

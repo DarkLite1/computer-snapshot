@@ -1,5 +1,5 @@
 {
-  "$schema": "../../Scripts/config.schema.json",
+  "$schema": "../../Engine/Schemas/config.schema.json",
   "SchemaVersion": 3,
   "Description": "Remote Desktop example: turns on Remote Desktop with Network Level Authentication, opens port 3389 on domain and private networks, makes the wired network private, and lets one account connect. Asks for that account. Changes this PC.",
   "Settings": {

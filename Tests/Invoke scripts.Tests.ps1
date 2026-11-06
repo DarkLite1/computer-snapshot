@@ -5,7 +5,7 @@
 
 Describe 'Readable report filenames' {
     BeforeAll {
-        Import-Module "$PSScriptRoot\..\Scripts\Common\Execution.psm1" -Force
+        Import-Module "$PSScriptRoot\..\Engine\Common\Execution.psm1" -Force
     }
     It ('includes the computer, timestamp, readable action and ' +
         'configuration name') {
@@ -68,7 +68,7 @@ Describe 'Readable report filenames' {
 
 Describe 'Prompted password output protection' {
     BeforeAll {
-        Import-Module "$PSScriptRoot\..\Scripts\Common\Execution.psm1" -Force
+        Import-Module "$PSScriptRoot\..\Engine\Common\Execution.psm1" -Force
     }
     It ('redacts child host, warning and nonterminating error streams ' +
         'while preserving the result object') {
@@ -112,7 +112,7 @@ Write-Error "Error $Data"
 
 Describe 'Main entry point script catalogue' {
     BeforeAll {
-        $entryScript = "$PSScriptRoot\..\Scripts\Invoke scripts.ps1"
+        $entryScript = "$PSScriptRoot\..\Engine\Scripts\Invoke scripts.ps1"
     }
     It ('exports a selected section without data as an empty entry, using ' +
         'the default catalogue, without changing Windows') {
@@ -165,7 +165,7 @@ param($Action, $Data, $RootFolder)
 
 Describe 'Child script error reporting' {
     BeforeAll {
-        $entryScript = "$PSScriptRoot\..\Scripts\Invoke scripts.ps1"
+        $entryScript = "$PSScriptRoot\..\Engine\Scripts\Invoke scripts.ps1"
 
         $partialChild = Join-Path $TestDrive 'partial.ps1'
         @'
@@ -289,7 +289,7 @@ Invoke-OuterHC
 
 Describe 'Child error capture with password redaction' {
     BeforeAll {
-        Import-Module "$PSScriptRoot\..\Scripts\Common\Execution.psm1" -Force
+        Import-Module "$PSScriptRoot\..\Engine\Common\Execution.psm1" -Force
     }
     It 'reports the same errors with and without secrets' {
         $child = Join-Path $TestDrive 'errors.ps1'
@@ -331,7 +331,7 @@ Write-Error 'second problem'
 
 Describe 'Script map validation' {
     BeforeAll {
-        $entryScript = "$PSScriptRoot\..\Scripts\Invoke scripts.ps1"
+        $entryScript = "$PSScriptRoot\..\Engine\Scripts\Invoke scripts.ps1"
         $child = Join-Path $TestDrive 'child.ps1'
         @'
 param($Action, $Data, $RootFolder)

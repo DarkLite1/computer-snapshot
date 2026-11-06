@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath  = "$PSScriptRoot\..\Scripts\" +
+    ScriptPath  = "$PSScriptRoot\..\Engine\Scripts\" +
         'Start custom scripts import export.ps1'
     Name        = 'Start custom scripts'
     EmptyExport = $true
@@ -11,7 +11,7 @@ $childContract = @{
 
 Describe 'Start custom scripts import' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Start custom scripts import export.ps1'
         $customRoot = Join-Path $TestDrive 'Usb'
         $null = New-Item -ItemType Directory -Force -Path (

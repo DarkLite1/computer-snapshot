@@ -2,10 +2,10 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 BeforeAll {
-    $testScript = "$PSScriptRoot\..\Scripts\Invoke configuration.ps1"
-    $testStartScript = "$PSScriptRoot\..\Scripts\Invoke scripts.ps1"
+    $testScript = "$PSScriptRoot\..\Engine\Scripts\Invoke configuration.ps1"
+    $testStartScript = "$PSScriptRoot\..\Engine\Scripts\Invoke scripts.ps1"
 
-    . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+    . "$PSScriptRoot\..\Engine\Common\RestoreInput.ps1"
 
     function Invoke-ScriptHC { param($Path, $Arguments) }
     function Test-ElevatedHC {}

@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath  = "$PSScriptRoot\..\Scripts\" +
+    ScriptPath  = "$PSScriptRoot\..\Engine\Scripts\" +
         'Copy files folders import export.ps1'
     Name        = 'Copy files folders'
     EmptyExport = $true
@@ -11,7 +11,7 @@ $childContract = @{
 
 Describe 'Copy files folders import' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Copy files folders import export.ps1'
     }
     BeforeEach {
@@ -131,7 +131,7 @@ Describe 'Copy files folders import' {
 
 Describe 'Copy a file with its placeholders filled in' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Copy files folders import export.ps1'
     }
     BeforeEach {

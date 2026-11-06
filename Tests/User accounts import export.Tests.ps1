@@ -2,14 +2,14 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContractParams = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\User accounts import export.ps1"
+    ScriptPath = "$PSScriptRoot\..\Engine\Scripts\User accounts import export.ps1"
     Name       = 'User accounts'
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContractParams
 
 Describe 'User accounts import errors' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\User accounts import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\User accounts import export.ps1"
 
         function New-InvalidPasswordErrorHC {
             [System.Management.Automation.ErrorRecord]::new(
@@ -221,7 +221,7 @@ Describe 'User accounts import errors' {
 
 Describe 'User accounts removal' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\User accounts import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\User accounts import export.ps1"
 
         function Get-CurrentUserSidHC {}
     }
@@ -592,7 +592,7 @@ Describe 'User accounts removal' {
 
 Describe 'User accounts export' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\User accounts import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\User accounts import export.ps1"
     }
     It ('writes a password placeholder for each user, except for accounts ' +
         'Windows manages') {
@@ -642,7 +642,7 @@ Describe 'User accounts export' {
         }
     }
     It 'writes placeholders that a restore recognizes' {
-        . "$PSScriptRoot\..\Scripts\Common\RestoreInput.ps1"
+        . "$PSScriptRoot\..\Engine\Common\RestoreInput.ps1"
         Mock Get-LocalUser {
             [pscustomobject]@{
                 Name    = 'kiosk'

@@ -2,14 +2,14 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath = "$PSScriptRoot\..\Scripts\NTP time servers import export.ps1"
+    ScriptPath = "$PSScriptRoot\..\Engine\Scripts\NTP time servers import export.ps1"
     Name       = 'NTP time servers'
 }
 . "$PSScriptRoot\Common\Child contract.ps1" @childContract
 
 Describe 'NTP peer capture' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'NTP time servers import export.ps1'
     }
 
@@ -90,7 +90,7 @@ Describe 'NTP peer capture' {
 
 Describe 'NTP command failures' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'NTP time servers import export.ps1'
         function w32tm {
             param(

@@ -82,7 +82,7 @@ Your USB stick has a specific layout to keep everything organized. Here are the 
 - **`Answers/`**: Answer files, also in subfolders such as `Answers/Kiosk/Brussels/`. `Answers/Examples/` holds examples; Git ignores everything else in this folder, because answer files can contain passwords.
 - **`Answers/`**: Optional local answer files for individual PCs. Create this
   folder when needed; Git ignores it because answers can contain passwords.
-- **`Scripts/`**: The tool itself. You normally don't need to touch anything here.
+- **`Engine/`**: The tool itself; don't change anything here. `Engine/Scripts/` holds the scripts, `Engine/Common/` their shared code and `Engine/Schemas/` the schemas that give editors their hints.
 - **`Tests/`**: Automated Pester tests for developers (see [Running the Tests](#-running-the-tests)).
 - **`Snapshots/`**: Legacy version-1 sample data, kept only for testing the configuration converter.
 
@@ -565,9 +565,9 @@ The tool follows the processes an installer starts by checking every 50 ms for t
 
 ### Editing with autocomplete
 
-Every configuration starts with `"$schema": "../Scripts/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works; in a subfolder such as `Configurations/Examples/` it is `../../Scripts/config.schema.json`.
+Every configuration starts with `"$schema": "../Engine/Schemas/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works; in a subfolder such as `Configurations/Examples/` it is `../../Engine/Schemas/config.schema.json`.
 
-Section files can't have that line, so `.vscode/settings.json` tells Visual Studio Code which schema in `Scripts/Schemas/` belongs to which file, by its name: `Examples/RegistryKeys.json`, `Examples/RegistryKeys <anything>.json` and `Shared/RegistryKeys <anything>.json` get the `RegistryKeys` hints, and the same for every other section. Open the computer-snapshot folder itself in Visual Studio Code for this, and name a new shared file after its section, such as `Shared\RegistryKeys Office.json`, to get the hints there too.
+Section files can't have that line, so `.vscode/settings.json` tells Visual Studio Code which schema in `Engine/Schemas/` belongs to which file, by its name: `Examples/RegistryKeys.json`, `Examples/RegistryKeys <anything>.json` and `Shared/RegistryKeys <anything>.json` get the `RegistryKeys` hints, and the same for every other section. Open the computer-snapshot folder itself in Visual Studio Code for this, and name a new shared file after its section, such as `Shared\RegistryKeys Office.json`, to get the hints there too.
 
 > **🔒 Important Security Warning:**
 > When you save settings that include passwords (like user accounts or certain registry keys), **they are saved in plain text**. Please keep your USB stick physically secure, and never upload files containing sensitive passwords to public spaces. Where possible, use a `{{password:...}}` placeholder instead, so the password is asked for during the restore and never stored (see [Restore-Time Input](#restore-time-input)).
@@ -685,7 +685,7 @@ From the tool's root folder:
 
 ```powershell
 New-Item -Path '.\Answers' -ItemType Directory -Force | Out-Null
-& '.\Scripts\New answer file.ps1' `
+& '.\Engine\Scripts\New answer file.ps1' `
     -ConfigurationFile 'Configurations\Examples\Prompted Setup.json' `
     -AnswerFile 'Answers\KIOSK01.json'
 ```
@@ -704,7 +704,7 @@ The configuration and all source files stay unchanged.
 #### Interactive restore with partial answers
 
 ```powershell
-& '.\Scripts\Invoke configuration.ps1' `
+& '.\Engine\Scripts\Invoke configuration.ps1' `
     -ConfigurationFile 'Configurations\Examples\Prompted Setup.json' `
     -AnswerFile 'Answers\Examples\Prompted Setup.json'
 ```
@@ -718,7 +718,7 @@ Start PowerShell as administrator first when the configuration requires it.
 After filling in your local answer file:
 
 ```powershell
-$result = & '.\Scripts\Invoke configuration.ps1' `
+$result = & '.\Engine\Scripts\Invoke configuration.ps1' `
     -ConfigurationFile 'Configurations\Examples\Prompted Setup.json' `
     -AnswerFile 'Answers\KIOSK01.json' `
     -Unattended
@@ -779,32 +779,32 @@ For scripting or one-off runs, open PowerShell in the root of the USB stick.
 Restore a configuration (asks for confirmation; add `-SkipConfirmation` to skip the question, or leave out `-ConfigurationFile` to pick from a list). The old name `-Confirm` still works, so existing shortcuts keep working:
 
 ```powershell
-& '.\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Examples\PC1.json'
+& '.\Engine\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Examples\PC1.json'
 ```
 
 Restore only some sections, and override saved settings for this run:
 
 ```powershell
-& '.\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Examples\PC1.json' -Items UserAccounts, Software -RebootComputer $true -RestartDelaySeconds 300
+& '.\Engine\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Examples\PC1.json' -Items UserAccounts, Software -RebootComputer $true -RestartDelaySeconds 300
 ```
 
 Export this computer to a new configuration file (add `-Force` to overwrite an existing file):
 
 ```powershell
-& '.\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\KIOSK01.json' -Items RegionalSettings, UserAccounts, FirewallRules
+& '.\Engine\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\KIOSK01.json' -Items RegionalSettings, UserAccounts, FirewallRules
 ```
 
 Export the scheduled tasks of other Task Scheduler folders than the default `\HC\` (subfolders are included):
 
 ```powershell
-& '.\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\KIOSK01.json' -Items ScheduledTasks -ExportOptions @{ ScheduledTasks = @{ TaskPath = '\HC\', '\Vendor\' } }
+& '.\Engine\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\KIOSK01.json' -Items ScheduledTasks -ExportOptions @{ ScheduledTasks = @{ TaskPath = '\HC\', '\Vendor\' } }
 ```
 
 `Invoke scripts.ps1` is the engine behind everything else. It returns an object with `Success`, `ReportFile` and per-section `Results`, so you can check the outcome from your own scripts.
 
 ## 🧩 Writing a Child Script
 
-Each section is handled by one script in `Scripts/` (for example `User accounts import export.ps1`). The main script calls it with three parameters, `-Action` (`Export` or `Import`), `-Data` (the section's data on import) and `-RootFolder` (the USB stick root), and expects exactly **one** object back:
+Each section is handled by one script in `Engine/Scripts/` (for example `User accounts import export.ps1`). The main script calls it with three parameters, `-Action` (`Export` or `Import`), `-Data` (the section's data on import) and `-RootFolder` (the USB stick root), and expects exactly **one** object back:
 
 ```powershell
 [pscustomobject]@{
@@ -856,7 +856,7 @@ If you have old configuration files from a previous version of this tool, they w
 Just open PowerShell from your USB stick and run:
 
 ```powershell
-& '.\Scripts\Convert configuration.ps1' -OldConfigurationFile 'Configurations\Old PC.json' -RootFolder $PWD.Path
+& '.\Engine\Scripts\Convert configuration.ps1' -OldConfigurationFile 'Configurations\Old PC.json' -RootFolder $PWD.Path
 ```
 
 This converts an old configuration (version 1, the `StartScript` format) to the current format (version 3). The result is written to `Configurations\<name>.json` and the original is kept as `<name>.v1.json`.

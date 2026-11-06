@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath  = "$PSScriptRoot\..\Scripts\Software import export.ps1"
+    ScriptPath  = "$PSScriptRoot\..\Engine\Scripts\Software import export.ps1"
     Name        = 'Software'
     EmptyExport = $true
 }
@@ -10,7 +10,7 @@ $childContract = @{
 
 Describe 'Software import' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Software import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Software import export.ps1"
         function Get-InstalledApplicationsHC { }
         function Remove-ApplicationHC {
             param(
@@ -422,7 +422,7 @@ Describe 'Software import' {
 
 Describe 'Software removal by pattern' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Software import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Software import export.ps1"
         function Get-InstalledApplicationsHC { }
         function Remove-ApplicationHC {
             param(
@@ -631,7 +631,7 @@ Describe 'Software removal by pattern' {
 Describe 'Waiting for installers and uninstallers' {
     BeforeAll {
         . (
-            "$PSScriptRoot\..\Scripts\Software import export.ps1"
+            "$PSScriptRoot\..\Engine\Scripts\Software import export.ps1"
         ) -Action Export -RootFolder $TestDrive | Out-Null
         $cmd = "$env:SystemRoot\System32\cmd.exe"
     }
@@ -872,7 +872,7 @@ Describe 'Waiting for installers and uninstallers' {
                 )
             }
             $importScript = (
-                "$PSScriptRoot\..\Scripts\Software import export.ps1"
+                "$PSScriptRoot\..\Engine\Scripts\Software import export.ps1"
             )
             $importParams = @{
                 Action     = 'Import'
@@ -903,7 +903,7 @@ Describe 'Waiting for installers and uninstallers' {
                 )
             }
             $importScript = (
-                "$PSScriptRoot\..\Scripts\Software import export.ps1"
+                "$PSScriptRoot\..\Engine\Scripts\Software import export.ps1"
             )
             $importParams = @{
                 Action     = 'Import'
@@ -947,7 +947,7 @@ Describe 'Installed applications lookup' {
         }
     }
     It 'also lists the applications of signed-in users, by account' {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Software import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Software import export.ps1"
         Mock Get-ChildItem {
             foreach ($name in @(
                     '.DEFAULT'
@@ -974,7 +974,7 @@ Describe 'Installed applications lookup' {
         Should -Invoke Get-ItemProperty -Times 3 -Exactly
     }
     It 'handles exactly one 32-bit application next to 64-bit applications' {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Software import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Software import export.ps1"
         Mock Get-ItemProperty {
             [pscustomobject]@{ DisplayName = 'One32'; UninstallString = 'x' }
         } -ParameterFilter { $Path -like '*Wow6432Node*' }

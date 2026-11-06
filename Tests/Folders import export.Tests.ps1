@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath  = "$PSScriptRoot\..\Scripts\Folders import export.ps1"
+    ScriptPath  = "$PSScriptRoot\..\Engine\Scripts\Folders import export.ps1"
     Name        = 'Folders'
     EmptyExport = $true
 }
@@ -10,7 +10,7 @@ $childContract = @{
 
 Describe 'Folders import' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\Folders import export.ps1"
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\Folders import export.ps1"
     }
     It 'creates folders with characters the old path check rejected' {
         $paths = @(

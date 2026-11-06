@@ -2,7 +2,7 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '6.0.0' }
 
 $childContract = @{
-    ScriptPath  = "$PSScriptRoot\..\Scripts\" +
+    ScriptPath  = "$PSScriptRoot\..\Engine\Scripts\" +
         'Hosts file entries import export.ps1'
     Name        = 'Hosts file entries'
     EmptyExport = $true
@@ -11,7 +11,7 @@ $childContract = @{
 
 Describe 'Hosts file entries' {
     BeforeAll {
-        $scriptPath = "$PSScriptRoot\..\Scripts\" +
+        $scriptPath = "$PSScriptRoot\..\Engine\Scripts\" +
             'Hosts file entries import export.ps1'
         function Get-HostsFilePathHC {}
     }

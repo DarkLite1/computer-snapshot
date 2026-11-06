@@ -99,7 +99,7 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | Order | Section                    | What it covers                                                          |
 | ----- | -------------------------- | ----------------------------------------------------------------------- |
 | 1     | `StartCustomScriptsBefore` | Your own PowerShell scripts (from `Files/`) to run before everything else. |
-| 2     | `RegionalSettings`         | System locale, time zone, home location and culture.                    |
+| 2     | `RegionalSettings`         | System locale, time zone, home location, culture, languages with keyboards and display language. |
 | 3     | `UserAccounts`             | Local user accounts to create, update or remove.                         |
 | 4     | `UserGroups`               | Local groups and their members.                                         |
 | 5     | `FirewallRules`            | Windows Defender Firewall rules.                                        |

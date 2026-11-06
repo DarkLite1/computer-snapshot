@@ -39,6 +39,10 @@ Describe '<Name> data contract' -ForEach @(
         function Get-HostsFilePathHC {}
         function Wait-ProcessTreeHC { param($Process, $TimeoutSeconds, $What) }
         function Start-ScriptHC { param($Path) }
+        function Get-UserLanguageListHC {}
+        function Set-UserLanguageListHC { param($Languages) }
+        function Get-UILanguageOverrideHC {}
+        function Set-UILanguageOverrideHC { param($Language) }
         function Invoke-CustomScriptHC { param($Path, $Arguments) }
         function Get-RegistryKeyStateHC { param($Path, $Name) }
         function Get-NetFirewallAddressFilter {
@@ -142,6 +146,15 @@ Describe '<Name> data contract' -ForEach @(
         Mock Set-TimeZone
         Mock Set-WinHomeLocation
         Mock Set-Culture
+        Mock Get-UserLanguageListHC {
+            [pscustomobject]@{
+                LanguageTag     = 'en-US'
+                InputMethodTips = @('0409:00000409')
+            }
+        }
+        Mock Get-UILanguageOverrideHC
+        Mock Set-UserLanguageListHC
+        Mock Set-UILanguageOverrideHC
         Mock Start-ScriptHC
         #endregion
 

@@ -595,6 +595,37 @@
           "type": "string",
           "description": "Current user culture name."
         },
+        "WinUserLanguageList": {
+          "type": "array",
+          "description": "Current user's languages with their keyboards, in order of preference; copied to accounts created later. Omit to leave unchanged.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "LanguageTag": {
+                "type": "string",
+                "description": "Language tag, such as nl-BE or en-US.",
+                "minLength": 2
+              },
+              "InputMethodTips": {
+                "type": "array",
+                "description": "Keyboards for this language, such as 0813:0000080C for Belgian French under Dutch (Belgium). Omit for the default keyboard of the language.",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "description": "a keyboard identifier, such as 0813:0000080C",
+                  "pattern": "^[0-9A-Fa-f]{4}:([0-9A-Fa-f]{8}|\\{[0-9A-Fa-f-]{36}\\}\\{[0-9A-Fa-f-]{36}\\})$"
+                }
+              }
+            },
+            "required": ["LanguageTag"]
+          }
+        },
+        "WinUILanguageOverride": {
+          "type": ["string", "null"],
+          "description": "Current user's Windows display language, such as nl-NL; the language pack must be installed. null removes the override. Omit to leave unchanged."
+        },
         "Comment": {
           "type": "string",
           "description": "Technician notes; ignored when applying the configuration."

@@ -140,7 +140,7 @@ function Get-SnapshotSectionLabelsHC {
         )
         RegionalSettings         = @(
             'Regional settings',
-            'Language, culture, home location and time zone.'
+            'Language, keyboards, culture, home location and time zone.'
         )
         UserAccounts             = @(
             'User accounts',

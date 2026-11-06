@@ -532,8 +532,8 @@ Describe 'Schema contract' {
         @(& $test '{{prefix:P}}').Count | Should -Be 0
         @(& $test '{{number:P}}').Count | Should -Be 1
     }
-    It ('finds a network card by exactly one of FindBy.Description and ' +
-        'FindBy.Name') {
+    It ('finds a network card by exactly one of FindBy.Description, ' +
+        'FindBy.Name and FindBy.OnlyCard') {
         $test = {
             param($card)
             $document = @{
@@ -544,14 +544,29 @@ Describe 'Schema contract' {
         }
 
         & $test @{ FindBy = @{}; Change = @{ NewName = 'LAN' } } |
-        Should -Match 'NetworkCards\[0\]\.FindBy: needs Description or Name'
+            Should -Match (
+                'NetworkCards\[0\]\.FindBy: needs one of Description, Name ' +
+                'and OnlyCard'
+            )
         & $test @{
             FindBy = @{ Description = 'Intel'; Name = 'Ethernet' }
             Change = @{}
         } | Should -Match (
-            'NetworkCards\[0\]\.FindBy: use either Description or Name, ' +
-            'not both'
+            'NetworkCards\[0\]\.FindBy: use only one of Description, Name ' +
+            'and OnlyCard'
         )
+        & $test @{
+            FindBy = @{ OnlyCard = $true }
+            Change = @{ NewName = 'LAN' }
+        } | Should -BeNullOrEmpty
+        & $test @{
+            FindBy = @{ OnlyCard = $false }
+            Change = @{ NewName = 'LAN' }
+        } | Should -Match 'FindBy\.OnlyCard: expected True'
+        & $test @{
+            FindBy = @{ OnlyCard = $true; Name = 'Ethernet' }
+            Change = @{}
+        } | Should -Match 'use only one of Description, Name and OnlyCard'
         & $test @{
             FindBy = @{ Name = 'Ethernet' }
             Change = @{ Description = 'New' }

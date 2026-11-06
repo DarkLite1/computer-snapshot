@@ -1062,7 +1062,7 @@
         "properties": {
           "FindBy": {
             "type": "object",
-            "description": "How to find the card; nothing here is changed. Use exactly one of Description and Name.",
+            "description": "How to find the card; nothing here is changed. Use exactly one of Description, Name and OnlyCard.",
             "additionalProperties": false,
             "properties": {
               "Description": {
@@ -1075,6 +1075,11 @@
                 "minLength": 1,
                 "description": "The card's current name, such as 'Ethernet', before any rename. Names can differ per computer."
               },
+              "OnlyCard": {
+                "type": "boolean",
+                "const": true,
+                "description": "true: the one physical network card of the computer, for computers with a single card. VPN and virtual adapters do not count; with no or several physical cards the entry fails."
+              },
               "Comment": {
                 "type": "string",
                 "description": "Technician notes; ignored when applying the configuration."
@@ -1086,6 +1091,9 @@
               },
               {
                 "required": ["Name"]
+              },
+              {
+                "required": ["OnlyCard"]
               }
             ]
           },

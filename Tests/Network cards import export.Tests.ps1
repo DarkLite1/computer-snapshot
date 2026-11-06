@@ -689,8 +689,64 @@ Describe 'Finding the card and IPv4 settings' {
             ("Failed to configure network card 'LAN': no network card " +
                 "found with Name 'LAN'; names: Ethernet, Wi-Fi")
             ("Failed to configure network card 'Ethernet': FindBy has " +
-                'both Description and Name; use one of them')
+                'more than one of Description, Name and OnlyCard')
         )
+    }
+    It ('renames the only physical card, ignoring VPN and virtual ' +
+        'adapters, and refuses when there are no or several') {
+        $cards = @(
+            [pscustomobject]@{
+                Name                 = 'Ethernet 3'
+                InterfaceDescription = 'Realtek PCIe GbE'
+                InterfaceIndex       = 7
+                HardwareInterface    = $true
+            }
+            [pscustomobject]@{
+                Name                 = 'VPN'
+                InterfaceDescription = 'Fortinet Virtual Ethernet Adapter'
+                InterfaceIndex       = 9
+                HardwareInterface    = $false
+            }
+        )
+        Mock Get-NetAdapter { $cards }
+        $data = @(
+            [pscustomobject]@{
+                FindBy = [pscustomobject]@{ OnlyCard = $true }
+                Change = [pscustomobject]@{ NewName = 'LAN' }
+            }
+        )
+        $importParams = @{
+            Action     = 'Import'
+            Data       = $data
+            RootFolder = $TestDrive
+        }
+
+        $result = . $scriptPath @importParams
+
+        $result.Errors.Count |
+            Should -Be 0 -Because ($result.Errors -join '; ')
+        Should -Invoke Rename-NetAdapter -Times 1 -Exactly -ParameterFilter {
+            $Name -eq 'Ethernet 3' -and $NewName -eq 'LAN'
+        }
+
+        $cards[1].HardwareInterface = $true
+        $result = . $scriptPath @importParams
+        $result.Errors | Should -Be @(
+            "Failed to configure network card 'LAN': FindBy OnlyCard: " +
+            'this computer has 2 physical network cards (''Ethernet 3'' ' +
+            '(Realtek PCIe GbE), ''VPN'' (Fortinet Virtual Ethernet ' +
+            'Adapter)); use Description or Name instead'
+        )
+
+        $cards[0].HardwareInterface = $false
+        $cards[1].HardwareInterface = $false
+        $data[0].Change = [pscustomobject]@{}
+        $result = . $scriptPath @importParams
+        $result.Errors | Should -Be @(
+            'Failed to configure network card (the only physical card): ' +
+            'FindBy OnlyCard: this computer has no physical network card'
+        )
+        Should -Invoke Rename-NetAdapter -Times 1 -Exactly
     }
     It 'renames a card found by FindBy.Name' {
         $data = @(

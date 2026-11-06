@@ -9,6 +9,9 @@
       otherwise the one card whose description contains the text. The
       description comes from the driver and cannot be changed.
     - Name: the card with this current name, such as 'Ethernet'.
+    - OnlyCard: true: the one physical card of the computer, for computers
+      with a single network card. VPN and virtual adapters do not count;
+      with no or several physical cards the entry is reported.
     Change renames the card (NewName), sets its DnsSuffix, NetworkCategory
     and IPSettings, in that order. When a step fails, the remaining steps
     for that card are skipped. Entries that match no card or more than one
@@ -91,19 +94,49 @@ function Find-NetAdapterHC {
     $partial[0]
 }
 
+function Find-OnlyNetAdapterHC {
+    # The one physical card of the computer. VPN and virtual adapters, such
+    # as a Hyper-V switch, are no hardware and do not count.
+    $physical = @($netAdapters | Where-Object { $_.HardwareInterface })
+    if ($physical.Count -eq 1) {
+        return $physical[0]
+    }
+    if (-not $physical.Count) {
+        throw 'FindBy OnlyCard: this computer has no physical network card'
+    }
+    $cards = (
+        $physical | ForEach-Object {
+            "'$($_.Name)' ($($_.InterfaceDescription))"
+        }
+    ) -join ', '
+    throw (
+        "FindBy OnlyCard: this computer has $($physical.Count) physical " +
+        "network cards ($cards); use Description or Name instead"
+    )
+}
+
 function Find-CardHC {
-    # The card of a configuration entry, by FindBy.Description or FindBy.Name
+    # The card of a configuration entry, by FindBy.Description,
+    # FindBy.Name or FindBy.OnlyCard
     param($FindBy)
     $hasDescription = -not [string]::IsNullOrWhiteSpace($FindBy.Description)
     $hasName = -not [string]::IsNullOrWhiteSpace($FindBy.Name)
-    if ($hasDescription -and $hasName) {
-        throw 'FindBy has both Description and Name; use one of them'
+    $onlyCard = $FindBy.OnlyCard -eq $true
+    $ways = @($hasDescription, $hasName, $onlyCard) -eq $true
+    if ($ways.Count -gt 1) {
+        throw 'FindBy has more than one of Description, Name and OnlyCard'
+    }
+    if ($onlyCard) {
+        return Find-OnlyNetAdapterHC
     }
     if ($hasDescription) {
         return Find-NetAdapterHC -Description $FindBy.Description
     }
     if (-not $hasName) {
-        throw 'FindBy needs Description or Name to find the network card'
+        throw (
+            'FindBy needs Description, Name or OnlyCard to find the ' +
+            'network card'
+        )
     }
     $named = @($netAdapters | Where-Object { $_.Name -eq $FindBy.Name })
     if (-not $named.Count) {
@@ -690,6 +723,9 @@ else {
         }
         elseif ($card.FindBy.Name) {
             "'$($card.FindBy.Name)'"
+        }
+        elseif ($card.FindBy.OnlyCard -eq $true) {
+            '(the only physical card)'
         }
         else {
             "with description '$($card.FindBy.Description)'"

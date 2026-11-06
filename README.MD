@@ -262,6 +262,7 @@ Each entry in `NetworkCards` has two parts: `FindBy` says how to find the card, 
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `Description` | by its description, the name in Device Manager: an exact match first, otherwise the one card containing the text. The driver sets the description; it can't be changed. |
 | `Name`        | by its current name, such as `Ethernet`, before any rename; names can differ per computer                                         |
+| `OnlyCard`    | `true`: the one physical card of the computer, for PCs with a single network card. VPN and virtual adapters (such as a Hyper-V switch) don't count; with no or several physical cards the entry fails and lists the cards. |
 
 `Change` can hold, applied in this order; anything left out stays as it is:
 

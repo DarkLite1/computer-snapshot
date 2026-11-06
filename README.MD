@@ -79,11 +79,8 @@ Your USB stick has a specific layout to keep everything organized. Here are the 
 - **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers. `Shared/Examples/` holds ready-made sample data for every section; copy what you need, or point to it from your own configuration.
 - **`Log/`**: Check here for your execution reports.
 - **`Answers/`**: Answer files, also in subfolders such as `Answers/Kiosk/Brussels/`. `Answers/Examples/` holds examples; Git ignores everything else in this folder, because answer files can contain passwords.
-- **`Answers/`**: Optional local answer files for individual PCs. Create this
-  folder when needed; Git ignores it because answers can contain passwords.
 - **`Engine/`**: The tool itself; don't change anything here. `Engine/Scripts/` holds the scripts, `Engine/Common/` their shared code and `Engine/Schemas/` the schemas that give editors their hints.
 - **`Tests/`**: Automated Pester tests for developers (see [Running the Tests](#-running-the-tests)).
-- **`Snapshots/`**: Legacy version-1 sample data, kept only for testing the configuration converter.
 
 ## ✍️ Customizing Your Setups
 

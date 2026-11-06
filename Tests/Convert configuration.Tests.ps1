@@ -17,7 +17,7 @@ Describe 'One-time configuration conversion' {
         }
         $null = New-Item @testParams
         $testParams = @{
-            LiteralPath = "$repositoryRoot\Snapshots"
+            LiteralPath = "$PSScriptRoot\Fixtures\Snapshots"
             Destination = "$TestDrive\Snapshots"
             Recurse     = $true
         }

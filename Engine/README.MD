@@ -83,3 +83,5 @@ Configuration files from a previous version of this tool don't work right away, 
 This converts an old configuration (version 1, the `StartScript` format) to the current format (version 3). The result is written to `Configurations\<name>.json` and the original is kept as `<name>.v1.json`.
 
 Run the converter once per configuration file; a file that is already version 3 is left alone. Share permissions that belong to a share that isn't in the old share list can't be applied, and are reported.
+
+See [VERSION.MD](VERSION.MD) for what changed in each version, breaking changes first.

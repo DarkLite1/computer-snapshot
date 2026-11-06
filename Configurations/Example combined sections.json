@@ -11,12 +11,12 @@
   "Items": {
     "Comment": "Each section lists its files; they are combined in this order.",
     "CreateFolders": [
-      "Shared\\Folders common.json",
-      "Shared\\Folders kiosk.json"
+      "Shared\\CreateFolders common.json",
+      "Shared\\CreateFolders kiosk.json"
     ],
     "RegistryKeys": [
-      "Shared\\Registry common.json",
-      "Shared\\Registry kiosk.json"
+      "Shared\\RegistryKeys common.json",
+      "Shared\\RegistryKeys kiosk.json"
     ]
   }
 }

@@ -128,6 +128,11 @@ Describe 'Schema contract' {
             Join-Path $root '.vscode\settings.json'
         ) | ConvertFrom-Json
 
+        foreach ($file in Get-Item -LiteralPath $shippedSharedSections) {
+            $file.Name.Split(' ')[0] | Should -BeIn $sections -Because (
+                "Shared file '$($file.Name)' starts with its section name"
+            )
+        }
         foreach ($name in $sections) {
             $schema.'$defs'.$name | Should -Not -BeNullOrEmpty -Because $name
             $wrapper = Get-Content -Raw -LiteralPath (

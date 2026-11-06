@@ -124,7 +124,7 @@ Some sections can't be fully captured automatically, so exporting them only give
 
 ### Ready-made examples for common settings
 
-`Examples/` also has ready-made sections for common Windows settings. Copy their entries into your configuration, or point to them like a shared file, such as `"RegistryKeys": ["Shared\\Registry common.json", "Examples\\RegistryKeys Explorer.json"]`:
+`Examples/` also has ready-made sections for common Windows settings. Copy their entries into your configuration, or point to them like a shared file, such as `"RegistryKeys": ["Shared\\RegistryKeys common.json", "Examples\\RegistryKeys Explorer.json"]`:
 
 | File | What it does |
 | ---- | ------------ |
@@ -157,7 +157,7 @@ A section can also be built from **several files**, so you can combine reusable 
 ```json
 "Items": {
   "SmbShares": [ "Shared\\SmbShares common.json", "Shared\\SmbShares scanner.json" ],
-  "RegistryKeys": [ "Shared\\Registry office.json", "Shared\\Registry kiosk.json" ]
+  "RegistryKeys": [ "Shared\\RegistryKeys office.json", "Shared\\RegistryKeys kiosk.json" ]
 }
 ```
 
@@ -167,6 +167,8 @@ The files are combined in the order you list them:
 - Objects are combined property by property, so the lists inside them are joined too, such as `RunAsCurrentUser.RegistryKeys`, `Software.Install` or `CreateFolders.FolderPaths`.
 - A single setting may appear in several files only with the same value. Two different values, such as two time zones in `RegionalSettings`, are reported as an error naming both files, instead of one silently winning.
 - The combined section is checked as a whole, so the same share or user in two files is reported as well.
+
+Name a shared file after its section, such as `Shared\SmbShares common.json`, so Visual Studio Code shows the hints for that section while you edit it (see [Editing with autocomplete](#editing-with-autocomplete)).
 
 See [Configurations/Example combined sections.json](Configurations/Example%20combined%20sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares common.json` with the shares of every PC and `Shared\SmbShares kiosk.json` with the extra kiosk shares.
 

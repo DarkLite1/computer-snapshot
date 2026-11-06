@@ -22,6 +22,7 @@ Describe '<Name> data contract' -ForEach @(
             'Account policy'       = 'AccountPolicy'
             'Environment variables' = 'EnvironmentVariables'
             Services               = 'Services'
+            'Power settings'       = 'PowerSettings'
             Software               = 'Software'
             'User accounts'        = 'UserAccounts'
             'User groups'          = 'UserGroups'
@@ -51,6 +52,8 @@ Describe '<Name> data contract' -ForEach @(
         function Send-EnvironmentChangeHC {}
         function Get-ServiceStartupTypeHC { param($Name) }
         function Set-ServiceStartupTypeHC { param($Name, $StartupType) }
+        function Invoke-PowerCfgHC { param([string[]]$Arguments) }
+        function Get-HibernateEnabledHC {}
         function Get-NetBiosSettingHC { param($Adapter) }
         function Set-NetBiosSettingHC { param($Adapter, $Setting) }
         function Get-UserLanguageListHC {}
@@ -200,6 +203,13 @@ Describe '<Name> data contract' -ForEach @(
         Mock Set-ServiceStartupTypeHC
         Mock Start-Service
         Mock Stop-Service
+        Mock Invoke-PowerCfgHC {
+            'Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  ' +
+            '(Balanced) *'
+            'Current AC Power Setting Index: 0x00000258'
+            'Current DC Power Setting Index: 0x0000012c'
+        }
+        Mock Get-HibernateEnabledHC { $true }
         #endregion
 
         #region Scheduled tasks
@@ -407,6 +417,10 @@ Describe '<Name> data contract' -ForEach @(
                     }
                 )
                 $command = 'Set-ServiceStartupTypeHC'
+            }
+            'Power settings' {
+                $data = [pscustomobject]@{ HibernateEnabled = $false }
+                $command = 'Invoke-PowerCfgHC'
             }
             'User accounts' {
                 $data = @(

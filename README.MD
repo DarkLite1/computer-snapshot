@@ -110,12 +110,13 @@ Each configuration has an `Items` object with one entry per section. Sections al
 | 10    | `NetworkCards`             | Network adapter names, network profile (category), DNS suffix and registration, IPv4 settings, NetBIOS and IPv6. |
 | 11    | `HostsFileEntries`         | Host names in the Windows hosts file and the IP addresses they point to. |
 | 12    | `NtpTimeServers`           | Time synchronization (domain or specific NTP servers).                  |
-| 13    | `RegistryKeys`             | Registry values to set.                                                 |
-| 14    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
-| 15    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
-| 16    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
-| 17    | `Services`                 | Startup type of Windows services, and starting or stopping them.        |
-| 18    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
+| 13    | `PowerSettings`            | Active power plan, display, sleep, hibernate and disk timeouts, and hibernation. |
+| 14    | `RegistryKeys`             | Registry values to set.                                                 |
+| 15    | `ScheduledTasks`           | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
+| 16    | `CopyFilesFolders`         | Files or folders to copy from the USB stick to the computer.            |
+| 17    | `Software`                 | Software to uninstall and installers (from `Software/`) to run.          |
+| 18    | `Services`                 | Startup type of Windows services, and starting or stopping them.        |
+| 19    | `StartCustomScriptsAfter`  | Your own PowerShell scripts to run after everything else.               |
 
 An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Examples/` folder for the exact format of each section.
 
@@ -194,6 +195,21 @@ See [Configurations/Example combined sections.json](Configurations/Example%20com
 ```
 
 `StartupType` is `Automatic`, `AutomaticDelayedStart`, `Manual` or `Disabled`. Stopping a service also stops the services that depend on it. A service listed twice, or `Disabled` together with `Running`, is reported before anything is changed.
+
+### Power settings
+
+`PowerSettings` chooses the active power plan and sets its timeouts, in minutes where 0 means never, for `AC` (plugged in) and `DC` (on battery):
+
+```json
+"PowerSettings": {
+  "ActivePlan": "HighPerformance",
+  "MonitorTimeoutMinutes": { "AC": 30, "DC": 10 },
+  "SleepTimeoutMinutes": { "AC": 0, "DC": 30 },
+  "HibernateEnabled": false
+}
+```
+
+`ActivePlan` is `Balanced`, `HighPerformance` or `PowerSaver`, which work in every Windows language, a plan name as `powercfg /list` shows it, or a plan GUID. Laptops with modern standby often only have `Balanced`. The timeouts are set on the plan that is active after `ActivePlan`. `HibernateEnabled` false also turns off fast startup.
 
 ### Removing local user accounts
 

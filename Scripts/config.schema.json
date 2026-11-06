@@ -333,6 +333,29 @@
             }
           ]
         },
+        "PowerSettings": {
+          "description": "Inline PowerSettings data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
+          "oneOf": [
+            {
+              "description": "Inline PowerSettings data.",
+              "$ref": "#/$defs/PowerSettings"
+            },
+            {
+              "description": "Root-relative or absolute JSON section path. Only one reference level is allowed.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "description": "Root-relative or absolute JSON section paths. Lists are joined in order and objects combined; a single value set differently in two files is an error.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          ]
+        },
         "RegistryKeys": {
           "description": "Inline RegistryKeys data, a root-relative path to a Shared JSON section, or a list of such paths that are combined in order.",
           "oneOf": [
@@ -512,6 +535,9 @@
         },
         {
           "required": ["NtpTimeServers"]
+        },
+        {
+          "required": ["PowerSettings"]
         },
         {
           "required": ["RegistryKeys"]
@@ -1518,6 +1544,61 @@
           "required": ["Comment"]
         }
       ]
+    },
+    "PowerSettings": {
+      "type": "object",
+      "description": "Active power plan, its timeouts and hibernation. Each setting that is left out stays as it is.",
+      "additionalProperties": false,
+      "properties": {
+        "ActivePlan": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Balanced, HighPerformance or PowerSaver, which work in every Windows language; the name of a plan as 'powercfg /list' shows it; or a plan GUID."
+        },
+        "MonitorTimeoutMinutes": {
+          "description": "Turn off the display after this many minutes; 0 is never.",
+          "$ref": "#/$defs/PowerTimeout"
+        },
+        "SleepTimeoutMinutes": {
+          "description": "Sleep after this many minutes; 0 is never.",
+          "$ref": "#/$defs/PowerTimeout"
+        },
+        "HibernateTimeoutMinutes": {
+          "description": "Hibernate after this many minutes; 0 is never.",
+          "$ref": "#/$defs/PowerTimeout"
+        },
+        "DiskTimeoutMinutes": {
+          "description": "Turn off hard disks after this many minutes; 0 is never.",
+          "$ref": "#/$defs/PowerTimeout"
+        },
+        "HibernateEnabled": {
+          "type": "boolean",
+          "description": "Hibernation, and with it fast startup, on or off."
+        },
+        "Comment": {
+          "type": "string",
+          "description": "Technician notes; ignored when applying the configuration."
+        }
+      }
+    },
+    "PowerTimeout": {
+      "type": "object",
+      "description": "Minutes when plugged in (AC) and on battery (DC); 0 is never. Leave one out to keep it.",
+      "additionalProperties": false,
+      "properties": {
+        "AC": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 71582788,
+          "description": "Minutes when plugged in; 0 is never."
+        },
+        "DC": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 71582788,
+          "description": "Minutes on battery; 0 is never."
+        }
+      }
     },
     "RegistryKeys": {
       "type": "object",

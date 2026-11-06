@@ -629,6 +629,7 @@ Describe 'Shared snapshot catalogue' {
             'UserAccounts', 'UserGroups', 'FirewallRules',
             'EnvironmentVariables', 'CreateFolders',
             'SmbShares', 'NetworkCards', 'HostsFileEntries', 'NtpTimeServers',
+            'PowerSettings',
             'RegistryKeys', 'ScheduledTasks', 'CopyFilesFolders', 'Software',
             'Services', 'StartCustomScriptsAfter'
         )

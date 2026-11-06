@@ -32,6 +32,7 @@ BeforeAll {
         'Account policy'             = 'AccountPolicy'
         'Environment variables'      = 'EnvironmentVariables'
         'Services'                   = 'Services'
+        'Power settings'             = 'PowerSettings'
         'Software'                   = 'Software'
         'User accounts'              = 'UserAccounts'
         'User groups'                = 'UserGroups'

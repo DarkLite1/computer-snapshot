@@ -19,6 +19,7 @@ function Get-SnapshotScriptsHC {
         NetworkCards             = 'Network cards import export.ps1'
         HostsFileEntries         = 'Hosts file entries import export.ps1'
         NtpTimeServers           = 'NTP time servers import export.ps1'
+        PowerSettings            = 'Power settings import export.ps1'
         RegistryKeys             = 'Registry keys import export.ps1'
         ScheduledTasks           = 'Scheduled tasks import export.ps1'
         CopyFilesFolders         = 'Copy files folders import export.ps1'
@@ -42,7 +43,7 @@ function Get-EmptySectionValueHC {
 
     $objectSections = @(
         'RegionalSettings', 'AccountPolicy', 'CreateFolders', 'NtpTimeServers',
-        'RegistryKeys', 'Software'
+        'RegistryKeys', 'Software', 'PowerSettings'
     )
     if ($Name -in $objectSections) {
         return , ([ordered]@{})
@@ -180,6 +181,10 @@ function Get-SnapshotSectionLabelsHC {
         NtpTimeServers           = @(
             'Time synchronization',
             'Domain time synchronization or NTP time servers.'
+        )
+        PowerSettings            = @(
+            'Power settings',
+            'Power plan, sleep and display timeouts, and hibernation.'
         )
         HostsFileEntries         = @(
             'Hosts file',

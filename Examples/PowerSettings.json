@@ -1,0 +1,9 @@
+{
+  "Comment": "A PC that never sleeps when plugged in; on battery the display turns off after 10 minutes. Settings that are left out stay as they are.",
+  "ActivePlan": "HighPerformance",
+  "MonitorTimeoutMinutes": { "AC": 30, "DC": 10 },
+  "SleepTimeoutMinutes": { "AC": 0, "DC": 30 },
+  "HibernateTimeoutMinutes": { "AC": 0 },
+  "DiskTimeoutMinutes": { "AC": 0 },
+  "HibernateEnabled": false
+}

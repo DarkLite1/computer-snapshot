@@ -184,10 +184,10 @@ Answer `gent` and `192.0.2.10` once, and you get `Kiosk account of gent`, `D:\Si
 `{{password:...}}`, `{{number:...}}` and `{{prefix:...}}` must be the **whole value**, with nothing else between the quotes:
 
 ```text
-"Password": "{{password:Password for this account}}"      ✅ only the placeholder
-"Password": "Pwd-{{password:Last part}}"                    ❌ a password with text
-"TimeoutMinutes": "{{number:Minutes}}"                      ✅ becomes a real number, such as 30
-"TimeoutMinutes": "{{number:Minutes}}0"                     ❌ a number with text
+"Password": "{{password:Password for this account}}"  ✅ only the placeholder
+"Password": "Pwd-{{password:Last part}}"              ❌ a password with text
+"TimeoutMinutes": "{{number:Minutes}}"                ✅ becomes a real number (ex. 30)
+"TimeoutMinutes": "{{number:Minutes}}0"               ❌ a number with text
 ```
 
 A password stays whole, so it is redacted reliably and can't end up in descriptions or paths. A number or prefix stays whole, because the setting needs a real number, not text.
@@ -257,27 +257,39 @@ For shortcuts, scripts and deployment tools. Open PowerShell in the root folder.
 **Restore** a specific file without the yes/no question:
 
 ```powershell
-& '.\Engine\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Kiosk.json' -SkipConfirmation
+& '.\Engine\Scripts\Invoke configuration.ps1' `
+    -ConfigurationFile 'Configurations\Kiosk.json' `
+    -SkipConfirmation
 ```
 
 **Restore unattended**, with only some sections. Run this from an administrator window:
 
 ```powershell
-& '.\Engine\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Kiosk.json' `
-    -AnswerFile 'Answers\Kiosk\Gent.json' -Items UserAccounts, NetworkCards -Unattended
+& '.\Engine\Scripts\Invoke configuration.ps1' `
+    -ConfigurationFile 'Configurations\Kiosk.json' `
+    -AnswerFile 'Answers\Kiosk\Gent.json' `
+    -Items UserAccounts, NetworkCards `
+    -Unattended
 ```
 
 **Create an answer file** with every placeholder set to `null`:
 
 ```powershell
-& '.\Engine\Scripts\New answer file.ps1' -ConfigurationFile 'Configurations\Kiosk.json' -AnswerFile 'Answers\Kiosk.json'
+& '.\Engine\Scripts\New answer file.ps1' `
+    -ConfigurationFile 'Configurations\Kiosk.json' `
+    -AnswerFile 'Answers\Kiosk.json'
 ```
 
 **Export** without the wizard, here with scheduled tasks from two Task Scheduler folders:
 
 ```powershell
-& '.\Engine\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\This PC.json' `
-    -Items ScheduledTasks, FirewallRules -ExportOptions @{ ScheduledTasks = @{ TaskPath = '\HC\', '\Vendor\' } }
+& '.\Engine\Scripts\Invoke scripts.ps1' `
+    -Action CreateSnapshot `
+    -ConfigurationFile 'Configurations\This PC.json' `
+    -Items ScheduledTasks, FirewallRules `
+    -ExportOptions @{ 
+      ScheduledTasks = @{ TaskPath = '\HC\', '\Vendor\' } 
+    }
 ```
 
 Useful restore options: `-RebootComputer $true`, `-RestartDelaySeconds 30` and `-OpenReportInBrowser $false` override the configuration's settings for one run.

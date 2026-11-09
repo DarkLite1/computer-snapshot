@@ -1,430 +1,271 @@
-# 🖥️ Computer Snapshot
+# 📸 Computer Snapshot
 
-Computer Snapshot is a portable tool that lets you easily backup (export) and set up (restore) Windows computers directly from a USB stick.
+**Set up a Windows computer once, then repeat it on every other computer with one click.**
 
-The best part? **No installation is required** on the computers you are managing. As long as the PC is running 64-bit Windows (PowerShell 5.1 or newer), you are good to go. Every computer's configuration is neatly saved as a single, easy-to-read text file.
+Computer Snapshot is a portable PowerShell tool that you can run from a USB stick. It saves the settings of a computer in one readable JSON file, called a **configuration**. Restore that file on another computer and you get the same accounts, shares, firewall rules, software and more. No installation needed.
 
-## 🚀 Quick Start: Using the Wizard
-
-The easiest way to use Computer Snapshot is through the built-in graphical wizard.
-
-1. **Plug in** your USB stick.
-2. **Open the tool** by double-clicking **`Start wizard.lnk`**.
-3. **To set up a PC (Restore):** the Restore tab guides you through a few
-   steps in the same window. **Next >** goes on and **< Back** returns, keeping
-   what you chose or typed.
-   1. **Configuration:** select a saved configuration. Configurations in a
-      subfolder show their path, such as `Examples\Kiosk` for the bundled
-      examples in `Configurations\Examples`.
-   2. **Sections:** check the settings you want to apply, and choose whether
-      to restart and open the report. **Unattended** takes every answer from
-      the answer file and asks nothing.
-   3. **Answer file** (only when the checked sections ask questions): choose an
-      answer file from the `Answers` folder, or **(None)**. The list shows each
-      file's path inside `Answers` and how many of the questions it answers;
-      a file that answers none of them is grayed out. Click a column header to
-      sort by path or date. To start a new answer file, type a name such as
-      `Kiosk\Antwerp\Kiosk.json` under the list and click **Create**.
-   4. **Questions:** a list grouped by section, like the review, with the
-      answers of the answer file already filled in. Click an answer to type
-      it, or choose it when the setting has fixed values; you can also change
-      an answer of the file, for this restore only (the file stays
-      unchanged). The **Check** column says what is expected or wrong while
-      you type, and where a valid answer comes from. **Reload answer file**
-      reads the file again (also after you edited it) and puts its answers
-      back, for example after choosing the wrong file first; answers you
-      typed for questions the file leaves open are kept. When **Software**
-      is checked, its installers are listed under Software with a check box:
-      uncheck one to leave it out of this restore; the questions only that
-      installer uses are then hidden and not asked. Without other questions
-      this step is called **Choose the software to install**. Skipped when
-      Unattended is checked; then every installer runs.
-   5. **Review:** a card shows the configuration, the answer file, the
-      restart, the report and, when checked, Unattended. Below it every
-      checked section is listed in run order with its answers and where each
-      comes from (answer file, changed, or typed; passwords are hidden), or
-      "No questions". Click **Restore**; nothing is changed before that.
-4. **To save a PC's setup (Export):**
-   - Click **Export**.
-   - Choose which sections you want to save (like users, folders, or network settings). The check box in the **Item** header checks every section or none; it shows a partly filled box when only some are checked.
-   - For **Scheduled tasks**, check the Task Scheduler folders to export under **Scheduled task folders** (default `\HC\`, subfolders included, several separated by commas). Entering `\` exports every task on the computer, including the Windows ones; the wizard asks you to confirm that.
-   - Every checked section is in the file. A section with nothing to export is saved with an empty value (`[]` or `{}`), so you can see it is there and fill it in; a restore skips an empty section. Folders to create, files to copy, registry values, software and custom scripts are never read from the computer: these are always empty, see the `Shared\Examples` folder for what to fill in.
-   - Give your file a name. _Tip: The wizard suggests a handy default name like `KIOSK01 2026-10-21 142536.json`_.
-   - Click the **Export** button. It shows **Exporting...** and stays disabled until the export has finished, so the same export can not be started twice.
-
-**💡 Quick Tips for the Wizard:**
-
-- **Need Admin Rights?** If a task requires it, click the **Restart as administrator** button at the top.
-- **Right PC, right account?** The top of the window shows the computer name and the user the wizard runs as, next to the selected configuration and answer file.
-- **Rebooting & Reports:** At the bottom of the restore screen, you can easily check boxes to automatically **Restart computer after successful restore** (with a countdown in seconds you can change) or **Open report in browser**.
-- **Check Your Results:** Once you run a task, look in the `Log` folder on your USB stick for an easy-to-read HTML report showing exactly what succeeded and what failed.
-
-## 🔗 Shortcuts
-
-| Shortcut                                                      | What it does                                                                        |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `Start wizard.lnk`                                            | Opens the graphical wizard for exporting and restoring.                             |
-| `Configurations\Examples\Restore PC1 Confirm First.lnk`       | Restores `Configurations\Examples\PC1.json` after asking you to confirm with `y`.   |
-| `Configurations\Examples\Restore PC1 Immediately.lnk`         | Restores `Configurations\Examples\PC1.json` straight away, without asking.          |
-
-Copy one of the `Restore PC1` shortcuts next to your own configuration and change its `-ConfigurationFile` path to make a one-click restore for it. The shortcut finds the tool relative to its own folder: `..\..\Engine\Scripts\Invoke configuration.ps1` from `Configurations\Examples`, `..\Engine\Scripts\Invoke configuration.ps1` from `Configurations`.
-
-## 📂 Know Your Folders
-
-Your USB stick has a specific layout to keep everything organized. Here are the main folders you will use:
-
-- **`Configurations/`**: This is where your saved PC setups live (one file per computer), also in subfolders. `Configurations/Examples/` holds the bundled example configurations.
-- **`Software/`**: Place any app installers (like `.exe` files) in here.
-- **`Files/`**: Put any standard files or custom scripts you want copied to the new PC here.
-- **`Shared/`**: A great place to keep standard, reusable settings (like a standard "Guest" user account) that you want to apply to multiple computers. `Shared/Examples/` holds ready-made sample data for every section; copy what you need, or point to it from your own configuration.
-- **`Log/`**: Check here for your execution reports.
-- **`Answers/`**: Answer files, also in subfolders such as `Answers/Kiosk/Brussels/`. `Answers/Examples/` holds examples; Git ignores everything else in this folder, because answer files can contain passwords.
-- **`Engine/`**: The tool itself; don't change anything here. Developers find how it is built, tested and upgraded from older versions in [Engine/README.MD](Engine/README.MD).
-
-## ✍️ Customizing Your Setups
-
-All configurations are saved as standard JSON files. You can open and edit them in any code editor, like Visual Studio Code.
-
-- **Smart Automation:** You don't need to worry about the order of operations. The script automatically handles things in a safe sequence (for example, creating user accounts before trying to copy files into their folders).
-- **Skipping Items:** If an item or section is missing from your file, the script simply skips it and moves on.
-- **Safety First:** If a specific setting fails to apply, the tool won't crash. It will continue setting up the rest of the computer and log the error for you to review later.
-
-### What can be exported and restored?
-
-Each configuration has an `Items` object with one entry per section. Sections always run in this order, regardless of the order in your file. Each section links to its example in `Shared/Examples/`, or to a page with more details and the pitfalls when it has one:
-
-| Order | Section | What it covers |
-| ----- | ------- | -------------- |
-| 1     | [`StartCustomScriptsBefore`](Shared/Examples/StartCustomScriptsAfter.md) | Your own PowerShell scripts (from `Files/`) to run before everything else. |
-| 2     | [`RegionalSettings`](Shared/Examples/RegionalSettings.json) | System locale, time zone, home location, culture, languages with keyboards and display language. |
-| 3     | [`AccountPolicy`](Shared/Examples/AccountPolicy.md) | Local password rules and account lockout. Needs administrator rights, also to export: without them the section is not run and is reported as failed. |
-| 4     | [`UserAccounts`](Shared/Examples/UserAccounts.md) | Local user accounts to create, update or remove. |
-| 5     | [`UserGroups`](Shared/Examples/UserGroups.json) | Local groups and their members. |
-| 6     | [`FirewallRules`](Shared/Examples/FirewallRules.json) | Windows Defender Firewall rules. |
-| 7     | [`EnvironmentVariables`](Shared/Examples/EnvironmentVariables.md) | Environment variables, and entries in lists such as `Path`. |
-| 8     | [`CreateFolders`](Shared/Examples/CreateFolders.json) | Folders to create. |
-| 9     | [`SmbShares`](Shared/Examples/SmbShares.md) | SMB shares, each with its share and NTFS permissions. |
-| 10    | [`NetworkCards`](Shared/Examples/NetworkCards.md) | Network adapter names, network profile (category), DNS suffix and registration, IPv4 settings, NetBIOS and IPv6. |
-| 11    | [`HostsFileEntries`](Shared/Examples/HostsFileEntries.md) | Host names in the Windows hosts file and the IP addresses they point to. |
-| 12    | [`NtpTimeServers`](Shared/Examples/NtpTimeServers.json) | Time synchronization (domain or specific NTP servers). |
-| 13    | [`PowerSettings`](Shared/Examples/PowerSettings.md) | Active power plan, display, sleep, hibernate and disk timeouts, and hibernation. |
-| 14    | [`RegistryKeys`](Shared/Examples/RegistryKeys.md) | Registry values to set, remove or clear. |
-| 15    | [`ScheduledTasks`](Shared/Examples/ScheduledTasks.md) | Scheduled tasks from the `\HC\` folder, as XML or an exported XML file, with the account they run as. |
-| 16    | [`CopyFilesFolders`](Shared/Examples/CopyFilesFolders.json) | Files or folders to copy from the USB stick to the computer. |
-| 17    | [`Software`](Shared/Examples/Software.md) | Software to uninstall and installers (from `Software/`) to run. |
-| 18    | [`Services`](Shared/Examples/Services.md) | Startup type of Windows services, and starting or stopping them. |
-| 19    | [`StartCustomScriptsAfter`](Shared/Examples/StartCustomScriptsAfter.md) | Your own PowerShell scripts to run after everything else. |
-
-An empty section (like `[]` or `{}`) is reported as *Skipped – Nothing to do*. See the `Shared/Examples/` folder for the exact format of each section.
-
-Some sections can't be fully captured automatically, so exporting them only gives you a starting example to edit: `CreateFolders`, `CopyFilesFolders`, `RegistryKeys`, `Software` and `Services`. `StartCustomScriptsBefore` and `StartCustomScriptsAfter` export an empty list, so no example script can run by accident; see `Shared\Examples\StartCustomScriptsBefore.json` for the format.
-
-### Ready-made examples for common settings
-
-`Shared/Examples/` also has ready-made sections for common Windows settings. Copy their entries into your configuration, or point to them like any shared file, such as `"RegistryKeys": ["Shared\\Examples\\RegistryKeys Common.json", "Shared\\Examples\\RegistryKeys Explorer.json"]`:
-
-| File | What it does |
-| ---- | ------------ |
-| `RegistryKeys Remote Desktop.json` and `FirewallRules Remote Desktop.json` | Turn on Remote Desktop with Network Level Authentication and open port 3389 on domain and private networks. Add the users who may connect to the `Remote Desktop Users` group in `UserGroups`. |
-| `RegistryKeys Auto Logon.json` | Sign in a kiosk account automatically. **Windows keeps the password in plain text in the registry**, readable by every administrator; the restore asks for it. |
-| `RegistryKeys Explorer.json` | Show file extensions and hidden files in File Explorer. |
-| `RegistryKeys Windows Suggestions.json` | Turn off suggestions, tips, ads and automatically installed apps on Windows 11. |
-
-The `HKCU` entries apply to the account running the restore; for another account, put them under `RunAsOtherUser`.
-
-File names follow one convention: `Shared\Examples\<Section>.json` shows every option of a section, `Shared\Examples\<Section> <Topic>.json` and your own `Shared\<Section> <Topic>.json` are ready-made sections, and the example configurations are in `Configurations\Examples\`, all in Title Case.
-
-The example configurations show how the sections fit together. They change the PC they are restored on, except `Combined Sections`; besides `PC1`, `Prompted Setup` and `Combined Sections`, described further on, there are:
-
-- [Configurations/Examples/Office PC.json](Configurations/Examples/Office%20PC.json): domain time, a tools folder in `Path`, the print server in the hosts file, power timeouts for a laptop, File Explorer showing extensions and hidden files, and Windows without suggestions.
-- [Configurations/Examples/Production PC.json](Configurations/Examples/Production%20PC.json): an `operator` account, a static IP address on the wired card, the PLC in the hosts file, an NTP time server, an `Exports` share, a clean-up task running as the operator, a power plan that never sleeps and Windows Search off. It asks for the operator password once, for both the account and the task.
-- [Configurations/Examples/Kiosk.json](Configurations/Examples/Kiosk.json): Belgian regional settings with a Belgian keyboard, password rules, a `kiosk` account that signs in automatically, an environment variable, a power plan that never sleeps, services, and Windows without suggestions. It asks for the kiosk password once, for both the account and auto logon, and for the computer name.
-- [Configurations/Examples/Remote Desktop.json](Configurations/Examples/Remote%20Desktop.json): Remote Desktop with its firewall rules, the account that may connect, and the wired network card made private.
-
-### Reusing sections across computers
-
-Instead of writing a section inline, you can point to a file. The path is relative to the USB stick root:
-
-```json
-"Items": {
-  "UserAccounts": "Shared\\Examples\\UserAccounts Kiosk.json"
-}
+```text
+ 🖥️ Computer A  ──Export──▶  📄 Configurations\Kiosk.json  ──Restore──▶  🖥️ Computer B, C, D…
 ```
 
-The referenced file contains only that section's data (for example, a JSON array of user accounts). Referenced files can't point to other files.
+---
 
-A section can also be built from **several files**, so you can combine reusable building blocks, for example the shares every PC has plus the shares of one kind of PC:
+## ✨ What can it set up?
 
-```json
-"Items": {
-  "SmbShares": [ "Shared\\SmbShares Common.json", "Shared\\SmbShares Scanner.json" ],
-  "RegistryKeys": [ "Shared\\RegistryKeys Office.json", "Shared\\RegistryKeys Kiosk.json" ]
-}
-```
+Each part of a configuration is called a **section**. A restore runs the sections in the order below. Click a section for an example and more explanation.
 
-The files are combined in the order you list them:
+| Section | What it does | Export captures it? |
+| ------- | ------------ | :-----------------: |
+| [`StartCustomScriptsBefore`](Shared/Examples/StartCustomScriptsBefore.json) | Run your own PowerShell scripts before everything else | ✏️ |
+| [`RegionalSettings`](Shared/Examples/RegionalSettings.json) | Language, keyboards, culture, home location and time zone | ✅ |
+| [`AccountPolicy`](Shared/Examples/AccountPolicy.md) | Local password rules and account lockout | ✅ |
+| [`UserAccounts`](Shared/Examples/UserAccounts.md) | Local user accounts to create, update or remove | ✅ |
+| [`UserGroups`](Shared/Examples/UserGroups.json) | Local groups and their members | ✅ |
+| [`FirewallRules`](Shared/Examples/FirewallRules.json) | Windows Firewall rules | ✅ |
+| [`EnvironmentVariables`](Shared/Examples/EnvironmentVariables.md) | Variables such as `JAVA_HOME`, and entries in `Path` | ✅ |
+| [`CreateFolders`](Shared/Examples/CreateFolders.json) | Folders to create | ✏️ |
+| [`SmbShares`](Shared/Examples/SmbShares.md) | Shared folders, with share and NTFS permissions | ✅ |
+| [`NetworkCards`](Shared/Examples/NetworkCards.md) | Adapter name, IP address, DNS and more | ✅ |
+| [`HostsFileEntries`](Shared/Examples/HostsFileEntries.md) | Host names in the Windows hosts file | ✅ |
+| [`NtpTimeServers`](Shared/Examples/NtpTimeServers.json) | Domain time sync or NTP time servers | ✅ |
+| [`PowerSettings`](Shared/Examples/PowerSettings.md) | Power plan, sleep and display timeouts, hibernation | ✅ |
+| [`RegistryKeys`](Shared/Examples/RegistryKeys.md) | Registry keys and values to set or remove | ✏️ |
+| [`ScheduledTasks`](Shared/Examples/ScheduledTasks.md) | Scheduled tasks and whether they are enabled | ✅ |
+| [`CopyFilesFolders`](Shared/Examples/CopyFilesFolders.json) | Files and folders to copy from the USB stick | ✏️ |
+| [`Software`](Shared/Examples/Software.md) | Applications to install or remove | ✏️ |
+| [`Services`](Shared/Examples/Services.md) | Startup type of Windows services, start or stop them | ✏️ |
+| [`StartCustomScriptsAfter`](Shared/Examples/StartCustomScriptsAfter.md) | Run your own PowerShell scripts after everything else | ✏️ |
 
-- Lists are joined: the shares, users, registry entries or installers of all files.
-- Objects are combined property by property, so the lists inside them are joined too, such as `RunAsCurrentUser.RegistryKeys`, `Software.Install` or `CreateFolders.FolderPaths`.
-- A single setting may appear in several files only with the same value. Two different values, such as two time zones in `RegionalSettings`, are reported as an error naming both files, instead of one silently winning.
-- The combined section is checked as a whole, so the same share or user in two files is reported as well.
+✅ **Captured:** an export reads the current settings from the computer.
+✏️ **You fill it in:** Windows can't tell which files, registry values or installers you chose on purpose. An export saves these sections **empty**, ready for you to fill in. Copy what you need from [`Shared/Examples`](Shared/Examples). On restore, an empty section is skipped.
 
-Name a shared file after its section, such as `Shared\SmbShares Common.json`, so Visual Studio Code shows the hints for that section while you edit it (see [Editing with autocomplete](#editing-with-autocomplete)).
+---
 
-See [Configurations/Examples/Combined Sections.json](Configurations/Examples/Combined%20Sections.json) for a complete example: an office PC base plus kiosk extras, with `CreateFolders` and `RegistryKeys` each built from a common and a kiosk file in `Shared\Examples\`. It is safe to restore as it is; it only adds example registry values under `HKCU\Software\ComputerSnapshot\Example` and folders under `%ProgramData%\ComputerSnapshot example`. Shares work the same way, for example `Shared\SmbShares Common.json` with the shares of every PC and `Shared\SmbShares Kiosk.json` with the extra kiosk shares.
+## 🚀 Quick Start
 
-### Accounts in other Windows languages
+1. Copy this folder to a USB stick or to a local folder.
+2. Double-click **`Start wizard.lnk`**.
+3. Choose a tab:
 
-Built-in accounts and groups have a different name in each Windows language: *Everyone* is *Iedereen* in Dutch and *Jeder* in German. So exports write them with their **English name**, such as `Everyone`, `BUILTIN\Administrators` or `NT AUTHORITY\Authenticated Users`. A restore looks the English name up in a fixed list of built-in accounts, whose security IDs (SIDs) are the same on every Windows, and uses the name of that computer's language. The prefix is optional: `Administrators` works too. This applies to user group names and members, share permissions, folder permissions and the account of scheduled tasks.
+### 📤 Export: save this computer
 
-### Paths
+1. Enter a **configuration name**, such as `Kiosk PC app X`.
+2. Tick the sections you want.
+3. Click **Export**.
 
-All paths in a configuration (installers, files to copy, custom scripts, shared sections) are relative to the root of the USB stick, unless you give a full path like `C:\Temp\file.txt`. Environment variables such as `%ProgramData%` are expanded in these paths, in the folders to create (`CreateFolders`) and in the destinations of `CopyFilesFolders`. An unknown variable is reported as an error instead of becoming part of a folder name.
+The result is saved as `Configurations\<name>.json`. A report opens in your browser, and a copy is kept in the `Log` folder.
 
-### Settings
+> 💡 Open the file in an editor such as VS Code. Remove everything you don't need and fill in the ✏️ sections. **Less is more:** a small configuration is faster and won't change things by accident.
 
-| Setting               | Default | Meaning                                                                   |
-| --------------------- | ------- | ------------------------------------------------------------------------- |
-| `RebootComputer`      | `false` | Restart the computer after a restore in which nothing failed, after a countdown (`shutdown /a` cancels it). The report shows whether it restarts. |
-| `RestartDelaySeconds` | `60`    | Length of that countdown, from `0` to `600` seconds.                      |
-| `OpenReportInBrowser` | `true`  | Open the HTML report when the run is finished.                            |
-| `RunElevated`         | `false` | When restoring from a shortcut or the command line, restart as administrator first (UAC prompt). |
+### 📥 Restore: set up a computer
 
-### Editing with autocomplete
+The wizard guides you step by step:
 
-Every configuration starts with `"$schema": "../Engine/Schemas/config.schema.json"`. Editors like Visual Studio Code use this to offer autocomplete and flag mistakes while you type. Keep this line, and keep your configurations in the `Configurations/` folder so the relative path works; in a subfolder such as `Configurations/Examples/` it is `../../Engine/Schemas/config.schema.json`.
+1. **Configuration:** choose a file from `Configurations` (subfolders are listed too).
+2. **Sections:** untick the sections or installers you want to skip.
+3. **Answer file:** optionally pick saved answers from `Answers` (see [placeholders](#-restore-time-input-placeholders)).
+4. **Questions:** answer what the configuration asks, such as a password or an IP address.
+5. **Review:** check your choices and start.
 
-Section files can't have that line, so `.vscode/settings.json` tells Visual Studio Code which schema in `Engine/Schemas/` belongs to which file, by its name: every file in `Shared/` or one of its subfolders named `RegistryKeys.json` or `RegistryKeys <anything>.json` gets the `RegistryKeys` hints, and the same for every other section. Open the computer-snapshot folder itself in Visual Studio Code for this, and name a new shared file after its section, such as `Shared\RegistryKeys Office.json`, to get the hints there too.
+Nothing changes on the computer before you click the final button. Afterwards a report shows what was done and what failed. Each section keeps going when one entry fails.
 
-> **🔒 Important Security Warning:**
-> When you save settings that include passwords (like user accounts or certain registry keys), **they are saved in plain text**. Please keep your USB stick physically secure, and never upload files containing sensitive passwords to public spaces. Where possible, use a `{{password:...}}` placeholder instead, so the password is asked for during the restore and never stored (see [Restore-Time Input](#restore-time-input)).
+> 🎯 New here? Try `Configurations\Examples\Prompted Setup.json`. It is a small example that asks three questions.
 
-## Restore-Time Input
+---
 
-Use a placeholder instead of a fixed string when a value changes between restores:
+## 📂 Folder Layout
 
-| Placeholder                                     | Field in the input form                                                             |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `{{input:Enter the local account name}}`        | Required text input.                                                                |
-| `{{password:Enter the local account password}}` | Required, masked input. Use this form for passwords and other secrets.              |
-| `{{ipv4:Enter the time-server IPv4 address}}`   | Required IPv4 address, such as `192.0.2.10`; invalid addresses cannot be submitted. |
-| `{{prefix:Enter the prefix length}}`            | Required subnet prefix length from 1 to 32, such as `24`; stored as a number.        |
-| `{{number:Minutes the installer may run}}`      | Required whole number, such as `15` or `-1`; stored as a number.                     |
+| Folder | What goes in it |
+| ------ | --------------- |
+| `Configurations\` | Your configurations. Ready-made examples are in `Configurations\Examples\`. |
+| `Shared\` | Section files that several configurations reuse (see [Reusing sections](#-reusing-sections)). |
+| `Shared\Examples\` | An example of every section, with explanations. |
+| `Answers\` | Saved answers to the questions of a configuration (see [Answer files](#-answer-files-skip-the-typing)). |
+| `Files\` | Files to copy or scripts to run, used by `CopyFilesFolders` and `StartCustomScripts...`. |
+| `Software\` | Installers used by the `Software` section. |
+| `Log\` | The HTML report of every export and restore. |
+| `Engine\` | The tool itself. You don't need to touch it ([developer docs](Engine/README.MD)). |
 
-The text after the colon is the question shown in the input form, with the configuration field path below it. For example, a user-account entry can contain:
+Paths in a configuration, such as `Software\\setup.exe`, are relative to this root folder, so the USB stick works from any drive letter.
+
+---
+
+## 📄 A Configuration File
 
 ```json
 {
-  "Name": "{{input:Enter the local account name}}",
-  "Password": "{{password:Enter the local account password}}",
-  "TimeServerNames": ["{{ipv4:Enter the IPv4 address of your NTP time server}}"]
-}
-```
-
-Select the configuration, click **Next >**, check the sections, and click **Next >** again. The configuration is checked first: a typo or a missing file is reported before any answer is asked for, and nothing is asked. When the checked sections need answers, the next steps of the same window ask for an answer file and then show every question with the answers of that file filled in: answer what it leaves open, and change any of its answers for this restore only; the file itself is never changed. **< Back** returns to change the sections or the answer file, and keeps the answers you typed or changed. The last step reviews everything before **Restore**. The questions are grouped under a header for each section, in the order the sections run; a placeholder used in several sections is asked once, under the section that runs first, and names the others. A restore started from the command line asks the same questions in a separate input form, after any required UAC elevation.
-
-Each field is checked while you type, against its placeholder kind and the setting it fills in: `TimeoutMinutes` only accepts 1 to 1440, a prefix length 1 to 32, and a setting with fixed values, such as a registry value `Type`, is a list to choose from. Below each field a grey line says what is expected; after you leave a field with a wrong answer, it turns red and says why. **Continue** is enabled once every answer is valid. **Cancel**, Escape, or closing the form cancels the entire restore before any sections run. The resolved configuration is checked again before applying settings. Windows may still reject an otherwise valid answer, for example because of password policy.
-
-Placeholders work in string values inside `Items`, including nested objects, arrays, and referenced shared sections. Only selected sections prompt. An identical placeholder (including its type and description) asks once and reuses the answer within that restore; use different descriptions to request independent values. Comments, metadata, settings, property names and section-reference filenames are not input fields. Do not use placeholders for booleans, or embed them within larger strings. `{{input:...}}` always gives text; use `{{prefix:...}}` for a prefix length and `{{number:...}}` for any other whole number, such as `TimeoutMinutes`, `SuccessExitCodes`, `WinHomeLocationGeoId` or `CATimeout`. Answers are used literally, not evaluated as PowerShell or expanded as further placeholders.
-
-For example, to ask how long an installer may run:
-
-```json
-"Install": [
-  { "ExecutablePath": "Software\\Setup.exe", "TimeoutMinutes": "{{number:Minutes the installer may run}}" }
-]
-```
-
-The answer must be a plain whole number, such as `30`: no leading zeros, decimals or spaces. The restore receives the number `30`, not the text `"30"`, so the setting passes the configuration check after filling in.
-
-**Placeholders inside a copied file:** a script or other text file on the USB stick can contain placeholders anywhere in its text, also in the middle of a line. Copy it with `CopyFilesFolders` and `"FillPlaceholders": true`; the placeholders are asked for at the start of the restore, together with the others, and the copy on the computer gets the answers. The file on the USB stick stays as it is, and the copy keeps the file's encoding.
-
-```powershell
-# Files\Start terminal.ps1 on the USB stick
-$ArgumentList = '--kiosk http://{{ipv4:IP address of the terminal server}}:1353/terminal/?reference=TRM_AISE_01'
-```
-
-```json
-"CopyFilesFolders": [
-  { "From": "Files\\Start terminal.ps1", "To": "C:\\HC\\Start terminal.ps1", "FillPlaceholders": true }
-]
-```
-
-`{{input:...}}`, `{{ipv4:...}}`, `{{prefix:...}}` and `{{number:...}}` work in files; in a file every answer is written as text. `{{password:...}}` is refused, because the password would be stored in plain text on the computer. `FillPlaceholders` works for a single file, not for a folder. When `To` is an existing folder, the filled file is written into it under its own name, as for a normal file copy.
-
-**Exported user accounts:** Windows never reveals passwords, so an export writes `{{password:Password for local user 'name'}}` for each local user. Restoring the export asks for each password (unless supplied in an answer file), and sets it on the user, also on a user that already exists. Accounts that Windows manages itself (Guest, DefaultAccount, WDAGUtilityAccount) get an empty password instead and keep their current one. To keep an existing user's password, replace its placeholder in the configuration with an empty string; a user that doesn't exist yet needs a password to be created.
-
-Interactive command-line restores use the same input form for missing answers and require an interactive Windows desktop. Browsing configurations and exporting do not ask for placeholder values. Use `-Unattended` to forbid the input form.
-
-See [Configurations/Examples/Prompted Setup.json](Configurations/Examples/Prompted%20Setup.json) for a complete example. It prompts for a local account name, its password, and an NTP time-server IPv4 address. Restoring it creates or updates the named account and changes time synchronization; uncheck either section to skip it. To ask for a network card's static IP address, see [NetworkCards](Shared/Examples/NetworkCards.md).
-
-**Password handling:** Answers are kept in memory for the current run. The original configuration and shared files are not rewritten, and answers are not written to disk or included in process-launch arguments. The wizard hands the answers of its questions page to the restore process over a one-time named pipe: it has a random name, admits only your account and the Administrators group, serves the answers once and then closes. If the restore cannot receive them, for example because the wizard was closed first, it says so and asks for them in the input form. Password placeholders mask typing and redact exact matches from the tool's generated results, HTML reports and captured PowerShell child output. This is not encrypted storage: the restore scripts receive plain strings in memory, and custom scripts or external programs can independently log, persist or transform them. Only run trusted scripts and use `password` placeholders for sensitive values. Ordinary `input` answers are not redacted.
-
-### Answer files and unattended restores
-
-Keep a configuration as a reusable template and supply per-computer values in a
-separate JSON file. `-AnswerFile` supplies values; `-Unattended` determines
-whether missing values may prompt:
-
-| Answer file | `-Unattended` | Behavior |
-| --- | --- | --- |
-| Supplied | No | Use its answers; prompt for missing answers. |
-| Supplied | Yes | Fail before any sections run if any required answer is missing. |
-| Not supplied | No | Prompt for all required answers. |
-| Not supplied | Yes | Proceed only if the selected sections and their template files require no answers. |
-
-An answer file contains an `Answers` object, with an optional `Comment`.
-Keys are **complete, case-sensitive placeholders**, including the braces,
-type and description. Values are strings; a prefix or a number may also be a
-JSON number, so `24` and `"24"` both work, as do `15` and `"15"`.
-`null` means **not supplied** and is useful in a generated template. Empty
-strings and invalid values are errors, not requests to prompt. Malformed files,
-duplicate keys, unknown top-level properties and invalid supplied answers
-always fail before any sections run, even in interactive mode.
-
-```json
-{
-  "Answers": {
-    "{{input:Enter the local account name to create or update}}": "kiosk",
-    "{{password:Enter the password for this local account}}": null,
-    "{{ipv4:Enter the IPv4 address of your NTP time server}}": "192.0.2.10"
+  "$schema": "../Engine/Schemas/config.schema.json",
+  "SchemaVersion": 3,
+  "Description": "Office PC: Belgian settings and the office printer",
+  "Settings": {
+    "RebootComputer": false,
+    "RestartDelaySeconds": 60,
+    "OpenReportInBrowser": true,
+    "RunElevated": true
+  },
+  "Items": {
+    "RegionalSettings": {
+      "WinSystemLocaleName": "nl-BE",
+      "TimeZoneId": "Romance Standard Time",
+      "WinHomeLocationGeoId": 21,
+      "CultureName": "nl-BE"
+    },
+    "HostsFileEntries": [
+      { "IPAddress": "192.0.2.50", "Hostnames": ["printserver"] }
+    ]
   }
 }
 ```
 
-This is the bundled [partial answer example](Answers/Examples/Prompted%20Setup.json)
-for [Prompted Setup](Configurations/Examples/Prompted%20Setup.json).
-It supplies a name and a documentation-only NTP address, and leaves the password
-to be entered interactively. **Change the address to your real NTP server**
-before using it. It is not a complete unattended answer file.
-`Answers/Examples/Kiosk/Brussels/` and `Answers/Examples/Kiosk/Gent/` show how
-to keep one answer file per site in subfolders.
+| Setting | Meaning |
+| ------- | ------- |
+| `Description` | Shown in the wizard, so you know which configuration to pick. |
+| `RebootComputer` | Restart after a restore, **only** when nothing failed. Cancel the countdown with `shutdown /a`. |
+| `RestartDelaySeconds` | The restart countdown, 0 to 600 seconds. |
+| `OpenReportInBrowser` | Open the report when done. |
+| `RunElevated` | Run as administrator; Windows asks for permission (UAC). Most sections need this. |
 
-Identical placeholders share one answer across the selected configuration,
-its shared sections and copied files using `FillPlaceholders`. Valid extra
-answers for unselected sections are ignored, so one answer file can be reused
-with different `-Items` selections. Every supplied answer is still checked
-for its type and format. Answers are literal data, never PowerShell code.
+✍️ **Editor hints:** with the `$schema` line, VS Code completes section names and explains every setting while you type.
+💬 **Notes:** add a `"Comment"` to any section or entry to explain it. The tool ignores comments.
 
-#### Generate an answer template
+---
 
-From the tool's root folder:
+## 💬 Restore-Time Input (Placeholders)
 
-```powershell
-New-Item -Path '.\Answers' -ItemType Directory -Force | Out-Null
-& '.\Engine\Scripts\New answer file.ps1' `
-    -ConfigurationFile 'Configurations\Examples\Prompted Setup.json' `
-    -AnswerFile 'Answers\KIOSK01.json'
+Some values differ per computer, such as an IP address or a password. Don't hard-code them, and never store a password in a file you share. Use a **placeholder** instead. The restore asks for the value and fills it in.
+
+### How it looks
+
+Write `{{type:question}}` where the value should go:
+
+```json
+"UserAccounts": [
+  {
+    "Name": "{{input:Name of the local account}}",
+    "Password": "{{password:Password for this account}}"
+  }
+]
 ```
 
-The generator writes each distinct placeholder with `null`, without applying
-settings or asking for answers. It includes shared sections and copied text
-templates with `FillPlaceholders`. Those source files must exist at fixed
-paths so the generator can inspect them. Add `-Items UserAccounts` to generate
-only that section's answers. The destination directory must exist. Existing
-answer files are protected unless you explicitly add `-Force`; that replaces
-their contents with a new empty template.
+On restore, the wizard shows:
 
-Edit the generated file locally, replacing each required `null` with a string.
-The configuration and all source files stay unchanged.
-
-#### Interactive restore with partial answers
-
-```powershell
-& '.\Engine\Scripts\Invoke configuration.ps1' `
-    -ConfigurationFile 'Configurations\Examples\Prompted Setup.json' `
-    -AnswerFile 'Answers\Examples\Prompted Setup.json'
+```text
+  Name of the local account     [ kiosk            ]
+  Password for this account     [ ●●●●●●●●         ]
 ```
 
-This still asks for confirmation, and asks for the missing password after any
-required elevation. Use `-SkipConfirmation` to skip only the initial confirmation.
+The text after the colon is the question you see, so write it the way you would ask a colleague.
 
-#### Unattended restore
+### The five types
 
-Start PowerShell as administrator first when the configuration requires it.
-After filling in your local answer file:
+| Placeholder | Asks for | Example answer |
+| ----------- | -------- | -------------- |
+| `{{input:...}}` | Any text | `kiosk-gent` |
+| `{{password:...}}` | A password, hidden while typing | `●●●●●●●●` |
+| `{{ipv4:...}}` | An IPv4 address | `192.168.1.20` |
+| `{{prefix:...}}` | A subnet prefix length, 1 to 32 | `24` |
+| `{{number:...}}` | A whole number | `30` |
 
-```powershell
-$result = & '.\Engine\Scripts\Invoke configuration.ps1' `
-    -ConfigurationFile 'Configurations\Examples\Prompted Setup.json' `
-    -AnswerFile 'Answers\KIOSK01.json' `
-    -Unattended
+Each answer is checked before anything runs. When a setting allows only certain values, you pick from a list. When it has a range, the allowed range is shown.
 
-if (-not $result.Success) { exit 1 }
+### Good to know
+
+- 🔁 **Asked once, used everywhere:** when the same placeholder appears in several places, you answer it once. The text must match exactly, including capitals.
+- 📋 **All questions up front:** every question is asked in one form before the restore starts. Cancel the form and nothing changes on the computer.
+- 🧱 **The whole value:** a placeholder must be the complete value. `"{{ipv4:Gateway}}"` works, but `"Server {{input:Name}}"` doesn't.
+- 🔒 **Passwords stay secret:** they are hidden while typing and replaced by `[redacted]` in the report.
+- 🧩 **Shared files too:** placeholders work in section files in `Shared\` (see [Reusing sections](#-reusing-sections)).
+- 📝 **Inside copied files:** set `"FillPlaceholders": true` on a `CopyFilesFolders` entry. Then the placeholders anywhere in that text file are filled in on the copy ([example](Shared/Examples/CopyFilesFolders.json)). `{{password:...}}` isn't allowed there, because the password would end up in plain text on the computer.
+- 🤖 **Exports use them too:** an export writes static IP addresses, saved task passwords and secret-looking environment variables as placeholders. That way, restoring on several computers never copies one computer's address or password.
+
+### 🗂️ Answer files: skip the typing
+
+Restoring the same configuration on many computers? Save the answers in an **answer file** in the `Answers` folder:
+
+```json
+{
+  "Comment": "Kiosk in Gent",
+  "Answers": {
+    "{{input:Name of the local account}}": "kiosk-gent",
+    "{{password:Password for this account}}": null
+  }
+}
 ```
 
-`-Unattended` skips confirmation and requires an explicit configuration path;
-it never shows the configuration picker. It suppresses browser opening even
-if `OpenReportInBrowser` is true. It always requires administrator rights,
-whatever `Settings.RunElevated` says: without them it fails with
-instructions before any input is read or any section runs, rather than
-requesting UAC. Restart settings still apply; use `-RebootComputer $false` to override them.
-A validation failure throws before any section runs, and the executor writes a
-failure report. Section failures are reported through `Success: false`, as in
-other restores; check that result in automation as shown above.
+- Each key is the **complete placeholder**, copied exactly from the configuration.
+- `null` means "ask me during the restore". Leave passwords `null`, so they never sit on the USB stick.
+- To create one, open the **Answer file** step in the wizard, type a name and click **Create**. Or run `New answer file.ps1` (see below). Both list every placeholder for you, also those inside copied files.
+- Make one answer file per site or per computer, for example `Answers\Kiosk\Gent\Prompted Setup.json` ([examples](Answers/Examples)).
+- **Unattended** (in the wizard or on the command line) asks nothing. Every answer must then be filled in, otherwise the restore stops before changing anything.
 
-`Invoke scripts.ps1 -Action RestoreSnapshot` also accepts `-AnswerFile` and
-`-Unattended`; these options are rejected on export. Both configuration and
-answer-file relative paths are resolved from the tool's root, not the current
-working directory. When launching PowerShell from Task Scheduler or another
-program, also use PowerShell's `-NoProfile -NonInteractive` options and an
-already elevated account. Custom scripts and installers must themselves be
-configured to run silently; these switches cannot prevent their own UI.
+> ⚠️ A filled-in password is stored in plain text. Protect the file. Git ignores the `Answers` folder, except `Answers\Examples`.
 
-#### Wizard
+---
 
-Store answer files in the `Answers` folder; subfolders are fine, for example
-`Answers\Kiosk\Brussels\Kiosk.json` and `Answers\Kiosk\Gent\Kiosk.json`. The
-**Answer file** step of the Restore tab lists every `*.json` file in `Answers`
-and its subfolders, with:
+## ♻️ Reusing Sections
 
-- its path inside `Answers`, the number of questions of the checked sections
-  it answers (such as `2 of 3`) and its date; click a column header to sort,
-  click it again to reverse. **(None)** asks every question in the next step.
-- files that answer none of the questions, or are not valid answer files,
-  grayed out; they can not be selected. Point at one to see why.
-- **New answer file: Answers\\...** with **Create**, to save an empty answer
-  file for the checked sections, also in a new subfolder. Edit its `null`
-  values in a text editor, then click **Refresh**.
+Instead of data, a section can point to one file, or a list of files, relative to the root folder. A list is combined in order:
 
-With **Unattended** checked on the sections step, only an answer file that
-answers every question can be selected. Unattended also unchecks and disables
-**Open report in browser**. Restart the wizard as administrator first if the
-configuration requests elevation.
-
-> **Passwords in answer files are plain text.** Keep real files in the
-> `Answers` folder: Git ignores everything in it except `Answers/Examples`.
-> Restrict filesystem access and protect any USB copies; Git ignoring is not
-> encryption or access control. Only the file path is passed to the restore
-> process; password answers receive the same report redaction as prompted
-> passwords. The bundled examples deliberately contain no password.
-
-## 💻 Command-Line Use
-
-For scripting or one-off runs, open PowerShell in the root of the USB stick.
-
-Restore a configuration (asks for confirmation; add `-SkipConfirmation` to skip the question, or leave out `-ConfigurationFile` to pick from a list). The old name `-Confirm` still works, so existing shortcuts keep working:
-
-```powershell
-& '.\Engine\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Examples\PC1.json'
+```json
+"Items": {
+  "UserAccounts": "Shared\\UserAccounts Kiosk.json",
+  "RegistryKeys": [
+    "Shared\\RegistryKeys Common.json",
+    "Shared\\RegistryKeys Kiosk.json"
+  ]
+}
 ```
 
-Restore only some sections, and override saved settings for this run:
+Change a shared file once, and every configuration that uses it is updated. See [`Combined Sections.json`](Configurations/Examples/Combined%20Sections.json) and [`Kiosk.json`](Configurations/Examples/Kiosk.json) for working examples.
+
+---
+
+## 🖥️ Command-Line Use
+
+For shortcuts, scripts and deployment tools. Open PowerShell in the root folder.
+
+**Restore** with a picker, then a yes/no question:
 
 ```powershell
-& '.\Engine\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Examples\PC1.json' -Items UserAccounts, Software -RebootComputer $true -RestartDelaySeconds 300
+& '.\Engine\Scripts\Invoke configuration.ps1'
 ```
 
-Export this computer to a new configuration file (add `-Force` to overwrite an existing file):
+**Restore** a specific file without the yes/no question:
 
 ```powershell
-& '.\Engine\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\KIOSK01.json' -Items RegionalSettings, UserAccounts, FirewallRules
+& '.\Engine\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Kiosk.json' -SkipConfirmation
 ```
 
-Export the scheduled tasks of other Task Scheduler folders than the default `\HC\` (subfolders are included):
+**Restore unattended**, with only some sections. Run this from an administrator window:
 
 ```powershell
-& '.\Engine\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\KIOSK01.json' -Items ScheduledTasks -ExportOptions @{ ScheduledTasks = @{ TaskPath = '\HC\', '\Vendor\' } }
+& '.\Engine\Scripts\Invoke configuration.ps1' -ConfigurationFile 'Configurations\Kiosk.json' `
+    -AnswerFile 'Answers\Kiosk\Gent.json' -Items UserAccounts, NetworkCards -Unattended
 ```
 
-`Invoke scripts.ps1` is the engine behind everything else. It returns an object with `Success`, `ReportFile` and per-section `Results`, so you can check the outcome from your own scripts.
+**Create an answer file** with every placeholder set to `null`:
+
+```powershell
+& '.\Engine\Scripts\New answer file.ps1' -ConfigurationFile 'Configurations\Kiosk.json' -AnswerFile 'Answers\Kiosk.json'
+```
+
+**Export** without the wizard, here with scheduled tasks from two Task Scheduler folders:
+
+```powershell
+& '.\Engine\Scripts\Invoke scripts.ps1' -Action CreateSnapshot -ConfigurationFile 'Configurations\This PC.json' `
+    -Items ScheduledTasks, FirewallRules -ExportOptions @{ ScheduledTasks = @{ TaskPath = '\HC\', '\Vendor\' } }
+```
+
+Useful restore options: `-RebootComputer $true`, `-RestartDelaySeconds 30` and `-OpenReportInBrowser $false` override the configuration's settings for one run.
+
+> 🔗 **One-click restore:** see the shortcuts in `Configurations\Examples`, such as `Restore PC1 Immediately.lnk`. Copy one and change the file name to make your own.
+
+---
+
+## 💡 Tips
+
+- **Start from an example:** `Configurations\Examples` has ready-made setups for a kiosk, office PC, production PC and Remote Desktop.
+- **Be descriptive:** name configurations clearly (`Kiosk PC for app X`) and fill in `Description`. You'll thank yourself months later.
+- **Test first:** restore on a test computer or virtual machine before you roll out.
+- **Read the report:** every run writes one to `Log`. It shows what changed and which entries failed.
+- **Upgrading from an older version?** See [Upgrading](Engine/README.MD#-upgrading-from-an-older-version) and the [version history](Engine/VERSION.MD).

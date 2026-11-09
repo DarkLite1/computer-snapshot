@@ -134,7 +134,9 @@ function Write-SnapshotReportHC {
         [string]$ReportsFolder,
         [string]$Action,
         [string]$ConfigurationFile,
-        $Results
+        $Results,
+        # Export only: the configuration file was saved
+        [bool]$ConfigurationWritten
     )
 
     $folderParams = @{
@@ -172,34 +174,159 @@ function Write-SnapshotReportHC {
         $suffix++
     }
 
+    $encode = { [System.Net.WebUtility]::HtmlEncode([string]$args[0]) }
+    $statusClass = {
+        switch ($args[0]) {
+            'Success' { 'ok' }
+            'Failed' { 'fail' }
+            'Warning' { 'warn' }
+            default { 'skip' }
+        }
+    }
+    $labels = Get-SnapshotSectionLabelsHC
+
     $rows = foreach ($result in $Results) {
-        $item = [System.Net.WebUtility]::HtmlEncode($result.Name)
-        $status = [System.Net.WebUtility]::HtmlEncode($result.Status)
+        $item = & $encode $result.Name
+        if (
+            $labels.ContainsKey([string]$result.Name) -and
+            $labels[$result.Name][0] -ne $result.Name
+        ) {
+            $item = (
+                (& $encode $labels[$result.Name][0]) +
+                "<span class=`"name`">$item</span>"
+            )
+        }
+
         $messages = @(
             $result.Messages | ForEach-Object {
-                '<li>' +
-                [System.Net.WebUtility]::HtmlEncode([string]$_) +
-                '</li>'
+                $class = if ([string]$_ -like 'ERROR:*') { ' class="err"' }
+                "<li$class>" + (& $encode $_) + '</li>'
             }
         ) -join ''
+        if (-not $messages) {
+            $messages = '<li class="none">No messages</li>'
+        }
 
-        "<tr><th>$item</th><td>$status</td><td><ul>$messages</ul></td></tr>"
+        ('<tr><td class="item">{0}</td><td><span class="badge {1}">{2}' +
+            '</span></td><td><ul>{3}</ul></td></tr>') -f (
+            $item, (& $statusClass $result.Status),
+            (& $encode $result.Status), $messages
+        )
     }
 
-    $title = [System.Net.WebUtility]::HtmlEncode("$Action - $ConfigurationFile")
+    $counts = @(
+        foreach ($status in @(
+                @('Success', 'succeeded'), @('Failed', 'failed'),
+                @('Warning', 'with warnings'), @('Skipped', 'skipped')
+            )) {
+            $count = @($Results | Where-Object Status -EQ $status[0]).Count
+            if ($count) {
+                '<span class="badge {0}">{1} {2}</span>' -f (
+                    (& $statusClass $status[0]), $count, $status[1]
+                )
+            }
+        }
+    ) -join ' '
+
+    # @() directly on the caller's generic List fails: 'Argument types do
+    # not match'
+    $ran = @($Results | Where-Object { $_ }).Count
+    $overall, $overallClass = if (-not $ran) {
+        'Nothing ran', 'skip'
+    }
+    elseif (@($Results | Where-Object Status -EQ 'Failed').Count) {
+        'Completed with errors', 'fail'
+    }
+    elseif (@($Results | Where-Object Status -EQ 'Warning').Count) {
+        'Completed with warnings', 'warn'
+    }
+    else {
+        'Completed successfully', 'ok'
+    }
+
+    $file = & $encode $ConfigurationFile
+    if ([IO.Path]::IsPathRooted($ConfigurationFile)) {
+        $file = '<a href="{0}">{1}</a>' -f (
+            (& $encode ([Uri]$ConfigurationFile).AbsoluteUri), $file
+        )
+    }
+
+    $note = ''
+    if ($operation -eq 'Export') {
+        if ($ConfigurationWritten) {
+            $fileLabel = 'Saved to'
+            $note = (
+                '<p class="note">The exported configuration is a plain ' +
+                'JSON file. Open it in a text editor, such as Visual Studio ' +
+                'Code, to review or edit it before restoring it on another ' +
+                'computer. Sections that failed are exported empty, so ' +
+                'they can be filled in by hand.</p>'
+            )
+        }
+        else {
+            $fileLabel = 'Not saved'
+        }
+    }
+    else {
+        $fileLabel = 'Configuration'
+    }
+
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $details = @(
+        @('Computer', (& $encode $env:COMPUTERNAME)),
+        @('User', (& $encode $identity)),
+        @('Date', (& $encode ([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss')))),
+        @($fileLabel, $file),
+        @('Sections', $counts)
+    ) | ForEach-Object { "<tr><th>$($_[0])</th><td>$($_[1])</td></tr>" }
+
+    $title = & $encode "$operation report - $configurationName"
     $style = (
-        'body{font-family:Segoe UI,sans-serif;margin:2rem}' +
+        'body{font-family:"Segoe UI",sans-serif;margin:0;background:#f3f4f6;' +
+        'color:#1f2937}' +
+        'main{max-width:1000px;margin:2rem auto;padding:0 1rem}' +
+        'header{background:#0f4c81;color:#fff;padding:1.5rem 2rem;' +
+        'border-radius:8px 8px 0 0}' +
+        'header h1{margin:0;font-size:1.6rem;font-weight:600}' +
+        'header p{margin:.3rem 0 0;opacity:.85}' +
+        'section{background:#fff;padding:1.5rem 2rem;margin-bottom:1rem;' +
+        'box-shadow:0 1px 3px rgba(0,0,0,.1)}' +
+        'section.first{border-radius:0 0 8px 8px}' +
+        'section:last-child{border-radius:8px}' +
+        'h2{font-size:1.1rem;margin:0 0 1rem}' +
         'table{border-collapse:collapse;width:100%}' +
-        'td,th{padding:0.6rem;border:1px solid #bbb;text-align:left;' +
-        'vertical-align:top}' +
-        'ul{margin:0}'
+        'th,td{padding:.55rem .7rem;text-align:left;vertical-align:middle;' +
+        'border-bottom:1px solid #e5e7eb}' +
+        'table.details th{width:9rem;color:#6b7280;font-weight:600}' +
+        'thead th{background:#f9fafb;color:#374151}' +
+        'a{color:#0f4c81;word-break:break-all}' +
+        '.item{font-weight:600}' +
+        '.name{display:block;font-weight:400;font-size:.8rem;color:#6b7280}' +
+        'ul{margin:0;padding-left:1.1rem}' +
+        'li.err{color:#b3261e}li.none{color:#9ca3af;list-style:none;' +
+        'margin-left:-1.1rem}' +
+        '.badge{display:inline-block;padding:.15rem .6rem;border-radius:999px;' +
+        'font-size:.85rem;font-weight:600;white-space:nowrap}' +
+        '.ok{background:#e6f4ea;color:#1e7e34}' +
+        '.fail{background:#fce8e6;color:#b3261e}' +
+        '.warn{background:#fff4e5;color:#8a5a00}' +
+        '.skip{background:#eef0f3;color:#4b5563}' +
+        '.note{margin:1rem 0 0;padding:.8rem 1rem;background:#eef5fb;' +
+        'border-left:4px solid #0f4c81;border-radius:4px}'
     )
     $html = (
-        '<!doctype html><html><head><meta charset="utf-8"><title>' +
-        $title + '</title><style>' + $style + '</style></head><body><h1>' +
-        $title + '</h1><table><thead><tr><th>Item</th><th>Status</th>' +
-        '<th>Messages</th></tr></thead><tbody>' + ($rows -join '') +
-        '</tbody></table></body></html>'
+        '<!doctype html><html><head><meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        "<title>$title</title><style>$style</style></head><body><main>" +
+        "<header><h1>$operation report</h1><p>" +
+        (& $encode $configurationName) + '</p></header>' +
+        '<section class="first"><h2>Summary <span class="badge ' +
+        "$overallClass`">$overall</span></h2>" +
+        '<table class="details">' + ($details -join '') + '</table>' +
+        $note + '</section>' +
+        '<section><h2>Sections</h2><table><thead><tr><th>Section</th>' +
+        '<th>Status</th><th>Messages</th></tr></thead><tbody>' +
+        ($rows -join '') + '</tbody></table></section></main></body></html>'
     )
 
     $encoding = New-Object System.Text.UTF8Encoding $false
@@ -799,6 +926,8 @@ function Invoke-ComputerSnapshotHC {
 
     Write-Progress -Activity $Action -Completed
 
+    $isWritten = $false
+
     #region Single-file export
     if ($Action -eq 'CreateSnapshot' -and $exported) {
         $document = [ordered]@{
@@ -815,8 +944,6 @@ function Invoke-ComputerSnapshotHC {
             }
             Items         = $exportItems
         }
-
-        $isWritten = $false
 
         try {
             $writeParams = @{
@@ -931,8 +1058,9 @@ function Invoke-ComputerSnapshotHC {
     $reportParams = @{
         ReportsFolder     = $ReportsFolder
         Action            = $Action
-        ConfigurationFile = $configurationPath
-        Results           = $results
+        ConfigurationFile    = $configurationPath
+        Results              = $results
+        ConfigurationWritten = $isWritten
     }
     $report = Write-SnapshotReportHC @reportParams
 

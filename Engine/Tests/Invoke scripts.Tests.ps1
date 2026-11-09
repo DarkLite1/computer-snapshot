@@ -64,6 +64,59 @@ Describe 'Readable report filenames' {
             Should -BeExactly $original
         }
     }
+    It ('shows who exported, when, where the file is saved and that it ' +
+        'can be edited') {
+        InModuleScope Execution -Parameters @{ ReportFolder = $TestDrive } {
+            $reportParams = @{
+                ReportsFolder        = $ReportFolder
+                Action               = 'CreateSnapshot'
+                ConfigurationFile    = 'C:\Configurations\PC 1 & co.json'
+                ConfigurationWritten = $true
+                Results              = @(
+                    [pscustomobject]@{
+                        Name = 'UserAccounts'; Status = 'Success'
+                        Messages = @('Exported <2> accounts')
+                    }
+                    [pscustomobject]@{
+                        Name = 'MyCustomItem'; Status = 'Failed'
+                        Messages = @('ERROR: broken')
+                    }
+                )
+            }
+            $html = Get-Content -LiteralPath (
+                Write-SnapshotReportHC @reportParams
+            ) -Raw
+
+            $html | Should -Not -Match 'CreateSnapshot'
+            $html | Should -Match '<h1>Export report</h1>'
+            $html | Should -Match '<p>PC 1 &amp; co</p>'
+            $html | Should -Match ([regex]::Escape(
+                [Security.Principal.WindowsIdentity]::GetCurrent().Name))
+            $html | Should -Match "<td>$env:COMPUTERNAME</td>"
+            $html | Should -Match '<th>Date</th><td>\d{4}-\d\d-\d\d \d\d:\d\d'
+            $html | Should -Match '<th>Saved to</th><td><a href="file:///'
+            $html | Should -Match 'C:\\Configurations\\PC 1 &amp; co.json</a>'
+            $html | Should -Match 'can be edited|edit it'
+            $html | Should -Match 'User accounts<span class="name">UserAccounts'
+            $html | Should -Match 'Exported &lt;2&gt; accounts'
+            $html | Should -Match '<li class="err">ERROR: broken'
+            $html | Should -Match 'Completed with errors'
+
+            $reportParams.ConfigurationWritten = $false
+            $html = Get-Content -LiteralPath (
+                Write-SnapshotReportHC @reportParams
+            ) -Raw
+            $html | Should -Match '<th>Not saved</th>'
+            $html | Should -Not -Match 'class="note"'
+
+            $reportParams.Action = 'RestoreSnapshot'
+            $html = Get-Content -LiteralPath (
+                Write-SnapshotReportHC @reportParams
+            ) -Raw
+            $html | Should -Match '<h1>Restore report</h1>'
+            $html | Should -Match '<th>Configuration</th>'
+        }
+    }
 }
 
 Describe 'Prompted password output protection' {

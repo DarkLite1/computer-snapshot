@@ -15,6 +15,12 @@ function Get-RestoreInputFieldsHC {
         )
         $match = [regex]::Match($Data, $pattern)
 
+        $incomplete = (
+            "${Path}: use a complete {{input:Description}}, " +
+            '{{password:Description}}, {{ipv4:Description}}, ' +
+            '{{prefix:Description}} or {{number:Description}} string.'
+        )
+
         if (
             $match.Success -and
             -not [string]::IsNullOrWhiteSpace(
@@ -28,17 +34,64 @@ function Get-RestoreInputFieldsHC {
                 Description = $match.Groups['Description'].Value.Trim()
                 Container   = $Container
                 Key         = $Key
+                Embedded    = $false
             }
+
+            return
         }
-        elseif (
-            $Data.StartsWith('{{') -or
-            $Data -match '\{\{(?:input|password|ipv4|prefix|number):'
-        ) {
-            throw (
-                "${Path}: use a complete {{input:Description}}, " +
-                '{{password:Description}}, {{ipv4:Description}}, ' +
-                '{{prefix:Description}} or {{number:Description}} string.'
+
+        # Placeholders combined with other text, such as 'Kiosk of
+        # {{input:Site}}'; only text answers fit inside text
+        $complete = [regex]::Matches(
+            $Data,
+            (
+                '\{\{(?<Kind>input|password|ipv4|prefix|number):' +
+                '(?<Description>[^{}\r\n]+)\}\}'
             )
+        )
+        $started = [regex]::Matches(
+            $Data,
+            '\{\{(?:input|password|ipv4|prefix|number):'
+        )
+
+        if (-not $started.Count) {
+            if ($Data.StartsWith('{{')) {
+                throw $incomplete
+            }
+
+            return
+        }
+
+        if ($started.Count -ne $complete.Count) {
+            throw $incomplete
+        }
+
+        foreach ($embedded in $complete) {
+            $kind = $embedded.Groups['Kind'].Value
+            $description = $embedded.Groups['Description'].Value
+
+            if ([string]::IsNullOrWhiteSpace($description)) {
+                throw $incomplete
+            }
+
+            if ($kind -notin @('input', 'ipv4')) {
+                throw (
+                    "${Path}: {{${kind}:Description}} must be the whole " +
+                    'value. Only {{input:...}} and {{ipv4:...}} can be ' +
+                    'combined with other text.'
+                )
+            }
+
+            [pscustomobject]@{
+                Path        = $Path
+                Placeholder = $embedded.Value
+                Kind        = $kind
+                Description = $description.Trim()
+                Container   = $Container
+                Key         = $Key
+                Embedded    = $true
+                Text        = $Data
+            }
         }
 
         return
@@ -502,8 +555,9 @@ function Get-RestoreInputQuestionHC {
         $section = Get-RestoreInputSectionHC -Path $field.Path
         $rule = $null
 
-        # A placeholder in a file is text; the schema does not describe it
-        if ($null -ne $field.Container) {
+        # A placeholder in a file or inside other text is text; the schema
+        # does not describe it
+        if ($null -ne $field.Container -and -not $field.Embedded) {
             if ($null -eq $schema) {
                 $schemaParams = @{
                     LiteralPath = "$PSScriptRoot\..\Schemas\config.schema.json"
@@ -1333,7 +1387,7 @@ function Read-RestoreAnswerFileHC {
             $node.LocalName
         }
         $field = @(Get-RestoreInputFieldsHC -Data $key)
-        if ($field.Count -ne 1) {
+        if ($field.Count -ne 1 -or $field[0].Embedded) {
             throw (
                 "Answer file '$Path': every answer key must be a complete " +
                 'placeholder.'
@@ -1467,8 +1521,9 @@ function Test-ConfigurationBeforeInputHC {
         Check a configuration before restore-time input is asked for.
     .DESCRIPTION
         Returns the problems of Test-ConfigurationHC, except those of a value
-        that is still a complete placeholder, such as {{prefix:...}} where a
-        number is expected or {{ipv4:...}} in a path. Those are checked again
+        that still holds a placeholder, such as {{prefix:...}} where a
+        number is expected, {{ipv4:...}} in a path or a host name such as
+        'kiosk-{{input:Site}}'. Those are checked again
         after the answers are filled in. This way nobody types answers for a
         configuration that cannot be restored anyway.
     #>
@@ -1612,16 +1667,37 @@ function Resolve-RestoreInputHC {
             continue
         }
 
-        # Prefix lengths and whole numbers are numbers in the configuration
-        $answer = switch ($field.Kind) {
-            'prefix' {
-                [int]$answers[$field.Placeholder]
-            }
-            'number' {
-                ConvertTo-RestoreInputNumberHC $answers[$field.Placeholder]
-            }
-            default {
-                $answers[$field.Placeholder]
+        $answer = if ($field.Embedded) {
+            # Fill in every placeholder of the original text at once, so an
+            # answer that looks like a placeholder is never filled in again
+            $parts = [regex]::Split(
+                $field.Text,
+                '(\{\{(?:input|ipv4):[^{}\r\n]+\}\})'
+            )
+            -join @(
+                foreach ($part in $parts) {
+                    if ($answers.ContainsKey($part)) {
+                        $answers[$part]
+                    }
+                    else {
+                        $part
+                    }
+                }
+            )
+        }
+        else {
+            # Prefix lengths and whole numbers are numbers in the
+            # configuration
+            switch ($field.Kind) {
+                'prefix' {
+                    [int]$answers[$field.Placeholder]
+                }
+                'number' {
+                    ConvertTo-RestoreInputNumberHC $answers[$field.Placeholder]
+                }
+                default {
+                    $answers[$field.Placeholder]
+                }
             }
         }
 

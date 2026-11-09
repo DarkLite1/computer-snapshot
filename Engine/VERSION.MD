@@ -23,7 +23,7 @@ Changed sections:
 - Every section reports failures per entry in `Errors` and keeps going with the other entries.
 
 Restore and wizard:
-- Restore-time input with `{{input}}`, `{{password}}`, `{{ipv4}}`, `{{prefix}}` and `{{number}}` placeholders, also inside copied files, answered in one form or from answer files in `Answers\`, also unattended.
+- Restore-time input with `{{input}}`, `{{password}}`, `{{ipv4}}`, `{{prefix}}` and `{{number}}` placeholders, also inside copied files, answered in one form or from answer files in `Answers\`, also unattended. `{{input}}` and `{{ipv4}}` can be combined with other text, such as `Kiosk account of {{input:Site name}}`.
 - The wizard restores in steps: configuration, sections, answer file, questions and review, and lists configurations in subfolders.
 - A section can be built from several files in `Shared\`.
 - Ready-made examples for Remote Desktop, kiosk auto logon, File Explorer and Windows suggestions, and example configurations for a kiosk, office PC, production PC and Remote Desktop.

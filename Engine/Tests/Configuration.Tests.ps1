@@ -60,9 +60,10 @@ Describe 'Restore input placeholders' {
         $items.UserAccounts[0].Name | Should -Be '{{input:Name}}'
         $items.UserAccounts[0].Password | Should -Be '{{password:Password}}'
     }
-    It 'rejects malformed or embedded placeholders before requesting values' {
+    It 'rejects malformed placeholders before requesting values' {
         $placeholders = @(
-            '{{input: }}', '{{unknown:Name}}', 'prefix {{input:Name}}'
+            '{{input: }}', '{{unknown:Name}}', 'prefix {{input: }}',
+            'prefix {{input:Name'
         )
         foreach ($placeholder in $placeholders) {
             {
@@ -71,6 +72,61 @@ Describe 'Restore input placeholders' {
                 }
             } | Should -Throw '*complete*'
         }
+    }
+    It ('fills in input and IPv4 placeholders combined with other text, ' +
+        'asking each placeholder once') {
+        $items = (
+            '{"UserAccounts":[{"Name":"{{input:Site}}",' +
+            '"Description":"Kiosk account of {{input:Site}}"}],' +
+            '"CreateFolders":{"FolderPaths":' +
+            '["C:\\Sites\\{{input:Site}}\\{{input:Lane}}"]},' +
+            '"HostsFileEntries":[{"IPAddress":"{{ipv4:Printer}}",' +
+            '"Hostnames":["printer-{{input:Site}}"]}],' +
+            '"Other":{"Url":"http://{{ipv4:Printer}}:631/{{input:Lane}}"}}'
+        ) | ConvertFrom-Json
+        $fakeAnswers = @{
+            '{{input:Site}}'   = 'gent'
+            '{{input:Lane}}'   = '{{input:Site}}'
+            '{{ipv4:Printer}}' = '192.0.2.10'
+        }
+        $script:asked = @()
+        $readValues = New-FakeReadValuesHC {
+            param($field)
+            $script:asked += $field.Placeholder
+            $fakeAnswers[$field.Placeholder]
+        }
+
+        $null = Resolve-RestoreInputHC -Items $items -ReadValues $readValues
+
+        $asked.Count | Should -Be 3
+        $items.UserAccounts[0].Name | Should -BeExactly 'gent'
+        $items.UserAccounts[0].Description |
+            Should -BeExactly 'Kiosk account of gent'
+        $items.CreateFolders.FolderPaths[0] |
+            Should -BeExactly 'C:\Sites\gent\{{input:Site}}' -Because (
+                'an answer is never filled in again'
+            )
+        $items.HostsFileEntries[0].Hostnames[0] |
+            Should -BeExactly 'printer-gent'
+        $items.Other.Url | Should -BeExactly 'http://192.0.2.10:631/{{input:Site}}'
+    }
+    It 'refuses a <Kind> placeholder combined with other text' -ForEach @(
+        @{ Kind = 'password' }
+        @{ Kind = 'number' }
+        @{ Kind = 'prefix' }
+    ) {
+        {
+            Get-RestoreInputFieldsHC -Data @{
+                A = "x {{${Kind}:Value}}"
+            }
+        } | Should -Throw "*{{${Kind}:Description}} must be the whole value*"
+    }
+    It 'refuses a password combined with text even next to allowed ones' {
+        {
+            Get-RestoreInputFieldsHC -Data @{
+                A = '{{input:User}}:{{password:Secret}}'
+            }
+        } | Should -Throw '*{{password:Description}} must be the whole value*'
     }
     It ('validates required values and canonical IPv4 addresses without ' +
         'exposing the value') {
@@ -272,6 +328,21 @@ Describe 'Restore input questions and their rules' {
         $schema = Get-Content -Raw -LiteralPath (
             "$PSScriptRoot\..\Schemas\config.schema.json"
         ) | ConvertFrom-Json
+    }
+    It 'gives no list of values to a placeholder inside other text' {
+        $items = @{
+            Services = @(
+                @{ Name = 'A'; StartupType = '{{input:Startup type}}' }
+                @{ Name = 'B'; StartupType = 'Auto{{input:Suffix}}' }
+            )
+        }
+        $fields = @(Get-RestoreInputFieldsHC -Data $items)
+
+        $questions = @(Get-RestoreInputQuestionHC -Fields $fields)
+
+        $questions[0].Rule.Values | Should -Contain 'Automatic'
+        $questions[1].Placeholder | Should -BeExactly '{{input:Suffix}}'
+        $questions[1].Rule | Should -BeNullOrEmpty
     }
     It 'finds the range of <Path>' -ForEach @(
         @{

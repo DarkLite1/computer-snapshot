@@ -118,6 +118,12 @@ Describe 'Answer file reading and resolution' {
             Should -Match '\{\{password:Password\}\}'
         ($items | ConvertTo-Json -Depth 10) | Should -BeExactly $before
     }
+    It 'refuses an answer key with text around the placeholder' {
+        '{"Answers":{"Kiosk {{input:Account}}":"Example"}}' |
+            Set-Content -LiteralPath $answerPath
+        { Read-RestoreAnswerFileHC $answerPath } |
+            Should -Throw '*every answer key must be a complete placeholder*'
+    }
     It 'matches complete placeholder keys exactly, including case' {
         '{"Answers":{"{{input:account}}":"Example"}}' |
             Set-Content -LiteralPath $answerPath
@@ -355,6 +361,26 @@ Describe 'Test-ConfigurationBeforeInputHC' {
         $problems.Count | Should -Be 1 -Because ($problems -join '; ')
         $problems[0] |
             Should -BeLike "*Install[[]1].ExecutablePath: file 'Missing*"
+    }
+    It 'leaves a host name with a placeholder inside it for later' {
+        $configuration = @{
+            SchemaVersion = 3
+            Items         = @{
+                HostsFileEntries = @(
+                    @{
+                        IPAddress = '192.0.2.10'
+                        Hostnames = @('printer-{{input:Site}}', 'bad name')
+                    }
+                )
+            }
+        }
+
+        $problems = @(
+            Test-ConfigurationBeforeInputHC $configuration $TestDrive
+        )
+
+        $problems.Count | Should -Be 1 -Because ($problems -join '; ')
+        $problems[0] | Should -BeLike "*Hostnames[[]1]: 'bad name'*"
     }
     It 'leaves a registry value that is still a placeholder for later' {
         $configuration = @{

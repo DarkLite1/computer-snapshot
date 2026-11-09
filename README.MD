@@ -168,21 +168,38 @@ The text after the colon is the question you see, so write it the way you would 
 
 Each answer is checked before anything runs. When a setting allows only certain values, you pick from a list. When it has a range, the allowed range is shown.
 
+### Combine with text
+
+`{{input:...}}` and `{{ipv4:...}}` can sit inside other text. Ask for a short answer once and reuse it in every place you need it:
+
+```json
+"Description": "Kiosk account of {{input:Site name}}",
+"FolderPaths": ["D:\\Sites\\{{input:Site name}}\\Logs"],
+"Hostnames": ["printer-{{input:Site name}}"],
+"Arguments": "/S /SERVER={{ipv4:Print server}}"
+```
+
+Answer `gent` and `192.0.2.10` once, and you get `Kiosk account of gent`, `D:\Sites\gent\Logs`, `printer-gent` and `/S /SERVER=192.0.2.10`.
+
+`{{password:...}}`, `{{number:...}}` and `{{prefix:...}}` must be the **whole value**, with nothing else between the quotes:
+
+```text
+"Password": "{{password:Password for this account}}"      ✅ only the placeholder
+"Password": "Pwd-{{password:Last part}}"                    ❌ a password with text
+"TimeoutMinutes": "{{number:Minutes}}"                      ✅ becomes a real number, such as 30
+"TimeoutMinutes": "{{number:Minutes}}0"                     ❌ a number with text
+```
+
+A password stays whole, so it is redacted reliably and can't end up in descriptions or paths. A number or prefix stays whole, because the setting needs a real number, not text.
+
 ### Good to know
 
 - 🔁 **Asked once, used everywhere:** when the same placeholder appears in several places, you answer it once. The text must match exactly, including capitals.
 - 📋 **All questions up front:** every question is asked in one form before the restore starts. Cancel the form and nothing changes on the computer.
-- 🧱 **Nothing else between the quotes:** in a configuration, the placeholder replaces the whole value. You can't mix it with other text:
-
-  ```text
-  "Description": "{{input:Description of this account}}"      ✅ only the placeholder
-  "Description": "Kiosk account of {{input:Site name}}"       ❌ text and a placeholder
-  ```
-
-  Need the extra text? Ask for the complete value instead, such as `{{input:Description, such as Kiosk account of Gent}}`. Only [copied files](#inside-copied-files) can mix text and placeholders.
+- ✔️ **Checked after filling in:** a value with a placeholder inside it is checked once the answers are filled in. When the result isn't valid for that setting, such as a host name with a space, the restore stops before changing anything.
 - 🔒 **Passwords stay secret:** they are hidden while typing and replaced by `[redacted]` in the report.
 - 🧩 **Shared files too:** placeholders work in section files in `Shared\` (see [Reusing sections](#-reusing-sections)).
-- <a id="inside-copied-files"></a>📝 **Inside copied files:** set `"FillPlaceholders": true` on a `CopyFilesFolders` entry. Then the placeholders anywhere in that text file are filled in on the copy ([example](Shared/Examples/CopyFilesFolders.json)). `{{password:...}}` isn't allowed there, because the password would end up in plain text on the computer.
+- <a id="inside-copied-files"></a>📝 **Inside copied files:** set `"FillPlaceholders": true` on a `CopyFilesFolders` entry. Then the placeholders anywhere in that text file are filled in on the copy ([example](Shared/Examples/CopyFilesFolders.json)). In a file, `{{number:...}}` and `{{prefix:...}}` can also sit inside text. `{{password:...}}` isn't allowed, because the password would end up in plain text on the computer.
 - 🤖 **Exports use them too:** an export writes static IP addresses, saved task passwords and secret-looking environment variables as placeholders. That way, restoring on several computers never copies one computer's address or password.
 
 ### 🗂️ Answer files: skip the typing
@@ -199,7 +216,7 @@ Restoring the same configuration on many computers? Save the answers in an **ans
 }
 ```
 
-- Each key is the **complete placeholder**, copied exactly from the configuration.
+- Each key is the **placeholder only**, copied exactly from the configuration. For `"Kiosk account of {{input:Site name}}"` the key is `"{{input:Site name}}"`.
 - `null` means "ask me during the restore". Leave passwords `null`, so they never sit on the USB stick.
 - To create one, open the **Answer file** step in the wizard, type a name and click **Create**. Or run `New answer file.ps1` (see below). Both list every placeholder for you, also those inside copied files.
 - Make one answer file per site or per computer, for example `Answers\Kiosk\Gent\Prompted Setup.json` ([examples](Answers/Examples)).

@@ -172,10 +172,17 @@ Each answer is checked before anything runs. When a setting allows only certain 
 
 - 🔁 **Asked once, used everywhere:** when the same placeholder appears in several places, you answer it once. The text must match exactly, including capitals.
 - 📋 **All questions up front:** every question is asked in one form before the restore starts. Cancel the form and nothing changes on the computer.
-- 🧱 **The whole value:** a placeholder must be the complete value. `"{{ipv4:Gateway}}"` works, but `"Server {{input:Name}}"` doesn't.
+- 🧱 **Nothing else between the quotes:** in a configuration, the placeholder replaces the whole value. You can't mix it with other text:
+
+  ```text
+  "Description": "{{input:Description of this account}}"      ✅ only the placeholder
+  "Description": "Kiosk account of {{input:Site name}}"       ❌ text and a placeholder
+  ```
+
+  Need the extra text? Ask for the complete value instead, such as `{{input:Description, such as Kiosk account of Gent}}`. Only [copied files](#inside-copied-files) can mix text and placeholders.
 - 🔒 **Passwords stay secret:** they are hidden while typing and replaced by `[redacted]` in the report.
 - 🧩 **Shared files too:** placeholders work in section files in `Shared\` (see [Reusing sections](#-reusing-sections)).
-- 📝 **Inside copied files:** set `"FillPlaceholders": true` on a `CopyFilesFolders` entry. Then the placeholders anywhere in that text file are filled in on the copy ([example](Shared/Examples/CopyFilesFolders.json)). `{{password:...}}` isn't allowed there, because the password would end up in plain text on the computer.
+- <a id="inside-copied-files"></a>📝 **Inside copied files:** set `"FillPlaceholders": true` on a `CopyFilesFolders` entry. Then the placeholders anywhere in that text file are filled in on the copy ([example](Shared/Examples/CopyFilesFolders.json)). `{{password:...}}` isn't allowed there, because the password would end up in plain text on the computer.
 - 🤖 **Exports use them too:** an export writes static IP addresses, saved task passwords and secret-looking environment variables as placeholders. That way, restoring on several computers never copies one computer's address or password.
 
 ### 🗂️ Answer files: skip the typing

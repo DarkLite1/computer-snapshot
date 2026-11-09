@@ -1087,10 +1087,6 @@ function Show-RestoreWizardStepHC {
         $Step -eq 'Configuration'
     (Find-RestoreWizardControlHC $Wizard 'ReloadAnswerFile').Visible =
         $Step -eq 'Questions' -and [bool]$state.AnswerFile
-    foreach ($name in @('SelectAll', 'ClearAll')) {
-        (Find-RestoreWizardControlHC $Wizard $name).Visible =
-            $Step -eq 'Sections'
-    }
 
     # Only the questions step may enable Next for the answers
     if ($null -ne $state.AnswerGrid) {
@@ -1189,7 +1185,7 @@ function Set-RestoreWizardConfigurationHC {
         $sectionsHost.Controls.Remove($old)
         $old.Dispose()
     }
-    $list = New-SnapshotItemListHC -Entries $entries
+    $list = New-SnapshotItemListHC -Entries $entries -SelectAllHeader
     $list.Add_ItemChecked({
         Update-RestoreWizardButtonsHC -Wizard (Get-RestoreWizardHC $this)
     })
@@ -2892,35 +2888,7 @@ function New-RestoreWizardHC {
         }
     })
 
-    $clear = New-Object Windows.Forms.Button
-    $clear.Name = 'ClearAll'
-    $clear.Text = 'Clear all'
-    $clear.Size = New-Object Drawing.Size 100, 34
-    $clear.Add_Click({
-        $owner = Get-RestoreWizardHC $this
-        $checkParams = @{
-            ItemList = Find-RestoreWizardControlHC $owner 'SnapshotItems'
-            Checked  = $false
-        }
-        Set-SnapshotItemsCheckedHC @checkParams
-    })
-
-    $all = New-Object Windows.Forms.Button
-    $all.Name = 'SelectAll'
-    $all.Text = 'Select all'
-    $all.Size = New-Object Drawing.Size 100, 34
-    $all.Add_Click({
-        $owner = Get-RestoreWizardHC $this
-        $checkParams = @{
-            ItemList = Find-RestoreWizardControlHC $owner 'SnapshotItems'
-            Checked  = $true
-        }
-        Set-SnapshotItemsCheckedHC @checkParams
-    })
-
-    $buttons.Controls.AddRange(
-        @($next, $back, $reload, $refresh, $clear, $all)
-    )
+    $buttons.Controls.AddRange(@($next, $back, $reload, $refresh))
     $wizard.Controls.Add($buttons, 0, 2)
     #endregion
 

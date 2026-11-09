@@ -1030,7 +1030,7 @@ Describe 'Restore wizard' {
         (& $find 'SectionsStep').Visible | Should -BeTrue
         (& $find 'ConfigurationDescription').Text | Should -Be 'Prompted kiosk'
         (& $find 'RefreshConfigurations').Visible | Should -BeFalse
-        (& $find 'SelectAll').Visible | Should -BeTrue
+        (& $find 'SnapshotItems').OwnerDraw | Should -BeTrue
         (& $find 'WizardBack').Enabled | Should -BeTrue
 
         (& $find 'WizardBack').PerformClick()
@@ -1067,13 +1067,25 @@ Describe 'Restore wizard' {
         $software.Checked = $true
         $software.Checked | Should -BeFalse
 
-        (& $find 'ClearAll').PerformClick()
+        $flags = [Reflection.BindingFlags]'Instance, NonPublic'
+        $onColumnClick = [Windows.Forms.ListView].GetMethod(
+            'OnColumnClick', $flags
+        )
+        $clickHeader = {
+            $arguments = [object[]]@(
+                [Windows.Forms.ColumnClickEventArgs]::new(0)
+            )
+            $null = $onColumnClick.Invoke($list, $arguments)
+        }
+
+        & $clickHeader
+        $list.CheckedItems.Count | Should -Be 0
         $next.Enabled | Should -BeFalse
         if (-not [Windows.Forms.SystemInformation]::HighContrast) {
             $next.BackColor | Should -Be ([Drawing.SystemColors]::Control)
         }
 
-        (& $find 'SelectAll').PerformClick()
+        & $clickHeader
         @($list.CheckedItems | ForEach-Object Tag) |
             Should -Be @('UserAccounts', 'NtpTimeServers')
         $next.Enabled | Should -BeTrue

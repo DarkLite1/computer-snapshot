@@ -1056,6 +1056,26 @@ function Test-ConfigurationHC {
     return $problems.ToArray()
 }
 
+function ConvertTo-ScalarJsonHC {
+    <#
+    .SYNOPSIS
+        Compress a scalar to JSON without PS5.1 escapes for ' < > &.
+    #>
+    param($Value)
+
+    $json = ConvertTo-Json -InputObject $Value -Depth 20 -Compress
+
+    # Skip sequences preceded by an escaped backslash, e.g. \\u0027
+    return [regex]::Replace(
+        $json, '(?<!\\)((?:\\\\)*)\\u(0027|003[cCeE]|0026)',
+        {
+            param($m)
+            $m.Groups[1].Value +
+            [string][char][Convert]::ToInt32($m.Groups[2].Value, 16)
+        }
+    )
+}
+
 function Format-ConfigurationJsonHC {
     <#
     .SYNOPSIS
@@ -1094,7 +1114,7 @@ function Format-ConfigurationJsonHC {
         )
 
         $lines = foreach ($name in $names) {
-            $key = ConvertTo-Json -InputObject ([string]$name) -Compress
+            $key = ConvertTo-ScalarJsonHC -Value ([string]$name)
             $formatParams = @{
                 Value        = $Value.$name
                 Depth        = $Depth + 1
@@ -1139,7 +1159,7 @@ function Format-ConfigurationJsonHC {
         )
     }
 
-    return ConvertTo-Json -InputObject $Value -Depth 20 -Compress
+    return ConvertTo-ScalarJsonHC -Value $Value
 }
 
 function Write-ConfigurationHC {

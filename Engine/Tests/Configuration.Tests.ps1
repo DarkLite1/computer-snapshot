@@ -622,6 +622,19 @@ Describe 'Version 2 configuration' {
         ([IO.File]::ReadAllText($path) | ConvertFrom-Json).SchemaVersion |
             Should -Be 3
     }
+    It 'writes quotes, angle brackets and ampersands unescaped' {
+        $text = "{{password:Password for 'Admin'}} <a> & \u0027 \\u0026"
+        $configuration.Items.UserAccounts = @(
+            [ordered]@{ Name = 'Admin'; Password = $text }
+        )
+        Write-ConfigurationHC $configuration $path
+
+        $json = [IO.File]::ReadAllText($path)
+        $json | Should -Match ([regex]::Escape(
+            "Password for 'Admin'}} <a> & \\u0027 \\\\u0026"))
+        (Read-ConfigurationHC $path $TestDrive).Items.UserAccounts[0].Password |
+            Should -BeExactly $text
+    }
     It ('resolves references from the USB root rather than the current ' +
         'directory') {
         $setParams = @{

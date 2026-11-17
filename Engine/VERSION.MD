@@ -29,6 +29,7 @@ Restore and wizard:
 - Ready-made examples for Remote Desktop, kiosk auto logon, File Explorer and Windows suggestions, and example configurations for a kiosk, office PC, production PC and Remote Desktop.
 - Editor hints for section files in `Shared\` and `Shared\Examples\`.
 - The restart countdown is a setting, adjustable in the wizard; a restart only happens after a successful restore.
+- Add `Start wizard.cmd` for computers where the `Start wizard.lnk` shortcut doesn't work. `Caller.ps1` shows a startup error in a message box, and points to 'Unblock' and 'Extract All' when it runs from a zip or temporary folder.
 
 # Version 2.0
 - Breaking change: one SchemaVersion 2 JSON configuration replaces the old StartScript wrapper and per-item input folders. Runtime does not support the previous format.

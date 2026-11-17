@@ -43,9 +43,13 @@ Each part of a configuration is called a **section**. A restore runs the section
 
 ## 🚀 Quick Start
 
-1. Copy this folder to a USB stick or to a local folder.
-2. Double-click **`Start wizard.lnk`**.
-3. Choose a tab:
+1. **Download** the zip file.
+2. **Right-click** the zip file, choose **Properties**, tick **Unblock** and click **OK**.
+3. Right-click the zip file again and choose **Extract All**. Don't run the wizard from inside the zip. Copy the extracted folder to a USB stick or a local folder if you like.
+4. Double-click **`Start wizard.cmd`**. The shortcut `Start wizard.lnk` does the same, but it depends on the folder Windows starts it in and can fail on some computers.
+5. Choose a tab:
+
+> ⚠️ **Wizard doesn't open?** A message box shows the error. The usual cause is a zip that isn't unblocked or isn't extracted. Repeat steps 2 and 3, and start again.
 
 ### 📤 Export: save this computer
 

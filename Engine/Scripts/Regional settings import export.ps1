@@ -75,10 +75,11 @@ Function Invoke-LanguageCommandHC {
 }
 Function Get-UserLanguageListHC {
     Invoke-LanguageCommandHC -ScriptBlock {
-        Get-WinUserLanguageList | ForEach-Object {
+        # The cmdlet emits the whole list as one object, so enumerate it with foreach
+        foreach ($language in (Get-WinUserLanguageList)) {
             [pscustomobject]@{
-                LanguageTag     = $_.LanguageTag
-                InputMethodTips = [string[]]$_.InputMethodTips
+                LanguageTag     = $language.LanguageTag
+                InputMethodTips = [string[]]$language.InputMethodTips
             }
         }
     }
